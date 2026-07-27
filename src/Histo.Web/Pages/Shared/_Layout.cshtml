@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] — Histopathology System</title>
+    <link rel="stylesheet" href="~/css/Styles.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="site-header">
+        <nav class="site-nav">
+            <span class="site-title">Histopathology System</span>
+            {{!-- TODO Phase 2: Replace VLAHeader.ascx -- inject user identity context from ISessionService --}}
+        </nav>
+    </header>
+
+    <main role="main" class="main-content">
+        @RenderBody()
+    </main>
+
+    <footer class="site-footer">
+        {{!-- TODO: Replace VLAFooter.ascx content --}}
+    </footer>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

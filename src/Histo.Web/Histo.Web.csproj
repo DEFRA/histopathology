@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Histo.Web</RootNamespace>
+    <UserSecretsId>histo-web-dev-secrets</UserSecretsId>
+    <Description>ASP.NET Core Razor Pages web host. Replaces HistopathologySystem (64 ASPX + 8 ASCX).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
+    <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.22.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Histo.Infrastructure\Histo.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

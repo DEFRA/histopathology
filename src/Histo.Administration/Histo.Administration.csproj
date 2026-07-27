@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Phase 1 stub — no source files yet. Implementation begins in Phase 4.1. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Histo.Administration</RootNamespace>
+    <Description>User management and pick-list services. Replaces HistopathologyLib/clsUser, LookupData.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Histo.Infrastructure\Histo.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

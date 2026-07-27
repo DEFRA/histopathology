@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Phase 1 stub — no source files yet. Implementation begins in Phase 3. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Histo.Reporting</RootNamespace>
+    <Description>HTML/PDF report rendering. Replaces 9 Crystal Reports (.rpt) and companion VB classes.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Histo.Infrastructure\Histo.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,30 @@
+/* Histo.Web — stub stylesheet
+ * Phase 5: Replace with full GOV.UK-compliant styles migrated from legacy HistopathologySystem/Styles.css
+ */
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+.site-header {
+    background-color: #003366;
+    color: #ffffff;
+    padding: 0.5rem 1rem;
+}
+
+.site-title {
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+.main-content {
+    padding: 1rem;
+}
+
+.site-footer {
+    background-color: #f0f0f0;
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+}
