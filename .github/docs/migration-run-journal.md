@@ -41,7 +41,7 @@
 | 2 | _(yyyy-MM-dd)_ | 0 | `dotnet-code-refactor` | Pre-conversion cleanup across all 185 VB files | Not Started | — | — | — |
 | 3 | 2025-07-27 | 0 | `testing` | Baseline xUnit tests for `Histo.Core` domain layer — 8 testable logic areas discovered in `clsAnimal`, `clsBatch`, `clsBlock`, `Common.vb` | Done | ISS-008 resolved; test coverage limited to pure-logic layer (no DB until Phase 1; no auth until Phase 2) | Created `src/Histo.Core/`, `tests/Histo.Tests/`, `.github/workflows/ci.yml` — see outputs | [docs/Test-Strategy.md](/docs/Test-Strategy.md), [tests/Histo.Tests/](/tests/Histo.Tests/), [.github/workflows/ci.yml](/.github/workflows/ci.yml) |
 | 4 | 2026-07-27 | 0 | `documentation` | HLD, LLD, 4 ADRs, Runbook — full codebase discovery across 3 projects, 185 VB files | Done | Plaintext SQL credential in Web.config (see ISS-006); no automated tests exist; Crystal Reports GAC-only dependency confirmed | — (documentation only — no code changes) | [docs/HLD.md](/docs/HLD.md), [docs/LLD.md](/docs/LLD.md), [docs/ADR/](/docs/ADR/), [docs/Runbook.md](/docs/Runbook.md) |
-| 5 | _(yyyy-MM-dd)_ | 0 | `intelligent-migration` | Programme plan, risk register, ROI model | Not Started | — | — | — |
+| 5 | 2026-07-27 | 0 | `intelligent-migration` | Programme governance — Intelligent-Migration-Plan, Intelligent-Team-Model, Risk-and-Governance, ROI-and-Budget; anchored to Chaos Report failure patterns; R-001–R-014 risk register; £498K indicative cost model with 42% AI uplift assumption | Done | R-001 (ISS-009 severity confirmed High/High); R-010 key-person risk raised; R-011 Azure admin dependency as critical path blocker | — (documentation only — no code changes) | [docs/Intelligent-Migration-Plan.md](/docs/Intelligent-Migration-Plan.md), [docs/Intelligent-Team-Model.md](/docs/Intelligent-Team-Model.md), [docs/Risk-and-Governance.md](/docs/Risk-and-Governance.md), [docs/ROI-and-Budget.md](/docs/ROI-and-Budget.md) |
 | 6 | _(yyyy-MM-dd)_ | 0 | `requirements-to-scrum-board` | Convert assessment → Azure DevOps / Jira backlog CSV | Not Started | — | — | — |
 | 7 | _(yyyy-MM-dd)_ | 0 | `azure-infra-analyser` | Config analysis → `infra-analysis.json` | Not Started | — | — | — |
 | 8 | _(yyyy-MM-dd)_ | 1 | `identity-migration` | Claims mapping design, role mapping rules | Not Started | — | — | — |
@@ -75,6 +75,7 @@
 | 2 | 2026-07-27 | `documentation` | _(check VS Code Output → GitHub Copilot Chat)_ | — (paste from VS Code Output) | — (paste from VS Code Output) | — (paste from VS Code Output) | — |
 | 3 | 2026-07-27 | `modernise-to-modular-monolith` | _(check VS Code Output → GitHub Copilot Chat)_ | — (paste from VS Code Output) | — (paste from VS Code Output) | — (paste from VS Code Output) | — |
 | 4 | 2025-07-27 | `testing` | _(check VS Code Output → GitHub Copilot Chat)_ | — (paste from VS Code Output) | — (paste from VS Code Output) | — (paste from VS Code Output) | — |
+| 5 | 2026-07-27 | `intelligent-migration` | _(check VS Code Output → GitHub Copilot Chat)_ | — (paste from VS Code Output) | — (paste from VS Code Output) | — (paste from VS Code Output) | — |
 
 **Running total:** `0 tokens`
 
@@ -130,6 +131,8 @@ $grandTotal       = ($totals | Measure-Object -Property total_tokens -Sum).Sum
 | ISS-007 | 2026-07-27 | 0 | `documentation` | `HistopathologySystem/Web.config` | `compilation debug="true"` — debug compilation must be disabled for production | Medium | _(dev name)_ | Open | Set to `false` in production `Web.Release.config` XDT transform |
 | ISS-008 | 2025-07-27 | 0 | `documentation` | `HistopathologySystem/` | No automated tests exist — zero unit/integration test coverage | High | _(dev name)_ | **Resolved** | Phase 0 `testing.agent` run created `src/Histo.Core/` + `tests/Histo.Tests/` + CI workflow. 25 unit tests covering 8 business-logic areas. Integration test scaffold in place (skipped until Phase 1). |
 | ISS-009 | 2026-07-27 | 3 | `modernise-to-modular-monolith` | `Histo.Administration::UserService` | `GetUserByNTLogin` SP expects `DOMAIN\username` format; Entra ID UPN is `user@domain.com` — mapping required | High | _(dev name)_ | Open | Phase 2 task: one-time data migration or SP parameter normalisation — confirm with DB team before Phase 2 begins |
+| ISS-010 | 2026-07-27 | 0 | `intelligent-migration` | Programme | Key-person risk: Sr Dev 1 holds sole institutional knowledge of VB.NET business rules — no redundancy | High | Delivery Lead | Open | Ensure all business rules are in `docs/LLD.md` + named unit tests before Sr Dev 1 begins conversion; pair-review policy enforced |
+| ISS-011 | 2026-07-27 | 0 | `intelligent-migration` | Programme — Phase 2 entry criterion | Azure admin must create Entra ID app registration and confirm group IDs before Phase 2 can begin — external dependency on critical path | High | Delivery Lead | Open | Pre-schedule Azure admin engagement during Phase 1; track as critical path item; escalate to Executive Sponsor if blocked |
 
 ---
 
