@@ -23,7 +23,7 @@
 |-------|-------------|--------|--------|---------|-----------|
 | 0 | Foundation & Safety Net | `testing`, `documentation`, `intelligent-migration`, `requirements-to-scrum-board`, `azure-infra-analyser` | In Progress | 2026-07-27 | — |
 | 1 | Authentication Migration | `identity-migration` | Not Started | — | — |
-| 2 | Reporting Migration | `pdf-migration-orchestrator`, `pdf-discovery`, `pdf-reference-generator`, `pdf-infrastructure`, `pdf-report-modernizer`, `pdf-report-converter`, `pdf-validation` | Not Started | — | — |
+| 2 | Reporting Migration | `pdf-report-modernizer`, `pdf-reference-generator`, `pdf-validation` | Not Started | — | — |
 | 3 | Platform Migration (VB→C#/.NET 10) | `dotnet-code-refactor`, `vbnet-to-csharp-net10-mvc-modernizer`, `modernise-to-modular-monolith` | In Progress | 2026-07-27 | — |
 | 4 | UI Migration (WebForms → Razor Pages) | `vbnet-to-csharp-net10-mvc-modernizer`, `ui-implementation` | Not Started | — | — |
 | 5 | Infrastructure & DevOps | `azure-infra-planner`, `azure-infra-implementer`, `devops-pipeline-modernizer` | Not Started | — | — |
@@ -45,11 +45,8 @@
 | 6 | _(yyyy-MM-dd)_ | 0 | `requirements-to-scrum-board` | Convert assessment → Azure DevOps / Jira backlog CSV | Not Started | — | — | — |
 | 7 | _(yyyy-MM-dd)_ | 0 | `azure-infra-analyser` | Config analysis → `infra-analysis.json` | Not Started | — | — | — |
 | 8 | _(yyyy-MM-dd)_ | 1 | `identity-migration` | Claims mapping design, role mapping rules | Not Started | — | — | — |
-| 9 | _(yyyy-MM-dd)_ | 2 | `pdf-discovery` | Fingerprint all 9 Crystal Reports | Not Started | — | — | — |
-| 10 | _(yyyy-MM-dd)_ | 2 | `pdf-infrastructure` | `IPlaywrightPdfService`, layout, smoke test | Not Started | — | — | — |
-| 11 | _(yyyy-MM-dd)_ | 2 | `pdf-report-modernizer` | Convert 7 low/medium complexity reports | Not Started | — | — | — |
-| 12 | _(yyyy-MM-dd)_ | 2 | `pdf-report-converter` | `HistologyReport` + `HistologySubReport` (high complexity) | Not Started | — | — | — |
-| 13 | _(yyyy-MM-dd)_ | 2 | `pdf-validation` | RMSE pixel diff + structural checks for all 9 reports | Not Started | — | — | — |
+| 9 | _(yyyy-MM-dd)_ | 2 | `pdf-report-modernizer` | All 9 Crystal Reports (.rpt) → Razor HTML + Dapper wiring (3-stage ReportDefinition.json pipeline): Stage 1 parse, Stage 2 templates, Stage 3 wire-up | Not Started | — | — | — |
+| 10 | _(yyyy-MM-dd)_ | 2 | `pdf-validation` | RMSE pixel diff + structural checks for all 9 reports vs Phase 0 reference PDFs | Not Started | — | — | — |
 | 14 | _(yyyy-MM-dd)_ | 3 | `vbnet-to-csharp-net10-mvc-modernizer` | Full VB.NET → C# 14 conversion, 185 files | Not Started | — | — | — |
 | 15 | 2026-07-27 | 3 | `modernise-to-modular-monolith` | Target Architecture, Migration Plan, ADR-005 — Dapper/SP decision gate (Option A confirmed by user) | Done | GetUserByNTLogin SP called with Entra UPN may need NT login format mapping (see ISS-009) | — (planning only — no code changes) | [docs/Target-Architecture.md](/docs/Target-Architecture.md), [docs/Migration-Plan.md](/docs/Migration-Plan.md), [docs/ADR/ADR-005-data-access-dapper-stored-procedures.md](/docs/ADR/ADR-005-data-access-dapper-stored-procedures.md) |
 | 16 | _(yyyy-MM-dd)_ | 4 | `ui-implementation` | ASCX controls → `_Layout.cshtml` + Partial Views | Not Started | — | — | — |

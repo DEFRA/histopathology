@@ -23,7 +23,7 @@
 Phase 0 — Foundation & Safety Net          [PREREQUISITE — MUST COMPLETE FIRST]
 Phase 1 — Solution Scaffold + Infrastructure Module
 Phase 2 — Authentication Migration
-Phase 3 — Reporting Migration (Crystal → Playwright)
+Phase 3 — Reporting Migration (Crystal Reports → PDF)
 Phase 4 — Module-by-Module Domain + Repository Layer
 Phase 5 — UI Migration (WebForms → Razor Pages)
 Phase 6 — Infrastructure, CI/CD, and Cutover
@@ -155,9 +155,9 @@ Remove `Microsoft.Identity.Web` wiring from `Program.cs`. Legacy app continues r
 
 ---
 
-## Phase 3 — Reporting Migration (Crystal → Playwright)
+## Phase 3 — Reporting Migration (Crystal Reports → PDF)
 
-**Purpose:** Replace all 9 Crystal Reports with Playwright HTML/PDF rendering. Can run in parallel with Phase 2.
+**Purpose:** Replace all 9 Crystal Reports with HTML/PDF rendering via `pdf-report-modernizer.agent`. Can run in parallel with Phase 2.
 
 ### Entry criteria
 - Phase 0 reference PDFs committed
@@ -165,15 +165,16 @@ Remove `Microsoft.Identity.Web` wiring from `Program.cs`. Legacy app continues r
 
 ### Change set
 
-Run `pdf-migration-orchestrator.agent` pipeline:
+Run `pdf-report-modernizer.agent` — the Civica-specific Crystal Reports moderniser (covers BSE, Histo, D2R2, PTLIMS). This is a self-contained, three-stage pipeline driven by `ReportDefinition.json`.
 
-| Step | Agent | Output |
+| Stage | What the agent does | Output |
 |---|---|---|
-| Discovery | `pdf-discovery.agent` | `report-inventory.json` |
-| Infrastructure | `pdf-infrastructure.agent` | `IPlaywrightPdfService`, `_PdfLayout.cshtml`, smoke test |
-| Convert 7 reports (low/medium) | `pdf-report-modernizer.agent` | Razor views + ViewModels for 7 reports |
-| Convert `HistologyReport` + sub-report (high) | `pdf-report-converter.agent` | Manual ViewModel design + Razor views |
-| Validate all 9 | `pdf-validation.agent` | RMSE pixel diff vs reference PDFs |
+| Stage 1 — Parse | Reads all 9 `.rpt` files; generates `ReportDefinition.json` with field mappings, sub-report links, and SP bindings | `docs/pdf-references/ReportDefinition.json` |
+| Stage 2 — Template | Generates Razor HTML templates + CSS for each report; handles sub-report nesting for `HistologyReport` | `src/Histo.Reporting/Views/Reports/*.cshtml` |
+| Stage 3 — Wire-up | Generates C# service/controller code; injects Dapper calls replacing XSD DataSet bindings; wires PDF rendering service | `src/Histo.Reporting/Services/`, `src/Histo.Reporting/Controllers/` |
+| Validation | Runs RMSE pixel diff against Phase 0 reference PDFs | Pass/fail report per `.rpt` file |
+
+> **Note on `HistologyReport` + `HistologySubReport`:** The sub-report nesting requires manual ViewModel design review before Stage 3 completes. The agent flags this as a manual review point; Sr Dev 1 reviews the generated ViewModel before committing.
 
 All report code lives in `src/Histo.Reporting/`.
 
@@ -282,7 +283,7 @@ All objects that were stored as DataTable/DataSet in session are converted to ty
 ### Exit criteria (per batch)
 - All converted pages render correctly in test environment
 - `[Authorize]` policies enforce same access rules as legacy `CheckPermissions()`
-- Playwright E2E tests pass for converted pages
+- Automated E2E tests pass for converted pages
 
 ### Rollback (per batch)
 Legacy ASPX pages remain deployable from the legacy solution. The new Razor Pages are in a separate project.
@@ -295,7 +296,7 @@ Legacy ASPX pages remain deployable from the legacy solution. The new Razor Page
 
 ### Entry criteria
 - All Phase 5 batches complete
-- All Playwright E2E tests pass
+- All E2E tests pass
 - Auth equivalence validated
 
 ### Change set
@@ -315,7 +316,7 @@ Legacy ASPX pages remain deployable from the legacy solution. The new Razor Page
 
 3. **Cutover:**
    - Deploy to App Service deployment slot (`staging`)
-   - Run full E2E Playwright suite against staging
+   - Run full E2E test suite against staging
    - Azure admin executes managed identity SQL grant
    - Traffic swap: `staging` → `production` slot
    - Monitor Application Insights for 30 minutes post-swap
@@ -339,7 +340,7 @@ Swap deployment slot back to legacy App Service. Legacy IIS remains available fo
 | Stored procedure result set changes between environments | Low | High | Compare SP output against Phase 0 reference data before any deployment |
 | Entra ID group IDs not matching legacy role groups | Medium | High | Auth equivalence test suite in Phase 2 validates role mapping before Phase 5 |
 | Session POCOs not JSON-serialisable | Medium | Medium | All POCO classes validated in Phase 4 tests before session integration |
-| Playwright PDF pixel diff failures on `HistologyReport` sub-report | High | Medium | Manual ViewModel design for sub-report; acceptance threshold 5% RMSE |
+| PDF pixel diff failures on `HistologyReport` sub-report | High | Medium | Manual ViewModel design for sub-report; acceptance threshold 5% RMSE |
 | `GetUserByNTLogin` SP expects Windows NT login format; Entra UPN differs | High | High | Phase 2 task: map Entra UPN → existing NT login in user table (one-time data migration or SP parameter update in agreement with DB team) |
 | UpdatePanel replacement incomplete for complex pages | Medium | Medium | HTMX standardisation; each UpdatePanel usage inventoried in Phase 5.3 before implementation |
 | Redis session connection failure | Low | High | Fallback to in-memory session in dev; Redis health check in CI smoke test |

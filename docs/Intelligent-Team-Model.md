@@ -128,7 +128,7 @@ AI tools act as **accelerators and drafting engines — not decision authorities
 | 0 | `documentation.agent`, `testing.agent`, `pdf-reference-generator.agent` | Summarise HLD/LLD for exec review | Architect reviews all generated docs; QA reviews test suite |
 | 1 | `dotnet-framework-upgrade.agent` (project migration) | — | Architect reviews solution structure; Sr Dev 2 reviews scaffold |
 | 2 | `identity-migration.agent` | Summarise auth design for stakeholders | Architect reviews auth wiring; Sr Dev 1 validates claims mapping |
-| 3 | `pdf-migration-orchestrator.agent` pipeline | — | QA validates RMSE diffs; Sr Dev 1 reviews ViewModel design |
+| 3 | `pdf-report-modernizer.agent` (Civica Crystal Reports → PDF pipeline; self-contained 3-stage) | — | QA validates RMSE pixel diffs; Sr Dev 1 reviews ViewModel for `HistologyReport` sub-report |
 | 4 | `dotnet-code-refactor.agent` per module | — | Sr Dev 1 validates every domain logic translation |
 | 5 | `ui-implementation.agent` per batch | — | QA validates Playwright E2E; end-user UAT sign-off per batch |
 | 6 | `azure-infra-planner.agent`, `azure-infra-implementer.agent`, `devops-pipeline-modernizer.agent` | Prepare cutover communications | Architect reviews Bicep what-if before production deployment |

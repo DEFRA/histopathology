@@ -13,7 +13,7 @@
 
 The Histopathology System is a business-critical ASP.NET WebForms application running on .NET Framework 4.0 / IIS / Windows Server. It manages the complete lifecycle of pathology submissions — from customer receipt through histology processing, reporting, and archiving — for Crown Commercial Property laboratory operations. It has been in continuous use with no significant architectural change.
 
-The migration programme transitions the system to a **C# 14 / .NET 10 Modular Monolith** deployed as a container on **Azure App Service**, with **Azure Entra ID** authentication, **Dapper + stored procedures** data access, **Playwright-based PDF reports**, and **Application Insights** observability.
+The migration programme transitions the system to a **C# 14 / .NET 10 Modular Monolith** deployed as a container on **Azure App Service**, with **Azure Entra ID** authentication, **Dapper + stored procedures** data access, **HTML/PDF reports** (via `pdf-report-modernizer.agent`), and **Application Insights** observability.
 
 This document defines the programme structure — objectives, roadmap, team, governance, and success criteria — to maximise delivery success probability against the industry-standard failure patterns identified in the Chaos Report.
 
@@ -42,12 +42,12 @@ This document defines the programme structure — objectives, roadmap, team, gov
 |---|---|---|
 | O-1 | Eliminate .NET Framework 4.0 dependency | New solution compiles and runs on .NET 10 with zero legacy framework references |
 | O-2 | Replace Windows Authentication with Entra ID | All three role groups (`Customer`, `Histopathology User`, `Maintenance`) sign in via Entra ID; zero access widening |
-| O-3 | Replace Crystal Reports with Playwright PDF | All 9 reports pass RMSE pixel diff validation against Phase 0 reference baselines |
+| O-3 | Replace Crystal Reports with HTML/PDF rendering | All 9 reports pass RMSE pixel diff validation against Phase 0 reference baselines |
 | O-4 | Eliminate IIS / Windows Server hosting dependency | Application deploys and runs correctly on Azure App Service Linux container |
 | O-5 | Achieve automated test coverage of all domain logic | Histo.Tests CI suite passes green; critical business rules have named unit test cases |
 | O-6 | Remove plaintext SQL credential from source control | `Web.config` credential eliminated; replaced with Managed Identity + Key Vault reference |
 | O-7 | Establish observable, supportable production platform | Application Insights exception telemetry active; structured logging via Serilog; health check endpoint returns 200 |
-| O-8 | Preserve complete functional equivalence | Playwright E2E baseline suite passes against the migrated application before production cutover |
+| O-8 | Preserve complete functional equivalence | Automated E2E baseline suite passes against the migrated application before production cutover |
 
 ---
 
@@ -64,7 +64,7 @@ The Chaos Report (Standish Group) identifies the following as the most common ca
 | **Unrealistic expectations** | Medium | This plan provides phase-level estimates, not a single delivery date. Each phase has independent exit criteria. Stakeholders review estimates at each gate, not just at the start. |
 | **Changing requirements** | Medium | The "database is frozen" principle locks the scope anchor. Feature changes are deferred to a post-migration backlog and must not enter any active migration phase. |
 | **Inadequate planning** | Low (mitigated) | Six-phase roadmap with explicit entry criteria, exit criteria, rollback strategy, and dependency mapping per phase. No phase begins without human approval. |
-| **Unreliable technology** | Low (mitigated) | Technology choices (Dapper, Razor Pages, HTMX, Playwright PDF) are production-proven and specifically selected for compatibility with the .NET 10 stack and the Azure App Service hosting model. |
+| **Unreliable technology** | Low (mitigated) | Technology choices (Dapper, Razor Pages, HTMX, HTML/PDF rendering) are production-proven and specifically selected for compatibility with the .NET 10 stack and the Azure App Service hosting model. |
 
 ---
 
@@ -136,13 +136,13 @@ Safety Net    + Infra     Migration    Modules    Migration   to Azure
 
 ---
 
-### Phase 3 — Reporting Migration (Crystal → Playwright)
+### Phase 3 — Reporting Migration (Crystal Reports → PDF)
 
 **Duration:** 4 weeks (runs in parallel with Phase 2)  
-**Purpose:** Replace all 9 Crystal Reports with Playwright HTML/PDF rendering.
+**Purpose:** Replace all 9 Crystal Reports with HTML/PDF rendering via `pdf-report-modernizer.agent`.
 
 **Key deliverables:**
-- `IPlaywrightPdfService` + base layout
+- PDF rendering service + base layout
 - 7 low/medium complexity reports converted
 - `HistologyReport` + `HistologySubReport` converted (manual ViewModel design required)
 - All 9 reports pass RMSE pixel diff validation against Phase 0 reference PDFs
@@ -180,7 +180,7 @@ Safety Net    + Infra     Migration    Modules    Migration   to Azure
 5. 6 report viewer pages (1 week)
 6. Maintenance and admin pages (1 week)
 
-**Go/no-go gate per batch:** Playwright E2E tests pass for converted pages. `[Authorize]` policies enforce same access rules as legacy `CheckPermissions()`.
+**Go/no-go gate per batch:** Automated E2E tests pass for converted pages. `[Authorize]` policies enforce same access rules as legacy `CheckPermissions()`.
 
 ---
 
@@ -224,7 +224,7 @@ The following steps **cannot be automated** and require human action before the 
 | 2 | All three role groups sign in via Entra ID; no access widening |
 | 3 | All 9 reports pass RMSE validation against Phase 0 reference PDFs |
 | 4 | All domain integration tests pass against `Histology` database |
-| 5 | All 64 pages render correctly; Playwright E2E suite green |
+| 5 | All 64 pages render correctly; automated E2E suite green |
 | 6 | Production smoke test passes; zero Application Insights exceptions after 30-minute soak |
 
 ---
