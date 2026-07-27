@@ -24,7 +24,7 @@
 | 0 | Foundation & Safety Net | `testing`, `documentation`, `intelligent-migration`, `requirements-to-scrum-board`, `azure-infra-analyser` | In Progress | 2026-07-27 | — |
 | 1 | Authentication Migration | `identity-migration` | Not Started | — | — |
 | 2 | Reporting Migration | `pdf-migration-orchestrator`, `pdf-discovery`, `pdf-reference-generator`, `pdf-infrastructure`, `pdf-report-modernizer`, `pdf-report-converter`, `pdf-validation` | Not Started | — | — |
-| 3 | Platform Migration (VB→C#/.NET 10) | `dotnet-code-refactor`, `vbnet-to-csharp-net10-mvc-modernizer`, `modernise-to-modular-monolith` | Not Started | — | — |
+| 3 | Platform Migration (VB→C#/.NET 10) | `dotnet-code-refactor`, `vbnet-to-csharp-net10-mvc-modernizer`, `modernise-to-modular-monolith` | In Progress | 2026-07-27 | — |
 | 4 | UI Migration (WebForms → Razor Pages) | `vbnet-to-csharp-net10-mvc-modernizer`, `ui-implementation` | Not Started | — | — |
 | 5 | Infrastructure & DevOps | `azure-infra-planner`, `azure-infra-implementer`, `devops-pipeline-modernizer` | Not Started | — | — |
 | 6 | Testing & Cutover | `dotnet-test-automation-and-quality-agent`, `playwright-tester-agent`, `testing` | Not Started | — | — |
@@ -51,7 +51,7 @@
 | 12 | _(yyyy-MM-dd)_ | 2 | `pdf-report-converter` | `HistologyReport` + `HistologySubReport` (high complexity) | Not Started | — | — | — |
 | 13 | _(yyyy-MM-dd)_ | 2 | `pdf-validation` | RMSE pixel diff + structural checks for all 9 reports | Not Started | — | — | — |
 | 14 | _(yyyy-MM-dd)_ | 3 | `vbnet-to-csharp-net10-mvc-modernizer` | Full VB.NET → C# 14 conversion, 185 files | Not Started | — | — | — |
-| 15 | _(yyyy-MM-dd)_ | 3 | `modernise-to-modular-monolith` | ADO.NET DataSet → Dapper POCO decision gate | Not Started | — | — | — |
+| 15 | 2026-07-27 | 3 | `modernise-to-modular-monolith` | Target Architecture, Migration Plan, ADR-005 — Dapper/SP decision gate (Option A confirmed by user) | Done | GetUserByNTLogin SP called with Entra UPN may need NT login format mapping (see ISS-009) | — (planning only — no code changes) | [docs/Target-Architecture.md](/docs/Target-Architecture.md), [docs/Migration-Plan.md](/docs/Migration-Plan.md), [docs/ADR/ADR-005-data-access-dapper-stored-procedures.md](/docs/ADR/ADR-005-data-access-dapper-stored-procedures.md) |
 | 16 | _(yyyy-MM-dd)_ | 4 | `ui-implementation` | ASCX controls → `_Layout.cshtml` + Partial Views | Not Started | — | — | — |
 | 17 | _(yyyy-MM-dd)_ | 4 | `ui-implementation` | 18 simple display pages → Razor Pages | Not Started | — | — | — |
 | 18 | _(yyyy-MM-dd)_ | 4 | `ui-implementation` | 28 CRUD pages → Razor Pages | Not Started | — | — | — |
@@ -73,6 +73,7 @@
 |---|------|-------|------------------|---------------|-------------------|--------------|------------------|
 | 1 | _(yyyy-MM-dd)_ | _(agent name)_ | _(debug log filename)_ | — | — | — | — |
 | 2 | 2026-07-27 | `documentation` | _(check VS Code Output → GitHub Copilot Chat)_ | — (paste from VS Code Output) | — (paste from VS Code Output) | — (paste from VS Code Output) | — |
+| 3 | 2026-07-27 | `modernise-to-modular-monolith` | _(check VS Code Output → GitHub Copilot Chat)_ | — (paste from VS Code Output) | — (paste from VS Code Output) | — (paste from VS Code Output) | — |
 
 **Running total:** `0 tokens`
 
@@ -127,6 +128,7 @@ $grandTotal       = ($totals | Measure-Object -Property total_tokens -Sum).Sum
 | ISS-006 | 2026-07-27 | 0 | `documentation` | `HistopathologySystem/Web.config` | Plaintext SQL credential in `DBConnectionString` (`User Id=HistologyUser;Password=HistologyUser9245`) — must not be committed and must be replaced with Managed Identity before Azure deployment | High | _(dev name)_ | Open | Replace with Managed Identity + Key Vault reference (per azure-infra.instructions.md Section 3) |
 | ISS-007 | 2026-07-27 | 0 | `documentation` | `HistopathologySystem/Web.config` | `compilation debug="true"` — debug compilation must be disabled for production | Medium | _(dev name)_ | Open | Set to `false` in production `Web.Release.config` XDT transform |
 | ISS-008 | 2026-07-27 | 0 | `documentation` | `HistopathologySystem/` | No automated tests exist — zero unit/integration test coverage | High | _(dev name)_ | Open | Phase 0 gate: run `testing.agent` to create baseline xUnit tests before any migration work begins |
+| ISS-009 | 2026-07-27 | 3 | `modernise-to-modular-monolith` | `Histo.Administration::UserService` | `GetUserByNTLogin` SP expects `DOMAIN\username` format; Entra ID UPN is `user@domain.com` — mapping required | High | _(dev name)_ | Open | Phase 2 task: one-time data migration or SP parameter normalisation — confirm with DB team before Phase 2 begins |
 
 ---
 
