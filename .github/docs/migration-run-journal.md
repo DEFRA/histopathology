@@ -8,12 +8,12 @@
 
 ## How to Use This Journal
 
-1. **Before each agent run** — create a new row in [Run Log](#run-log) with `In Progress` status and note the VS Code debug session log filename (see [Token Usage](#token-usage) section for how to find it).
-2. **After each agent run** — update status, paste token counts from the VS Code Output panel → **GitHub Copilot Chat** channel, and link to the agent's output report.
+1. **Before each agent run** — note the current time, create a new row in [Run Log](#run-log) with `In Progress` status, and record the **Start Time** in [Session Metrics](#session-metrics).
+2. **After each agent run** — note the finish time, update Run Log status, fill in **End Time** and **Duration** in Session Metrics, and link to the agent's output report.
 3. **Any issue that is not auto-fixed** — add a row to [Open Issues](#open-issues).
 4. **Any architectural or config decision made** — add a row to [Decision Log](#decision-log).
 
-> **Token values:** In VS Code, open **Output** panel → select **GitHub Copilot Chat** from the dropdown → scroll to the end of the session. Copy the `prompt_tokens`, `completion_tokens`, and `total_tokens` values. Alternatively, use the PowerShell script in [Token Extraction Script](#token-extraction-script) to parse the debug log file directly.
+> **Duration tip:** Use the PowerShell one-liner in [Session Metrics](#session-metrics) — run it before starting the agent, then re-run after it finishes to print elapsed minutes automatically.
 
 ---
 
@@ -22,7 +22,7 @@
 | Phase | Description | Agents | Status | Started | Completed |
 |-------|-------------|--------|--------|---------|-----------|
 | 0 | Foundation & Safety Net | `testing`, `documentation`, `intelligent-migration`, `requirements-to-scrum-board`, `azure-infra-analyser` | In Progress | 2026-07-27 | — |
-| 1 | Authentication Migration | `identity-migration` | Not Started | — | — |
+| 1 | Authentication Migration | `identity-migration` | **In Progress** | 2026-07-27 | — |
 | 2 | Reporting Migration | `pdf-report-modernizer`, `pdf-reference-generator`, `pdf-validation` | Not Started | — | — |
 | 3 | Platform Migration (VB→C#/.NET 10) | `dotnet-code-refactor`, `vbnet-to-csharp-net10-mvc-modernizer`, `modernise-to-modular-monolith` | In Progress | 2026-07-27 | — |
 | 4 | UI Migration (WebForms → Razor Pages) | `vbnet-to-csharp-net10-mvc-modernizer`, `ui-implementation` | Not Started | — | — |
@@ -44,7 +44,7 @@
 | 5 | 2026-07-27 | 0 | `intelligent-migration` | Programme governance — Intelligent-Migration-Plan, Intelligent-Team-Model, Risk-and-Governance, ROI-and-Budget; anchored to Chaos Report failure patterns; R-001–R-014 risk register; £498K indicative cost model with 42% AI uplift assumption | Done | R-001 (ISS-009 severity confirmed High/High); R-010 key-person risk raised; R-011 Azure admin dependency as critical path blocker | — (documentation only — no code changes) | [docs/Intelligent-Migration-Plan.md](/docs/Intelligent-Migration-Plan.md), [docs/Intelligent-Team-Model.md](/docs/Intelligent-Team-Model.md), [docs/Risk-and-Governance.md](/docs/Risk-and-Governance.md), [docs/ROI-and-Budget.md](/docs/ROI-and-Budget.md) |
 | 6 | _(yyyy-MM-dd)_ | 0 | `requirements-to-scrum-board` | Convert assessment → Azure DevOps / Jira backlog CSV | Not Started | — | — | — |
 | 7 | _(yyyy-MM-dd)_ | 0 | `azure-infra-analyser` | Config analysis → `infra-analysis.json` | Not Started | — | — | — |
-| 8 | _(yyyy-MM-dd)_ | 1 | `identity-migration` | Claims mapping design, role mapping rules | Not Started | — | — | — |
+| 8 | 2026-07-27 | 1 | `implementation` | Phase 1 — Solution Scaffold + Infrastructure Module: `HistopathologySystem.slnx`, `src/Histo.Infrastructure/` (IDbConnectionFactory, SqlConnectionFactory, IAppLogger, AppLogger, AppOptions), `src/Histo.Web/` stub (Program.cs, health endpoint, _Layout.cshtml, appsettings.json), 6 domain module stubs (Submissions, Histology, QC, Reporting, AuditLog, Administration), 8 new tests (SqlConnectionFactoryTests, AppOptionsTests) | Done | No issues — all 78 tests pass; `Histo.Web` and `Histo.Infrastructure` build green | Created all `src/` project stubs under existing `src/` folder per user instruction | [src/Histo.Infrastructure/](/src/Histo.Infrastructure/), [src/Histo.Web/](/src/Histo.Web/), [HistopathologySystem.slnx](/HistopathologySystem.slnx) |
 | 9 | _(yyyy-MM-dd)_ | 2 | `pdf-report-modernizer` | All 9 Crystal Reports (.rpt) → Razor HTML + Dapper wiring (3-stage ReportDefinition.json pipeline): Stage 1 parse, Stage 2 templates, Stage 3 wire-up | Not Started | — | — | — |
 | 10 | _(yyyy-MM-dd)_ | 2 | `pdf-validation` | RMSE pixel diff + structural checks for all 9 reports vs Phase 0 reference PDFs | Not Started | — | — | — |
 | 14 | _(yyyy-MM-dd)_ | 3 | `vbnet-to-csharp-net10-mvc-modernizer` | Full VB.NET → C# 14 conversion, 185 files | Not Started | — | — | — |
@@ -61,55 +61,36 @@
 
 ---
 
-## Token Usage
+## Session Metrics
 
-> Paste values from the **VS Code Output panel → GitHub Copilot Chat** after each agent session ends.  
-> To open: `Ctrl+Shift+U` → select **GitHub Copilot Chat** in the dropdown → scroll to the bottom of the session output.
+> Record start and end time for every agent run. Duration is calculated automatically by the script below.
 
-| # | Date | Agent | Session Log File | Prompt Tokens | Completion Tokens | Total Tokens | Cumulative Total |
-|---|------|-------|------------------|---------------|-------------------|--------------|------------------|
-| 1 | _(yyyy-MM-dd)_ | _(agent name)_ | _(debug log filename)_ | — | — | — | — |
-| 2 | 2026-07-27 | `documentation` | _(check VS Code Output → GitHub Copilot Chat)_ | — (paste from VS Code Output) | — (paste from VS Code Output) | — (paste from VS Code Output) | — |
-| 3 | 2026-07-27 | `modernise-to-modular-monolith` | _(check VS Code Output → GitHub Copilot Chat)_ | — (paste from VS Code Output) | — (paste from VS Code Output) | — (paste from VS Code Output) | — |
-| 4 | 2025-07-27 | `testing` | _(check VS Code Output → GitHub Copilot Chat)_ | — (paste from VS Code Output) | — (paste from VS Code Output) | — (paste from VS Code Output) | — |
-| 5 | 2026-07-27 | `intelligent-migration` | _(check VS Code Output → GitHub Copilot Chat)_ | — (paste from VS Code Output) | — (paste from VS Code Output) | — (paste from VS Code Output) | — |
+| # | Date | Agent | Start Time | End Time | Duration (mins) | Notes |
+|---|------|-------|------------|----------|-----------------|-------|
+| 1 | _(yyyy-MM-dd)_ | _(agent name)_ | _(HH:mm)_ | _(HH:mm)_ | — | — |
+| 2 | 2026-07-27 | `documentation` | 10:56 | 11:39 | **~43** | File timestamps: HLD.md created 10:56, all docs last-modified 11:39 |
+| 3 | 2026-07-27 | `modernise-to-modular-monolith` | 12:05 | 12:14 | **~9** | File timestamps: Target-Architecture.md created 12:05, modified 12:14 |
+| 4 | 2026-07-27 | `testing` | 12:29 | 12:44 | **~15** | File timestamps: Test-Strategy.md created 12:29, modified 12:44 |
+| 5 | 2026-07-27 | `intelligent-migration` | 12:49 | 12:55 | **~6** | File timestamps: Intelligent-Migration-Plan.md 12:49, ROI-and-Budget.md last-modified 12:55 |
+| 6 | 2026-07-27 | `implementation` | 14:35 | 14:38 | **~10** | File timestamps: slnx + Infrastructure created 14:35–14:36, test files created 14:37–14:38; build+test run follows |
 
-**Running total:** `0 tokens`
+### Duration Timer Script
 
-### Token Extraction Script
-
-Run this PowerShell script after each session to extract token counts from the VS Code debug log. The debug log folder path is fixed for this workspace:
+Run this **before** starting the agent to capture the start time. When the agent finishes, run it again — it prints the elapsed duration in minutes:
 
 ```powershell
-# Path to your VS Code Copilot debug logs for this workspace
-$debugLogDir = "C:\Users\sd000106\AppData\Roaming\Code\User\workspaceStorage\fa3481503911503d7c4240ff8145f7e0\GitHub.copilot-chat\debug-logs"
+# Step 1 — Run BEFORE starting the agent (saves start time to $agentStart)
+$agentStart = Get-Date
+Write-Host "Timer started at: $($agentStart.ToString('HH:mm:ss'))"
 
-# List available session log files (most recent first)
-Get-ChildItem $debugLogDir -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 10 Name, LastWriteTime
-
-# --- After identifying your session folder, run this to sum tokens: ---
-# Replace the session folder name below with the one from the listing above
-$sessionFolder = "$debugLogDir\<your-session-folder-name>"
-
-$totals = Get-ChildItem $sessionFolder -Filter "*.json" -Recurse |
-    ForEach-Object {
-        try {
-            $json = Get-Content $_.FullName -Raw | ConvertFrom-Json -ErrorAction Stop
-            if ($json.usage) { $json.usage }
-        } catch { $null }
-    } |
-    Where-Object { $_ -ne $null }
-
-$promptTotal      = ($totals | Measure-Object -Property prompt_tokens -Sum).Sum
-$completionTotal  = ($totals | Measure-Object -Property completion_tokens -Sum).Sum
-$grandTotal       = ($totals | Measure-Object -Property total_tokens -Sum).Sum
-
-[PSCustomObject]@{
-    Prompt_Tokens     = $promptTotal
-    Completion_Tokens = $completionTotal
-    Total_Tokens      = $grandTotal
-} | Format-Table -AutoSize
+# Step 2 — Run AFTER the agent finishes (calculates elapsed time)
+$agentEnd = Get-Date
+$elapsed  = [math]::Round(($agentEnd - $agentStart).TotalMinutes, 1)
+Write-Host "Agent finished at : $($agentEnd.ToString('HH:mm:ss'))"
+Write-Host "Elapsed duration  : $elapsed minutes"
 ```
+
+> **Tip:** Keep a PowerShell terminal open for the duration of each agent run. `$agentStart` persists in the session as long as the terminal is not closed or the variable is not overwritten.
 
 ---
 
