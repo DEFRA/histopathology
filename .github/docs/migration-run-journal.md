@@ -25,7 +25,7 @@
 | 1 | Authentication Migration | `identity-migration` | **In Progress** | 2026-07-27 | — |
 | 2 | Reporting Migration | `pdf-report-modernizer`, `pdf-reference-generator`, `pdf-validation` | Not Started | — | — |
 | 3 | Platform Migration (VB→C#/.NET 10) | `dotnet-code-refactor`, `vbnet-to-csharp-net10-mvc-modernizer`, `modernise-to-modular-monolith` | In Progress | 2026-07-27 | — |
-| 4 | UI Migration (WebForms → Razor Pages) | `vbnet-to-csharp-net10-mvc-modernizer`, `ui-implementation` | Not Started | — | — |
+| 4 | **Domain + Repository Modules** | `implementation` | **Complete** | 2026-07-29 | 2026-07-29 |
 | 5 | Infrastructure & DevOps | `azure-infra-planner`, `azure-infra-implementer`, `devops-pipeline-modernizer` | Not Started | — | — |
 | 6 | Testing & Cutover | `dotnet-test-automation-and-quality-agent`, `playwright-tester-agent`, `testing` | Not Started | — | — |
 
@@ -45,6 +45,7 @@
 | 6 | _(yyyy-MM-dd)_ | 0 | `requirements-to-scrum-board` | Convert assessment → Azure DevOps / Jira backlog CSV | Not Started | — | — | — |
 | 7 | _(yyyy-MM-dd)_ | 0 | `azure-infra-analyser` | Config analysis → `infra-analysis.json` | Not Started | — | — | — |
 | 8 | 2026-07-27 | 1 | `implementation` | Phase 1 — Solution Scaffold + Infrastructure Module: `HistopathologySystem.slnx`, `src/Histo.Infrastructure/` (IDbConnectionFactory, SqlConnectionFactory, IAppLogger, AppLogger, AppOptions), `src/Histo.Web/` stub (Program.cs, health endpoint, _Layout.cshtml, appsettings.json), 6 domain module stubs (Submissions, Histology, QC, Reporting, AuditLog, Administration), 8 new tests (SqlConnectionFactoryTests, AppOptionsTests) | Done | No issues — all 78 tests pass; `Histo.Web` and `Histo.Infrastructure` build green | Created all `src/` project stubs under existing `src/` folder per user instruction | [src/Histo.Infrastructure/](/src/Histo.Infrastructure/), [src/Histo.Web/](/src/Histo.Web/), [HistopathologySystem.slnx](/HistopathologySystem.slnx) |
+| 25 | 2026-07-29 | 4 | `implementation` | **Phase 4 — Domain and Repository Modules (all 5 sub-phases):** Sub-phase 4.1 `Histo.Administration` (User model, IUserRepository/LookupRepository + Dapper impls, UserService/LookupService); Sub-phase 4.2 `Histo.AuditLog` (AuditLogEntry, IAuditLogRepository + multi-SP fan-out impl, AuditLogService); Sub-phase 4.3 `Histo.QualityControl` (QCNote + rowstamp concurrency, IQCNoteRepository + return-value concurrency detection, QCNoteService with QCNoteConcurrencyException propagation); Sub-phase 4.4 `Histo.Histology` (Block + BlockStatus, HistologyRef, IBlockRepository/IHistologyRepository + Dapper impls, BlockService/HistologyRefService with BlockHelpers delegation); Sub-phase 4.5 `Histo.Submissions` (Batch, Animal, BatchSubmission, Tissue + TissueOwner, DomainExceptions, IBatchRepository/ISubmissionRepository + Dapper impls, BatchService/SubmissionService with PG-number auto-reversal via AnimalHelpers); 10 new unit tests added (SubmissionServiceAnimalTests, QCNoteServiceTests, DomainExceptionTests); Moq added to test project | **Done** | No issues — build succeeded 0 warnings/errors; 88 tests pass (up from 78), 0 failures, 1 skipped (integration) | All 5 module `.csproj` files upgraded with Dapper + Microsoft.Data.SqlClient; test project wired to all 5 new modules | [src/Histo.Administration/](/src/Histo.Administration/), [src/Histo.AuditLog/](/src/Histo.AuditLog/), [src/Histo.QualityControl/](/src/Histo.QualityControl/), [src/Histo.Histology/](/src/Histo.Histology/), [src/Histo.Submissions/](/src/Histo.Submissions/) |
 | 9 | _(yyyy-MM-dd)_ | 2 | `pdf-report-modernizer` | All 9 Crystal Reports (.rpt) → Razor HTML + Dapper wiring (3-stage ReportDefinition.json pipeline): Stage 1 parse, Stage 2 templates, Stage 3 wire-up | Not Started | — | — | — |
 | 10 | _(yyyy-MM-dd)_ | 2 | `pdf-validation` | RMSE pixel diff + structural checks for all 9 reports vs Phase 0 reference PDFs | Not Started | — | — | — |
 | 14 | _(yyyy-MM-dd)_ | 3 | `vbnet-to-csharp-net10-mvc-modernizer` | Full VB.NET → C# 14 conversion, 185 files | Not Started | — | — | — |
@@ -73,6 +74,7 @@
 | 4 | 2026-07-27 | `testing` | 12:29 | 12:44 | **~15** | File timestamps: Test-Strategy.md created 12:29, modified 12:44 |
 | 5 | 2026-07-27 | `intelligent-migration` | 12:49 | 12:55 | **~6** | File timestamps: Intelligent-Migration-Plan.md 12:49, ROI-and-Budget.md last-modified 12:55 |
 | 6 | 2026-07-27 | `implementation` | 14:35 | 14:38 | **~10** | File timestamps: slnx + Infrastructure created 14:35–14:36, test files created 14:37–14:38; build+test run follows |
+| 7 | 2026-07-29 | `implementation` | 15:33 | 15:43 | **~10** | File timestamps: first source file written 15:33, last file (DomainExceptionTests.cs) at 15:43; build + test run confirms 88 pass, 0 failures |
 
 ### Duration Timer Script
 
