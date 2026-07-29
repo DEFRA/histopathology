@@ -1,0 +1,91 @@
+# -----------------------------------------------------------------------
+# .NET / Visual Studio build outputs
+# -----------------------------------------------------------------------
+*.dll
+*.exe
+*.pdb
+*.lib
+*.exp
+*.ilk
+
+# Build output directories
+[Dd]ebug/
+[Rr]elease/
+[Xx]64/
+[Xx]86/
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+# MSBuild
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.ncrunchsolution
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+.nuget/
+project.lock.json
+artifacts/
+
+# .NET SDK / CLI
+.dotnet/
+.sdk/
+
+# -----------------------------------------------------------------------
+# Visual Studio / VS Code
+# -----------------------------------------------------------------------
+.vs/
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+*.rsuser
+
+# -----------------------------------------------------------------------
+# Secrets and credentials — NEVER commit these
+# -----------------------------------------------------------------------
+*.pfx
+*.p12
+*.key
+appsettings.*.json
+!appsettings.json
+!appsettings.Test.json
+secrets.json
+local.settings.json
+
+# -----------------------------------------------------------------------
+# Crystal Reports runtime outputs (legacy)
+# -----------------------------------------------------------------------
+*.rpt.bak
+
+# -----------------------------------------------------------------------
+# Export / temp files
+# -----------------------------------------------------------------------
+*.tmp
+*.temp
+[Tt]emp/
+[Tt]mp/
+export/
+
+# -----------------------------------------------------------------------
+# OS files
+# -----------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# -----------------------------------------------------------------------
+# Coverage and test results
+# -----------------------------------------------------------------------
+coverage/
+*.coverage
+*.coveragexml
+TestResults/
+[Tt]est[Rr]esult*/
+*.trx

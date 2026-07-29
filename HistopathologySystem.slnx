@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Histo.Core/Histo.Core.csproj" />
+    <Project Path="src/Histo.Infrastructure/Histo.Infrastructure.csproj" />
+    <Project Path="src/Histo.Web/Histo.Web.csproj" />
+    <Project Path="src/Histo.Submissions/Histo.Submissions.csproj" />
+    <Project Path="src/Histo.Histology/Histo.Histology.csproj" />
+    <Project Path="src/Histo.QualityControl/Histo.QualityControl.csproj" />
+    <Project Path="src/Histo.Reporting/Histo.Reporting.csproj" />
+    <Project Path="src/Histo.AuditLog/Histo.AuditLog.csproj" />
+    <Project Path="src/Histo.Administration/Histo.Administration.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Histo.Tests/Histo.Tests.csproj" />
+  </Folder>
+</Solution>
