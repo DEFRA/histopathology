@@ -1,0 +1,27 @@
+@page
+@model Histo.Web.Pages.Archive.ArchiveTissuesModel
+@{
+    ViewData["Title"] = "Archive Tissues";
+    ViewData["PageTitle"] = "Archive Tissues";
+}
+
+<table class="table table-striped">
+    <thead class="table-dark">
+        <tr><th>Sender Ref</th><th>Histology Ref</th><th>On Hold</th></tr>
+    </thead>
+    <tbody>
+        @foreach (var a in Model.Animals)
+        {
+            <tr>
+                <td>@a.SenderRef</td>
+                <td>@a.HistologyRef</td>
+                <td>@(a.OnHold ? "Yes" : "No")</td>
+            </tr>
+        }
+        @if (!Model.Animals.Any())
+        {
+            <tr><td colspan="3" class="text-center">No tissues to archive.</td></tr>
+        }
+    </tbody>
+</table>
+<a asp-page="/Archive/ArchiveMenu" class="btn btn-secondary">Back</a>

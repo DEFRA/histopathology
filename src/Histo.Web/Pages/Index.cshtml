@@ -2,6 +2,67 @@
 @model IndexModel
 @{
     ViewData["Title"] = "Home";
+    ViewData["PageTitle"] = "Home";
 }
-<h1>Histopathology System</h1>
-<p>Application scaffold — Phase 1 stub. Full UI migration in Phase 5.</p>
+
+<div class="home-panels">
+
+    @* Customer panel *@
+    @if (Model.Session.IsCustomer || Model.Session.IsHistoUser || Model.Session.IsMaintenance)
+    {
+        <section class="panel">
+            <h2>Submissions</h2>
+            <ul>
+                <li><a asp-page="/Submissions/AddSubmission">New Submission</a></li>
+                <li><a asp-page="/Submissions/ViewSubmissions">View Submissions</a></li>
+            </ul>
+        </section>
+    }
+
+    @* Histopathology User / Maintenance panel *@
+    @if (Model.Session.IsHistoUser || Model.Session.IsMaintenance)
+    {
+        <section class="panel">
+            <h2>Laboratory</h2>
+            <ul>
+                <li><a asp-page="/Batches/BatchesNotReceived">Receive Batches</a></li>
+                <li><a asp-page="/Batches/BatchesReceived">Batches Received</a></li>
+                <li><a asp-page="/Batches/BatchesForEditing">Edit Batches</a></li>
+                <li><a asp-page="/Batches/BatchesForDispatch">Dispatch Batches</a></li>
+                <li><a asp-page="/Batches/BatchesForArchiving">Archive Batches</a></li>
+            </ul>
+        </section>
+
+        <section class="panel">
+            <h2>Search &amp; Reports</h2>
+            <ul>
+                <li><a asp-page="/Search/SearchMenu">Search Submissions</a></li>
+                <li><a asp-page="/Search/SearchSample">Search Samples</a></li>
+                <li><a asp-page="/Search/SearchBlockRefs">Search Block Refs</a></li>
+                <li><a asp-page="/QC/QCNotes">Quality Data</a></li>
+                <li><a asp-page="/AuditLog/AuditLogMenu">Audit Log</a></li>
+            </ul>
+        </section>
+
+        <section class="panel">
+            <h2>Bookings &amp; Archive</h2>
+            <ul>
+                <li><a asp-page="/Bookings/BookingMenu">Book Histology Refs</a></li>
+                <li><a asp-page="/Archive/ArchiveMenu">Archive</a></li>
+            </ul>
+        </section>
+    }
+
+    @* Maintenance only *@
+    @if (Model.Session.IsMaintenance)
+    {
+        <section class="panel">
+            <h2>Administration</h2>
+            <ul>
+                <li><a asp-page="/Admin/UserMaintenance">User Maintenance</a></li>
+                <li><a asp-page="/Admin/PickListMaintenance">Pick Lists</a></li>
+            </ul>
+        </section>
+    }
+
+</div>

@@ -1,0 +1,16 @@
+@* _UserContextPartial.cshtml
+   Replaces VLAHeader.ascx labels: lblUser, lblLab, lblArea, lblBatchNo, lblSubmission.
+   All values come from ISessionService — no direct Session[] access in views.
+*@
+@inject Histo.Web.Services.ISessionService SessionSvc
+
+<span class="ctx-user">User: @SessionSvc.UserName</span>
+<span class="ctx-group">Group: @SessionSvc.GroupName</span>
+@if (!string.IsNullOrEmpty(SessionSvc.UserArea))
+{
+    <span class="ctx-area">Area: @SessionSvc.UserArea</span>
+}
+@if (SessionSvc.BatchID.HasValue)
+{
+    <span class="ctx-batch">Batch No: @SessionSvc.BatchID</span>
+}

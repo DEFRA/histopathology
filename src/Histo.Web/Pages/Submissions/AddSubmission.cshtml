@@ -1,0 +1,19 @@
+@page
+@model Histo.Web.Pages.Submissions.AddSubmissionModel
+@{
+    ViewData["Title"] = "Add Submission";
+    ViewData["PageTitle"] = "Add Submission";
+}
+
+<form method="post">
+    <div class="mb-3">
+        <label class="form-label">Sender Reference</label>
+        <input asp-for="SenderRef" class="form-control" required />
+    </div>
+    <div class="mb-3 form-check">
+        <input asp-for="IsNeuropath" class="form-check-input" type="checkbox" />
+        <label class="form-check-label">Neuropath</label>
+    </div>
+    <button type="submit" class="btn btn-primary">Add Animal</button>
+    <a asp-page="/Submissions/ViewSamples" class="btn btn-secondary ms-2">Cancel</a>
+</form>

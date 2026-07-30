@@ -1,0 +1,16 @@
+@page
+@model SearchMenuModel
+@{
+    ViewData["Title"] = "Search";
+    ViewData["PageTitle"] = "Search";
+}
+
+<ul class="menu-links">
+    <li><a asp-page="/Search/SearchSubmissions">Search Submissions</a></li>
+    <li><a asp-page="/Search/SearchSample">Search Samples</a></li>
+    <li><a asp-page="/Search/SearchSender">Search by Sender</a></li>
+    <li><a asp-page="/Search/SearchPMDates">Search by PM Date</a></li>
+    <li><a asp-page="/Search/SearchBlockRefs">Search Block Refs</a></li>
+    <li><a asp-page="/Search/SearchArchiveLocation">Search Archive Locations</a></li>
+    <li><a asp-page="/Search/SearchUnUsedHistologyRefs">Unused Histology Refs</a></li>
+</ul>

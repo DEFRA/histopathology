@@ -1,0 +1,40 @@
+@page
+@model BatchesNotReceivedModel
+@{
+    ViewData["Title"] = "Batches Not Received";
+    ViewData["PageTitle"] = "Batches Not Received";
+}
+
+@if (!Model.Batches.Any())
+{
+    <p>No batches awaiting receipt.</p>
+}
+else
+{
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Batch No</th>
+                <th>Customer Ref</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var b in Model.Batches)
+            {
+                <tr>
+                    <td>@b.ID</td>
+                    <td>@b.CustomerRef</td>
+                    <td>@b.Status</td>
+                    <td>
+                        <form method="post">
+                            <input type="hidden" name="batchId" value="@b.ID" />
+                            <button type="submit" asp-page-handler="Receive">Receive</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

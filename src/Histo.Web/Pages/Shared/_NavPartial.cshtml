@@ -1,0 +1,46 @@
+@* _NavPartial.cshtml
+   Role-based navigation — replaces the VLAHeader.ascx hyperlink show/hide logic.
+   Visible links are determined by the user's GroupName stored in ISessionService.
+   Phase 2: Replace @User.Identity?.Name with session group from Entra ID claims.
+*@
+@inject Histo.Web.Services.ISessionService SessionSvc
+
+@{
+    var group = SessionSvc.GroupName;
+    bool isHisto = group == "Histopathology User";
+    bool isMaint = group == "Maintenance";
+    bool isCustomer = group == "Customer" || (!isHisto && !isMaint);
+}
+
+<ul class="nav-links">
+
+    @* ── Links available to ALL groups ──────────────────────────────────── *@
+    <li><a asp-page="/Submissions/ViewSubmissions">View Submissions</a></li>
+
+    @if (isCustomer || isHisto || isMaint)
+    {
+        <li><a asp-page="/Submissions/AddSubmission">New Submission</a></li>
+    }
+
+    @* ── Histopathology User + Maintenance ──────────────────────────────── *@
+    @if (isHisto || isMaint)
+    {
+        <li><a asp-page="/Batches/BatchesNotReceived">Receive Batches</a></li>
+        <li><a asp-page="/Batches/BatchesReceived">Batches Received</a></li>
+        <li><a asp-page="/Batches/BatchesForEditing">Edit Batches</a></li>
+        <li><a asp-page="/Batches/BatchesForDispatch">Dispatch Batches</a></li>
+        <li><a asp-page="/Search/SearchMenu">Search</a></li>
+        <li><a asp-page="/QC/QCNotes">Quality Data</a></li>
+        <li><a asp-page="/Bookings/BookingMenu">Book Histology Refs</a></li>
+        <li><a asp-page="/Archive/ArchiveMenu">Archive</a></li>
+        <li><a asp-page="/AuditLog/AuditLogMenu">Audit Log</a></li>
+    }
+
+    @* ── Maintenance only ───────────────────────────────────────────────── *@
+    @if (isMaint)
+    {
+        <li><a asp-page="/Admin/UserMaintenance">User Maintenance</a></li>
+        <li><a asp-page="/Admin/PickListMaintenance">Pick Lists</a></li>
+    }
+
+</ul>

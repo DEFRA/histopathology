@@ -1,0 +1,34 @@
+@page
+@model SubmissionsOnHoldModel
+@{
+    ViewData["Title"] = "Submissions On Hold";
+    ViewData["PageTitle"] = "Submissions On Hold";
+}
+
+@if (!Model.Batches.Any())
+{
+    <p>No submissions currently on hold.</p>
+}
+else
+{
+    <table class="data-table">
+        <thead>
+            <tr><th>Batch No</th><th>Customer Ref</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var b in Model.Batches)
+            {
+                <tr>
+                    <td>@b.ID</td>
+                    <td>@b.CustomerRef</td>
+                    <td>
+                        <form method="post">
+                            <input type="hidden" name="batchId" value="@b.ID" />
+                            <button type="submit" asp-page-handler="Select">View</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

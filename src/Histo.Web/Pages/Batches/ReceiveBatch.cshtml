@@ -1,0 +1,20 @@
+@page
+@model Histo.Web.Pages.Batches.ReceiveBatchModel
+@{
+    ViewData["Title"] = "Receive Batch";
+    ViewData["PageTitle"] = "Receive Batch";
+}
+
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="alert alert-danger">@Model.Error</div>
+}
+
+@if (Model.Batch is not null)
+{
+    <p>Confirm receipt of batch <strong>@Model.Batch.CustomerRef</strong> (ID: @Model.Batch.ID)?</p>
+    <form method="post">
+        <button type="submit" class="btn btn-primary">Confirm Receipt</button>
+        <a asp-page="/Batches/BatchesNotReceived" class="btn btn-secondary ms-2">Cancel</a>
+    </form>
+}
