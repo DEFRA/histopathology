@@ -43,4 +43,12 @@ public interface ISessionService
     /// Replaces <c>VLAHeader.ascx::getUserDetails()</c>.
     /// </summary>
     void Populate(System.Security.Claims.ClaimsPrincipal principal);
+
+    /// <summary>
+    /// Hydrates all session identity fields from a resolved <see cref="Histo.Administration.Models.User"/>.
+    /// Called by <c>HistoPageModel</c> after <c>UserService.ResolveUserAsync</c> succeeds.
+    /// Replaces the legacy pattern of writing individual Session() keys in
+    /// <c>VLAHeader.ascx::getUserDetails()</c>.
+    /// </summary>
+    void PopulateFromUser(Histo.Administration.Models.User user);
 }

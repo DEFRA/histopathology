@@ -4,12 +4,19 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] — Histopathology System</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+          integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+          crossorigin="anonymous" />
     <link rel="stylesheet" href="~/css/Styles.css" asp-append-version="true" />
 </head>
 <body>
+    <a name="top"></a>
     <header class="site-header">
         <nav class="site-nav">
-            <a class="site-title" asp-page="/Index">Histopathology System</a>
+            <a class="site-title" asp-page="/Index">
+                <img src="~/images/vlalogoExtended.gif" alt="" class="site-logo" />
+                Histopathology System
+            </a>
             @await Html.PartialAsync("_NavPartial")
         </nav>
         <div class="site-context">
@@ -33,9 +40,14 @@
     </main>
 
     <footer class="site-footer">
-        <p>Histopathology System &copy; @DateTime.Now.Year</p>
+        <a href="#top" class="footer-top-link">Top</a>
+        <span>Copyright &copy; @DateTime.Now.Year Veterinary Laboratories Agency</span>
+        <span>Department: ITU</span>
     </footer>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+            crossorigin="anonymous"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

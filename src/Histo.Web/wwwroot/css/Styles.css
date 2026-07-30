@@ -1,30 +1,198 @@
-/* Histo.Web — stub stylesheet
- * Phase 5: Replace with full GOV.UK-compliant styles migrated from legacy HistopathologySystem/Styles.css
- */
+/* Histo.Web site theme — migrated from legacy HistopathologySystem/Style/vla-ie.css
+ * Preserves VLA brand palette (#003399 blue / #33ccff accent) and font stack.
+ * See docs/migration-run-journal.md ISS-014 for migration gap details. */
+
+:root {
+    --vla-blue: #003399;
+    --vla-accent: #33ccff;
+    --vla-border: #cccccc;
+}
 
 body {
     font-family: Arial, Helvetica, sans-serif;
+    font-size: 90%;
     margin: 0;
     padding: 0;
+    color: #000;
+    background-color: #fff;
 }
 
+a {
+    color: var(--vla-blue);
+    text-decoration: underline;
+}
+
+a:hover {
+    color: #3333cc;
+}
+
+/* ── Header (replaces VLAHeader.ascx bordered box) ───────────────────── */
 .site-header {
-    background-color: #003366;
-    color: #ffffff;
+    border: 2px solid var(--vla-blue);
+    background-color: #fff;
     padding: 0.5rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
 }
 
 .site-title {
-    font-size: 1.1rem;
+    font-family: Verdana, Arial, sans-serif;
+    font-weight: bold;
+    font-size: 1.4rem;
+    color: var(--vla-accent);
+    text-shadow: 1px 1px 2px var(--vla-blue);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.site-logo {
+    height: 40px;
+    vertical-align: middle;
+}
+
+.site-nav {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.nav-links {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    margin: 0.5rem 0 0 0;
+    padding: 0;
+    background-color: var(--vla-blue);
+    border-radius: 2px;
+}
+
+.nav-links li {
+    margin: 0;
+}
+
+.nav-links a {
+    display: block;
+    padding: 0.4rem 0.75rem;
+    color: #fff;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.nav-links a:hover {
+    text-decoration: underline;
+    background-color: #002a80;
+}
+
+/* ── User context (replaces VLAHeader lblUser/lblLab/lblArea/lblSubmission) ── */
+.site-context {
+    text-align: right;
+    font-size: 0.85rem;
+    color: var(--vla-blue);
+}
+
+.site-context span {
+    display: block;
+}
+
+.ctx-batch {
+    font-weight: bold;
+    color: var(--vla-blue);
+}
+
+/* ── Page title bar (replaces VLAHeader lblPageTitle) ────────────────── */
+.page-title-bar {
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--vla-border);
+}
+
+.page-title {
+    font-size: 1.6rem;
+    font-weight: normal;
+    color: var(--vla-blue);
+    margin: 0.25rem 0;
+}
+
+.context-label {
+    font-size: 0.85rem;
+    color: green;
     font-weight: bold;
 }
 
+/* ── Main content ─────────────────────────────────────────────────────── */
 .main-content {
     padding: 1rem;
 }
 
+/* ── Home page module panels (replaces Home.aspx absolute-positioned links) */
+.home-panels {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+}
+
+.panel {
+    border: 1px solid var(--vla-border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.panel h2 {
+    background-color: var(--vla-blue);
+    color: #fff;
+    font-size: 1rem;
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+}
+
+.panel ul {
+    list-style: none;
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+}
+
+.panel li {
+    padding: 0.25rem 0;
+}
+
+/* ── Footer (replaces VLAFooter.ascx) ─────────────────────────────────── */
 .site-footer {
-    background-color: #f0f0f0;
-    padding: 0.5rem 1rem;
+    border: 2px solid var(--vla-blue);
+    border-top: none;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
     font-size: 0.85rem;
+    color: var(--vla-blue);
+    padding: 0.5rem 1rem;
+}
+
+.footer-top-link {
+    background-color: var(--vla-blue);
+    color: #fff !important;
+    padding: 0.4rem 0.75rem;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+/* ── Grid / table header (replaces .GridHeader) — augments Bootstrap ─── */
+.table-dark {
+    background-color: var(--vla-blue) !important;
+}
+
+/* ── Error / warning text (replaces .ErrorText / .WarningText) ──────── */
+.text-error {
+    font-size: 115%;
+    color: red;
+}
+
+.text-warning-legacy {
+    font-size: 115%;
+    color: green;
 }

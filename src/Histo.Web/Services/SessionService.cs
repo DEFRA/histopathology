@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Histo.Administration.Models;
 
 namespace Histo.Web.Services;
 
@@ -83,12 +84,31 @@ public sealed class SessionService : ISessionService
     /// <inheritdoc/>
     public void Populate(ClaimsPrincipal principal)
     {
-        // Phase 2: replace with full Entra ID claim mapping.
-        // For now, read identity name from the principal and leave group/area
-        // fields empty — they will be resolved by UserService.ResolveUserAsync
-        // once the auth pipeline is wired.
+        // Phase 2: replace with full Entra ID claim mapping (ISS-009).
+        // For now, read identity name only — PopulateFromUser must be called
+        // after UserService.ResolveUserAsync to set group/area fields.
         var name = principal.Identity?.Name ?? string.Empty;
         _session.SetString(KeyUserName, name);
+    }
+
+    /// <inheritdoc/>
+    public void PopulateFromUser(User user)
+    {
+        // Mirrors the legacy VLAHeader.ascx::getUserDetails() Session writes:
+        //   Session(SessionVars.SV_HeaderUserName)  = sName
+        //   Session(SessionVars.SV_HeaderGroupID)   = sGroupCode
+        //   Session(SessionVars.SV_HeaderGroupName) = sGroupName
+        //   Session(SessionVars.SV_HeaderUserID)    = iUserID
+        //   Session(SessionVars.SV_HeaderUserEmail) = sEmail
+        //   Session(SessionVars.SV_HeaderUserArea)  = sAreaName
+        //   Session(SessionVars.SV_HeaderUserAreaID)= iUserArea
+        _session.SetString(KeyUserName,  user.Name);
+        _session.SetString(KeyGroupName, user.GroupName);
+        _session.SetString(KeyUserEmail, user.Email);
+        _session.SetString(KeyUserArea,  user.AreaName);
+        _session.Set(KeyUserID,    BitConverter.GetBytes(user.UserID));
+        _session.Set(KeyGroupID,   BitConverter.GetBytes(user.GroupCode));
+        _session.Set(KeyUserAreaID,BitConverter.GetBytes(user.AreaCode));
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
