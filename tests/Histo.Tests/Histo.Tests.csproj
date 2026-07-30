@@ -24,11 +24,17 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.0" />
+    <PackageReference Include="Moq" Version="4.20.72" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Histo.Core\Histo.Core.csproj" />
     <ProjectReference Include="..\..\src\Histo.Infrastructure\Histo.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Histo.Administration\Histo.Administration.csproj" />
+    <ProjectReference Include="..\..\src\Histo.AuditLog\Histo.AuditLog.csproj" />
+    <ProjectReference Include="..\..\src\Histo.QualityControl\Histo.QualityControl.csproj" />
+    <ProjectReference Include="..\..\src\Histo.Histology\Histo.Histology.csproj" />
+    <ProjectReference Include="..\..\src\Histo.Submissions\Histo.Submissions.csproj" />
   </ItemGroup>
 
 </Project>
