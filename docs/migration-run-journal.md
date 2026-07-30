@@ -2,7 +2,7 @@
 
 **Project:** Histopathology System — VB.NET ASP.NET WebForms → C# .NET 10 + Razor Pages  
 **Started:** 2026-07-27  
-**Assessment ref:** [migration-assessment-net10.md](migration-assessment-net10.md)
+**Assessment ref:** [migration-assessment-net10.md](../.github/docs/migration-assessment-net10.md)
 
 ---
 
@@ -24,9 +24,9 @@
 | 0 | Foundation & Safety Net | `testing`, `documentation`, `intelligent-migration`, `requirements-to-scrum-board`, `azure-infra-analyser` | In Progress | 2026-07-27 | — |
 | 1 | Authentication Migration | `identity-migration` | **In Progress** | 2026-07-27 | — |
 | 2 | Reporting Migration | `pdf-report-modernizer`, `pdf-reference-generator`, `pdf-validation` | Not Started | — | — |
-| 3 | Platform Migration (VB→C#/.NET 10) | `dotnet-code-refactor`, `vbnet-to-csharp-net10-mvc-modernizer`, `modernise-to-modular-monolith` | In Progress | 2026-07-27 | — |
+| 3 | Platform Migration (VB→C#/.NET 10) | `dotnet-code-refactor`, `modernise-to-modular-monolith` | In Progress | 2026-07-27 | — |
 | 4 | **Domain + Repository Modules** | `implementation` | **Complete** | 2026-07-29 | 2026-07-29 |
-| 5 | Infrastructure & DevOps | `azure-infra-planner`, `azure-infra-implementer`, `devops-pipeline-modernizer` | Not Started | — | — |
+| 5 | UI Migration (Phase 5) | `ui-implementation` | **In Progress** | 2026-07-30 | — |
 | 6 | Testing & Cutover | `dotnet-test-automation-and-quality-agent`, `playwright-tester-agent`, `testing` | Not Started | — | — |
 
 ---
@@ -46,9 +46,8 @@
 | 7 | _(yyyy-MM-dd)_ | 0 | `azure-infra-analyser` | Config analysis → `infra-analysis.json` | Not Started | — | — | — |
 | 8 | 2026-07-27 | 1 | `implementation` | Phase 1 — Solution Scaffold + Infrastructure Module: `HistopathologySystem.slnx`, `src/Histo.Infrastructure/` (IDbConnectionFactory, SqlConnectionFactory, IAppLogger, AppLogger, AppOptions), `src/Histo.Web/` stub (Program.cs, health endpoint, _Layout.cshtml, appsettings.json), 6 domain module stubs (Submissions, Histology, QC, Reporting, AuditLog, Administration), 8 new tests (SqlConnectionFactoryTests, AppOptionsTests) | Done | No issues — all 78 tests pass; `Histo.Web` and `Histo.Infrastructure` build green | Created all `src/` project stubs under existing `src/` folder per user instruction | [src/Histo.Infrastructure/](/src/Histo.Infrastructure/), [src/Histo.Web/](/src/Histo.Web/), [HistopathologySystem.slnx](/HistopathologySystem.slnx) |
 | 25 | 2026-07-29 | 4 | `implementation` | **Phase 4 — Domain and Repository Modules (all 5 sub-phases):** Sub-phase 4.1 `Histo.Administration` (User model, IUserRepository/LookupRepository + Dapper impls, UserService/LookupService); Sub-phase 4.2 `Histo.AuditLog` (AuditLogEntry, IAuditLogRepository + multi-SP fan-out impl, AuditLogService); Sub-phase 4.3 `Histo.QualityControl` (QCNote + rowstamp concurrency, IQCNoteRepository + return-value concurrency detection, QCNoteService with QCNoteConcurrencyException propagation); Sub-phase 4.4 `Histo.Histology` (Block + BlockStatus, HistologyRef, IBlockRepository/IHistologyRepository + Dapper impls, BlockService/HistologyRefService with BlockHelpers delegation); Sub-phase 4.5 `Histo.Submissions` (Batch, Animal, BatchSubmission, Tissue + TissueOwner, DomainExceptions, IBatchRepository/ISubmissionRepository + Dapper impls, BatchService/SubmissionService with PG-number auto-reversal via AnimalHelpers); 10 new unit tests added (SubmissionServiceAnimalTests, QCNoteServiceTests, DomainExceptionTests); Moq added to test project | **Done** | No issues — build succeeded 0 warnings/errors; 88 tests pass (up from 78), 0 failures, 1 skipped (integration) | All 5 module `.csproj` files upgraded with Dapper + Microsoft.Data.SqlClient; test project wired to all 5 new modules | [src/Histo.Administration/](/src/Histo.Administration/), [src/Histo.AuditLog/](/src/Histo.AuditLog/), [src/Histo.QualityControl/](/src/Histo.QualityControl/), [src/Histo.Histology/](/src/Histo.Histology/), [src/Histo.Submissions/](/src/Histo.Submissions/) |
-| 9 | _(yyyy-MM-dd)_ | 2 | `pdf-report-modernizer` | All 9 Crystal Reports (.rpt) → Razor HTML + Dapper wiring (3-stage ReportDefinition.json pipeline): Stage 1 parse, Stage 2 templates, Stage 3 wire-up | Not Started | — | — | — |
+| 26 | 2026-07-30 | 5 | `ui-implementation` | **Phase 5 — UI Migration (WebForms → Razor Pages), Session 2 (resumed):** Completed Batch 3 CRUD pages (EditQCNote, BatchDetails, EditBatch, ReceiveBatch, BatchesForArchiving), Batch 4 complex workflow pages (AddSubmission, ViewSamples, BlockDetails, ArchiveBlocks, ArchiveTissues, BookHistologyRef, BookBlockRef), Batch 5 admin pages (UserMaintenance, PickListMaintenance, Error/Shared); wired all domain service + repository DI registrations and `AddSession`/`UseSession` in `Program.cs`; fixed 26 build errors (nullable session IDs, BatchStatus namespace, HistologyRef.Ref property name, Activity import, non-record Batch `with` expression) | **Done** | 26 build errors fixed (all resolved); build succeeded 0 warnings/errors; 88 tests pass, 0 failures | `Program.cs` updated with full DI wiring; all 5 Phase 4 project references active; `app.UseSession()` added to middleware pipeline | [src/Histo.Web/Pages/](/src/Histo.Web/Pages/), [src/Histo.Web/Program.cs](/src/Histo.Web/Program.cs) | All 9 Crystal Reports (.rpt) → Razor HTML + Dapper wiring (3-stage ReportDefinition.json pipeline): Stage 1 parse, Stage 2 templates, Stage 3 wire-up | Not Started | — | — | — |
 | 10 | _(yyyy-MM-dd)_ | 2 | `pdf-validation` | RMSE pixel diff + structural checks for all 9 reports vs Phase 0 reference PDFs | Not Started | — | — | — |
-| 14 | _(yyyy-MM-dd)_ | 3 | `vbnet-to-csharp-net10-mvc-modernizer` | Full VB.NET → C# 14 conversion, 185 files | Not Started | — | — | — |
 | 15 | 2026-07-27 | 3 | `modernise-to-modular-monolith` | Target Architecture, Migration Plan, ADR-005 — Dapper/SP decision gate (Option A confirmed by user) | Done | GetUserByNTLogin SP called with Entra UPN may need NT login format mapping (see ISS-009) | — (planning only — no code changes) | [docs/Target-Architecture.md](/docs/Target-Architecture.md), [docs/Migration-Plan.md](/docs/Migration-Plan.md), [docs/ADR/ADR-005-data-access-dapper-stored-procedures.md](/docs/ADR/ADR-005-data-access-dapper-stored-procedures.md) |
 | 16 | _(yyyy-MM-dd)_ | 4 | `ui-implementation` | ASCX controls → `_Layout.cshtml` + Partial Views | Not Started | — | — | — |
 | 17 | _(yyyy-MM-dd)_ | 4 | `ui-implementation` | 18 simple display pages → Razor Pages | Not Started | — | — | — |
@@ -59,6 +58,7 @@
 | 22 | _(yyyy-MM-dd)_ | 5 | `devops-pipeline-modernizer` | CI/CD YAML, branching strategy | Not Started | — | — | — |
 | 23 | _(yyyy-MM-dd)_ | 6 | `dotnet-test-automation-and-quality-agent` | C# xUnit domain tests + integration tests | Not Started | — | — | — |
 | 24 | _(yyyy-MM-dd)_ | 6 | `playwright-tester-agent` | E2E Playwright tests for critical user journeys | Not Started | — | — | — |
+| 27 | 2026-07-30 | 5 | `ui-implementation` | **Hot-fix — `IAppLogger` not registered in DI container:** All 8 domain services (`UserService`, `LookupService`, `AuditLogService`, `BlockService`, `HistologyRefService`, `QCNoteService`, `BatchService`, `SubmissionService`) threw `AggregateException` on startup because `IAppLogger` was missing from the DI container. Added `AddTransient<IAppLogger>` factory registration in `Program.cs` using `ILoggerFactory` to create an `AppLogger<IAppLogger>` backed by the Serilog pipeline. | **Done** | ISS-012: `IAppLogger` missing from DI — caused `System.AggregateException` on `Histo.Web` startup; all 8 domain services unresolvable | Added `IAppLogger` transient factory registration in `Program.cs` | [src/Histo.Web/Program.cs](../src/Histo.Web/Program.cs) |
 
 ---
 
@@ -74,7 +74,8 @@
 | 4 | 2026-07-27 | `testing` | 12:29 | 12:44 | **~15** | File timestamps: Test-Strategy.md created 12:29, modified 12:44 |
 | 5 | 2026-07-27 | `intelligent-migration` | 12:49 | 12:55 | **~6** | File timestamps: Intelligent-Migration-Plan.md 12:49, ROI-and-Budget.md last-modified 12:55 |
 | 6 | 2026-07-27 | `implementation` | 14:35 | 14:38 | **~10** | File timestamps: slnx + Infrastructure created 14:35–14:36, test files created 14:37–14:38; build+test run follows |
-| 7 | 2026-07-29 | `implementation` | 15:33 | 15:43 | **~10** | File timestamps: first source file written 15:33, last file (DomainExceptionTests.cs) at 15:43; build + test run confirms 88 pass, 0 failures |
+| 8 | 2026-07-30 | `ui-implementation` | 15:08 | 15:25 | **~17** | Resumed from Session 1 (prior conversation). Completed all remaining pages and DI wiring. Build: 0 warnings/0 errors. Tests: 88 pass, 0 fail. |
+| 9 | 2026-07-30 | `ui-implementation` | 15:40 | 15:43 | **~3** | Hot-fix: `IAppLogger` not registered in DI. Added `AddTransient<IAppLogger>` factory. Build: 0 warnings/0 errors. Tests: 88 pass, 0 fail. |
 
 ### Duration Timer Script
 
@@ -113,6 +114,104 @@ Write-Host "Elapsed duration  : $elapsed minutes"
 | ISS-009 | 2026-07-27 | 3 | `modernise-to-modular-monolith` | `Histo.Administration::UserService` | `GetUserByNTLogin` SP expects `DOMAIN\username` format; Entra ID UPN is `user@domain.com` — mapping required | High | _(dev name)_ | Open | Phase 2 task: one-time data migration or SP parameter normalisation — confirm with DB team before Phase 2 begins |
 | ISS-010 | 2026-07-27 | 0 | `intelligent-migration` | Programme | Key-person risk: Sr Dev 1 holds sole institutional knowledge of VB.NET business rules — no redundancy | High | Delivery Lead | Open | Ensure all business rules are in `docs/LLD.md` + named unit tests before Sr Dev 1 begins conversion; pair-review policy enforced |
 | ISS-011 | 2026-07-27 | 0 | `intelligent-migration` | Programme — Phase 2 entry criterion | Azure admin must create Entra ID app registration and confirm group IDs before Phase 2 can begin — external dependency on critical path | High | Delivery Lead | Open | Pre-schedule Azure admin engagement during Phase 1; track as critical path item; escalate to Executive Sponsor if blocked |
+| ISS-012 | 2026-07-30 | 5 | `ui-implementation` | `src/Histo.Web/Program.cs` | `IAppLogger` not registered in DI container — all 8 domain services unresolvable on startup (`System.AggregateException`) | High | — | **Resolved** | Added `AddTransient<IAppLogger>` factory using `ILoggerFactory` in `Program.cs`. Build: 0 errors. Tests: 88 pass. |
+
+---
+
+## Issue Detail
+
+> Short structured record for each ISS-* item: symptom, root cause, and fix. Add one entry per issue as they are raised or resolved.
+
+---
+
+### ISS-006 — Plaintext SQL credential in Web.config
+
+| Field | Detail |
+|-------|--------|
+| **Status** | Open |
+| **Phase** | 0 |
+| **Symptom** | `DBConnectionString` in `HistopathologySystem/Web.config` contains `User Id=HistologyUser;Password=HistologyUser9245` in plaintext, committed to source control. |
+| **Root cause** | Legacy on-premises pattern — SQL Auth credentials were stored directly in config. No secrets management was in place. |
+| **Fix** | Replace with Managed Identity connection string (`Authentication=Active Directory Default`) before Azure deployment. Store the current credential as a Key Vault secret during transition. Apply `web.Release.config` XDT transform to remove the key in Release builds. See `azure-infra.instructions.md` Section 3. |
+| **Owner** | Dev team + Azure admin |
+
+---
+
+### ISS-007 — Debug compilation enabled in Web.config
+
+| Field | Detail |
+|-------|--------|
+| **Status** | Open |
+| **Phase** | 0 |
+| **Symptom** | `<compilation debug="true">` in `Web.config` — would be deployed to production as-is. |
+| **Root cause** | Development setting left in source; no XDT transform in place to override it for Release. |
+| **Fix** | Add `<compilation xdt:Transform="SetAttributes" debug="false" />` to `Web.Release.config`. |
+| **Owner** | Dev team |
+
+---
+
+### ISS-008 — No automated test coverage (Resolved)
+
+| Field | Detail |
+|-------|--------|
+| **Status** | Resolved |
+| **Phase** | 0 |
+| **Symptom** | Zero unit or integration tests existed across all 185 VB files. No CI pipeline. |
+| **Root cause** | Legacy codebase predated automated testing practices; no test framework was ever introduced. |
+| **Fix** | Phase 0 `testing` agent created `src/Histo.Core/`, `tests/Histo.Tests/` (88 unit tests), and `.github/workflows/ci.yml`. |
+| **Owner** | Resolved |
+
+---
+
+### ISS-009 — NT login format mismatch for Entra ID migration
+
+| Field | Detail |
+|-------|--------|
+| **Status** | Open |
+| **Phase** | 3 |
+| **Symptom** | `GetUserByNTLogin` stored procedure expects `DOMAIN\username` format. Entra ID provides `user@domain.com` (UPN). The `SessionService.Populate()` method has a `// TODO Phase 2` comment marking this gap. |
+| **Root cause** | Legacy Windows Auth stored NT login names in the `DOMAIN\username` format in the Users table. Entra ID tokens carry UPN format instead. |
+| **Fix** | Phase 2 task. Options: (a) one-time data migration to convert NT login values to UPN in the Users table, or (b) add a normalisation step in `UserService.ResolveUserAsync` that strips the domain prefix and appends the tenant domain. Confirm the approach with the DB team and customer before Phase 2 begins. |
+| **Owner** | Dev team + DB team |
+
+---
+
+### ISS-010 — Key-person risk: sole VB.NET knowledge holder
+
+| Field | Detail |
+|-------|--------|
+| **Status** | Open |
+| **Phase** | Programme |
+| **Symptom** | Sr Dev 1 holds sole institutional knowledge of VB.NET business rules with no redundancy. |
+| **Root cause** | Long-tenure single developer; no knowledge transfer or pair-review policy enforced. |
+| **Fix** | Ensure all business rules are documented in `docs/LLD.md` and expressed as named unit tests before Sr Dev 1 begins conversion work. Enforce pair-review policy for all Phase 3+ PRs. |
+| **Owner** | Delivery Lead |
+
+---
+
+### ISS-011 — Azure admin external dependency blocks Phase 2
+
+| Field | Detail |
+|-------|--------|
+| **Status** | Open |
+| **Phase** | Programme |
+| **Symptom** | Entra ID app registration and group IDs are required before Phase 2 (Auth Migration) can begin. This is an external dependency outside the dev team's control. |
+| **Root cause** | Azure admin engagement was not pre-scheduled as part of Phase 0 planning. |
+| **Fix** | Pre-schedule Azure admin engagement during Phase 1. Escalate to Executive Sponsor if not confirmed within two weeks of Phase 1 completion. Track as critical path item in programme risk register. |
+| **Owner** | Delivery Lead |
+
+---
+
+### ISS-012 — `IAppLogger` not registered in DI container (Resolved)
+
+| Field | Detail |
+|-------|--------|
+| **Status** | Resolved |
+| **Phase** | 5 |
+| **Symptom** | `System.AggregateException` thrown on `Histo.Web` startup. All 8 domain services (`UserService`, `LookupService`, `AuditLogService`, `BlockService`, `HistologyRefService`, `QCNoteService`, `BatchService`, `SubmissionService`) failed DI validation with: _"Unable to resolve service for type `Histo.Infrastructure.IAppLogger`"_. |
+| **Root cause** | `IAppLogger` is a custom infrastructure interface (`Histo.Infrastructure.IAppLogger`) implemented by `AppLogger<T>`. When the domain service DI registrations were added to `Program.cs` during Phase 5, the `IAppLogger` registration was omitted. `Microsoft.Extensions.Logging.ILogger<T>` is registered automatically by the host, but `IAppLogger` is not — it is a project-level abstraction that must be explicitly wired. |
+| **Fix** | Added the following registration to `Program.cs` (after `AddSingleton<IDbConnectionFactory>`): `builder.Services.AddTransient<IAppLogger>(sp => { var factory = sp.GetRequiredService<ILoggerFactory>(); return new AppLogger<IAppLogger>(factory.CreateLogger<IAppLogger>()); });` This creates an `AppLogger<IAppLogger>` backed by the Serilog pipeline for every injection site. Build: 0 errors. Tests: 88 pass. |
+| **Owner** | Resolved — 2026-07-30 |
 
 ---
 

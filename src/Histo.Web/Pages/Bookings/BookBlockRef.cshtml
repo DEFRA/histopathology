@@ -1,0 +1,32 @@
+@page
+@model Histo.Web.Pages.Bookings.BookBlockRefModel
+@{
+    ViewData["Title"] = "Book Block Reference";
+    ViewData["PageTitle"] = "Book Block Reference";
+}
+
+<table class="table table-striped">
+    <thead class="table-dark">
+        <tr><th>Block Ref</th><th>Customer Ref</th><th>Action</th></tr>
+    </thead>
+    <tbody>
+        @foreach (var b in Model.PreBookedBlocks)
+        {
+            <tr>
+                <td>@b.BlockRef</td>
+                <td>@b.CustomerRef</td>
+                <td>
+                    <form method="post">
+                        <input type="hidden" name="blockId" value="@b.ID" />
+                        <button type="submit" class="btn btn-sm btn-primary">Book</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        @if (!Model.PreBookedBlocks.Any())
+        {
+            <tr><td colspan="3" class="text-center">No pre-booked blocks found.</td></tr>
+        }
+    </tbody>
+</table>
+<a asp-page="/Bookings/BookingMenu" class="btn btn-secondary">Back</a>

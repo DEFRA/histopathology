@@ -16,6 +16,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Histo.Infrastructure\Histo.Infrastructure.csproj" />
+    <ProjectReference Include="..\Histo.Administration\Histo.Administration.csproj" />
+    <ProjectReference Include="..\Histo.AuditLog\Histo.AuditLog.csproj" />
+    <ProjectReference Include="..\Histo.QualityControl\Histo.QualityControl.csproj" />
+    <ProjectReference Include="..\Histo.Histology\Histo.Histology.csproj" />
+    <ProjectReference Include="..\Histo.Submissions\Histo.Submissions.csproj" />
   </ItemGroup>
 
 </Project>

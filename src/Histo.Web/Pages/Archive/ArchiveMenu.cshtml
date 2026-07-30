@@ -1,0 +1,12 @@
+@page
+@model ArchiveMenuModel
+@{
+    ViewData["Title"] = "Archive";
+    ViewData["PageTitle"] = "Archive";
+}
+
+<ul class="menu-links">
+    <li><a asp-page="/Archive/ArchiveBlocks">Archive Blocks</a></li>
+    <li><a asp-page="/Archive/ArchiveTissues">Archive Tissues</a></li>
+    <li><a asp-page="/Archive/BatchesForArchiving">Batches for Archiving</a></li>
+</ul>

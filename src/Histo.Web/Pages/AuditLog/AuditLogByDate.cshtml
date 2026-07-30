@@ -1,0 +1,33 @@
+@page
+@model AuditLogByDateModel
+@{
+    ViewData["Title"] = "Audit Log by Date";
+    ViewData["PageTitle"] = "Audit Log — Search by Date";
+}
+
+<form method="post" class="filter-form">
+    <label>From: <input type="date" asp-for="StartDate" /></label>
+    <label>To: <input type="date" asp-for="EndDate" /></label>
+    <button type="submit">Search</button>
+</form>
+
+@if (Model.Results.Any())
+{
+    <table class="data-table">
+        <thead>
+            <tr><th>Date</th><th>User</th><th>Action</th><th>Entity</th><th>Detail</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var e in Model.Results)
+            {
+                <tr>
+                    <td>@e.ChangedAt.ToShortDateString()</td>
+                    <td>@e.UserName</td>
+                    <td>@e.Action</td>
+                    <td>@e.EntityType @e.EntityID</td>
+                    <td>@e.Detail</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

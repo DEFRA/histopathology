@@ -9,17 +9,31 @@
 <body>
     <header class="site-header">
         <nav class="site-nav">
-            <span class="site-title">Histopathology System</span>
-            {{!-- TODO Phase 2: Replace VLAHeader.ascx -- inject user identity context from ISessionService --}}
+            <a class="site-title" asp-page="/Index">Histopathology System</a>
+            @await Html.PartialAsync("_NavPartial")
         </nav>
+        <div class="site-context">
+            @await Html.PartialAsync("_UserContextPartial")
+        </div>
     </header>
+
+    @if (ViewData["PageTitle"] is string pt)
+    {
+        <div class="page-title-bar">
+            <h1 class="page-title">@pt</h1>
+            @if (ViewData["BatchNo"] is string batchNo)
+            {
+                <span class="context-label">Batch No: @batchNo</span>
+            }
+        </div>
+    }
 
     <main role="main" class="main-content">
         @RenderBody()
     </main>
 
     <footer class="site-footer">
-        {{!-- TODO: Replace VLAFooter.ascx content --}}
+        <p>Histopathology System &copy; @DateTime.Now.Year</p>
     </footer>
 
     @await RenderSectionAsync("Scripts", required: false)

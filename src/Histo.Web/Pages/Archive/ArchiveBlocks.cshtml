@@ -1,0 +1,29 @@
+@page
+@model Histo.Web.Pages.Archive.ArchiveBlocksModel
+@{
+    ViewData["Title"] = "Archive Blocks";
+    ViewData["PageTitle"] = "Archive Blocks";
+}
+
+<table class="table table-striped">
+    <thead class="table-dark">
+        <tr>
+            <th>Block Ref</th><th>Customer Ref</th><th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var b in Model.Blocks)
+        {
+            <tr>
+                <td>@b.BlockRef</td>
+                <td>@b.CustomerRef</td>
+                <td>@b.Status</td>
+            </tr>
+        }
+        @if (!Model.Blocks.Any())
+        {
+            <tr><td colspan="3" class="text-center">No blocks to archive.</td></tr>
+        }
+    </tbody>
+</table>
+<a asp-page="/Archive/ArchiveMenu" class="btn btn-secondary">Back</a>

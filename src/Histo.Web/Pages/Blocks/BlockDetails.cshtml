@@ -1,0 +1,44 @@
+@page
+@model Histo.Web.Pages.Blocks.BlockDetailsModel
+@{
+    ViewData["Title"] = "Block Details";
+    ViewData["PageTitle"] = "Block Details";
+}
+
+<table class="table table-striped table-hover">
+    <thead class="table-dark">
+        <tr>
+            <th>Block Ref</th>
+            <th>Customer Ref</th>
+            <th>Comment</th>
+            <th>Repeat</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var b in Model.Blocks)
+        {
+            <tr>
+                <td>@b.BlockRef</td>
+                <td>@b.CustomerRef</td>
+                <td>@b.Comment</td>
+                <td>@(b.RepeatBlock ? "Yes" : "No")</td>
+                <td>@b.Status</td>
+                <td>
+                    <form method="post" asp-page-handler="Delete" class="d-inline">
+                        <input type="hidden" name="blockId" value="@b.ID" />
+                        <button type="submit" class="btn btn-sm btn-danger"
+                                onclick="return confirm('Delete this block?')">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        @if (!Model.Blocks.Any())
+        {
+            <tr><td colspan="6" class="text-center">No blocks found for this batch.</td></tr>
+        }
+    </tbody>
+</table>
+
+<a asp-page="/Submissions/ViewSamples" class="btn btn-secondary">Back to Animals</a>

@@ -1,0 +1,41 @@
+@page
+@model QCNotesModel
+@{
+    ViewData["Title"] = "QC Notes";
+    ViewData["PageTitle"] = "Quality Control Notes";
+}
+
+<p><strong>Batch No:</strong> @Model.BatchID</p>
+
+<form method="post" asp-page-handler="Add">
+    <button type="submit">Add QC Note</button>
+</form>
+
+@if (Model.Notes.Any())
+{
+    <table class="data-table">
+        <thead>
+            <tr><th>ID</th><th>Created By</th><th>Date</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var n in Model.Notes)
+            {
+                <tr>
+                    <td>@n.ID</td>
+                    <td>@n.CreatedBy</td>
+                    <td>@n.DateCreated</td>
+                    <td>
+                        <form method="post">
+                            <input type="hidden" name="noteId" value="@n.ID" />
+                            <button type="submit" asp-page-handler="Edit">Edit</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+else
+{
+    <p>No QC notes for this batch.</p>
+}

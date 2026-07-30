@@ -1,0 +1,49 @@
+@page
+@model ViewSubmissionsModel
+@{
+    ViewData["Title"] = "View Submissions";
+    ViewData["PageTitle"] = "View Submissions";
+}
+
+<form method="get" class="filter-form">
+    <label>Status:
+        <select name="StatusFilter" asp-for="StatusFilter">
+            <option value="">— All —</option>
+            <option value="1">Submitted</option>
+            <option value="2">Received</option>
+            <option value="4">Completed</option>
+            <option value="5">On Hold</option>
+            <option value="6">In Progress</option>
+        </select>
+    </label>
+    <button type="submit">Search</button>
+</form>
+
+@if (!Model.Results.Any())
+{
+    <p>No submissions found.</p>
+}
+else
+{
+    <table class="data-table">
+        <thead>
+            <tr><th>Batch No</th><th>Customer Ref</th><th>Status</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var b in Model.Results)
+            {
+                <tr>
+                    <td>@b.ID</td>
+                    <td>@b.CustomerRef</td>
+                    <td>@b.Status</td>
+                    <td>
+                        <form method="post">
+                            <input type="hidden" name="batchId" value="@b.ID" />
+                            <button type="submit" asp-page-handler="Select">Select</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

@@ -1,0 +1,26 @@
+@page
+@model Histo.Web.Pages.Bookings.BookHistologyRefModel
+@{
+    ViewData["Title"] = "Book Histology Reference";
+    ViewData["PageTitle"] = "Book Histology Reference";
+}
+
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="alert alert-danger">@Model.Error</div>
+}
+
+<form method="post">
+    <div class="mb-3">
+        <label class="form-label">Select Reference</label>
+        <select name="histoRef" class="form-select" required>
+            <option value="">-- Select --</option>
+            @foreach (var r in Model.AvailableRefs)
+            {
+                <option value="@r.Ref">@r.Ref</option>
+            }
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Book</button>
+    <a asp-page="/Submissions/ViewSamples" class="btn btn-secondary ms-2">Cancel</a>
+</form>

@@ -1,0 +1,16 @@
+@page "{NoteId:int}"
+@model Histo.Web.Pages.QC.EditQCNoteModel
+
+@if (!string.IsNullOrEmpty(Model.ConcurrencyError))
+{
+    <div class="alert alert-danger">@Model.ConcurrencyError</div>
+}
+
+<form method="post">
+    <div class="mb-3">
+        <label class="form-label">Note Text</label>
+        <textarea name="Text" class="form-control" rows="6">@Model.Text</textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-page="/QC/QCNotes" class="btn btn-secondary ms-2">Cancel</a>
+</form>

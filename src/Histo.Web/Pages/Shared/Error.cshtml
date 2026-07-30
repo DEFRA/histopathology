@@ -1,0 +1,17 @@
+@page
+@model Histo.Web.Pages.Shared.ErrorModel
+@{
+    ViewData["Title"] = "Error";
+    ViewData["PageTitle"] = "An Error Occurred";
+}
+
+<div class="alert alert-danger" role="alert">
+    <h4 class="alert-heading">Something went wrong.</h4>
+    <p>An unexpected error occurred. Please try again or contact support if the problem persists.</p>
+    @if (!string.IsNullOrEmpty(Model.RequestId))
+    {
+        <hr />
+        <p class="mb-0">Request ID: <code>@Model.RequestId</code></p>
+    }
+</div>
+<a asp-page="/Index" class="btn btn-primary">Return to Home</a>
