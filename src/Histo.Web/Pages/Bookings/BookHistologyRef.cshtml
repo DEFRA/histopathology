@@ -7,13 +7,22 @@
 
 @if (!string.IsNullOrEmpty(Model.Error))
 {
-    <div class="alert alert-danger">@Model.Error</div>
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.Error</li>
+                </ul>
+            </div>
+        </div>
+    </div>
 }
 
 <form method="post">
-    <div class="mb-3">
-        <label class="form-label">Select Reference</label>
-        <select name="histoRef" class="form-select" required>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="histoRef">Select reference</label>
+        <select name="histoRef" id="histoRef" class="govuk-select" required>
             <option value="">-- Select --</option>
             @foreach (var r in Model.AvailableRefs)
             {
@@ -21,6 +30,6 @@
             }
         </select>
     </div>
-    <button type="submit" class="btn btn-primary">Book</button>
-    <a asp-page="/Submissions/ViewSamples" class="btn btn-secondary ms-2">Cancel</a>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Book</button>
+    <a asp-page="/Submissions/ViewSamples" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
 </form>

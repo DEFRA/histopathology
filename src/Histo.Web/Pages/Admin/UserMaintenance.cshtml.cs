@@ -13,11 +13,13 @@ public class UserMaintenanceModel : HistoPageModel
         : base(session) => _users = users;
 
     public IReadOnlyList<User> Users { get; private set; } = [];
+    public string? StatusMessage { get; private set; }
 
     public async Task OnGetAsync()
     {
         ViewData["Title"] = "User Maintenance";
         ViewData["PageTitle"] = "User Maintenance";
+        StatusMessage = TempData["StatusMessage"] as string;
         Users = await _users.GetAllUsersAsync();
     }
 }

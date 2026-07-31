@@ -43,4 +43,16 @@ public interface ILookupRepository
     /// Returns projects for a submitted area. Maps to <c>GetProjectsArea</c>.
     /// </summary>
     Task<IReadOnlyList<LookupItem>> GetProjectsByAreaAsync(string area, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the list of user groups for the User Maintenance group drop-down.
+    /// Maps to <c>GetluUserGroup</c> (legacy source: <c>LookupData.GetUserGroups</c>).
+    /// </summary>
+    Task<IReadOnlyList<LookupItem>> GetUserGroupsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the list of user areas for the User Maintenance area drop-down.
+    /// Maps to <c>GetluUserArea</c> (legacy source: <c>LookupData.GetUserAreas</c>).
+    /// </summary>
+    Task<IReadOnlyList<LookupItem>> GetUserAreasAsync(CancellationToken ct = default);
 }

@@ -67,4 +67,41 @@ public sealed class UserRepository : IUserRepository
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
+
+    /// <inheritdoc/>
+    public async Task CreateUserAsync(User user, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        await conn.ExecuteAsync(
+            "AddUser",
+            new
+            {
+                NTLogin   = user.NtLogin,
+                Name      = user.Name,
+                Email     = user.Email,
+                UserGroup = user.GroupCode,
+                UserArea  = user.AreaCode,
+                Active    = user.Active,
+            },
+            commandType: System.Data.CommandType.StoredProcedure);
+    }
+
+    /// <inheritdoc/>
+    public async Task UpdateUserAsync(User user, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        await conn.ExecuteAsync(
+            "EditUser",
+            new
+            {
+                ID        = user.UserID,
+                NTLogin   = user.NtLogin,
+                Name      = user.Name,
+                Email     = user.Email,
+                UserGroup = user.GroupCode,
+                UserArea  = user.AreaCode,
+                Active    = user.Active,
+            },
+            commandType: System.Data.CommandType.StoredProcedure);
+    }
 }

@@ -5,9 +5,10 @@
     ViewData["PageTitle"] = "View Submissions";
 }
 
-<form method="get" class="filter-form">
-    <label>Status:
-        <select name="StatusFilter" asp-for="StatusFilter">
+<form method="get">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="StatusFilter">Status</label>
+        <select class="govuk-select" name="StatusFilter" asp-for="StatusFilter">
             <option value="">— All —</option>
             <option value="1">Submitted</option>
             <option value="2">Received</option>
@@ -15,31 +16,36 @@
             <option value="5">On Hold</option>
             <option value="6">In Progress</option>
         </select>
-    </label>
-    <button type="submit">Search</button>
+    </div>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
 </form>
 
 @if (!Model.Results.Any())
 {
-    <p>No submissions found.</p>
+    <p class="govuk-body">No submissions found.</p>
 }
 else
 {
-    <table class="data-table">
-        <thead>
-            <tr><th>Batch No</th><th>Customer Ref</th><th>Status</th><th>Action</th></tr>
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Batch No</th>
+                <th scope="col" class="govuk-table__header">Customer ref</th>
+                <th scope="col" class="govuk-table__header">Status</th>
+                <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
+            </tr>
         </thead>
-        <tbody>
+        <tbody class="govuk-table__body">
             @foreach (var b in Model.Results)
             {
-                <tr>
-                    <td>@b.ID</td>
-                    <td>@b.CustomerRef</td>
-                    <td>@b.Status</td>
-                    <td>
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@b.ID</td>
+                    <td class="govuk-table__cell">@b.CustomerRef</td>
+                    <td class="govuk-table__cell">@b.Status</td>
+                    <td class="govuk-table__cell">
                         <form method="post">
                             <input type="hidden" name="batchId" value="@b.ID" />
-                            <button type="submit" asp-page-handler="Select">Select</button>
+                            <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-page-handler="Select">Select</button>
                         </form>
                     </td>
                 </tr>

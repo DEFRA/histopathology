@@ -5,28 +5,32 @@
     ViewData["PageTitle"] = "Book Block Reference";
 }
 
-<table class="table table-striped">
-    <thead class="table-dark">
-        <tr><th>Block Ref</th><th>Customer Ref</th><th>Action</th></tr>
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">Block ref</th>
+            <th scope="col" class="govuk-table__header">Customer ref</th>
+            <th scope="col" class="govuk-table__header">Action</th>
+        </tr>
     </thead>
-    <tbody>
+    <tbody class="govuk-table__body">
         @foreach (var b in Model.PreBookedBlocks)
         {
-            <tr>
-                <td>@b.BlockRef</td>
-                <td>@b.CustomerRef</td>
-                <td>
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">@b.BlockRef</td>
+                <td class="govuk-table__cell">@b.CustomerRef</td>
+                <td class="govuk-table__cell">
                     <form method="post">
                         <input type="hidden" name="blockId" value="@b.ID" />
-                        <button type="submit" class="btn btn-sm btn-primary">Book</button>
+                        <button type="submit" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button">Book</button>
                     </form>
                 </td>
             </tr>
         }
         @if (!Model.PreBookedBlocks.Any())
         {
-            <tr><td colspan="3" class="text-center">No pre-booked blocks found.</td></tr>
+            <tr class="govuk-table__row"><td colspan="3" class="govuk-table__cell">No pre-booked blocks found.</td></tr>
         }
     </tbody>
 </table>
-<a asp-page="/Bookings/BookingMenu" class="btn btn-secondary">Back</a>
+<a asp-page="/Bookings/BookingMenu" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back</a>

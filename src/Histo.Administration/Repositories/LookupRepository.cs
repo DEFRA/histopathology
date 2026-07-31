@@ -83,9 +83,40 @@ public sealed class LookupRepository : ILookupRepository
         return rows.ToList();
     }
 
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<LookupItem>> GetUserGroupsAsync(CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<dynamic>(
+            "GetluUserGroup",
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.Select(MapCodeDescription).ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<LookupItem>> GetUserAreasAsync(CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<dynamic>(
+            "GetluUserArea",
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.Select(MapCodeDescription).ToList();
+    }
+
     // -----------------------------------------------------------------------
     // Private helpers
     // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Maps a "Code"/"Description" row (the shape returned by <c>GetluUserGroup</c>
+    /// and <c>GetluUserArea</c>) into a <see cref="LookupItem"/>.
+    /// </summary>
+    private static LookupItem MapCodeDescription(dynamic row) => new()
+    {
+        ID     = Convert.ToInt32(row.Code),
+        Name   = (string)(row.Description ?? string.Empty),
+        Active = true,
+    };
 
     /// <summary>
     /// Calls <c>GetEditableLookupProcs</c> to resolve the select stored procedure

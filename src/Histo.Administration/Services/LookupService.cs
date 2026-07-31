@@ -72,4 +72,32 @@ public sealed class LookupService
             return [];
         }
     }
+
+    /// <summary>Returns the user group pick-list for the User Maintenance form.</summary>
+    public async Task<IReadOnlyList<LookupItem>> GetUserGroupsAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _lookups.GetUserGroupsAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get user groups.", ex);
+            return [];
+        }
+    }
+
+    /// <summary>Returns the user area pick-list for the User Maintenance form.</summary>
+    public async Task<IReadOnlyList<LookupItem>> GetUserAreasAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _lookups.GetUserAreasAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get user areas.", ex);
+            return [];
+        }
+    }
 }

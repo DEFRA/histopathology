@@ -73,4 +73,46 @@ public sealed class UserService
             return [];
         }
     }
+
+    /// <summary>
+    /// Creates a new user. Replaces the legacy <c>clsUser.SaveUserData</c> insert path
+    /// (<c>UserMaintenance.aspx</c> grid "Add new" row).
+    ///
+    /// Returns <see langword="false"/> and logs the error if the create fails —
+    /// callers should surface a generic save error to the user.
+    /// </summary>
+    public async Task<bool> CreateUserAsync(User user, CancellationToken ct = default)
+    {
+        try
+        {
+            await _users.CreateUserAsync(user, ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to create user {NtLogin}.", ex, user.NtLogin);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Updates an existing user. Replaces the legacy <c>clsUser.SaveUserData</c> update path
+    /// (<c>UserMaintenance.aspx</c> grid inline "Edit" row).
+    ///
+    /// Returns <see langword="false"/> and logs the error if the update fails —
+    /// callers should surface a generic save error to the user.
+    /// </summary>
+    public async Task<bool> UpdateUserAsync(User user, CancellationToken ct = default)
+    {
+        try
+        {
+            await _users.UpdateUserAsync(user, ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to update user {UserId}.", ex, user.UserID);
+            return false;
+        }
+    }
 }

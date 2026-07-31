@@ -5,25 +5,27 @@
     ViewData["PageTitle"] = "Archive Blocks";
 }
 
-<table class="table table-striped">
-    <thead class="table-dark">
-        <tr>
-            <th>Block Ref</th><th>Customer Ref</th><th>Status</th>
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">Block ref</th>
+            <th scope="col" class="govuk-table__header">Customer ref</th>
+            <th scope="col" class="govuk-table__header">Status</th>
         </tr>
     </thead>
-    <tbody>
+    <tbody class="govuk-table__body">
         @foreach (var b in Model.Blocks)
         {
-            <tr>
-                <td>@b.BlockRef</td>
-                <td>@b.CustomerRef</td>
-                <td>@b.Status</td>
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">@b.BlockRef</td>
+                <td class="govuk-table__cell">@b.CustomerRef</td>
+                <td class="govuk-table__cell">@b.Status</td>
             </tr>
         }
         @if (!Model.Blocks.Any())
         {
-            <tr><td colspan="3" class="text-center">No blocks to archive.</td></tr>
+            <tr class="govuk-table__row"><td colspan="3" class="govuk-table__cell">No blocks to archive.</td></tr>
         }
     </tbody>
 </table>
-<a asp-page="/Archive/ArchiveMenu" class="btn btn-secondary">Back</a>
+<a asp-page="/Archive/ArchiveMenu" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back</a>

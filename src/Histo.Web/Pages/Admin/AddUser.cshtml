@@ -1,0 +1,68 @@
+@page
+@model Histo.Web.Pages.Admin.AddUserModel
+@{
+    ViewData["Title"] = "Add user";
+    ViewData["PageTitle"] = "Add user";
+}
+
+@if (Model.Errors.Count > 0)
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    @foreach (var error in Model.Errors)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+<form method="post">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="NtLogin">NT login</label>
+        <input class="govuk-input" asp-for="NtLogin" spellcheck="false" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Name">Name</label>
+        <input class="govuk-input" asp-for="Name" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Email">Email</label>
+        <input class="govuk-input" asp-for="Email" type="email" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="GroupCode">Group</label>
+        <select class="govuk-select" asp-for="GroupCode">
+            <option value="">-- Select --</option>
+            @foreach (var g in Model.Groups)
+            {
+                <option value="@g.ID">@g.Name</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="AreaCode">Area</label>
+        <select class="govuk-select" asp-for="AreaCode">
+            <option value="">-- Select --</option>
+            @foreach (var a in Model.Areas)
+            {
+                <option value="@a.ID">@a.Name</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-form-group">
+        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="Active" type="checkbox" />
+                <label class="govuk-label govuk-checkboxes__label" for="Active">Active</label>
+            </div>
+        </div>
+    </div>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Add user</button>
+    <a asp-page="/Admin/UserMaintenance" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+</form>
