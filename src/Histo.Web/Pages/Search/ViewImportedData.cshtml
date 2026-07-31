@@ -1,0 +1,69 @@
+@page
+@model Histo.Web.Pages.Search.ViewImportedDataModel
+@{
+    ViewData["Title"] = "View Old ICC_Sub Data";
+    ViewData["PageTitle"] = "View Old ICC_Sub Data";
+}
+
+<form method="get">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="SelectedTable">Table</label>
+        <select class="govuk-select" asp-for="SelectedTable">
+            <option value="">-- Select a table --</option>
+            @foreach (var t in Model.Tables)
+            {
+                <option value="@t.ID" selected="@(t.ID.ToString() == Model.SelectedTable)">@t.Name</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Filter">Filter</label>
+        <input class="govuk-input" asp-for="Filter" />
+    </div>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Go</button>
+    <a class="govuk-button govuk-button--secondary" asp-page="/Search/ViewImportedData">Clear</a>
+    @if (!string.IsNullOrEmpty(Model.SelectedTable) && Model.Results.Any())
+    {
+        <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to CSV</button>
+    }
+</form>
+
+@if (!string.IsNullOrEmpty(Model.SelectedTable))
+{
+    @if (Model.Results.Any())
+    {
+        <table class="govuk-table">
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">Sender ref</th>
+                    <th scope="col" class="govuk-table__header">Histology ref</th>
+                    <th scope="col" class="govuk-table__header">Block ref</th>
+                    <th scope="col" class="govuk-table__header">Project</th>
+                    <th scope="col" class="govuk-table__header">Date submitted</th>
+                    <th scope="col" class="govuk-table__header">Species</th>
+                    <th scope="col" class="govuk-table__header">Tissue</th>
+                    <th scope="col" class="govuk-table__header">Comments</th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @foreach (var r in Model.Results)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@r.SenderRef</td>
+                        <td class="govuk-table__cell">@r.HistologyRef</td>
+                        <td class="govuk-table__cell">@r.BlockRef</td>
+                        <td class="govuk-table__cell">@r.Project</td>
+                        <td class="govuk-table__cell">@r.DateSubmitted?.ToShortDateString()</td>
+                        <td class="govuk-table__cell">@r.Species</td>
+                        <td class="govuk-table__cell">@r.Tissue</td>
+                        <td class="govuk-table__cell">@r.Comments</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <p class="govuk-body">No imported data found for the selected table.</p>
+    }
+}

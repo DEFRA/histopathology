@@ -1,0 +1,117 @@
+using Histo.Administration.Models;
+using Histo.Administration.Services;
+using Histo.Web.Services;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Histo.Web.Pages.Admin;
+
+/// <summary>
+/// Area-scoped pick-list quick-add editor. Replaces the legacy <c>PickListUserArea.aspx</c>,
+/// which is invoked from <c>BatchDetails.aspx</c>'s "New Project"/"New Contact" buttons so a
+/// user can add (or edit) a Project/Contact pick-list entry scoped to their own — or a passed —
+/// user area without leaving the batch workflow.
+///
+/// This is a genuinely distinct page from <c>PickListMaintenanceID.aspx</c> (see
+/// <c>Admin/EditLookupItem</c>): that page is the unrestricted, Maintenance-group table editor
+/// with a "select a table" drop-down and no area filtering; this page is locked to a single
+/// table (passed in via the route) and filters rows to one user area (<c>LookupData.GetUserAreaData</c>).
+///
+/// Note: the current migrated <c>Batches/BatchDetails</c> page does not yet have "New
+/// Project"/"New Contact" buttons to invoke this page (that page is a simplified read-only
+/// summary) — wiring those buttons up is out of scope for this change. This page is reachable
+/// directly, e.g. <c>/Admin/PickListUserArea/19?userArea=HISTO</c> for Projects.
+/// </summary>
+public class PickListUserAreaModel : HistoPageModel
+{
+    private readonly LookupService _lookups;
+
+    public PickListUserAreaModel(ISessionService session, LookupService lookups)
+        : base(session) => _lookups = lookups;
+
+    [BindProperty(SupportsGet = true)] public int TableId { get; set; }
+    [BindProperty(SupportsGet = true)] public string? UserArea { get; set; }
+    [BindProperty(SupportsGet = true)] public int? ItemId { get; set; }
+
+    [BindProperty] public string Description { get; set; } = string.Empty;
+    [BindProperty] public bool Active { get; set; } = true;
+
+    public string TableName { get; private set; } = string.Empty;
+    public IReadOnlyList<LookupItem> Items { get; private set; } = [];
+    public List<string> Errors { get; } = [];
+    public string? StatusMessage { get; private set; }
+
+    private string EffectiveArea => string.IsNullOrEmpty(UserArea) ? Session.UserArea : UserArea;
+
+    public async Task OnGetAsync()
+    {
+        ViewData["Title"] = "Pick List";
+        ViewData["PageTitle"] = "Pick List";
+        StatusMessage = TempData["StatusMessage"] as string;
+        await LoadTableNameAsync();
+        await LoadItemsAsync();
+
+        if (ItemId is int id)
+        {
+            var item = Items.FirstOrDefault(i => i.ID == id);
+            if (item is not null)
+            {
+                Description = item.Name;
+                Active = item.Active;
+            }
+        }
+        else
+        {
+            Active = true;
+        }
+    }
+
+    public async Task<IActionResult> OnPostAsync()
+    {
+        ViewData["Title"] = "Pick List";
+        ViewData["PageTitle"] = "Pick List";
+        await LoadTableNameAsync();
+        await LoadItemsAsync();
+
+        Validate();
+        if (Errors.Count > 0) return Page();
+
+        bool ok;
+        if (ItemId is int id)
+        {
+            var item = new LookupItem { ID = id, Name = Description.Trim(), Active = Active };
+            ok = await _lookups.UpdateLookupItemAsync(TableId, item, Session.UserID);
+        }
+        else
+        {
+            var item = new LookupItem { Name = Description.Trim(), Active = Active, Area = EffectiveArea };
+            ok = await _lookups.CreateLookupItemAsync(TableId, item, Session.UserID);
+        }
+
+        if (!ok)
+        {
+            Errors.Add("Failed to save the pick list item. Please try again.");
+            return Page();
+        }
+
+        TempData["StatusMessage"] = ItemId is int
+            ? $"'{Description.Trim()}' was updated."
+            : $"'{Description.Trim()}' was added.";
+        return RedirectToPage("/Admin/PickListUserArea", new { tableId = TableId, userArea = UserArea });
+    }
+
+    private void Validate()
+    {
+        if (string.IsNullOrWhiteSpace(Description)) Errors.Add("Enter a description.");
+    }
+
+    private async Task LoadTableNameAsync()
+    {
+        var tables = await _lookups.ListEditableLookupsAsync();
+        TableName = tables.FirstOrDefault(t => t.ID == TableId)?.TableName ?? string.Empty;
+    }
+
+    private async Task LoadItemsAsync()
+    {
+        Items = await _lookups.GetUserAreaDataAsync(TableId, EffectiveArea);
+    }
+}

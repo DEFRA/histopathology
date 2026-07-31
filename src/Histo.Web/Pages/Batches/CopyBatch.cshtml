@@ -1,0 +1,62 @@
+@page "{sourceBatchId:int?}"
+@model Histo.Web.Pages.Batches.CopyBatchModel
+@{
+    ViewData["Title"] = "Copy Submission";
+    ViewData["PageTitle"] = "Copy Submission";
+}
+
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.Error</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+@if (Model.SourceBatch is not null)
+{
+    <form method="post">
+        <input type="hidden" asp-for="SourceBatchId" />
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="NewCustomerRef">Customer reference for new submission</label>
+            <input class="govuk-input" asp-for="NewCustomerRef" />
+        </div>
+
+        <h2 class="govuk-heading-m">Samples to copy</h2>
+        <table class="govuk-table">
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">Sender ref</th>
+                    <th scope="col" class="govuk-table__header">New sender ref</th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @for (var i = 0; i < Model.Animals.Count; i++)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@Model.Animals[i].SenderRef</td>
+                        <td class="govuk-table__cell">
+                            <input type="hidden" asp-for="Animals[i].AnimalId" />
+                            <input type="hidden" asp-for="Animals[i].SubmissionId" />
+                            <input type="hidden" asp-for="Animals[i].SenderRef" />
+                            <input class="govuk-input" asp-for="Animals[i].NewSenderRef" />
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Animals.Any())
+                {
+                    <tr class="govuk-table__row"><td colspan="2" class="govuk-table__cell">No samples found for this submission.</td></tr>
+                }
+            </tbody>
+        </table>
+
+        <button type="submit" class="govuk-button" data-module="govuk-button">Copy submission</button>
+        <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    </form>
+}

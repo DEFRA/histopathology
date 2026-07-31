@@ -46,4 +46,64 @@ public interface IBatchRepository
 
     /// <summary>Returns comment rows for a batch. Maps to <c>GetAllBatchComments</c>.</summary>
     Task<IReadOnlyList<string>> GetCommentsAsync(int batchId, CancellationToken ct = default);
+
+    // -----------------------------------------------------------------------
+    // Search (read-only)
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Multi-field submission search. Maps to <c>GetSearchBatchDetails</c>.
+    /// Legacy source: SearchSubmissions.aspx.vb — <c>clsBatch.SearchBatchDetails</c>.
+    /// </summary>
+    Task<IReadOnlyList<BatchSearchResult>> SearchAsync(BatchSearchCriteria criteria, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns a simplified test-item listing for a project/date range.
+    /// Maps to <c>GetTestRows</c>. Legacy source: SearchTest.aspx.vb — <c>clsBatch.GetTestItemRows</c>.
+    ///
+    /// SIMPLIFIED: the legacy screen additionally builds a histology/antibody/special-stain
+    /// checkbox-driven premium-charge cross-tab via <c>CountHistologysTestItems</c>,
+    /// <c>CountStainTestItems</c>, and <c>CountAntibodesTestItems</c> — that analytics
+    /// engine is not ported. See the search module report for details.
+    /// </summary>
+    Task<IReadOnlyList<TestItemRow>> GetTestItemRowsAsync(string? projectDesc, int batchType, CancellationToken ct = default);
+
+    // -----------------------------------------------------------------------
+    // Fix Completed Dates (admin data-correction utility)
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns the IDs of all batches that have blocks (cassetted batches).
+    /// Maps to <c>GetBatchesLinkedToBlocks</c>.
+    /// Legacy source: <c>FixCompletedDates.aspx.vb</c> — <c>GetBatchIDs</c>.
+    /// </summary>
+    Task<IReadOnlyList<int>> GetBatchIdsLinkedToBlocksAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the dispatch status of every histology test on a batch.
+    /// Maps to <c>GetHistologyDispatched</c>.
+    /// Legacy source: <c>FixCompletedDates.aspx.vb</c> — <c>GetBatchHistology</c>.
+    /// </summary>
+    Task<IReadOnlyList<TestDispatchStatus>> GetHistologyDispatchStatusAsync(int batchId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the dispatch status of every special stain test on a batch.
+    /// Maps to <c>GetStainDispatched</c>.
+    /// Legacy source: <c>FixCompletedDates.aspx.vb</c> — <c>GetBatchStain</c>.
+    /// </summary>
+    Task<IReadOnlyList<TestDispatchStatus>> GetStainDispatchStatusAsync(int batchId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the dispatch status of every antibodies test on a batch.
+    /// Maps to <c>GetAntibodiesDispatched</c>.
+    /// Legacy source: <c>FixCompletedDates.aspx.vb</c> — <c>GetBatchAntibodies</c>.
+    /// </summary>
+    Task<IReadOnlyList<TestDispatchStatus>> GetAntibodiesDispatchStatusAsync(int batchId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Sets a batch's completed date directly (bypasses normal status workflow).
+    /// Maps to <c>EditBatchCompletedDate</c>.
+    /// Legacy source: <c>FixCompletedDates.aspx.vb</c> — <c>UpdateBatchCompletedDate</c>.
+    /// </summary>
+    Task UpdateCompletedDateAsync(int batchId, DateTime completedDate, CancellationToken ct = default);
 }

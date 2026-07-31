@@ -15,6 +15,10 @@
         <input class="govuk-input govuk-input--width-10" type="date" asp-for="EndDate" />
     </div>
     <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
+    @if (Model.Results.Any())
+    {
+        <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to CSV</button>
+    }
 </form>
 
 @if (Model.Results.Any())

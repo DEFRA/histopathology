@@ -1,0 +1,36 @@
+@page "{newBatchId:int?}"
+@model Histo.Web.Pages.Batches.CopyBatchSummaryModel
+@{
+    ViewData["Title"] = "Submission Copied";
+    ViewData["PageTitle"] = "Submission Copied";
+}
+
+@if (Model.NewBatch is not null)
+{
+    <div class="govuk-panel govuk-panel--confirmation">
+        <h1 class="govuk-panel__title">Submission copied</h1>
+        <div class="govuk-panel__body">
+            New submission ID: @Model.NewBatch.ID
+        </div>
+    </div>
+
+    <dl class="govuk-summary-list">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Customer ref</dt>
+            <dd class="govuk-summary-list__value">@Model.NewBatch.CustomerRef</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Samples copied</dt>
+            <dd class="govuk-summary-list__value">@Model.AnimalCount</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Sample groups copied</dt>
+            <dd class="govuk-summary-list__value">@Model.SubmissionCount</dd>
+        </div>
+    </dl>
+
+    <form method="post" asp-page-handler="View">
+        <input type="hidden" name="newBatchId" value="@Model.NewBatchId" />
+        <button type="submit" class="govuk-button" data-module="govuk-button">View submission</button>
+    </form>
+}

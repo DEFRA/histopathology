@@ -11,6 +11,14 @@ public sealed class LookupItem
     public int ID { get; init; }
     public string Name { get; init; } = string.Empty;
     public bool Active { get; init; } = true;
+
+    /// <summary>
+    /// Optional user-area code. Only meaningful for the area-scoped pick-list tables
+    /// (Contacts/Projects — table IDs 18/19), where the legacy <c>LookupData.SaveLookupData</c>
+    /// insert path requires an Area value. Ignored (and not sent to the database) when creating
+    /// rows in any other pick-list table.
+    /// </summary>
+    public string? Area { get; init; }
 }
 
 /// <summary>

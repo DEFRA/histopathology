@@ -31,4 +31,17 @@ public class AuditLogByDateModel : HistoPageModel
         Results = await _auditLog.GetByDateAsync(StartDate, EndDate);
         return Page();
     }
+
+    /// <summary>Replaces the legacy ExcelExport.aspx link — exports the current results as CSV.</summary>
+    public async Task<IActionResult> OnPostExportCsvAsync()
+    {
+        var results = await _auditLog.GetByDateAsync(StartDate, EndDate);
+        return CsvExportHelper.BuildCsv(
+            "AuditLogByDate.csv",
+            ["Date", "User", "Action", "Entity", "Detail"],
+            results.Select(e => (IReadOnlyList<string?>)new string?[]
+            {
+                e.ChangedAt.ToShortDateString(), e.UserName, e.Action, $"{e.EntityType} {e.EntityID}", e.Detail
+            }));
+    }
 }

@@ -41,4 +41,12 @@ public interface IHistologyRepository
     /// Maps to <c>GetUnUsedBookedHistologyRefs</c> stored procedure.
     /// </summary>
     Task<IReadOnlyList<HistologyRef>> GetUnusedBookedRefsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns every unused histology ref, with no type filter.
+    /// Maps to the <c>GetUnusedHistologyRefs</c> stored procedure called with no
+    /// parameters. Legacy source: HistopathologyLib/clsHistology.vb —
+    /// <c>GetUnUsedHistologyRefsTable</c>. Used by SearchUnUsedHistologyRefs.aspx.
+    /// </summary>
+    Task<IReadOnlyList<HistologyRef>> GetAllUnusedRefsAsync(CancellationToken ct = default);
 }

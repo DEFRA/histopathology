@@ -107,6 +107,30 @@ public sealed class BlockService
         }
     }
 
+    /// <summary>
+    /// Creates a copy of an existing block on a target animal, computing the next
+    /// free block reference for that animal from <paramref name="existingBlockRefs"/>.
+    /// Used by the "Copy blocks" and "Copy samples" workflows.
+    ///
+    /// Legacy source: HistopathologyLib/clsBlock.vb — <c>CopyBlock()</c>
+    /// (tissue/histology/stain/antibody copying is orchestrated by the caller,
+    /// since those records live in the Submissions module).
+    /// </summary>
+    public async Task<int> CopyBlockAsync(
+        Block source,
+        int newBatchId,
+        int newAnimalId,
+        IEnumerable<string> existingBlockRefs,
+        IEnumerable<int> existingOrders,
+        int userId,
+        CancellationToken ct = default)
+    {
+        var newBlockRef = BlockHelpers.ComputeNextBlockRef(existingBlockRefs);
+        return await AddBlockAsync(
+            newBatchId, newAnimalId, newBlockRef, existingOrders, userId,
+            source.CustomerRef, source.Comment, source.RepeatBlock, ct);
+    }
+
     /// <summary>Deletes a block.</summary>
     public async Task<bool> DeleteBlockAsync(int blockId, int userId, CancellationToken ct = default)
     {
@@ -119,6 +143,68 @@ public sealed class BlockService
         {
             _logger.LogError("Failed to delete block {BlockId}.", ex, blockId);
             return false;
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Search (read-only)
+    // -----------------------------------------------------------------------
+
+    /// <summary>Returns the used block refs (with status) for a histology ref.</summary>
+    public async Task<IReadOnlyList<UsedBlockRef>> GetUsedBlockRefsByHistologyRefAsync(string histologyRef, CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repo.GetUsedBlockRefsByHistologyRefAsync(histologyRef, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to search used block refs by histology ref {HistologyRef}.", ex, histologyRef);
+            return [];
+        }
+    }
+
+    /// <summary>Returns the used block refs (with status) for a sender ref.</summary>
+    public async Task<IReadOnlyList<UsedBlockRef>> GetUsedBlockRefsBySenderRefAsync(string senderRef, CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repo.GetUsedBlockRefsBySenderRefAsync(senderRef, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to search used block refs by sender ref {SenderRef}.", ex, senderRef);
+            return [];
+        }
+    }
+
+    /// <summary>Returns archived block records matching the given (optional) filters.</summary>
+    public async Task<IReadOnlyList<BlockArchiveInfo>> GetBlockArchiveAsync(
+        string? senderRef, string? histologyRef, string? blockRef, string? archiveLocation, CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repo.GetBlockArchiveAsync(senderRef, histologyRef, blockRef, archiveLocation, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to search block archive information.", ex);
+            return [];
+        }
+    }
+
+    /// <summary>Returns archived slide records matching the given (optional) filters.</summary>
+    public async Task<IReadOnlyList<SlideArchiveInfo>> GetSlideArchiveAsync(
+        string? senderRef, string? histologyRef, string? archiveLocation, CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repo.GetSlideArchiveAsync(senderRef, histologyRef, archiveLocation, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to search slide archive information.", ex);
+            return [];
         }
     }
 }

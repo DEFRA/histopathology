@@ -98,6 +98,8 @@ try
     builder.Services.AddScoped<BlockService>();
     builder.Services.AddScoped<IHistologyRepository, HistologyRepository>();
     builder.Services.AddScoped<HistologyRefService>();
+    builder.Services.AddScoped<IBlockTestRepository, BlockTestRepository>();
+    builder.Services.AddScoped<BlockTestService>();
 
     // ── QualityControl module ─────────────────────────────────────────────────
     builder.Services.AddScoped<IQCNoteRepository, QCNoteRepository>();

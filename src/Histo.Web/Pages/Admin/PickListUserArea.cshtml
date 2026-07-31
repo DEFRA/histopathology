@@ -1,0 +1,85 @@
+@page "{tableId:int}"
+@model Histo.Web.Pages.Admin.PickListUserAreaModel
+@{
+    ViewData["Title"] = "Pick List";
+    ViewData["PageTitle"] = "Pick List";
+}
+
+<h2 class="govuk-heading-m">@Model.TableName</h2>
+
+<p class="govuk-body">Use the form below to add, edit or deactivate entries in this table. The description field must be completed for the entry to be successfully saved.</p>
+
+@if (!string.IsNullOrEmpty(Model.StatusMessage))
+{
+    <div class="govuk-notification-banner govuk-notification-banner--success" role="alert" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
+        <div class="govuk-notification-banner__header">
+            <h2 class="govuk-notification-banner__title" id="govuk-notification-banner-title">Success</h2>
+        </div>
+        <div class="govuk-notification-banner__content">
+            <p class="govuk-notification-banner__heading">@Model.StatusMessage</p>
+        </div>
+    </div>
+}
+
+@if (Model.Errors.Count > 0)
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    @foreach (var error in Model.Errors)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">Description</th>
+            <th scope="col" class="govuk-table__header">Active</th>
+            <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @foreach (var i in Model.Items)
+        {
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">@i.Name</td>
+                <td class="govuk-table__cell">@(i.Active ? "Yes" : "No")</td>
+                <td class="govuk-table__cell">
+                    <a asp-page="/Admin/PickListUserArea" asp-route-tableId="@Model.TableId" asp-route-userArea="@Model.UserArea" asp-route-itemId="@i.ID" class="govuk-link">Edit</a>
+                </td>
+            </tr>
+        }
+        @if (!Model.Items.Any())
+        {
+            <tr class="govuk-table__row"><td colspan="3" class="govuk-table__cell">No items found.</td></tr>
+        }
+    </tbody>
+</table>
+
+<h2 class="govuk-heading-m">@(Model.ItemId is int ? "Edit item" : "Add item")</h2>
+
+<form method="post">
+    <input type="hidden" asp-for="ItemId" />
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Description">Description</label>
+        <input class="govuk-input" asp-for="Description" maxlength="50" />
+    </div>
+    <div class="govuk-form-group">
+        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="Active" type="checkbox" />
+                <label class="govuk-label govuk-checkboxes__label" for="Active">Active</label>
+            </div>
+        </div>
+    </div>
+    <button type="submit" class="govuk-button" data-module="govuk-button">@(Model.ItemId is int ? "Save changes" : "Add item")</button>
+    <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
+</form>

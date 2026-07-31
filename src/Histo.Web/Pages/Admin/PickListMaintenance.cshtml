@@ -14,6 +14,7 @@
             <th scope="col" class="govuk-table__header">Insert SP</th>
             <th scope="col" class="govuk-table__header">Update SP</th>
             <th scope="col" class="govuk-table__header">Delete SP</th>
+            <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
         </tr>
     </thead>
     <tbody class="govuk-table__body">
@@ -26,11 +27,14 @@
                 <td class="govuk-table__cell">@l.InsertStoredProcedure</td>
                 <td class="govuk-table__cell">@l.UpdateStoredProcedure</td>
                 <td class="govuk-table__cell">@l.DeleteStoredProcedure</td>
+                <td class="govuk-table__cell">
+                    <a asp-page="/Admin/EditLookupItem" asp-route-tableId="@l.ID" class="govuk-link">Edit</a>
+                </td>
             </tr>
         }
         @if (!Model.Lookups.Any())
         {
-            <tr class="govuk-table__row"><td colspan="6" class="govuk-table__cell">No editable lookups found.</td></tr>
+            <tr class="govuk-table__row"><td colspan="7" class="govuk-table__cell">No editable lookups found.</td></tr>
         }
     </tbody>
 </table>

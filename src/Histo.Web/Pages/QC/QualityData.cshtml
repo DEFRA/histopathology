@@ -1,0 +1,54 @@
+@page
+@model Histo.Web.Pages.QC.QualityDataModel
+
+<p class="govuk-body"><strong>Batch No:</strong> @Model.BatchID</p>
+
+@if (Model.Tests.Any())
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Histology ref</th>
+                <th scope="col" class="govuk-table__header">Block ref</th>
+                <th scope="col" class="govuk-table__header">Test</th>
+                <th scope="col" class="govuk-table__header">Result</th>
+                <th scope="col" class="govuk-table__header">Dispatched</th>
+                <th scope="col" class="govuk-table__header">Archived</th>
+                <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var t in Model.Tests)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@t.HistologyRef</td>
+                    <td class="govuk-table__cell">@t.BlockRef</td>
+                    <td class="govuk-table__cell">@(t.TestDetails ?? t.Code)</td>
+                    <td class="govuk-table__cell">
+                        @(t.Result == Histo.Histology.Models.BlockTestResult.Passed ? "Passed"
+                            : t.Result == Histo.Histology.Models.BlockTestResult.Failed ? "Failed" : "Not tested")
+                    </td>
+                    <td class="govuk-table__cell">@(t.Dispatched ? "Yes" : "No")</td>
+                    <td class="govuk-table__cell">@(t.Archived ? "Yes" : "No")</td>
+                    <td class="govuk-table__cell">
+                        @if (t.OnHold)
+                        {
+                            <span class="govuk-tag govuk-tag--grey">On hold</span>
+                        }
+                        else
+                        {
+                            <form method="post">
+                                <input type="hidden" name="testId" value="@t.ID" />
+                                <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-page-handler="Edit">Edit</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+else
+{
+    <p class="govuk-body">No tests found for this batch.</p>
+}

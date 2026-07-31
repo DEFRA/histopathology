@@ -55,4 +55,27 @@ public interface ILookupRepository
     /// Maps to <c>GetluUserArea</c> (legacy source: <c>LookupData.GetUserAreas</c>).
     /// </summary>
     Task<IReadOnlyList<LookupItem>> GetUserAreasAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the list of legacy imported ICC_Sub table names for the ViewImportedData
+    /// table drop-down. Maps to <c>GetluImportedTables</c>
+    /// (legacy source: <c>LookupData.GetImportedtables</c>).
+    /// </summary>
+    Task<IReadOnlyList<LookupItem>> GetImportedTablesAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Inserts a new pick-list row into the table identified by <paramref name="tableId"/>,
+    /// using the Insert stored procedure resolved via <c>GetEditableLookupProcs</c>.
+    /// Legacy source: <c>LookupData.SaveLookupData</c> insert path
+    /// (<c>PickListMaintenanceID.aspx</c> / <c>PickListUserArea.aspx</c> grid "Add new" row).
+    /// </summary>
+    Task CreateLookupItemAsync(int tableId, LookupItem item, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Updates an existing pick-list row in the table identified by <paramref name="tableId"/>,
+    /// using the Update stored procedure resolved via <c>GetEditableLookupProcs</c>.
+    /// Legacy source: <c>LookupData.SaveLookupData</c> update path
+    /// (<c>PickListMaintenanceID.aspx</c> / <c>PickListUserArea.aspx</c> grid "Edit" row).
+    /// </summary>
+    Task UpdateLookupItemAsync(int tableId, LookupItem item, int userId, CancellationToken ct = default);
 }

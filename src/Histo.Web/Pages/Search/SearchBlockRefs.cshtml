@@ -1,0 +1,45 @@
+@page
+@model SearchBlockRefsModel
+@{
+    ViewData["Title"] = "Search Block Refs";
+    ViewData["PageTitle"] = "Search Block Refs";
+}
+
+<form method="post">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="SenderRef">Sender ref</label>
+        <input class="govuk-input" asp-for="SenderRef" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="HistologyRef">Histology ref</label>
+        <input class="govuk-input" asp-for="HistologyRef" />
+    </div>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
+</form>
+
+@if (Model.ErrorMessage is not null)
+{
+    <p class="govuk-error-message">@Model.ErrorMessage</p>
+}
+else if (Model.Results.Any())
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Used block refs</th>
+                <th scope="col" class="govuk-table__header">Unused block refs</th>
+                <th scope="col" class="govuk-table__header">Pre booked block refs</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var r in Model.Results)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@r.UsedBlockRefs</td>
+                    <td class="govuk-table__cell">@r.UnusedBlockRefs</td>
+                    <td class="govuk-table__cell">@r.PreBookedBlockRefs</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

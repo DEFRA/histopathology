@@ -49,5 +49,6 @@ else
     </dl>
     <a asp-page="/Batches/EditBatch" class="govuk-button" data-module="govuk-button">Edit batch</a>
     <a asp-page="/Submissions/ViewSamples" class="govuk-button govuk-button--secondary" data-module="govuk-button">View samples</a>
+    <a asp-page="/Batches/CopyBatch" asp-route-sourceBatchId="@Model.Batch.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy batch</a>
     <a asp-page="/Index" class="govuk-button govuk-button--secondary" data-module="govuk-button">Home</a>
 }

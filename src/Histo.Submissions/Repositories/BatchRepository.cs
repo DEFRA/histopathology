@@ -132,4 +132,105 @@ public sealed class BatchRepository : IBatchRepository
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
+
+    // -----------------------------------------------------------------------
+    // Search (read-only)
+    // -----------------------------------------------------------------------
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BatchSearchResult>> SearchAsync(BatchSearchCriteria criteria, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<BatchSearchResult>(
+            "GetSearchBatchDetails",
+            new
+            {
+                SubmittedBy       = (object?)criteria.SubmittedBy ?? DBNull.Value,
+                ProjectContract   = (object?)criteria.ProjectContractCode ?? DBNull.Value,
+                ContactName       = (object?)criteria.ContactName ?? DBNull.Value,
+                Species           = (object?)criteria.Species ?? DBNull.Value,
+                SubmittedArea     = (object?)criteria.SubmittedArea ?? DBNull.Value,
+                SubmittedDateFrom = (object?)criteria.SubmittedDateFrom ?? DBNull.Value,
+                SubmittedDateTo   = (object?)criteria.SubmittedDateTo ?? DBNull.Value,
+                ReceivedDateFrom  = (object?)criteria.ReceivedDateFrom ?? DBNull.Value,
+                ReceivedDateTo    = (object?)criteria.ReceivedDateTo ?? DBNull.Value,
+                Fixation          = (object?)criteria.Fixation ?? DBNull.Value,
+                HistologyRef      = (object?)criteria.HistologyRef ?? DBNull.Value,
+                SenderRef         = (object?)criteria.SenderRef ?? DBNull.Value,
+                Number            = (object?)criteria.SubmissionNumber ?? DBNull.Value,
+                Status            = (object?)criteria.Status ?? DBNull.Value,
+                EnteredBy         = (object?)criteria.EnteredBy ?? DBNull.Value,
+                All               = 0,
+            },
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<TestItemRow>> GetTestItemRowsAsync(string? projectDesc, int batchType, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<TestItemRow>(
+            "GetTestRows",
+            new { ProjectContractDesc = (object?)projectDesc ?? DBNull.Value, BatchType = batchType },
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    // -----------------------------------------------------------------------
+    // Fix Completed Dates (admin data-correction utility)
+    // -----------------------------------------------------------------------
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<int>> GetBatchIdsLinkedToBlocksAsync(CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<int>(
+            "GetBatchesLinkedToBlocks",
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<TestDispatchStatus>> GetHistologyDispatchStatusAsync(int batchId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<TestDispatchStatus>(
+            "GetHistologyDispatched",
+            new { BatchID = batchId },
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<TestDispatchStatus>> GetStainDispatchStatusAsync(int batchId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<TestDispatchStatus>(
+            "GetStainDispatched",
+            new { BatchID = batchId },
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<TestDispatchStatus>> GetAntibodiesDispatchStatusAsync(int batchId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<TestDispatchStatus>(
+            "GetAntibodiesDispatched",
+            new { BatchID = batchId },
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task UpdateCompletedDateAsync(int batchId, DateTime completedDate, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        await conn.ExecuteAsync(
+            "EditBatchCompletedDate",
+            new { CompletedDate = completedDate, BatchID = batchId },
+            commandType: System.Data.CommandType.StoredProcedure);
+    }
 }

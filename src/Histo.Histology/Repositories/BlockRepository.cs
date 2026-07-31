@@ -103,4 +103,54 @@ public sealed class BlockRepository : IBlockRepository
             new { ID = blockId, BlockRef = blockRef, UserID = userId },
             commandType: System.Data.CommandType.StoredProcedure);
     }
+
+    // -----------------------------------------------------------------------
+    // Search (read-only)
+    // -----------------------------------------------------------------------
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<UsedBlockRef>> GetUsedBlockRefsByHistologyRefAsync(string histologyRef, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<UsedBlockRef>(
+            "GetBlocksForHistoRef",
+            new { HistologyRef = histologyRef },
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<UsedBlockRef>> GetUsedBlockRefsBySenderRefAsync(string senderRef, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<UsedBlockRef>(
+            "GetBlocksForSenderRef",
+            new { SenderRef = senderRef },
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BlockArchiveInfo>> GetBlockArchiveAsync(
+        string? senderRef, string? histologyRef, string? blockRef, string? archiveLocation, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<BlockArchiveInfo>(
+            "GetAnimalBlockArchiveInformation",
+            new { SenderRef = senderRef, HistologyRef = histologyRef, BlockRef = blockRef, ArchiveLocation = archiveLocation },
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<SlideArchiveInfo>> GetSlideArchiveAsync(
+        string? senderRef, string? histologyRef, string? archiveLocation, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<SlideArchiveInfo>(
+            "GetAnimalStainArchiveInformation",
+            new { SenderRef = senderRef, HistologyRef = histologyRef, ArchiveLocation = archiveLocation },
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
 }

@@ -21,4 +21,22 @@ public static class BlockHelpers
         var list = existingOrders.ToList();
         return list.Count == 0 ? 0 : list.Max() + 1;
     }
+
+    /// <summary>
+    /// Returns the next free two-digit block reference for an animal, given the
+    /// block refs already assigned to that animal.
+    ///
+    /// Legacy source: HistopathologyLib/clsBlock.vb, <c>CopyBlock()</c> —
+    /// "iBlockRef += 1 ... If iBlockRef &lt; 10 Then sNextBlockRef = "0" &amp; ..." block.
+    /// Non-numeric refs are ignored (treated as 0) rather than throwing.
+    /// </summary>
+    public static string ComputeNextBlockRef(IEnumerable<string> existingBlockRefs)
+    {
+        var max = existingBlockRefs
+            .Select(r => int.TryParse(r, out var n) ? n : 0)
+            .DefaultIfEmpty(0)
+            .Max();
+        var next = max + 1;
+        return next < 10 ? $"0{next}" : next.ToString();
+    }
 }

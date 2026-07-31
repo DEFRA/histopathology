@@ -26,13 +26,6 @@ public class QCNotesModel : HistoPageModel
             Notes = await _qc.GetBySubmissionAsync(Session.BatchID.Value);
     }
 
-    public async Task<IActionResult> OnPostAddAsync()
-    {
-        if (!Session.BatchID.HasValue) return RedirectToPage("/Index");
-        await _qc.AddAsync(Session.BatchID.Value, Session.UserID);
-        return RedirectToPage();
-    }
-
     public IActionResult OnPostEdit(int noteId)
     {
         return RedirectToPage("/QC/EditQCNote", new { noteId });

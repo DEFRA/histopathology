@@ -1,0 +1,23 @@
+@page
+@model Histo.Web.Pages.Submissions.AddSampleModel
+@{
+    ViewData["Title"] = "Add Sample";
+    ViewData["PageTitle"] = "Add Sample";
+}
+
+<form method="post">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="SenderRef">Sender reference</label>
+        <input class="govuk-input" asp-for="SenderRef" required />
+    </div>
+    <div class="govuk-form-group">
+        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="IsNeuropath" type="checkbox" />
+                <label class="govuk-label govuk-checkboxes__label" for="IsNeuropath">Neuropath</label>
+            </div>
+        </div>
+    </div>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Add sample</button>
+    <a asp-page="/Submissions/ViewSamples" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+</form>

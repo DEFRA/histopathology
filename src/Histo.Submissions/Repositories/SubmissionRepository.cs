@@ -191,6 +191,109 @@ public sealed class SubmissionRepository : ISubmissionRepository
     }
 
     /// <inheritdoc/>
+    public async Task<IReadOnlyList<Tissue>> GetTissuesByBlockAsync(int blockId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<Tissue>(
+            "GetTissuesByBlockID",
+            new { ID = blockId },
+            commandType: System.Data.CommandType.StoredProcedure);
+
+        // Owner is not a DB column — these are always block-owned tissues.
+        return rows.Select(t => new Tissue
+        {
+            ID = t.ID,
+            OwnerID = blockId,
+            Owner = TissueOwner.Block,
+            TissueCode = t.TissueCode,
+            NoPieces = t.NoPieces,
+            Comment = t.Comment,
+            ArchiveLocation = t.ArchiveLocation,
+            ArchivedDate = t.ArchivedDate,
+            ArchiveComment = t.ArchiveComment,
+            RowStamp = t.RowStamp,
+        }).ToList();
+    }
+
+    // -----------------------------------------------------------------------
+    // Search (read-only)
+    // -----------------------------------------------------------------------
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<PmDateSearchResult>> GetByPmDateRangeAsync(DateTime fromDate, DateTime toDate, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<PmDateSearchResult>(
+            "GetSearchPMDates",
+            new { FromDate = fromDate, ToDate = toDate },
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<SenderSearchResult>> GetAnimalsBySenderRefAsync(string senderRef, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<SenderSearchResult>(
+            "GetAnimalsBySenderRef",
+            new { SenderRef = senderRef },
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<TissueArchiveInfo>> GetTissueArchiveAsync(
+        string? senderRef, string? histologyRef, string? archiveLocation, string? tissueCode, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<TissueArchiveInfo>(
+            "GetAnimalTissuesArchiveInformation",
+            new { SenderRef = senderRef, HistologyRef = histologyRef, ArchiveLocation = archiveLocation, TissueCode = tissueCode },
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    // Table-ID -> stored procedure mapping mirroring the legacy Select Case in
+    // clsAnimal.vb GetImportedData. Any ID not in this map (including "All") falls
+    // back to GetAllImportedData, matching the legacy Case Else branch.
+    private static readonly Dictionary<string, string> ImportedDataProcs = new()
+    {
+        ["1"] = "Get2001EXTSUB",
+        ["2"] = "Get2001NEUROSUB",
+        ["3"] = "Get2002EXTSUB",
+        ["4"] = "Get2002EXTSUBNOCPU",
+        ["5"] = "Get2002MOUSESUB",
+        ["6"] = "Get2002NEUROSUB",
+        ["7"] = "Get2003EXTSUB",
+        ["8"] = "Get2003MOUSESUB",
+        ["9"] = "Get2003NEUROSUB",
+        ["10"] = "Get2004EXTSUB",
+        ["11"] = "Get2004MOUSESUB",
+        ["12"] = "Get2004NEUROSUB",
+        ["13"] = "Get2005TBDIAGSUB",
+        ["14"] = "GetICCSUBMI11999TO12JAN2001",
+        ["15"] = "GetICCSUBMI1TISSUEONLYTO12THJAN2001",
+    };
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<ImportedDataRow>> GetImportedDataAsync(string? selectedTable, CancellationToken ct = default)
+    {
+        // Legacy: an empty selection is a no-op (Case "" -> Do nothing) — no query is run.
+        if (string.IsNullOrEmpty(selectedTable))
+            return [];
+
+        var procName = ImportedDataProcs.TryGetValue(selectedTable, out var mapped)
+            ? mapped
+            : "GetAllImportedData";
+
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<ImportedDataRow>(
+            procName,
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
     public async Task DeleteTissueAsync(int tissueId, TissueOwner owner, int userId, CancellationToken ct = default)
     {
         var procName = owner == TissueOwner.Submission ? "DeleteTissue" : "DeleteBlockTissue";

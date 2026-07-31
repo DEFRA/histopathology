@@ -1,0 +1,55 @@
+@page
+@model SearchPMDatesModel
+@{
+    ViewData["Title"] = "Search PM Dates";
+    ViewData["PageTitle"] = "Search by PM Date";
+}
+
+<form method="post">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="StartDate">PM from date</label>
+        <input class="govuk-input govuk-input--width-10" type="date" asp-for="StartDate" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="EndDate">PM to date</label>
+        <input class="govuk-input govuk-input--width-10" type="date" asp-for="EndDate" />
+    </div>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
+</form>
+
+@if (Model.Results.Any())
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Sub. number</th>
+                <th scope="col" class="govuk-table__header">Sender ref</th>
+                <th scope="col" class="govuk-table__header">PM date</th>
+                <th scope="col" class="govuk-table__header">Date submitted</th>
+                <th scope="col" class="govuk-table__header">Date received / rejected</th>
+                <th scope="col" class="govuk-table__header">Time received / rejected</th>
+                <th scope="col" class="govuk-table__header">Date completed</th>
+                <th scope="col" class="govuk-table__header">Customer received date</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var r in Model.Results)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@r.ID</td>
+                    <td class="govuk-table__cell">@r.SenderRef</td>
+                    <td class="govuk-table__cell">@r.PMDate?.ToShortDateString()</td>
+                    <td class="govuk-table__cell">@r.BatchDate?.ToShortDateString()</td>
+                    <td class="govuk-table__cell">@r.DateReceived?.ToShortDateString()</td>
+                    <td class="govuk-table__cell">@r.TimeReceived</td>
+                    <td class="govuk-table__cell">@r.CompletedDate?.ToShortDateString()</td>
+                    <td class="govuk-table__cell">@r.CustomerReceivedDate?.ToShortDateString()</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+else
+{
+    <p class="govuk-body">No submissions found for the selected PM date range.</p>
+}

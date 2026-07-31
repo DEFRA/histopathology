@@ -82,4 +82,40 @@ public sealed class HistologyRefService
             return [];
         }
     }
+
+    /// <summary>
+    /// Returns every unused histology ref, with no type filter.
+    /// Used by SearchUnUsedHistologyRefs.aspx.
+    /// </summary>
+    public async Task<IReadOnlyList<HistologyRef>> GetAllUnusedRefsAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repo.GetAllUnusedRefsAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to retrieve all unused histology refs.", ex);
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// Updates a histology reference record for the given type.
+    /// Replaces the legacy <c>clsHistology.UpdateHistologyRefs</c> call.
+    /// Returns <see langword="true"/> on success.
+    /// </summary>
+    public async Task<bool> UpdateRefAsync(string histologyRef, int histologyType, int userId, CancellationToken ct = default)
+    {
+        try
+        {
+            await _repo.UpdateRefAsync(histologyRef, histologyType, userId, ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to update histology ref {HistologyRef}.", ex, histologyRef);
+            return false;
+        }
+    }
 }

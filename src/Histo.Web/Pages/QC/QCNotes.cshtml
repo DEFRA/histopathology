@@ -7,9 +7,9 @@
 
 <p class="govuk-body"><strong>Batch No:</strong> @Model.BatchID</p>
 
-<form method="post" asp-page-handler="Add">
-    <button type="submit" class="govuk-button" data-module="govuk-button">Add QC note</button>
-</form>
+<p class="govuk-body">
+    <a asp-page="/QC/AddQCNote" class="govuk-button" data-module="govuk-button">Add QC note</a>
+</p>
 
 @if (Model.Notes.Any())
 {
