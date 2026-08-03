@@ -23,3 +23,18 @@ public sealed class Batch
     public bool IsPreCassetted { get; init; }
     public byte[]? RowStamp { get; init; }
 }
+
+/// <summary>
+/// One test-item dispatch status row, used only by the Fix Completed Dates admin
+/// utility to determine whether every test on a batch has been dispatched.
+///
+/// Legacy source: <c>FixCompletedDates.aspx.vb</c> — <c>GetBatchHistology</c>,
+/// <c>GetBatchStain</c> and <c>GetBatchAntibodies</c> (which call
+/// <c>GetHistologyDispatched</c>, <c>GetStainDispatched</c> and
+/// <c>GetAntibodiesDispatched</c> respectively) all return the same shape.
+/// </summary>
+public sealed class TestDispatchStatus
+{
+    public bool Dispatched { get; init; }
+    public DateTime? DispatchedDate { get; init; }
+}

@@ -65,6 +65,31 @@ public sealed class BatchService
     }
 
     /// <summary>
+    /// Creates a new batch header copied from an existing one — the starting point
+    /// for the "Copy batch" workflow. The new batch always starts in Submitted
+    /// status regardless of the source batch's current status.
+    ///
+    /// Legacy source: HistopathologyLib/clsBatch.vb — <c>CopyBatch()</c> /
+    /// <c>CopyDataToNewBatch()</c> (batch-header portion only; sub-tables are
+    /// copied by the caller via <see cref="Histo.Submissions.Services.SubmissionService"/>).
+    /// </summary>
+    public async Task<int> CopyBatchHeaderAsync(Batch source, int userId, CancellationToken ct = default)
+    {
+        var batch = new Batch
+        {
+            Status            = BatchStatus.Submitted,
+            CustomerRef        = source.CustomerRef,
+            Comments           = source.Comments,
+            SubmittedByUserID  = userId,
+            UserAreaCode       = source.UserAreaCode,
+            IsPreCassetted     = source.IsPreCassetted,
+        };
+
+        try { return await _batches.AddAsync(batch, userId, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to copy batch {BatchId}.", ex, source.ID); return 0; }
+    }
+
+    /// <summary>
     /// Updates batch status. Throws <see cref="BatchConcurrencyException"/> on
     /// concurrent modification.
     /// </summary>
@@ -72,6 +97,94 @@ public sealed class BatchService
     {
         // BatchConcurrencyException propagates — the UI must handle it
         await _batches.UpdateStatusAsync(batchId, newStatus, rowStamp, userId, ct);
+        return true;
+    }
+
+    // -----------------------------------------------------------------------
+    // Search (read-only)
+    // -----------------------------------------------------------------------
+
+    /// <summary>Multi-field submission search.</summary>
+    public async Task<IReadOnlyList<BatchSearchResult>> SearchAsync(BatchSearchCriteria criteria, CancellationToken ct = default)
+    {
+        try { return await _batches.SearchAsync(criteria, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to search submissions.", ex); return []; }
+    }
+
+    /// <summary>
+    /// Returns a simplified test-item listing for a project/date range.
+    /// See <see cref="IBatchRepository.GetTestItemRowsAsync"/> for scope notes.
+    /// </summary>
+    public async Task<IReadOnlyList<TestItemRow>> GetTestItemRowsAsync(string? projectDesc, int batchType, CancellationToken ct = default)
+    {
+        try { return await _batches.GetTestItemRowsAsync(projectDesc, batchType, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to retrieve test item rows.", ex); return []; }
+    }
+
+    /// <summary>
+    /// Recomputes and corrects the <c>CompletedDate</c> of every cassetted batch whose
+    /// histology, antibodies and special-stain tests have all been dispatched, setting
+    /// it to the latest dispatch date found across those tests. Batches with any
+    /// outstanding (not-dispatched) test are left untouched.
+    ///
+    /// Replaces <c>FixCompletedDates.aspx.vb</c> — <c>btnUpdate_Click</c>. The legacy
+    /// page wrapped every batch update in a single SQL transaction; here each batch is
+    /// corrected independently so a failure on one batch does not prevent the others
+    /// from being fixed.
+    /// </summary>
+    /// <returns>The number of batches whose completed date was updated.</returns>
+    public async Task<int> FixCompletedDatesAsync(CancellationToken ct = default)
+    {
+        var updated = 0;
+        try
+        {
+            var batchIds = await _batches.GetBatchIdsLinkedToBlocksAsync(ct);
+            foreach (var batchId in batchIds)
+            {
+                try
+                {
+                    var latest = default(DateTime);
+                    if (!TryGetLatestDispatchDate(await _batches.GetHistologyDispatchStatusAsync(batchId, ct), ref latest))
+                        continue;
+
+                    if (!TryGetLatestDispatchDate(await _batches.GetStainDispatchStatusAsync(batchId, ct), ref latest))
+                        continue;
+
+                    if (!TryGetLatestDispatchDate(await _batches.GetAntibodiesDispatchStatusAsync(batchId, ct), ref latest))
+                        continue;
+
+                    await _batches.UpdateCompletedDateAsync(batchId, latest, ct);
+                    updated++;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Failed to fix completed date for batch {BatchId}.", ex, batchId);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to retrieve batches linked to blocks.", ex);
+        }
+
+        return updated;
+    }
+
+    /// <summary>
+    /// Checks that every row is dispatched, updating <paramref name="latest"/> to the
+    /// latest dispatch date found. Returns <see langword="false"/> (and leaves
+    /// <paramref name="latest"/> unchanged) as soon as an un-dispatched row is found.
+    /// </summary>
+    private static bool TryGetLatestDispatchDate(IReadOnlyList<TestDispatchStatus> rows, ref DateTime latest)
+    {
+        foreach (var row in rows)
+        {
+            if (!row.Dispatched)
+                return false;
+
+            if (row.DispatchedDate is { } d && d > latest)
+                latest = d;
+        }
         return true;
     }
 }

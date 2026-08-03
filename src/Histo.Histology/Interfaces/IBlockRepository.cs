@@ -41,4 +41,38 @@ public interface IBlockRepository
     /// Maps to <c>BookBlockRef</c> stored procedure.
     /// </summary>
     Task BookRefAsync(int blockId, string blockRef, int userId, CancellationToken ct = default);
+
+    // -----------------------------------------------------------------------
+    // Search (read-only)
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns the used block refs (with status) for a histology ref.
+    /// Maps to <c>GetBlocksForHistoRef</c>. Legacy source: SearchBlockRefs.aspx.
+    /// </summary>
+    Task<IReadOnlyList<UsedBlockRef>> GetUsedBlockRefsByHistologyRefAsync(string histologyRef, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the used block refs (with status) for a sender ref.
+    /// Maps to <c>GetBlocksForSenderRef</c>. Legacy source: SearchBlockRefs.aspx.
+    /// </summary>
+    Task<IReadOnlyList<UsedBlockRef>> GetUsedBlockRefsBySenderRefAsync(string senderRef, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns archived block records matching the given (optional) filters.
+    /// Maps to <c>GetAnimalBlockArchiveInformation</c>. Legacy source: SearchArchiveLocation.aspx (Block Archive mode).
+    /// </summary>
+    Task<IReadOnlyList<BlockArchiveInfo>> GetBlockArchiveAsync(
+        string? senderRef, string? histologyRef, string? blockRef, string? archiveLocation, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns archived slide records matching the given (optional) filters.
+    /// Maps to <c>GetAnimalStainArchiveInformation</c>. Legacy source: SearchArchiveLocation.aspx (Slide Archive mode).
+    ///
+    /// SIMPLIFIED: the legacy method (<c>clsAnimal.GetAnimalSlideArchiveInformation</c>)
+    /// additionally merges in <c>GetAnimalBatches</c> and per-batch-type data — that
+    /// merge is not reproduced. See the search module report for details.
+    /// </summary>
+    Task<IReadOnlyList<SlideArchiveInfo>> GetSlideArchiveAsync(
+        string? senderRef, string? histologyRef, string? archiveLocation, CancellationToken ct = default);
 }

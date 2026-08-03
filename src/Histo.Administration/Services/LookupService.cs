@@ -72,4 +72,90 @@ public sealed class LookupService
             return [];
         }
     }
+
+    /// <summary>Returns the user group pick-list for the User Maintenance form.</summary>
+    public async Task<IReadOnlyList<LookupItem>> GetUserGroupsAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _lookups.GetUserGroupsAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get user groups.", ex);
+            return [];
+        }
+    }
+
+    /// <summary>Returns the user area pick-list for the User Maintenance form.</summary>
+    public async Task<IReadOnlyList<LookupItem>> GetUserAreasAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _lookups.GetUserAreasAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get user areas.", ex);
+            return [];
+        }
+    }
+
+    /// <summary>Returns the legacy imported ICC_Sub table pick-list for the ViewImportedData form.</summary>
+    public async Task<IReadOnlyList<LookupItem>> GetImportedTablesAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _lookups.GetImportedTablesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get imported tables.", ex);
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// Creates a new pick-list row in the table identified by <paramref name="tableId"/>.
+    /// Replaces the legacy <c>LookupData.SaveLookupData</c> insert path
+    /// (<c>PickListMaintenanceID.aspx</c> / <c>PickListUserArea.aspx</c> grid "Add new" row).
+    ///
+    /// Returns <see langword="false"/> and logs the error if the create fails —
+    /// callers should surface a generic save error to the user.
+    /// </summary>
+    public async Task<bool> CreateLookupItemAsync(int tableId, LookupItem item, int userId, CancellationToken ct = default)
+    {
+        try
+        {
+            await _lookups.CreateLookupItemAsync(tableId, item, userId, ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to create lookup item for table ID {TableId}.", ex, tableId);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Updates an existing pick-list row in the table identified by <paramref name="tableId"/>.
+    /// Replaces the legacy <c>LookupData.SaveLookupData</c> update path
+    /// (<c>PickListMaintenanceID.aspx</c> / <c>PickListUserArea.aspx</c> grid "Edit" row).
+    ///
+    /// Returns <see langword="false"/> and logs the error if the update fails —
+    /// callers should surface a generic save error to the user.
+    /// </summary>
+    public async Task<bool> UpdateLookupItemAsync(int tableId, LookupItem item, int userId, CancellationToken ct = default)
+    {
+        try
+        {
+            await _lookups.UpdateLookupItemAsync(tableId, item, userId, ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to update lookup item {ItemId} for table ID {TableId}.", ex, item.ID, tableId);
+            return false;
+        }
+    }
 }

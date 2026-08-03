@@ -28,6 +28,6 @@ public class BatchesForDispatchModel : HistoPageModel
     public IActionResult OnPostSelect(int batchId)
     {
         Session.BatchID = batchId;
-        return RedirectToPage("/Batches/BatchDetails");
+        return RedirectToPage("/QC/QualityData");
     }
 }

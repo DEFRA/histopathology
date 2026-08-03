@@ -5,27 +5,36 @@
     ViewData["PageTitle"] = "Pick List Maintenance";
 }
 
-<table class="table table-striped table-hover">
-    <thead class="table-dark">
-        <tr>
-            <th>ID</th><th>Table Name</th><th>Select SP</th><th>Insert SP</th><th>Update SP</th><th>Delete SP</th>
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">ID</th>
+            <th scope="col" class="govuk-table__header">Table name</th>
+            <th scope="col" class="govuk-table__header">Select SP</th>
+            <th scope="col" class="govuk-table__header">Insert SP</th>
+            <th scope="col" class="govuk-table__header">Update SP</th>
+            <th scope="col" class="govuk-table__header">Delete SP</th>
+            <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
         </tr>
     </thead>
-    <tbody>
+    <tbody class="govuk-table__body">
         @foreach (var l in Model.Lookups)
         {
-            <tr>
-                <td>@l.ID</td>
-                <td>@l.TableName</td>
-                <td>@l.SelectStoredProcedure</td>
-                <td>@l.InsertStoredProcedure</td>
-                <td>@l.UpdateStoredProcedure</td>
-                <td>@l.DeleteStoredProcedure</td>
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">@l.ID</td>
+                <td class="govuk-table__cell">@l.TableName</td>
+                <td class="govuk-table__cell">@l.SelectStoredProcedure</td>
+                <td class="govuk-table__cell">@l.InsertStoredProcedure</td>
+                <td class="govuk-table__cell">@l.UpdateStoredProcedure</td>
+                <td class="govuk-table__cell">@l.DeleteStoredProcedure</td>
+                <td class="govuk-table__cell">
+                    <a asp-page="/Admin/EditLookupItem" asp-route-tableId="@l.ID" class="govuk-link">Edit</a>
+                </td>
             </tr>
         }
         @if (!Model.Lookups.Any())
         {
-            <tr><td colspan="6" class="text-center">No editable lookups found.</td></tr>
+            <tr class="govuk-table__row"><td colspan="7" class="govuk-table__cell">No editable lookups found.</td></tr>
         }
     </tbody>
 </table>

@@ -1,6 +1,8 @@
 @* _NavPartial.cshtml
    Role-based navigation — replaces the VLAHeader.ascx hyperlink show/hide logic.
    Visible links are determined by the user's GroupName stored in ISessionService.
+   Emits <li class="govuk-service-navigation__item"> items only — the enclosing
+   <ul id="navigation" class="govuk-service-navigation__list"> lives in _Layout.cshtml.
    Phase 2: Replace @User.Identity?.Name with session group from Entra ID claims.
 *@
 @inject Histo.Web.Services.ISessionService SessionSvc
@@ -12,35 +14,61 @@
     bool isCustomer = group == "Customer" || (!isHisto && !isMaint);
 }
 
-<ul class="nav-links">
+@* ── Links available to ALL groups ──────────────────────────────────── *@
+<li class="govuk-service-navigation__item">
+    <a class="govuk-service-navigation__link" asp-page="/Submissions/ViewSubmissions">View submissions</a>
+</li>
 
-    @* ── Links available to ALL groups ──────────────────────────────────── *@
-    <li><a asp-page="/Submissions/ViewSubmissions">View Submissions</a></li>
+@if (isCustomer || isHisto || isMaint)
+{
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Submissions/AddSubmission">New submission</a>
+    </li>
+}
 
-    @if (isCustomer || isHisto || isMaint)
-    {
-        <li><a asp-page="/Submissions/AddSubmission">New Submission</a></li>
-    }
+@* ── Histopathology User + Maintenance ──────────────────────────────── *@
+@if (isHisto || isMaint)
+{
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Batches/BatchesNotReceived">Receive batches</a>
+    </li>
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Batches/BatchesReceived">Batches received</a>
+    </li>
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Batches/BatchesForEditing">Edit batches</a>
+    </li>
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Batches/BatchesForDispatch">Dispatch batches</a>
+    </li>
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Search/SearchMenu">Search</a>
+    </li>
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/QC/QCNotes">Quality data</a>
+    </li>
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Bookings/BookingMenu">Book histology refs</a>
+    </li>
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Archive/ArchiveMenu">Archive</a>
+    </li>
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/AuditLog/AuditLogMenu">Audit log</a>
+    </li>
+}
 
-    @* ── Histopathology User + Maintenance ──────────────────────────────── *@
-    @if (isHisto || isMaint)
-    {
-        <li><a asp-page="/Batches/BatchesNotReceived">Receive Batches</a></li>
-        <li><a asp-page="/Batches/BatchesReceived">Batches Received</a></li>
-        <li><a asp-page="/Batches/BatchesForEditing">Edit Batches</a></li>
-        <li><a asp-page="/Batches/BatchesForDispatch">Dispatch Batches</a></li>
-        <li><a asp-page="/Search/SearchMenu">Search</a></li>
-        <li><a asp-page="/QC/QCNotes">Quality Data</a></li>
-        <li><a asp-page="/Bookings/BookingMenu">Book Histology Refs</a></li>
-        <li><a asp-page="/Archive/ArchiveMenu">Archive</a></li>
-        <li><a asp-page="/AuditLog/AuditLogMenu">Audit Log</a></li>
-    }
+@* ── Maintenance only ───────────────────────────────────────────────── *@
+@if (isMaint)
+{
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Admin/UserMaintenance">User maintenance</a>
+    </li>
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Admin/PickListMaintenance">Pick lists</a>
+    </li>
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Admin/FixCompletedDates">Fix completed dates</a>
+    </li>
+}
 
-    @* ── Maintenance only ───────────────────────────────────────────────── *@
-    @if (isMaint)
-    {
-        <li><a asp-page="/Admin/UserMaintenance">User Maintenance</a></li>
-        <li><a asp-page="/Admin/PickListMaintenance">Pick Lists</a></li>
-    }
-
-</ul>

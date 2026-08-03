@@ -5,27 +5,53 @@
     ViewData["PageTitle"] = "User Maintenance";
 }
 
-<table class="table table-striped table-hover">
-    <thead class="table-dark">
-        <tr>
-            <th>Name</th><th>NT Login</th><th>Group</th><th>Area</th><th>Email</th><th>Active</th>
+@if (!string.IsNullOrEmpty(Model.StatusMessage))
+{
+    <div class="govuk-notification-banner govuk-notification-banner--success" role="alert" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
+        <div class="govuk-notification-banner__header">
+            <h2 class="govuk-notification-banner__title" id="govuk-notification-banner-title">Success</h2>
+        </div>
+        <div class="govuk-notification-banner__content">
+            <p class="govuk-notification-banner__heading">@Model.StatusMessage</p>
+        </div>
+    </div>
+}
+
+<p class="govuk-body">
+    <a asp-page="/Admin/AddUser" class="govuk-button" data-module="govuk-button">Add user</a>
+</p>
+
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">Name</th>
+            <th scope="col" class="govuk-table__header">NT Login</th>
+            <th scope="col" class="govuk-table__header">Group</th>
+            <th scope="col" class="govuk-table__header">Area</th>
+            <th scope="col" class="govuk-table__header">Email</th>
+            <th scope="col" class="govuk-table__header">Active</th>
+            <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
         </tr>
     </thead>
-    <tbody>
+    <tbody class="govuk-table__body">
         @foreach (var u in Model.Users)
         {
-            <tr>
-                <td>@u.Name</td>
-                <td>@u.NtLogin</td>
-                <td>@u.GroupName</td>
-                <td>@u.AreaName</td>
-                <td>@u.Email</td>
-                <td>@(u.Active ? "Yes" : "No")</td>
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">@u.Name</td>
+                <td class="govuk-table__cell">@u.NtLogin</td>
+                <td class="govuk-table__cell">@u.GroupName</td>
+                <td class="govuk-table__cell">@u.AreaName</td>
+                <td class="govuk-table__cell">@u.Email</td>
+                <td class="govuk-table__cell">@(u.Active ? "Yes" : "No")</td>
+                <td class="govuk-table__cell">
+                    <a class="govuk-link" asp-page="/Admin/EditUser" asp-route-userId="@u.UserID">Change<span class="govuk-visually-hidden"> @u.Name</span></a>
+                </td>
             </tr>
         }
         @if (!Model.Users.Any())
         {
-            <tr><td colspan="6" class="text-center">No users found.</td></tr>
+            <tr class="govuk-table__row"><td colspan="7" class="govuk-table__cell">No users found.</td></tr>
         }
     </tbody>
 </table>
+

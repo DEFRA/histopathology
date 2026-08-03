@@ -1,0 +1,88 @@
+@page
+@model Histo.Web.Pages.Submissions.SubmissionDetailsBlockModel
+@{
+    ViewData["Title"] = "Sample Blocks";
+    ViewData["PageTitle"] = "Sample Blocks";
+}
+
+@if (Model.Animal is null)
+{
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <strong class="govuk-warning-text__text">
+            <span class="govuk-visually-hidden">Warning</span>
+            Sample not found.
+        </strong>
+    </div>
+}
+else
+{
+    <dl class="govuk-summary-list">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Sender ref</dt>
+            <dd class="govuk-summary-list__value">@Model.Animal.SenderRef</dd>
+        </div>
+    </dl>
+
+    <form method="post" asp-page-handler="SaveDetails">
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="PMDate">PM date</label>
+            <input class="govuk-input" asp-for="PMDate" />
+        </div>
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="HistologyRef">Histology reference</label>
+            <input class="govuk-input" asp-for="HistologyRef" />
+        </div>
+        <button type="submit" class="govuk-button" data-module="govuk-button">Save details</button>
+    </form>
+
+    <h2 class="govuk-heading-m">Blocks</h2>
+    <form method="post" asp-page-handler="Copy">
+        <table class="govuk-table">
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">Select</th>
+                    <th scope="col" class="govuk-table__header">Block ref</th>
+                    <th scope="col" class="govuk-table__header">Customer ref</th>
+                    <th scope="col" class="govuk-table__header">Comment</th>
+                    <th scope="col" class="govuk-table__header">Repeat</th>
+                    <th scope="col" class="govuk-table__header">Status</th>
+                    <th scope="col" class="govuk-table__header">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @foreach (var b in Model.Blocks)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">
+                            <div class="govuk-checkboxes__item">
+                                <input class="govuk-checkboxes__input" type="checkbox" name="blockIds" value="@b.ID" />
+                                <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">Select block @b.BlockRef</span></label>
+                            </div>
+                        </td>
+                        <td class="govuk-table__cell">@b.BlockRef</td>
+                        <td class="govuk-table__cell">@b.CustomerRef</td>
+                        <td class="govuk-table__cell">@b.Comment</td>
+                        <td class="govuk-table__cell">@(b.RepeatBlock ? "Yes" : "No")</td>
+                        <td class="govuk-table__cell">@b.Status</td>
+                        <td class="govuk-table__cell">
+                            <button type="submit" asp-page-handler="Delete" name="blockId" value="@b.ID"
+                                    class="govuk-button govuk-button--warning govuk-!-margin-bottom-0"
+                                    onclick="return confirm('Delete this block?')">Delete</button>
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Blocks.Any())
+                {
+                    <tr class="govuk-table__row"><td colspan="7" class="govuk-table__cell">No blocks found for this sample.</td></tr>
+                }
+            </tbody>
+        </table>
+        @if (Model.Blocks.Any())
+        {
+            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy selected blocks</button>
+        }
+    </form>
+
+    <a asp-page="/Submissions/ViewSamples" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to samples</a>
+}

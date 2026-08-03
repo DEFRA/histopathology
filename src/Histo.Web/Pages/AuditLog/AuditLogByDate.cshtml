@@ -5,29 +5,49 @@
     ViewData["PageTitle"] = "Audit Log — Search by Date";
 }
 
-<form method="post" class="filter-form">
-    <label>From: <input type="date" asp-for="StartDate" /></label>
-    <label>To: <input type="date" asp-for="EndDate" /></label>
-    <button type="submit">Search</button>
+<form method="post">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="StartDate">From</label>
+        <input class="govuk-input govuk-input--width-10" type="date" asp-for="StartDate" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="EndDate">To</label>
+        <input class="govuk-input govuk-input--width-10" type="date" asp-for="EndDate" />
+    </div>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
+    @if (Model.Results.Any())
+    {
+        <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to CSV</button>
+    }
 </form>
 
 @if (Model.Results.Any())
 {
-    <table class="data-table">
-        <thead>
-            <tr><th>Date</th><th>User</th><th>Action</th><th>Entity</th><th>Detail</th></tr>
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Date</th>
+                <th scope="col" class="govuk-table__header">User</th>
+                <th scope="col" class="govuk-table__header">Action</th>
+                <th scope="col" class="govuk-table__header">Entity</th>
+                <th scope="col" class="govuk-table__header">Detail</th>
+            </tr>
         </thead>
-        <tbody>
+        <tbody class="govuk-table__body">
             @foreach (var e in Model.Results)
             {
-                <tr>
-                    <td>@e.ChangedAt.ToShortDateString()</td>
-                    <td>@e.UserName</td>
-                    <td>@e.Action</td>
-                    <td>@e.EntityType @e.EntityID</td>
-                    <td>@e.Detail</td>
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@e.ChangedAt.ToShortDateString()</td>
+                    <td class="govuk-table__cell">@e.UserName</td>
+                    <td class="govuk-table__cell">@e.Action</td>
+                    <td class="govuk-table__cell">@e.EntityType @e.EntityID</td>
+                    <td class="govuk-table__cell">@e.Detail</td>
                 </tr>
             }
         </tbody>
     </table>
+}
+else
+{
+    <p class="govuk-body">No audit log entries found for the selected date range.</p>
 }

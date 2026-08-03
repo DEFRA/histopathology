@@ -1,0 +1,33 @@
+@page
+@model Histo.Web.Pages.Blocks.CopySamplesSummaryModel
+@{
+    ViewData["Title"] = "Samples Copied";
+    ViewData["PageTitle"] = "Samples Copied";
+}
+
+<div class="govuk-panel govuk-panel--confirmation">
+    <h1 class="govuk-panel__title">Samples copied</h1>
+    <div class="govuk-panel__body">
+        @Model.BlocksCopiedCount block(s) copied to @Model.TargetAnimals.Count sample(s)
+    </div>
+</div>
+
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Source submission</dt>
+        <dd class="govuk-summary-list__value">@Model.SourceBatchId</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Source sample</dt>
+        <dd class="govuk-summary-list__value">@(Model.SourceAnimal?.SenderRef ?? "—")</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Target sample(s)</dt>
+        <dd class="govuk-summary-list__value">@string.Join(", ", Model.TargetAnimals.Select(a => a.SenderRef))</dd>
+    </div>
+</dl>
+
+<form method="post" asp-page-handler="Done">
+    <button type="submit" class="govuk-button" data-module="govuk-button">Done</button>
+</form>
+<a asp-page="/Blocks/CopySamples" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy more samples</a>

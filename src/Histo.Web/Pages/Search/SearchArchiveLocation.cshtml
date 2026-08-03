@@ -1,0 +1,153 @@
+@page
+@model SearchArchiveLocationModel
+@{
+    ViewData["Title"] = "Search Archive Location";
+    ViewData["PageTitle"] = "Search Archive Location";
+}
+
+<form method="post">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="HistologyRef">Histology ref</label>
+        <input class="govuk-input" asp-for="HistologyRef" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="SenderRef">Sender ref</label>
+        <input class="govuk-input" asp-for="SenderRef" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="ArchiveLocation">Archive location</label>
+        <input class="govuk-input" asp-for="ArchiveLocation" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="ArchiveType">Archive type</label>
+        <select class="govuk-select" asp-for="ArchiveType">
+            <option value="Tissue">Tissue archive</option>
+            <option value="Block">Block archive</option>
+            <option value="Slide">Slide archive</option>
+        </select>
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="TissueCode">Tissue code (Tissue archive only)</label>
+        <input class="govuk-input" asp-for="TissueCode" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="BlockRef">Block ref (Block archive only)</label>
+        <input class="govuk-input" asp-for="BlockRef" />
+    </div>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
+    @if (Model.Searched && Model.ErrorMessage is null)
+    {
+        <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to CSV</button>
+    }
+</form>
+
+@if (Model.ErrorMessage is not null)
+{
+    <p class="govuk-error-message">@Model.ErrorMessage</p>
+}
+else if (Model.Searched)
+{
+    @if (Model.ArchiveType == "Block")
+    {
+        @if (Model.BlockResults.Any())
+        {
+            <table class="govuk-table">
+                <thead class="govuk-table__head">
+                    <tr class="govuk-table__row">
+                        <th scope="col" class="govuk-table__header">Submission number</th>
+                        <th scope="col" class="govuk-table__header">Block ref</th>
+                        <th scope="col" class="govuk-table__header">Archive location</th>
+                        <th scope="col" class="govuk-table__header">Archived date</th>
+                        <th scope="col" class="govuk-table__header">Tissue</th>
+                        <th scope="col" class="govuk-table__header">No pieces</th>
+                    </tr>
+                </thead>
+                <tbody class="govuk-table__body">
+                    @foreach (var r in Model.BlockResults)
+                    {
+                        <tr class="govuk-table__row">
+                            <td class="govuk-table__cell">@r.ID</td>
+                            <td class="govuk-table__cell">@r.BlockRef</td>
+                            <td class="govuk-table__cell">@r.ArchiveLocation</td>
+                            <td class="govuk-table__cell">@r.ArchivedDate?.ToShortDateString()</td>
+                            <td class="govuk-table__cell">@r.TissueDescription</td>
+                            <td class="govuk-table__cell">@r.NoPieces</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p class="govuk-body">No block archive records found.</p>
+        }
+    }
+    else if (Model.ArchiveType == "Slide")
+    {
+        @if (Model.SlideResults.Any())
+        {
+            <table class="govuk-table">
+                <thead class="govuk-table__head">
+                    <tr class="govuk-table__row">
+                        <th scope="col" class="govuk-table__header">Submission number</th>
+                        <th scope="col" class="govuk-table__header">Block ref</th>
+                        <th scope="col" class="govuk-table__header">Archive location</th>
+                        <th scope="col" class="govuk-table__header">Archived date</th>
+                        <th scope="col" class="govuk-table__header">Slide</th>
+                        <th scope="col" class="govuk-table__header">Tissue</th>
+                    </tr>
+                </thead>
+                <tbody class="govuk-table__body">
+                    @foreach (var r in Model.SlideResults)
+                    {
+                        <tr class="govuk-table__row">
+                            <td class="govuk-table__cell">@r.BatchID</td>
+                            <td class="govuk-table__cell">@r.BlockRef</td>
+                            <td class="govuk-table__cell">@r.ArchiveLocation</td>
+                            <td class="govuk-table__cell">@r.ArchivedDate?.ToShortDateString()</td>
+                            <td class="govuk-table__cell">@r.Description</td>
+                            <td class="govuk-table__cell">@r.TissueDescription</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p class="govuk-body">No slide archive records found.</p>
+        }
+    }
+    else
+    {
+        @if (Model.TissueResults.Any())
+        {
+            <table class="govuk-table">
+                <thead class="govuk-table__head">
+                    <tr class="govuk-table__row">
+                        <th scope="col" class="govuk-table__header">Submission number</th>
+                        <th scope="col" class="govuk-table__header">Tissue</th>
+                        <th scope="col" class="govuk-table__header">Archive location</th>
+                        <th scope="col" class="govuk-table__header">Archived date</th>
+                        <th scope="col" class="govuk-table__header">No pieces</th>
+                    </tr>
+                </thead>
+                <tbody class="govuk-table__body">
+                    @foreach (var r in Model.TissueResults)
+                    {
+                        <tr class="govuk-table__row">
+                            <td class="govuk-table__cell">@r.BatchID</td>
+                            <td class="govuk-table__cell">@r.TissueDescription</td>
+                            <td class="govuk-table__cell">@r.ArchiveLocation</td>
+                            <td class="govuk-table__cell">@r.ArchivedDate?.ToShortDateString()</td>
+                            <td class="govuk-table__cell">@r.NoPieces</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p class="govuk-body">No tissue archive records found.</p>
+        }
+    }
+}

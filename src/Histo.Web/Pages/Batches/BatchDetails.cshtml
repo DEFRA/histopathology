@@ -7,20 +7,48 @@
 
 @if (Model.Batch is null)
 {
-    <p class="alert alert-warning">Batch not found.</p>
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <strong class="govuk-warning-text__text">
+            <span class="govuk-visually-hidden">Warning</span>
+            Batch not found.
+        </strong>
+    </div>
 }
 else
 {
-    <dl class="row">
-        <dt class="col-sm-3">Batch ID</dt>         <dd class="col-sm-9">@Model.Batch.ID</dd>
-        <dt class="col-sm-3">Customer Ref</dt>     <dd class="col-sm-9">@Model.Batch.CustomerRef</dd>
-        <dt class="col-sm-3">Status</dt>           <dd class="col-sm-9">@Model.Batch.Status</dd>
-        <dt class="col-sm-3">Received Date</dt>    <dd class="col-sm-9">@Model.Batch.ReceivedDate?.ToShortDateString()</dd>
-        <dt class="col-sm-3">Completed Date</dt>   <dd class="col-sm-9">@Model.Batch.CompletedDate?.ToShortDateString()</dd>
-        <dt class="col-sm-3">Comments</dt>         <dd class="col-sm-9">@Model.Batch.Comments</dd>
-        <dt class="col-sm-3">Pre-Cassetted</dt>    <dd class="col-sm-9">@(Model.Batch.IsPreCassetted ? "Yes" : "No")</dd>
+    <dl class="govuk-summary-list">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Batch ID</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.ID</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Customer ref</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.CustomerRef</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Status</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.Status</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Received date</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.ReceivedDate?.ToShortDateString()</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Completed date</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.CompletedDate?.ToShortDateString()</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Comments</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.Comments</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Pre-cassetted</dt>
+            <dd class="govuk-summary-list__value">@(Model.Batch.IsPreCassetted ? "Yes" : "No")</dd>
+        </div>
     </dl>
-    <a asp-page="/Batches/EditBatch" class="btn btn-primary">Edit Batch</a>
-    <a asp-page="/Submissions/ViewSamples" class="btn btn-secondary ms-2">View Samples</a>
-    <a asp-page="/Index" class="btn btn-outline-secondary ms-2">Home</a>
+    <a asp-page="/Batches/EditBatch" class="govuk-button" data-module="govuk-button">Edit batch</a>
+    <a asp-page="/Submissions/ViewSamples" class="govuk-button govuk-button--secondary" data-module="govuk-button">View samples</a>
+    <a asp-page="/Batches/CopyBatch" asp-route-sourceBatchId="@Model.Batch.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy batch</a>
+    <a asp-page="/Index" class="govuk-button govuk-button--secondary" data-module="govuk-button">Home</a>
 }

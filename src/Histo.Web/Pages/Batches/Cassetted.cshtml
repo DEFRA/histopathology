@@ -1,0 +1,26 @@
+@page
+@model Histo.Web.Pages.Batches.CassettedModel
+@{
+    ViewData["Title"] = "Submission Type";
+    ViewData["PageTitle"] = "Submission Type";
+}
+
+@if (Model.SaveError is not null)
+{
+    <p class="govuk-error-message">@Model.SaveError</p>
+}
+
+<form method="post">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="SubmittedAs">Select the submission type, then click Next. Only one submission type can be selected.</label>
+        <select class="govuk-select" asp-for="SubmittedAs">
+            <option value="">-- Select --</option>
+            @foreach (var o in Model.SubmittedAsOptions)
+            {
+                <option value="@o.ID">@o.Name</option>
+            }
+        </select>
+    </div>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Next</button>
+    <a asp-page="/Index" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+</form>

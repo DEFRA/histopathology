@@ -1,0 +1,90 @@
+@page
+@model Histo.Web.Pages.Submissions.SubmissionDetailsModel
+@{
+    ViewData["Title"] = "Sample Details";
+    ViewData["PageTitle"] = "Sample Details";
+}
+
+@if (Model.Animal is null)
+{
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <strong class="govuk-warning-text__text">
+            <span class="govuk-visually-hidden">Warning</span>
+            Sample not found.
+        </strong>
+    </div>
+}
+else
+{
+    <dl class="govuk-summary-list">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Sender ref</dt>
+            <dd class="govuk-summary-list__value">@Model.Animal.SenderRef</dd>
+        </div>
+    </dl>
+
+    <form method="post" asp-page-handler="SaveDetails">
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="PMDate">PM date</label>
+            <input class="govuk-input" asp-for="PMDate" />
+        </div>
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="HistologyRef">Histology reference</label>
+            <input class="govuk-input" asp-for="HistologyRef" />
+        </div>
+        <button type="submit" class="govuk-button" data-module="govuk-button">Save details</button>
+    </form>
+
+    <h2 class="govuk-heading-m">Tissues</h2>
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Tissue code</th>
+                <th scope="col" class="govuk-table__header">No. pieces</th>
+                <th scope="col" class="govuk-table__header">Comment</th>
+                <th scope="col" class="govuk-table__header">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var t in Model.Tissues)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@t.TissueCode</td>
+                    <td class="govuk-table__cell">@t.NoPieces</td>
+                    <td class="govuk-table__cell">@t.Comment</td>
+                    <td class="govuk-table__cell">
+                        <form method="post" asp-page-handler="DeleteTissue" class="govuk-!-display-inline">
+                            <input type="hidden" name="tissueId" value="@t.ID" />
+                            <button type="submit" class="govuk-button govuk-button--warning govuk-!-margin-bottom-0"
+                                    onclick="return confirm('Delete this tissue?')">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            @if (!Model.Tissues.Any())
+            {
+                <tr class="govuk-table__row"><td colspan="4" class="govuk-table__cell">No tissues recorded for this sample.</td></tr>
+            }
+        </tbody>
+    </table>
+
+    <h2 class="govuk-heading-m">Add tissue</h2>
+    <form method="post" asp-page-handler="AddTissue">
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="TissueCode">Tissue code</label>
+            <input class="govuk-input" asp-for="TissueCode" />
+        </div>
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="NoPieces">No. pieces</label>
+            <input class="govuk-input govuk-input--width-3" asp-for="NoPieces" />
+        </div>
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="Comment">Comment</label>
+            <textarea class="govuk-textarea" asp-for="Comment" rows="2"></textarea>
+        </div>
+        <button type="submit" class="govuk-button" data-module="govuk-button">Add tissue</button>
+    </form>
+
+    <a asp-page="/Submissions/ViewSamples" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to samples</a>
+}

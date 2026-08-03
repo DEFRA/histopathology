@@ -1,0 +1,63 @@
+@page
+@model SearchTestModel
+@{
+    ViewData["Title"] = "Search Test Totals";
+    ViewData["PageTitle"] = "Search Test Totals";
+}
+
+<form method="post">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="StartDate">Start date</label>
+        <input class="govuk-input govuk-input--width-10" type="date" asp-for="StartDate" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="EndDate">End date</label>
+        <input class="govuk-input govuk-input--width-10" type="date" asp-for="EndDate" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="ProjectDescription">Project or contract code</label>
+        <select class="govuk-select" asp-for="ProjectDescription">
+            <option value="">-- Any --</option>
+            @foreach (var p in Model.Projects)
+            {
+                <option value="@p.Name">@p.Name</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="SubmissionType">Submission type</label>
+        <select class="govuk-select" asp-for="SubmissionType">
+            <option value="0">TSE</option>
+            <option value="1">Non-TSE</option>
+        </select>
+    </div>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Analyse results</button>
+</form>
+
+@if (Model.Searched)
+{
+    @if (Model.Results.Any())
+    {
+        <table class="govuk-table">
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">Description</th>
+                    <th scope="col" class="govuk-table__header">Count</th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @foreach (var r in Model.Results)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@r.Description</td>
+                        <td class="govuk-table__cell">@r.Count</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <p class="govuk-body">No test items found matching the search criteria.</p>
+    }
+}

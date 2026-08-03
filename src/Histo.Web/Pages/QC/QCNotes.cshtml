@@ -5,29 +5,34 @@
     ViewData["PageTitle"] = "Quality Control Notes";
 }
 
-<p><strong>Batch No:</strong> @Model.BatchID</p>
+<p class="govuk-body"><strong>Batch No:</strong> @Model.BatchID</p>
 
-<form method="post" asp-page-handler="Add">
-    <button type="submit">Add QC Note</button>
-</form>
+<p class="govuk-body">
+    <a asp-page="/QC/AddQCNote" class="govuk-button" data-module="govuk-button">Add QC note</a>
+</p>
 
 @if (Model.Notes.Any())
 {
-    <table class="data-table">
-        <thead>
-            <tr><th>ID</th><th>Created By</th><th>Date</th><th>Action</th></tr>
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">ID</th>
+                <th scope="col" class="govuk-table__header">Created by</th>
+                <th scope="col" class="govuk-table__header">Date</th>
+                <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
+            </tr>
         </thead>
-        <tbody>
+        <tbody class="govuk-table__body">
             @foreach (var n in Model.Notes)
             {
-                <tr>
-                    <td>@n.ID</td>
-                    <td>@n.CreatedBy</td>
-                    <td>@n.DateCreated</td>
-                    <td>
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@n.ID</td>
+                    <td class="govuk-table__cell">@n.CreatedBy</td>
+                    <td class="govuk-table__cell">@n.DateCreated</td>
+                    <td class="govuk-table__cell">
                         <form method="post">
                             <input type="hidden" name="noteId" value="@n.ID" />
-                            <button type="submit" asp-page-handler="Edit">Edit</button>
+                            <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-page-handler="Edit">Edit</button>
                         </form>
                     </td>
                 </tr>
@@ -37,5 +42,5 @@
 }
 else
 {
-    <p>No QC notes for this batch.</p>
+    <p class="govuk-body">No QC notes for this batch.</p>
 }

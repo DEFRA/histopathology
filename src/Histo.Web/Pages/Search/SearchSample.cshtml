@@ -1,0 +1,43 @@
+@page
+@model SearchSampleModel
+@{
+    ViewData["Title"] = "Search Samples";
+    ViewData["PageTitle"] = "Search Samples";
+}
+
+<form method="post">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="SenderRef">Sender ref</label>
+        <input class="govuk-input" asp-for="SenderRef" />
+    </div>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
+</form>
+
+@if (Model.Results.Any())
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Sender ref</th>
+                <th scope="col" class="govuk-table__header">Histology ref</th>
+                <th scope="col" class="govuk-table__header">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var r in Model.Results)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@r.SenderRef</td>
+                    <td class="govuk-table__cell">@r.HistologyRef</td>
+                    <td class="govuk-table__cell">
+                        <a asp-page="/Submissions/AddSample" asp-route-senderRef="@r.SenderRef" class="govuk-link">Add to batch</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+else if (Model.SenderRef is not null)
+{
+    <p class="govuk-body">No matching samples found for the given Sender Ref.</p>
+}

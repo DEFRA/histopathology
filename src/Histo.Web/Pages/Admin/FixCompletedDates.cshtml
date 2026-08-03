@@ -1,0 +1,22 @@
+@page
+@model Histo.Web.Pages.Admin.FixCompletedDatesModel
+
+<p class="govuk-body">
+    Recomputes the completed date of every cassetted batch whose histology, antibodies
+    and special stain tests have all been dispatched, setting it to the latest dispatch
+    date found. Batches with any outstanding test are left unchanged.
+</p>
+
+@if (Model.BatchesUpdated is int count)
+{
+    <div class="govuk-panel govuk-panel--confirmation govuk-!-margin-bottom-6">
+        <h2 class="govuk-panel__title">Completed dates updated</h2>
+        <div class="govuk-panel__body">
+            @count batch@(count == 1 ? "" : "es") updated
+        </div>
+    </div>
+}
+
+<form method="post">
+    <button type="submit" class="govuk-button" data-module="govuk-button">Update completed dates</button>
+</form>

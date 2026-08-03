@@ -3,14 +3,23 @@
 
 @if (!string.IsNullOrEmpty(Model.ConcurrencyError))
 {
-    <div class="alert alert-danger">@Model.ConcurrencyError</div>
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.ConcurrencyError</li>
+                </ul>
+            </div>
+        </div>
+    </div>
 }
 
 <form method="post">
-    <div class="mb-3">
-        <label class="form-label">Note Text</label>
-        <textarea name="Text" class="form-control" rows="6">@Model.Text</textarea>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Text">Note text</label>
+        <textarea name="Text" id="Text" class="govuk-textarea" rows="6">@Model.Text</textarea>
     </div>
-    <button type="submit" class="btn btn-primary">Save</button>
-    <a asp-page="/QC/QCNotes" class="btn btn-secondary ms-2">Cancel</a>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
+    <a asp-page="/QC/QCNotes" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
 </form>

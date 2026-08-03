@@ -5,33 +5,33 @@
     ViewData["PageTitle"] = "Batches for Archiving";
 }
 
-<table class="table table-striped table-hover">
-    <thead class="table-dark">
-        <tr>
-            <th>Batch ID</th>
-            <th>Customer Ref</th>
-            <th>Completed Date</th>
-            <th>Actions</th>
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">Batch ID</th>
+            <th scope="col" class="govuk-table__header">Customer ref</th>
+            <th scope="col" class="govuk-table__header">Completed date</th>
+            <th scope="col" class="govuk-table__header">Actions</th>
         </tr>
     </thead>
-    <tbody>
+    <tbody class="govuk-table__body">
         @foreach (var b in Model.Batches)
         {
-            <tr>
-                <td>@b.ID</td>
-                <td>@b.CustomerRef</td>
-                <td>@b.CompletedDate?.ToShortDateString()</td>
-                <td>
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">@b.ID</td>
+                <td class="govuk-table__cell">@b.CustomerRef</td>
+                <td class="govuk-table__cell">@b.CompletedDate?.ToShortDateString()</td>
+                <td class="govuk-table__cell">
                     <a asp-page="/Archive/ArchiveBlocks"
-                       asp-route-batchId="@b.ID" class="btn btn-sm btn-warning">Archive Blocks</a>
+                       asp-route-batchId="@b.ID" class="govuk-button govuk-button--warning govuk-!-margin-bottom-0" data-module="govuk-button">Archive blocks</a>
                     <a asp-page="/Archive/ArchiveTissues"
-                       asp-route-batchId="@b.ID" class="btn btn-sm btn-secondary ms-1">Archive Tissues</a>
+                       asp-route-batchId="@b.ID" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Archive tissues</a>
                 </td>
             </tr>
         }
         @if (!Model.Batches.Any())
         {
-            <tr><td colspan="4" class="text-center">No batches available for archiving.</td></tr>
+            <tr class="govuk-table__row"><td colspan="4" class="govuk-table__cell">No batches available for archiving.</td></tr>
         }
     </tbody>
 </table>

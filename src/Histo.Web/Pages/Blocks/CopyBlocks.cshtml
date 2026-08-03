@@ -1,0 +1,73 @@
+@page
+@model Histo.Web.Pages.Blocks.CopyBlocksModel
+@{
+    ViewData["Title"] = "Copy Blocks";
+    ViewData["PageTitle"] = "Copy Blocks";
+}
+
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.Error</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+<h2 class="govuk-heading-m">Blocks to copy</h2>
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">Block ref</th>
+            <th scope="col" class="govuk-table__header">Customer ref</th>
+            <th scope="col" class="govuk-table__header">Comment</th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @foreach (var b in Model.SourceBlocks)
+        {
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">@b.BlockRef</td>
+                <td class="govuk-table__cell">@b.CustomerRef</td>
+                <td class="govuk-table__cell">@b.Comment</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<form method="post">
+    @foreach (var b in Model.SourceBlocks)
+    {
+        <input type="hidden" name="BlockIds" value="@b.ID" />
+    }
+
+    <div class="govuk-form-group">
+        <fieldset class="govuk-fieldset">
+            <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Copy to sample(s)</legend>
+            <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                @foreach (var a in Model.TargetAnimals)
+                {
+                    <div class="govuk-checkboxes__item">
+                        <input class="govuk-checkboxes__input" type="checkbox" name="TargetAnimalIds" value="@a.ID" id="target-@a.ID" />
+                        <label class="govuk-label govuk-checkboxes__label" for="target-@a.ID">@a.SenderRef</label>
+                    </div>
+                }
+                @if (!Model.TargetAnimals.Any())
+                {
+                    <p class="govuk-body">No other samples are available in this submission to copy blocks to.</p>
+                }
+            </div>
+        </fieldset>
+    </div>
+
+    @if (Model.TargetAnimals.Any())
+    {
+        <button type="submit" class="govuk-button" data-module="govuk-button">Copy blocks</button>
+    }
+    <a asp-page="/Submissions/SubmissionDetailsBlock" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+</form>

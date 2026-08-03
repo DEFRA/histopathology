@@ -1,0 +1,64 @@
+using Histo.Histology.Services;
+using Histo.Web.Services;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Histo.Web.Pages.Bookings;
+
+/// <summary>
+/// Replaces the histology reference pool maintenance workflow from
+/// <c>HistopathologySystem/BookHistologyRef.aspx</c> (<c>clsHistology.UpdateHistologyRefs</c>,
+/// SP <c>EditHistologyRef</c>) — updates the "next histology ref" counter for a
+/// given histology type.
+///
+/// Note: the legacy per-animal <c>EditHistologyRef.aspx</c> page (renaming an
+/// individual sample's Sender Ref / Histology Ref via <c>clsAnimal.UpdateAnimalSenderRef</c>
+/// / <c>UpdateAnimalHistologyRef</c>) is a different workflow with no corresponding
+/// repository method yet exposed — that gap remains open.
+/// </summary>
+public class EditHistologyRefModel : HistoPageModel
+{
+    private readonly HistologyRefService _refs;
+
+    public EditHistologyRefModel(ISessionService session, HistologyRefService refs)
+        : base(session) => _refs = refs;
+
+    [BindProperty] public int HistologyType { get; set; }
+    [BindProperty] public string NewHistologyRef { get; set; } = string.Empty;
+
+    public string? Error { get; private set; }
+    public string? SuccessMessage { get; private set; }
+
+    public void OnGet()
+    {
+        ViewData["Title"] = "Edit Histology Reference";
+        ViewData["PageTitle"] = "Edit Histology Reference";
+    }
+
+    public async Task<IActionResult> OnPostAsync()
+    {
+        ViewData["Title"] = "Edit Histology Reference";
+        ViewData["PageTitle"] = "Edit Histology Reference";
+
+        if (HistologyType <= 0)
+        {
+            Error = "You must select a Histology Ref Type.";
+            return Page();
+        }
+
+        if (string.IsNullOrWhiteSpace(NewHistologyRef))
+        {
+            Error = "You must enter a Histology Ref.";
+            return Page();
+        }
+
+        var ok = await _refs.UpdateRefAsync(NewHistologyRef.Trim(), HistologyType, Session.UserID);
+        if (!ok)
+        {
+            Error = "Failed to update the Histology Reference. Another user may have altered the record — please try again.";
+            return Page();
+        }
+
+        SuccessMessage = "The Histology Reference has been updated.";
+        return Page();
+    }
+}

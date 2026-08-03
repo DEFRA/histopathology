@@ -1,0 +1,29 @@
+@page
+@model SearchUnUsedHistologyRefsModel
+@{
+    ViewData["Title"] = "Unused Histology Refs";
+    ViewData["PageTitle"] = "Unused Histology Refs";
+}
+
+@if (Model.Results.Any())
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Histology ref</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var r in Model.Results)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@r.Ref</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+else
+{
+    <p class="govuk-body">No unused histology refs found.</p>
+}

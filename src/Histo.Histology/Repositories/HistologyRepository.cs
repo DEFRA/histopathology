@@ -65,4 +65,14 @@ public sealed class HistologyRepository : IHistologyRepository
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<HistologyRef>> GetAllUnusedRefsAsync(CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<HistologyRef>(
+            "GetUnusedHistologyRefs",
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
 }

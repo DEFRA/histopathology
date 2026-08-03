@@ -6,14 +6,18 @@
 }
 
 <form method="post">
-    <div class="mb-3">
-        <label class="form-label">Sender Reference</label>
-        <input asp-for="SenderRef" class="form-control" required />
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="SenderRef">Sender reference</label>
+        <input class="govuk-input" asp-for="SenderRef" required />
     </div>
-    <div class="mb-3 form-check">
-        <input asp-for="IsNeuropath" class="form-check-input" type="checkbox" />
-        <label class="form-check-label">Neuropath</label>
+    <div class="govuk-form-group">
+        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="IsNeuropath" type="checkbox" />
+                <label class="govuk-label govuk-checkboxes__label" for="IsNeuropath">Neuropath</label>
+            </div>
+        </div>
     </div>
-    <button type="submit" class="btn btn-primary">Add Animal</button>
-    <a asp-page="/Submissions/ViewSamples" class="btn btn-secondary ms-2">Cancel</a>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Add animal</button>
+    <a asp-page="/Submissions/ViewSamples" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
 </form>

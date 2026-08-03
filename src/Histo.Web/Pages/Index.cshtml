@@ -5,64 +5,67 @@
     ViewData["PageTitle"] = "Home";
 }
 
-<div class="home-panels">
+<div class="govuk-grid-row">
 
     @* Customer panel *@
     @if (Model.Session.IsCustomer || Model.Session.IsHistoUser || Model.Session.IsMaintenance)
     {
-        <section class="panel">
-            <h2>Submissions</h2>
-            <ul>
-                <li><a asp-page="/Submissions/AddSubmission">New Submission</a></li>
-                <li><a asp-page="/Submissions/ViewSubmissions">View Submissions</a></li>
+        <div class="govuk-grid-column-one-third">
+            <h2 class="govuk-heading-m">Submissions</h2>
+            <ul class="govuk-list">
+                <li><a class="govuk-link" asp-page="/Batches/Cassetted">New submission</a></li>
+                <li><a class="govuk-link" asp-page="/Submissions/ViewSubmissions">View submissions</a></li>
             </ul>
-        </section>
+        </div>
     }
 
     @* Histopathology User / Maintenance panel *@
     @if (Model.Session.IsHistoUser || Model.Session.IsMaintenance)
     {
-        <section class="panel">
-            <h2>Laboratory</h2>
-            <ul>
-                <li><a asp-page="/Batches/BatchesNotReceived">Receive Batches</a></li>
-                <li><a asp-page="/Batches/BatchesReceived">Batches Received</a></li>
-                <li><a asp-page="/Batches/BatchesForEditing">Edit Batches</a></li>
-                <li><a asp-page="/Batches/BatchesForDispatch">Dispatch Batches</a></li>
-                <li><a asp-page="/Batches/BatchesForArchiving">Archive Batches</a></li>
+        <div class="govuk-grid-column-one-third">
+            <h2 class="govuk-heading-m">Laboratory</h2>
+            <ul class="govuk-list">
+                <li><a class="govuk-link" asp-page="/Batches/BatchesNotReceived">Receive batches</a></li>
+                <li><a class="govuk-link" asp-page="/Batches/BatchesReceived">Batches received</a></li>
+                <li><a class="govuk-link" asp-page="/Batches/BatchesForEditing">Edit batches</a></li>
+                <li><a class="govuk-link" asp-page="/Batches/BatchesForDispatch">Dispatch batches</a></li>
+                <li><a class="govuk-link" asp-page="/Batches/BatchesForArchiving">Archive batches</a></li>
             </ul>
-        </section>
+        </div>
 
-        <section class="panel">
-            <h2>Search &amp; Reports</h2>
-            <ul>
-                <li><a asp-page="/Search/SearchMenu">Search Submissions</a></li>
-                <li><a asp-page="/Search/SearchSample">Search Samples</a></li>
-                <li><a asp-page="/Search/SearchBlockRefs">Search Block Refs</a></li>
-                <li><a asp-page="/QC/QCNotes">Quality Data</a></li>
-                <li><a asp-page="/AuditLog/AuditLogMenu">Audit Log</a></li>
+        <div class="govuk-grid-column-one-third">
+            <h2 class="govuk-heading-m">Search and reports</h2>
+            <ul class="govuk-list">
+                <li><a class="govuk-link" asp-page="/Search/SearchMenu">Search submissions</a></li>
+                <li><a class="govuk-link" asp-page="/Search/SearchSample">Search samples</a></li>
+                <li><a class="govuk-link" asp-page="/Search/SearchBlockRefs">Search block refs</a></li>
+                <li><a class="govuk-link" asp-page="/QC/QCNotes">Quality data</a></li>
+                <li><a class="govuk-link" asp-page="/AuditLog/AuditLogMenu">Audit log</a></li>
+                <li><a class="govuk-link" asp-page="/Search/ViewImportedData">View old ICC_Sub data</a></li>
             </ul>
-        </section>
+        </div>
 
-        <section class="panel">
-            <h2>Bookings &amp; Archive</h2>
-            <ul>
-                <li><a asp-page="/Bookings/BookingMenu">Book Histology Refs</a></li>
-                <li><a asp-page="/Archive/ArchiveMenu">Archive</a></li>
+        <div class="govuk-grid-column-one-third">
+            <h2 class="govuk-heading-m">Bookings and archive</h2>
+            <ul class="govuk-list">
+                <li><a class="govuk-link" asp-page="/Bookings/BookingMenu">Book histology refs</a></li>
+                <li><a class="govuk-link" asp-page="/Archive/ArchiveMenu">Archive</a></li>
             </ul>
-        </section>
+        </div>
     }
 
     @* Maintenance only *@
     @if (Model.Session.IsMaintenance)
     {
-        <section class="panel">
-            <h2>Administration</h2>
-            <ul>
-                <li><a asp-page="/Admin/UserMaintenance">User Maintenance</a></li>
-                <li><a asp-page="/Admin/PickListMaintenance">Pick Lists</a></li>
+        <div class="govuk-grid-column-one-third">
+            <h2 class="govuk-heading-m">Administration</h2>
+            <ul class="govuk-list">
+                <li><a class="govuk-link" asp-page="/Admin/UserMaintenance">User maintenance</a></li>
+                <li><a class="govuk-link" asp-page="/Admin/PickListMaintenance">Pick lists</a></li>
+                <li><a class="govuk-link" asp-page="/Admin/FixCompletedDates">Fix completed dates</a></li>
             </ul>
-        </section>
+        </div>
     }
 
 </div>
+

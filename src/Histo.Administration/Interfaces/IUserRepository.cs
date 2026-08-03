@@ -27,4 +27,16 @@ public interface IUserRepository
     /// Maps to <c>GetUsersByUserArea</c> stored procedure.
     /// </summary>
     Task<IReadOnlyList<User>> GetUsersByAreaAsync(string userArea, CancellationToken ct = default);
+
+    /// <summary>
+    /// Creates a new user record. Maps to the <c>AddUser</c> stored procedure
+    /// (legacy source: <c>clsUser.SaveUserData</c> insert parameter set).
+    /// </summary>
+    Task CreateUserAsync(User user, CancellationToken ct = default);
+
+    /// <summary>
+    /// Updates an existing user record. Maps to the <c>EditUser</c> stored procedure
+    /// (legacy source: <c>clsUser.SaveUserData</c> update parameter set).
+    /// </summary>
+    Task UpdateUserAsync(User user, CancellationToken ct = default);
 }
