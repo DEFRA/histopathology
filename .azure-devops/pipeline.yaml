@@ -1,0 +1,52 @@
+name: $(BuildID)
+ 
+parameters:
+  - name: apiName
+    displayName: 'API Name to Deploy'
+    type: string
+    default: '__ALL__'
+ 
+  - name: forceDeploy
+    displayName: 'Force full slice deployment (no ApiNames required)'
+    type: boolean
+    default: false
+ 
+ 
+resources:
+  repositories:
+    - repository: DefraApiInfra
+      type: git
+      name: DEFRA-Common-Platform-Improvements/DEFRA-API-INFRA
+      ref: main
+ 
+trigger:
+  branches:
+    include:
+      - develop
+      - master
+  paths:
+    include:
+      - internal/**
+pr:
+  branches:
+    include:
+      - master
+      - develop
+  paths:
+      include:
+        - internal/**
+ 
+variables:
+- group: apim-api-keys
+- name: TraceTag
+  value: "API=$(parameters.apiName)-Env=01-RunID=$(Build.BuildId)"
+ 
+ 
+extends:
+  template: /.azure-devops/api-ops-publisher.yaml@DefraApiInfra
+ 
+  parameters:
+    internalOrExternalApimService: internal
+    environmentId: '01'
+    apiName: ${{ parameters.apiName }}        
+    forceDeploy: ${{ parameters.forceDeploy }}
