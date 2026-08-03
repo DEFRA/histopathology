@@ -25,3 +25,16 @@ public sealed class AnimalConcurrencyException : Exception
     public AnimalConcurrencyException()
         : base("Another user has modified this sample record.") { }
 }
+
+/// <summary>
+/// Exception thrown when the <c>EditAnimalSenderRef</c> / <c>EditAnimalHistologyRef</c>
+/// stored procedures reject a Sender Ref / Histology Ref rename — the original
+/// Sender Ref was not found, or the new reference is already used by another sample.
+///
+/// Legacy source: HistopathologyLib/clsAnimal.vb — <c>AnimalUpdateException</c>,
+/// as raised from <c>UpdateAnimalSenderRef</c> / <c>UpdateAnimalHistologyRef</c>.
+/// </summary>
+public sealed class AnimalRefUpdateException : Exception
+{
+    public AnimalRefUpdateException(string message) : base(message) { }
+}

@@ -1,5 +1,13 @@
 @page
 @model Histo.Web.Pages.QC.QualityDataModel
+@{
+    ViewData["Title"] = "Quality data";
+    ViewData["PageTitle"] = "Quality data";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Batches/BatchDetails" class="govuk-back-link">Back</a>
+}
 
 <p class="govuk-body"><strong>Batch No:</strong> @Model.BatchID</p>
 

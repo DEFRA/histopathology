@@ -1,8 +1,12 @@
 @page
 @model AuditLogBySubmissionModel
 @{
-    ViewData["Title"] = "Audit Log by Submission";
-    ViewData["PageTitle"] = "Audit Log — By Submission";
+    ViewData["Title"] = "Audit log by submission";
+    ViewData["PageTitle"] = "Audit log — by submission";
+}
+
+@section BeforeHeading {
+    <a asp-page="/AuditLog/AuditLogMenu" class="govuk-back-link">Back</a>
 }
 
 <form method="post">

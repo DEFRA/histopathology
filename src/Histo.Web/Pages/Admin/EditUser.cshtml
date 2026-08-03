@@ -5,6 +5,10 @@
     ViewData["PageTitle"] = "Edit user";
 }
 
+@section BeforeHeading {
+    <a asp-page="/Admin/UserMaintenance" class="govuk-back-link">Back</a>
+}
+
 @if (Model.Errors.Count > 0)
 {
     <div class="govuk-error-summary" data-module="govuk-error-summary">

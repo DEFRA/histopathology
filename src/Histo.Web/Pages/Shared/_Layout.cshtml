@@ -68,6 +68,7 @@
         </div>
 
         <main class="govuk-main-wrapper" id="main-content" role="main">
+            @RenderSection("BeforeHeading", required: false)
             @if (ViewData["PageTitle"] is string pt)
             {
                 @if (ViewData["BatchNo"] is string batchNo)

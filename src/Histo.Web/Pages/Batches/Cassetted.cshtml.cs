@@ -18,6 +18,11 @@ namespace Histo.Web.Pages.Batches;
 /// Legacy source: Cassetted.aspx.vb. The multi-select checkbox list in the
 /// legacy page enforces single-selection in code (<c>chkblSubmittedAs_SelectedIndexChanged</c>);
 /// this is reproduced here as a single-select dropdown.
+///
+/// ISS-023 fix: the legacy Home.aspx exposed two separate links ("New TSE Submission"
+/// and "New Non-TSE Submission") that set <c>SV_SubmissionType</c> in session before
+/// routing here. This page now captures that choice directly via the BatchType
+/// radio group, consistent with GOV.UK single-page-per-question design.
 /// </summary>
 public class CassettedModel : HistoPageModel
 {
@@ -34,6 +39,9 @@ public class CassettedModel : HistoPageModel
     }
 
     [BindProperty] public int? SubmittedAs { get; set; }
+
+    /// <summary>0 = TSE (default), 1 = Non-TSE. Mirrors legacy SUBMISSION_TSE/SUBMISSION_NONTSE.</summary>
+    [BindProperty] public int BatchType { get; set; } = BatchTypeConstants.Tse;
 
     public IReadOnlyList<LookupItem> SubmittedAsOptions { get; private set; } = [];
     public string? SaveError { get; private set; }
@@ -63,6 +71,7 @@ public class CassettedModel : HistoPageModel
             SubmittedByUserID = Session.UserID,
             UserAreaCode      = Session.UserAreaID,
             IsPreCassetted    = ValidationHelpers.IsBatchPreCassetted(selected.ID.ToString()),
+            BatchType         = BatchType,
         };
 
         var batchId = await _batches.AddAsync(batch, Session.UserID);
@@ -72,7 +81,8 @@ public class CassettedModel : HistoPageModel
             return Page();
         }
 
-        Session.BatchID = batchId;
+        Session.BatchID   = batchId;
+        Session.BatchType = BatchType;  // ISS-023: persist for downstream lookup selection
         return RedirectToPage("/Batches/BatchDetails");
     }
 }

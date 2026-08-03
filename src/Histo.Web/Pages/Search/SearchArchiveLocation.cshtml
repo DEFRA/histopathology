@@ -1,8 +1,26 @@
 @page
 @model SearchArchiveLocationModel
 @{
-    ViewData["Title"] = "Search Archive Location";
-    ViewData["PageTitle"] = "Search Archive Location";
+    ViewData["Title"] = "Search archive location";
+    ViewData["PageTitle"] = "Search archive location";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Search/SearchMenu" class="govuk-back-link">Back</a>
+}
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.ErrorMessage</li>
+                </ul>
+            </div>
+        </div>
+    </div>
 }
 
 <form method="post">
@@ -41,11 +59,7 @@
     }
 </form>
 
-@if (Model.ErrorMessage is not null)
-{
-    <p class="govuk-error-message">@Model.ErrorMessage</p>
-}
-else if (Model.Searched)
+@if (Model.Searched)
 {
     @if (Model.ArchiveType == "Block")
     {

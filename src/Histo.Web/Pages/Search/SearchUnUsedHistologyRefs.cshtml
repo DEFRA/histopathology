@@ -1,8 +1,12 @@
 @page
 @model SearchUnUsedHistologyRefsModel
 @{
-    ViewData["Title"] = "Unused Histology Refs";
-    ViewData["PageTitle"] = "Unused Histology Refs";
+    ViewData["Title"] = "Unused histology refs";
+    ViewData["PageTitle"] = "Unused histology refs";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Search/SearchMenu" class="govuk-back-link">Back</a>
 }
 
 @if (Model.Results.Any())

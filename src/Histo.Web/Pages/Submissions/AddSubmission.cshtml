@@ -1,8 +1,12 @@
 @page
 @model Histo.Web.Pages.Submissions.AddSubmissionModel
 @{
-    ViewData["Title"] = "Add Submission";
-    ViewData["PageTitle"] = "Add Submission";
+    ViewData["Title"] = "Add submission";
+    ViewData["PageTitle"] = "Add submission";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Submissions/ViewSamples" class="govuk-back-link">Back</a>
 }
 
 <form method="post">

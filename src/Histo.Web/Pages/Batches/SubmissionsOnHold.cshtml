@@ -1,8 +1,12 @@
 @page
 @model SubmissionsOnHoldModel
 @{
-    ViewData["Title"] = "Submissions On Hold";
-    ViewData["PageTitle"] = "Submissions On Hold";
+    ViewData["Title"] = "Submissions on hold";
+    ViewData["PageTitle"] = "Submissions on hold";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Index" class="govuk-back-link">Back</a>
 }
 
 @if (!Model.Batches.Any())

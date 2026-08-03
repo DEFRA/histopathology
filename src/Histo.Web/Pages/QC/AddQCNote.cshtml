@@ -1,5 +1,13 @@
 @page
 @model Histo.Web.Pages.QC.AddQCNoteModel
+@{
+    ViewData["Title"] = "Add QC note";
+    ViewData["PageTitle"] = "Add QC note";
+}
+
+@section BeforeHeading {
+    <a asp-page="/QC/QCNotes" class="govuk-back-link">Back</a>
+}
 
 <p class="govuk-body"><strong>Batch No:</strong> @Model.BatchID</p>
 

@@ -1,8 +1,12 @@
 @page
 @model Histo.Web.Pages.Batches.BatchesForArchivingModel
 @{
-    ViewData["Title"] = "Batches for Archiving";
-    ViewData["PageTitle"] = "Batches for Archiving";
+    ViewData["Title"] = "Batches for archiving";
+    ViewData["PageTitle"] = "Batches for archiving";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Archive/ArchiveMenu" class="govuk-back-link">Back</a>
 }
 
 <table class="govuk-table">

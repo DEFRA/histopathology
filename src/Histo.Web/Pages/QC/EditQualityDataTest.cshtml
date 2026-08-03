@@ -1,5 +1,13 @@
 @page "{TestId:int}"
 @model Histo.Web.Pages.QC.EditQualityDataTestModel
+@{
+    ViewData["Title"] = "Edit quality data test";
+    ViewData["PageTitle"] = "Edit quality data test";
+}
+
+@section BeforeHeading {
+    <a asp-page="/QC/QualityData" class="govuk-back-link">Back</a>
+}
 
 @if (!string.IsNullOrEmpty(Model.Error))
 {

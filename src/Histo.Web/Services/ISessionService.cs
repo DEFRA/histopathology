@@ -29,6 +29,14 @@ public interface ISessionService
     int? AnimalID { get; set; }
     int? BlockID { get; set; }
 
+    /// <summary>
+    /// Batch type for the currently active submission: 0 = TSE, 1 = Non-TSE.
+    /// Mirrors <c>SessionVars.SV_SubmissionType</c> from the legacy application.
+    /// Set in <c>CassettedModel</c> (new batch) and in <c>BatchDetailsModel</c>
+    /// (opening an existing batch).
+    /// </summary>
+    int BatchType { get; set; }
+
     // ── Role helpers ─────────────────────────────────────────────────────────
 
     bool IsCustomer { get; }

@@ -1,16 +1,49 @@
 @page
 @model Histo.Web.Pages.Batches.CassettedModel
+@using Histo.Submissions.Models
 @{
-    ViewData["Title"] = "Submission Type";
-    ViewData["PageTitle"] = "Submission Type";
+    ViewData["Title"] = "Submission type";
+    ViewData["PageTitle"] = "Submission type";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Index" class="govuk-back-link">Back</a>
 }
 
 @if (Model.SaveError is not null)
 {
-    <p class="govuk-error-message">@Model.SaveError</p>
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.SaveError</li>
+                </ul>
+            </div>
+        </div>
+    </div>
 }
 
 <form method="post">
+    <div class="govuk-form-group">
+        <fieldset class="govuk-fieldset">
+            <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">
+                Submission category
+            </legend>
+            <div class="govuk-radios" data-module="govuk-radios">
+                <div class="govuk-radios__item">
+                    <input class="govuk-radios__input" type="radio" asp-for="BatchType"
+                           value="@BatchTypeConstants.Tse" id="batchType-tse" />
+                    <label class="govuk-label govuk-radios__label" for="batchType-tse">TSE</label>
+                </div>
+                <div class="govuk-radios__item">
+                    <input class="govuk-radios__input" type="radio" asp-for="BatchType"
+                           value="@BatchTypeConstants.NonTse" id="batchType-nontse" />
+                    <label class="govuk-label govuk-radios__label" for="batchType-nontse">Non-TSE</label>
+                </div>
+            </div>
+        </fieldset>
+    </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="SubmittedAs">Select the submission type, then click Next. Only one submission type can be selected.</label>
         <select class="govuk-select" asp-for="SubmittedAs">

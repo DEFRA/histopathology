@@ -21,6 +21,8 @@ public class BatchDetailsModel : HistoPageModel
         ViewData["PageTitle"] = "Batch Details";
         if (Session.BatchID <= 0) return RedirectToPage("/Index");
         Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0);
+        if (Batch is not null)
+            Session.BatchType = Batch.BatchType;  // ISS-023: restore from DB for downstream lookup selection
         return Page();
     }
 }

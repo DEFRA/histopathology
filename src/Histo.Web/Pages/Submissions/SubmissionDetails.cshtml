@@ -1,8 +1,12 @@
 @page
 @model Histo.Web.Pages.Submissions.SubmissionDetailsModel
 @{
-    ViewData["Title"] = "Sample Details";
-    ViewData["PageTitle"] = "Sample Details";
+    ViewData["Title"] = "Sample details";
+    ViewData["PageTitle"] = "Sample details";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Submissions/ViewSamples" class="govuk-back-link">Back</a>
 }
 
 @if (Model.Animal is null)

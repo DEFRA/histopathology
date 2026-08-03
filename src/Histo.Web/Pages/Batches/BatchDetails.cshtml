@@ -1,8 +1,12 @@
 @page
 @model Histo.Web.Pages.Batches.BatchDetailsModel
 @{
-    ViewData["Title"] = "Batch Details";
-    ViewData["PageTitle"] = "Batch Details";
+    ViewData["Title"] = "Batch details";
+    ViewData["PageTitle"] = "Batch details";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Batches/BatchesForEditing" class="govuk-back-link">Back</a>
 }
 
 @if (Model.Batch is null)
@@ -41,6 +45,10 @@ else
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Comments</dt>
             <dd class="govuk-summary-list__value">@Model.Batch.Comments</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submission category</dt>
+            <dd class="govuk-summary-list__value">@Histo.Submissions.Models.BatchTypeConstants.DisplayName(Model.Batch.BatchType)</dd>
         </div>
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Pre-cassetted</dt>

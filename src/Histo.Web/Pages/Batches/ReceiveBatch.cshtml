@@ -1,8 +1,12 @@
 @page
 @model Histo.Web.Pages.Batches.ReceiveBatchModel
 @{
-    ViewData["Title"] = "Receive Batch";
-    ViewData["PageTitle"] = "Receive Batch";
+    ViewData["Title"] = "Receive batch";
+    ViewData["PageTitle"] = "Receive batch";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Batches/BatchesNotReceived" class="govuk-back-link">Back</a>
 }
 
 @if (!string.IsNullOrEmpty(Model.Error))

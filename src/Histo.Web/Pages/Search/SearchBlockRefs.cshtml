@@ -1,8 +1,26 @@
 @page
 @model SearchBlockRefsModel
 @{
-    ViewData["Title"] = "Search Block Refs";
-    ViewData["PageTitle"] = "Search Block Refs";
+    ViewData["Title"] = "Search block refs";
+    ViewData["PageTitle"] = "Search block refs";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Search/SearchMenu" class="govuk-back-link">Back</a>
+}
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.ErrorMessage</li>
+                </ul>
+            </div>
+        </div>
+    </div>
 }
 
 <form method="post">
@@ -17,13 +35,11 @@
     <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
 </form>
 
-@if (Model.ErrorMessage is not null)
+@if (Model.ErrorMessage is null)
 {
-    <p class="govuk-error-message">@Model.ErrorMessage</p>
-}
-else if (Model.Results.Any())
-{
-    <table class="govuk-table">
+    @if (Model.Results.Any())
+    {
+        <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
                 <th scope="col" class="govuk-table__header">Used block refs</th>
@@ -42,4 +58,9 @@ else if (Model.Results.Any())
             }
         </tbody>
     </table>
+    }
+    else if (Model.SenderRef is not null || Model.HistologyRef is not null)
+    {
+        <p class="govuk-body">No block refs found for the given criteria.</p>
+    }
 }

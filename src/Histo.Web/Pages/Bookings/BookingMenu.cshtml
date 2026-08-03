@@ -2,11 +2,11 @@
 @model BookingMenuModel
 @{
     ViewData["Title"] = "Bookings";
-    ViewData["PageTitle"] = "Booking Menu";
+    ViewData["PageTitle"] = "Booking menu";
 }
 
-<ul class="menu-links">
-    <li><a asp-page="/Bookings/BookHistologyRef">Book Histology Reference</a></li>
-    <li><a asp-page="/Bookings/BookBlockRef">Book Block Reference</a></li>
-    <li><a asp-page="/Bookings/EditHistologyRef">Edit Histology References</a></li>
+<ul class="govuk-list govuk-list--spaced">
+    <li><a asp-page="/Bookings/BookHistologyRef" class="govuk-link">Book histology reference</a></li>
+    <li><a asp-page="/Bookings/BookBlockRef" class="govuk-link">Book block reference</a></li>
+    <li><a asp-page="/Bookings/EditHistologyRef" class="govuk-link">Edit histology references</a></li>
 </ul>

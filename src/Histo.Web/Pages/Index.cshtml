@@ -2,7 +2,7 @@
 @model IndexModel
 @{
     ViewData["Title"] = "Home";
-    ViewData["PageTitle"] = "Home";
+    ViewData["PageTitle"] = "Welcome to the Histopathology Submissions System";
 }
 
 <div class="govuk-grid-row">
@@ -25,8 +25,7 @@
         <div class="govuk-grid-column-one-third">
             <h2 class="govuk-heading-m">Laboratory</h2>
             <ul class="govuk-list">
-                <li><a class="govuk-link" asp-page="/Batches/BatchesNotReceived">Receive batches</a></li>
-                <li><a class="govuk-link" asp-page="/Batches/BatchesReceived">Batches received</a></li>
+                <li><a class="govuk-link" asp-page="/Batches/BatchesNotReceived">Receive submissions</a></li>
                 <li><a class="govuk-link" asp-page="/Batches/BatchesForEditing">Edit batches</a></li>
                 <li><a class="govuk-link" asp-page="/Batches/BatchesForDispatch">Dispatch batches</a></li>
                 <li><a class="govuk-link" asp-page="/Batches/BatchesForArchiving">Archive batches</a></li>
@@ -48,7 +47,7 @@
         <div class="govuk-grid-column-one-third">
             <h2 class="govuk-heading-m">Bookings and archive</h2>
             <ul class="govuk-list">
-                <li><a class="govuk-link" asp-page="/Bookings/BookingMenu">Book histology refs</a></li>
+                <li><a class="govuk-link" asp-page="/Bookings/BookingMenu">Booking</a></li>
                 <li><a class="govuk-link" asp-page="/Archive/ArchiveMenu">Archive</a></li>
             </ul>
         </div>
@@ -61,8 +60,8 @@
             <h2 class="govuk-heading-m">Administration</h2>
             <ul class="govuk-list">
                 <li><a class="govuk-link" asp-page="/Admin/UserMaintenance">User maintenance</a></li>
-                <li><a class="govuk-link" asp-page="/Admin/PickListMaintenance">Pick lists</a></li>
-                <li><a class="govuk-link" asp-page="/Admin/FixCompletedDates">Fix completed dates</a></li>
+                <li><a class="govuk-link" asp-page="/Admin/PickListMaintenance">Pick list maintenance</a></li>
+                <li><a class="govuk-link" asp-page="/Admin/EditAnimalRef">Edit Sender/Histology Ref</a></li>
             </ul>
         </div>
     }
