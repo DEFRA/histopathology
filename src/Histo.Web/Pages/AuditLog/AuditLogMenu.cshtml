@@ -1,12 +1,12 @@
 @page
 @model AuditLogMenuModel
 @{
-    ViewData["Title"] = "Audit Log";
-    ViewData["PageTitle"] = "Audit Log";
+    ViewData["Title"] = "Audit log";
+    ViewData["PageTitle"] = "Audit log";
 }
 
-<ul class="menu-links">
-    <li><a asp-page="/AuditLog/AuditLogByDate">Search by Date</a></li>
-    <li><a asp-page="/AuditLog/AuditLogByUser">Search by User</a></li>
-    <li><a asp-page="/AuditLog/AuditLogBySubmission">Search by Submission</a></li>
+<ul class="govuk-list govuk-list--spaced">
+    <li><a asp-page="/AuditLog/AuditLogByDate" class="govuk-link">Search by date</a></li>
+    <li><a asp-page="/AuditLog/AuditLogByUser" class="govuk-link">Search by user</a></li>
+    <li><a asp-page="/AuditLog/AuditLogBySubmission" class="govuk-link">Search by submission</a></li>
 </ul>

@@ -1,8 +1,12 @@
 @page
 @model BatchesReceivedModel
 @{
-    ViewData["Title"] = "Batches Received";
-    ViewData["PageTitle"] = "Batches Received";
+    ViewData["Title"] = "Batches received";
+    ViewData["PageTitle"] = "Batches received";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Index" class="govuk-back-link">Back</a>
 }
 
 @if (!Model.Batches.Any())

@@ -1,8 +1,12 @@
 @page
 @model Histo.Web.Pages.Blocks.BlockDetailsModel
 @{
-    ViewData["Title"] = "Block Details";
-    ViewData["PageTitle"] = "Block Details";
+    ViewData["Title"] = "Block details";
+    ViewData["PageTitle"] = "Block details";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Submissions/ViewSamples" class="govuk-back-link">Back</a>
 }
 
 <a asp-page="/Blocks/CopySamples" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy samples</a>

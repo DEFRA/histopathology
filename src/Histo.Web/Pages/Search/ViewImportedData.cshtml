@@ -1,8 +1,12 @@
 @page
 @model Histo.Web.Pages.Search.ViewImportedDataModel
 @{
-    ViewData["Title"] = "View Old ICC_Sub Data";
-    ViewData["PageTitle"] = "View Old ICC_Sub Data";
+    ViewData["Title"] = "View old ICC_Sub data";
+    ViewData["PageTitle"] = "View old ICC_Sub data";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Search/SearchMenu" class="govuk-back-link">Back</a>
 }
 
 <form method="get">

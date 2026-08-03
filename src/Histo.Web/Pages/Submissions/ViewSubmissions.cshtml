@@ -1,8 +1,12 @@
 @page
 @model ViewSubmissionsModel
 @{
-    ViewData["Title"] = "View Submissions";
-    ViewData["PageTitle"] = "View Submissions";
+    ViewData["Title"] = "View submissions";
+    ViewData["PageTitle"] = "View submissions";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Index" class="govuk-back-link">Back</a>
 }
 
 <form method="get">

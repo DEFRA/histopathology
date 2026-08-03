@@ -5,6 +5,10 @@
     ViewData["PageTitle"] = "Edit pick list";
 }
 
+@section BeforeHeading {
+    <a asp-page="/Admin/PickListMaintenance" class="govuk-back-link">Back</a>
+}
+
 <h2 class="govuk-heading-m">@Model.TableName</h2>
 
 @if (!string.IsNullOrEmpty(Model.StatusMessage))

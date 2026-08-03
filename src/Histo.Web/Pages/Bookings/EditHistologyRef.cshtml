@@ -1,8 +1,12 @@
 @page
 @model Histo.Web.Pages.Bookings.EditHistologyRefModel
 @{
-    ViewData["Title"] = "Edit Histology Reference";
-    ViewData["PageTitle"] = "Edit Histology Reference";
+    ViewData["Title"] = "Edit histology reference";
+    ViewData["PageTitle"] = "Edit histology reference";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Bookings/BookingMenu" class="govuk-back-link">Back</a>
 }
 
 <p class="govuk-body">Use this page to correct the "next histology reference" counter for a histology type. Please use this with extreme care.</p>

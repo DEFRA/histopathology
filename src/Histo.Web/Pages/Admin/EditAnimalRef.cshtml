@@ -1,0 +1,68 @@
+@page
+@model Histo.Web.Pages.Admin.EditAnimalRefModel
+@{
+    ViewData["Title"] = "Edit sender/histology ref";
+    ViewData["PageTitle"] = "Edit sender/histology ref";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Index" class="govuk-back-link">Back</a>
+}
+
+<p class="govuk-body">This page allows you to change existing Sender or Histology refs. Please use this page with extreme care. When you change a Sender or Histology ref, all submissions using that reference will also be changed.</p>
+
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.Error</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="govuk-panel govuk-panel--confirmation govuk-!-margin-bottom-6">
+        <p class="govuk-panel__body">@Model.SuccessMessage</p>
+    </div>
+}
+
+<form method="post">
+    <div class="govuk-form-group">
+        <label class="govuk-label govuk-label--s" for="OriginalSenderRef">Sample (Sender) Ref</label>
+        <input class="govuk-input govuk-input--width-10" id="OriginalSenderRef" name="OriginalSenderRef" type="text" value="@Model.OriginalSenderRef" />
+    </div>
+
+    <div class="govuk-form-group">
+        <label class="govuk-label govuk-label--s" for="CurrentHistologyRef">Original Histology Ref</label>
+        <input class="govuk-input govuk-input--width-10" id="CurrentHistologyRef" value="@Model.CurrentHistologyRef" readonly />
+        <button type="submit" asp-page-handler="GetHistologyRef" class="govuk-button govuk-button--secondary govuk-!-margin-top-2" data-module="govuk-button">Get Histology Ref</button>
+    </div>
+
+    <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m" />
+
+    <div class="govuk-form-group">
+        <label class="govuk-label govuk-label--s" for="NewSenderRef">New Sample (Sender) Ref</label>
+        <input class="govuk-input govuk-input--width-10" id="NewSenderRef" name="NewSenderRef" type="text" value="@Model.NewSenderRef" />
+        <button type="submit" asp-page-handler="EditSenderRef" class="govuk-button govuk-!-margin-top-2" data-module="govuk-button">Save Sender Ref</button>
+    </div>
+
+    <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m" />
+
+    <div class="govuk-form-group">
+        <label class="govuk-label govuk-label--s" for="NewHistologyRef">New Histology Ref</label>
+        <div class="govuk-hint">Leave blank to remove any existing Histology Ref for this sample.</div>
+        <input class="govuk-input govuk-input--width-10" id="NewHistologyRef" name="NewHistologyRef" type="text" value="@Model.NewHistologyRef" />
+        <button type="submit" asp-page-handler="SaveHistologyRef" class="govuk-button govuk-!-margin-top-2" data-module="govuk-button" data-prevent-double-click="true"
+                onclick="return document.getElementById('NewHistologyRef').value !== '' || confirm('You have not entered a Histology ref. This will delete any existing Histology Ref. Do you wish to continue?');">Save Histology Ref</button>
+    </div>
+
+    <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m" />
+
+    <a asp-page="/Index" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
+</form>

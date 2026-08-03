@@ -1,5 +1,13 @@
 @page
 @model Histo.Web.Pages.Admin.FixCompletedDatesModel
+@{
+    ViewData["Title"] = "Fix completed dates";
+    ViewData["PageTitle"] = "Fix completed dates";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Index" class="govuk-back-link">Back</a>
+}
 
 <p class="govuk-body">
     Recomputes the completed date of every cassetted batch whose histology, antibodies

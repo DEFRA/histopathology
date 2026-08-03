@@ -1,8 +1,12 @@
 @page
 @model Histo.Web.Pages.Archive.ArchiveBlocksModel
 @{
-    ViewData["Title"] = "Archive Blocks";
-    ViewData["PageTitle"] = "Archive Blocks";
+    ViewData["Title"] = "Archive blocks";
+    ViewData["PageTitle"] = "Archive blocks";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Archive/ArchiveMenu" class="govuk-back-link">Back</a>
 }
 
 <table class="govuk-table">

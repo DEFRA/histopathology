@@ -28,6 +28,7 @@ public sealed class SessionService : ISessionService
     private const string KeySubmID    = "BatchSubmissionID";
     private const string KeyAnimalID  = "AnimalID";
     private const string KeyBlockID   = "BlockID";
+    private const string KeyBatchType = "BatchType";
 
     private readonly ISession _session;
 
@@ -71,6 +72,12 @@ public sealed class SessionService : ISessionService
     {
         get => GetNullableInt(KeyBlockID);
         set => SetNullableInt(KeyBlockID, value);
+    }
+
+    public int BatchType
+    {
+        get => GetInt(KeyBatchType);
+        set => _session.Set(KeyBatchType, BitConverter.GetBytes(value));
     }
 
     // ── Role helpers ─────────────────────────────────────────────────────────

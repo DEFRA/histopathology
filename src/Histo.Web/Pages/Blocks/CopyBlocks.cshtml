@@ -1,8 +1,12 @@
 @page
 @model Histo.Web.Pages.Blocks.CopyBlocksModel
 @{
-    ViewData["Title"] = "Copy Blocks";
-    ViewData["PageTitle"] = "Copy Blocks";
+    ViewData["Title"] = "Copy blocks";
+    ViewData["PageTitle"] = "Copy blocks";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Submissions/SubmissionDetailsBlock" class="govuk-back-link">Back</a>
 }
 
 @if (!string.IsNullOrEmpty(Model.Error))

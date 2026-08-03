@@ -150,6 +150,25 @@ public sealed class SubmissionService
         catch (Exception ex) { _logger.LogError("Failed to delete animal {AnimalId}.", ex, animalId); return false; }
     }
 
+    /// <summary>
+    /// Renames the Sender Ref of an existing sample. Throws
+    /// <see cref="AnimalRefUpdateException"/> when the original Sender Ref is not
+    /// found or the new Sender Ref is already in use — the UI layer must handle it.
+    /// Legacy source: EditHistologyRef.aspx.vb — <c>cmdEditSenderRef_Click</c>.
+    /// </summary>
+    public async Task UpdateAnimalSenderRefAsync(string senderRef, string newSenderRef, int userId, CancellationToken ct = default)
+        => await _repo.UpdateAnimalSenderRefAsync(senderRef, newSenderRef, userId, ct);
+
+    /// <summary>
+    /// Renames (or clears, when <paramref name="newHistologyRef"/> is empty) the
+    /// Histology Ref of an existing sample, identified by its Sender Ref. Throws
+    /// <see cref="AnimalRefUpdateException"/> when the Sender Ref is not found or
+    /// the new Histology Ref is already in use — the UI layer must handle it.
+    /// Legacy source: EditHistologyRef.aspx.vb — <c>cmdSaveHistologyRef_Click</c>.
+    /// </summary>
+    public async Task UpdateAnimalHistologyRefAsync(string senderRef, string? newHistologyRef, int userId, CancellationToken ct = default)
+        => await _repo.UpdateAnimalHistologyRefAsync(senderRef, newHistologyRef, userId, ct);
+
     // -----------------------------------------------------------------------
     // Tissues
     // -----------------------------------------------------------------------

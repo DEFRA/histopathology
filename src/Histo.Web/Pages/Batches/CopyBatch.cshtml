@@ -1,8 +1,12 @@
 @page "{sourceBatchId:int?}"
 @model Histo.Web.Pages.Batches.CopyBatchModel
 @{
-    ViewData["Title"] = "Copy Submission";
-    ViewData["PageTitle"] = "Copy Submission";
+    ViewData["Title"] = "Copy submission";
+    ViewData["PageTitle"] = "Copy submission";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Batches/BatchDetails" class="govuk-back-link">Back</a>
 }
 
 @if (!string.IsNullOrEmpty(Model.Error))

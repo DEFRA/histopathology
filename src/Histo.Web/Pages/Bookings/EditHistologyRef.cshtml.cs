@@ -12,8 +12,8 @@ namespace Histo.Web.Pages.Bookings;
 ///
 /// Note: the legacy per-animal <c>EditHistologyRef.aspx</c> page (renaming an
 /// individual sample's Sender Ref / Histology Ref via <c>clsAnimal.UpdateAnimalSenderRef</c>
-/// / <c>UpdateAnimalHistologyRef</c>) is a different workflow with no corresponding
-/// repository method yet exposed — that gap remains open.
+/// / <c>UpdateAnimalHistologyRef</c>) is a different workflow, now implemented
+/// separately at <see cref="Histo.Web.Pages.Admin.EditAnimalRefModel"/> (ISS-022).
 /// </summary>
 public class EditHistologyRefModel : HistoPageModel
 {

@@ -48,6 +48,33 @@ public interface ISubmissionRepository
     /// <summary>Deletes an animal record. Maps to <c>DeleteAnimal</c>.</summary>
     Task DeleteAnimalAsync(int animalId, int userId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Renames the Sender Ref of an existing animal/sample record, cascading to
+    /// every submission that references it. Maps to <c>EditAnimalSenderRef</c>.
+    ///
+    /// Legacy source: HistopathologyLib/clsAnimal.vb — <c>UpdateAnimalSenderRef()</c>.
+    /// Legacy UI: EditHistologyRef.aspx (the per-animal Sender/Histology Ref rename
+    /// page — distinct from the pool-level counter page at <c>Bookings/EditHistologyRef</c>).
+    ///
+    /// Throws <see cref="AnimalRefUpdateException"/> when the original Sender Ref is
+    /// not found (SP return code 1) or the new Sender Ref is already used by another
+    /// sample (SP return code 3).
+    /// </summary>
+    Task UpdateAnimalSenderRefAsync(string senderRef, string newSenderRef, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Renames the Histology Ref of an existing animal/sample record identified by
+    /// its Sender Ref. Passing an empty <paramref name="newHistologyRef"/> removes
+    /// the existing Histology Ref. Maps to <c>EditAnimalHistologyRef</c>.
+    ///
+    /// Legacy source: HistopathologyLib/clsAnimal.vb — <c>UpdateAnimalHistologyRef()</c>.
+    ///
+    /// Throws <see cref="AnimalRefUpdateException"/> when the Sender Ref is not found
+    /// (SP return code 1) or the new Histology Ref is already used by another sample
+    /// (SP return code 3).
+    /// </summary>
+    Task UpdateAnimalHistologyRefAsync(string senderRef, string? newHistologyRef, int userId, CancellationToken ct = default);
+
     // -----------------------------------------------------------------------
     // Tissues
     // -----------------------------------------------------------------------

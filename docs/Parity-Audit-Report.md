@@ -1,15 +1,31 @@
 # Legacy vs. Current Application — Full Parity Audit Report
 
 **Project:** Histopathology System — VB.NET ASP.NET WebForms → C# .NET 10 Razor Pages (GOV.UK Design System)
-**Audit date:** 2026-08-01 (original audit) — **updated 2026-08-01 following remediation batches A–F**
+**Audit date:** 2026-08-01 (original audit) — **updated 2026-08-01 following remediation batches A–F** — **further updated 2026-08-03 following ISS-022 resolution (Run Log #43)**
 **Scope:** Every module, screen, feature, workflow, business rule, and CRUD operation in the legacy application (`HistopathologySystem/`), compared against the current application (`src/Histo.Web/` + domain modules).
 **Method:** Full directory enumeration of both codebases, 1:1 page-name mapping, repository/service-layer interface inspection for CRUD completeness, and targeted grep of legacy business-rule and authorization patterns (`CheckPermissions()`, `web.config`, `HistopathologyLib`). Cross-referenced against `docs/migration-run-journal.md` Open Issues (ISS-001 → ISS-022) to avoid duplicate reporting.
 
-> **Post-audit update:** Following this audit, six remediation batches (A–F, Run Log #34–#42 in `docs/migration-run-journal.md`) closed nearly all of the page-migration gaps identified below. **The page-by-page table in §2 is now a historical snapshot as of the original audit** — see the Section 10 addendum for the current, post-remediation state. Authentication (F-07/ISS-001) remains open and unaffected by this remediation work.
+> **Post-audit update (2026-08-03):** All page-migration gaps identified below are now resolved, including ISS-022 (the final Phase 5 gap — the per-animal Sender/Histology Ref rename workflow, `Admin/EditAnimalRef.cshtml`). **The page-by-page table in §2 and the Executive Summary in §1 have been corrected in place below to reflect current state** — the original pre-remediation figures are retained in §1a and §10 for audit-trail purposes only. Authentication (F-07/ISS-001) remains open and is unaffected by this remediation work — it is now the sole critical pre-production blocker.
 
 ---
 
-## 1. Executive Summary (original, pre-remediation)
+## 1. Executive Summary
+
+**Current status (2026-08-03):** 60 of 64 legacy pages migrated or functionally superseded; 3 pages (`FinalPrintBatch`, `SubmissionForm`, `SubmissionNotes`) remain blocked on Phase 2 (Reporting, still 0% started); 1 page (`CalendarPopup`) is not applicable (superseded by the native GDS date input). The domain/repository CRUD layer is now at full parity with its consuming UI — no outstanding "backend exists, page missing" gaps remain (ISS-018, ISS-020, ISS-021, ISS-022 all resolved). **Authentication/authorization remains 0% implemented and is the sole critical pre-production blocker** (ISS-001, F-07 — unchanged since the original audit).
+
+| Area | Legacy count | Migrated / Superseded | Blocked / N/A | Completion |
+|---|---|---|---|---|
+| ASPX pages | 64 | 60 | 3 blocked on Phase 2, 1 N/A | **~94%** (100% of non-reporting-blocked pages) |
+| ASCX user controls | 8 | 8 functionally replaced (see §3) | — | 100% |
+| Crystal Reports (.rpt) | 9 | 0 | 9 | **0%** — Phase 2 not started |
+| Domain/repository CRUD (Batch, Submission, Animal, Tissue, Block, HistologyRef, QCNote, Lookup) | — | Create/Update/Delete methods present at interface level **and** exposed via UI for every entity | None outstanding | **Full parity** |
+| Authentication / authorization (`CheckPermissions()`) | ~60+ call sites across all pages | 0 | All | **0%** — no `[Authorize]`, `AddAuthentication`, or Entra ID wiring exists anywhere in `Histo.Web`; only a hard-coded Development-only stub identity |
+
+**Headline finding (current):** UI migration (Phase 5) is complete for every page that does not depend on Phase 2 Reporting. The application is **not yet production-ready** — authentication/authorization remains entirely unimplemented, which is now the only critical blocker to further deployment. See §11 for the full list of pending migrations and gaps.
+
+---
+
+### 1a. Original Executive Summary (pre-remediation, 2026-08-01 — retained for audit trail)
 
 | Area | Legacy count | Migrated | Missing | Completion |
 |---|---|---|---|---|
@@ -29,7 +45,7 @@ Legend: ✅ Migrated · ❌ Missing · ⚠️ Partial/Read-only gap (already tra
 
 | # | Legacy page | Current equivalent | Status | Notes |
 |---|---|---|---|---|
-| 1 | `AddSample.aspx` | — | ❌ | No current page. Sample creation workflow appears entirely absent from `Histo.Web`. |
+| 1 | `AddSample.aspx` | [Submissions/AddSample.cshtml](../src/Histo.Web/Pages/Submissions/AddSample.cshtml) | ✅ | Built in Batch D1 — landing page for adding an *existing* animal (found via Search/SearchSample) to the current batch. |
 | 2 | `AddSubmission.aspx` | [Submissions/AddSubmission.cshtml](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml) | ✅ | |
 | 3 | `AppError.aspx` | [Shared/Error.cshtml](../src/Histo.Web/Pages/Shared/Error.cshtml) | ✅ | Functional equivalent (ASP.NET Core error page pattern) |
 | 4 | `ArchiveBlocks.aspx` | [Archive/ArchiveBlocks.cshtml](../src/Histo.Web/Pages/Archive/ArchiveBlocks.cshtml) | ✅ | |
@@ -39,62 +55,64 @@ Legend: ✅ Migrated · ❌ Missing · ⚠️ Partial/Read-only gap (already tra
 | 8 | `AuditLogBySubmission.aspx` | [AuditLog/AuditLogBySubmission.cshtml](../src/Histo.Web/Pages/AuditLog/AuditLogBySubmission.cshtml) | ✅ | |
 | 9 | `AuditLogByUser.aspx` | [AuditLog/AuditLogByUser.cshtml](../src/Histo.Web/Pages/AuditLog/AuditLogByUser.cshtml) | ✅ | |
 | 10 | `AuditLogMenu.aspx` | [AuditLog/AuditLogMenu.cshtml](../src/Histo.Web/Pages/AuditLog/AuditLogMenu.cshtml) | ✅ | |
-| 11 | `BatchBlocks.aspx` | — | ❌ | Block-per-batch listing/print workflow not migrated. |
-| 12 | `BatchBlockSummary.aspx` | — | ❌ | |
+| 11 | `BatchBlocks.aspx` | [Blocks/BlockDetails.cshtml](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml) | ✅ Superseded | Confirmed in Batch E2 — functionally covered, no separate page needed. |
+| 12 | `BatchBlockSummary.aspx` | [Submissions/ViewSamples.cshtml](../src/Histo.Web/Pages/Submissions/ViewSamples.cshtml) + [Submissions/SubmissionDetailsBlock.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml) | ✅ Superseded | Confirmed in Batch E2. |
 | 13 | `BatchDetails.aspx` | [Batches/BatchDetails.cshtml](../src/Histo.Web/Pages/Batches/BatchDetails.cshtml) | ✅ | |
 | 14 | `BatchesForArchiving.aspx` | [Batches/BatchesForArchiving.cshtml](../src/Histo.Web/Pages/Batches/BatchesForArchiving.cshtml) | ✅ | |
 | 15 | `BatchesForDispatch.aspx` | [Batches/BatchesForDispatch.cshtml](../src/Histo.Web/Pages/Batches/BatchesForDispatch.cshtml) | ✅ | |
 | 16 | `BatchesForEditing.aspx` | [Batches/BatchesForEditing.cshtml](../src/Histo.Web/Pages/Batches/BatchesForEditing.cshtml) | ✅ | |
 | 17 | `BatchesNotReceived.aspx` | [Batches/BatchesNotReceived.cshtml](../src/Histo.Web/Pages/Batches/BatchesNotReceived.cshtml) | ✅ | |
 | 18 | `BatchesReceived.aspx` | [Batches/BatchesReceived.cshtml](../src/Histo.Web/Pages/Batches/BatchesReceived.cshtml) | ✅ | |
-| 19 | `BatchSummary.aspx` | — | ❌ | |
+| 19 | `BatchSummary.aspx` | [Submissions/ViewSamples.cshtml](../src/Histo.Web/Pages/Submissions/ViewSamples.cshtml) + [Submissions/SubmissionDetails.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml) | ✅ Superseded | Confirmed in Batch E2. |
 | 20 | `BlockDetails.aspx` | [Blocks/BlockDetails.cshtml](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml) | ✅ | |
 | 21 | `BookBlockRef.aspx` | [Bookings/BookBlockRef.cshtml](../src/Histo.Web/Pages/Bookings/BookBlockRef.cshtml) | ✅ | |
 | 22 | `BookHistologyRef.aspx` | [Bookings/BookHistologyRef.cshtml](../src/Histo.Web/Pages/Bookings/BookHistologyRef.cshtml) | ✅ | |
 | 23 | `BookingMenu.aspx` | [Bookings/BookingMenu.cshtml](../src/Histo.Web/Pages/Bookings/BookingMenu.cshtml) | ✅ | |
 | 24 | `CalendarPopup.aspx` | — | ❌* | *Not a functional gap — legacy JS date-picker popup, superseded by the native GDS date input pattern. No action required. |
-| 25 | `Cassetted.aspx` | — | ❌ | Marking blocks as "cassetted" (workflow status transition) not migrated. |
-| 26 | `CopyBatch.aspx` | — | ❌ | |
-| 27 | `CopyBatchBlocks.aspx` | — | ❌ | |
-| 28 | `CopyBatchBlocksSummary.aspx` | — | ❌ | |
-| 29 | `CopyBlocks.aspx` | — | ❌ | |
-| 30 | `CopySamples.aspx` | — | ❌ | |
-| 31 | `CopySamplesBlocks.aspx` | — | ❌ | |
-| 32 | `CopySamplesSummary.aspx` | — | ❌ | Entire "Copy Batch/Samples/Blocks" workflow family (7 pages, #26–32) has no current equivalent. |
+| 25 | `Cassetted.aspx` | [Batches/Cassetted.cshtml](../src/Histo.Web/Pages/Batches/Cassetted.cshtml) | ✅ | Built in Batch D1 — corrected understanding: this is the "New Submission" type-selection step, not a block-status transition. |
+| 26 | `CopyBatch.aspx` | [Batches/CopyBatch.cshtml](../src/Histo.Web/Pages/Batches/CopyBatch.cshtml) | ✅ | Built in Batch D2. |
+| 27 | `CopyBatchBlocks.aspx` | [Batches/CopyBatch.cshtml](../src/Histo.Web/Pages/Batches/CopyBatch.cshtml) + [Batches/CopyBatchSummary.cshtml](../src/Histo.Web/Pages/Batches/CopyBatchSummary.cshtml) | ✅ Consolidated | Built in Batch D2. |
+| 28 | `CopyBatchBlocksSummary.aspx` | [Batches/CopyBatchSummary.cshtml](../src/Histo.Web/Pages/Batches/CopyBatchSummary.cshtml) | ✅ Consolidated | Built in Batch D2. |
+| 29 | `CopyBlocks.aspx` | [Blocks/CopyBlocks.cshtml](../src/Histo.Web/Pages/Blocks/CopyBlocks.cshtml) | ✅ | Built in Batch D2. |
+| 30 | `CopySamples.aspx` | [Blocks/CopySamples.cshtml](../src/Histo.Web/Pages/Blocks/CopySamples.cshtml) | ✅ | Built in Batch D2. |
+| 31 | `CopySamplesBlocks.aspx` | [Blocks/CopySamples.cshtml](../src/Histo.Web/Pages/Blocks/CopySamples.cshtml) | ✅ Consolidated | Built in Batch D2. |
+| 32 | `CopySamplesSummary.aspx` | [Blocks/CopySamplesSummary.cshtml](../src/Histo.Web/Pages/Blocks/CopySamplesSummary.cshtml) | ✅ | Entire "Copy Batch/Samples/Blocks" workflow family (7 pages, #26–32) resolved in Batch D2 — consolidated into a 5-page wizard flow, no new repository code needed. |
 | 33 | `EditBatch.aspx` | [Batches/EditBatch.cshtml](../src/Histo.Web/Pages/Batches/EditBatch.cshtml) | ✅ | |
-| 34 | `EditHistologyRef.aspx` | — | ❌ | `IHistologyRepository.UpdateRefAsync` already exists at the repository layer (see §3) — only the UI page is missing. |
+| 34 | `EditHistologyRef.aspx` | [Bookings/EditHistologyRef.cshtml](../src/Histo.Web/Pages/Bookings/EditHistologyRef.cshtml) (pool-counter update) + [Admin/EditAnimalRef.cshtml](../src/Histo.Web/Pages/Admin/EditAnimalRef.cshtml) (per-animal Sender/Histology Ref rename) | ✅ | Two distinct legacy workflows shared this name. Pool-counter page built in Batch A; the true per-animal renamer (`clsAnimal.UpdateAnimalSenderRef`/`UpdateAnimalHistologyRef`) was a genuine backend gap (ISS-022) resolved 2026-08-03 — new repository methods added, page built as `Admin/EditAnimalRef.cshtml`. |
 | 35 | `EditQCNote.aspx` | [QC/EditQCNote.cshtml](../src/Histo.Web/Pages/QC/EditQCNote.cshtml) | ✅ | |
-| 36 | `ExcelExport.aspx` | — | ❌ | No data-export capability in the current app at all. |
-| 37 | `FinalPrintBatch.aspx` | — | ❌ | Depends on Crystal Reports (Phase 2, not started). |
-| 38 | `FixCompletedDates.aspx` | — | ❌ | Admin data-correction utility. |
+| 36 | `ExcelExport.aspx` | `CsvExportHelper` wired into 4 pages (AuditLogByDate, AuditLogBySubmission, AuditLogByUser, SearchArchiveLocation) | ✅ | Built in Batch F — plain CSV export, faithful equivalent to "opens in Excel", no new NuGet dependency. |
+| 37 | `FinalPrintBatch.aspx` | — | ❌ | Confirmed genuinely blocked on Phase 2 (Batch F investigation) — its only two actions launch the Crystal Reports popups below; a shell page with two non-functional buttons was judged not to add value and intentionally deferred. |
+| 38 | `FixCompletedDates.aspx` | [Admin/FixCompletedDates.cshtml](../src/Histo.Web/Pages/Admin/FixCompletedDates.cshtml) | ✅ | Built in Batch E3. |
 | 39 | `Home.aspx` | [Index.cshtml](../src/Histo.Web/Pages/Index.cshtml) | ✅ | |
-| 40 | `PickListMaintenance.aspx` | [Admin/PickListMaintenance.cshtml](../src/Histo.Web/Pages/Admin/PickListMaintenance.cshtml) | ⚠️ | Read-only list only. Per-table edit is `PickListMaintenanceID.aspx` (#41) — missing. Tracked as **ISS-018**. |
-| 41 | `PickListMaintenanceID.aspx` | — | ❌ | Per-table inline Add/Edit editor. See ISS-018. |
-| 42 | `PickListUserArea.aspx` | — | ❌ | |
-| 43 | `QCNoteForm.aspx` | — | ❌ | `IQCNoteRepository.AddAsync` exists at repository layer, but current `QC/EditQCNote.cshtml` only edits existing notes — there is no "Add QC Note" Razor Page equivalent to this legacy Create form. |
+| 40 | `PickListMaintenance.aspx` | [Admin/PickListMaintenance.cshtml](../src/Histo.Web/Pages/Admin/PickListMaintenance.cshtml) | ✅ | Full CRUD restored — per-row Edit links to #41 added. **ISS-018 resolved.** |
+| 41 | `PickListMaintenanceID.aspx` | [Admin/EditLookupItem.cshtml](../src/Histo.Web/Pages/Admin/EditLookupItem.cshtml) | ✅ | Built in Batch E1 — resolves ISS-018. |
+| 42 | `PickListUserArea.aspx` | [Admin/PickListUserArea.cshtml](../src/Histo.Web/Pages/Admin/PickListUserArea.cshtml) | ✅ | Built in Batch E1. |
+| 43 | `QCNoteForm.aspx` | [QC/AddQCNote.cshtml](../src/Histo.Web/Pages/QC/AddQCNote.cshtml) | ✅ | Built in Batch A — mirrors the legacy two-step Add+Update note-text flow. |
 | 44 | `QCNotes.aspx` | [QC/QCNotes.cshtml](../src/Histo.Web/Pages/QC/QCNotes.cshtml) | ✅ | |
-| 45 | `QualityData.aspx` | — | ❌ | |
+| 45 | `QualityData.aspx` | [QC/QualityData.cshtml](../src/Histo.Web/Pages/QC/QualityData.cshtml) + [QC/EditQualityDataTest.cshtml](../src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml) | ✅ | Built in Batch E3 — deliberately simplified to edit one test at a time rather than the legacy multi-select batch-save. |
 | 46 | `ReceiveBatch.aspx` | [Batches/ReceiveBatch.cshtml](../src/Histo.Web/Pages/Batches/ReceiveBatch.cshtml) | ✅ | |
-| 47 | `SearchArchiveLocation.aspx` | — | ❌ | |
-| 48 | `SearchBlockRefs.aspx` | — | ❌ | |
-| 49 | `SearchMenu.aspx` | [Search/SearchMenu.cshtml](../src/Histo.Web/Pages/Search/SearchMenu.cshtml) | ⚠️ | Menu shell only migrated — **none** of the 8 legacy search screens it links to (#47, #48, #50–55) have been built. The entire Search module is functionally a dead-end menu. |
-| 50 | `SearchPMDates.aspx` | — | ❌ | |
-| 51 | `SearchSample.aspx` | — | ❌ | |
-| 52 | `SearchSender.aspx` | — | ❌ | |
-| 53 | `SearchSubmissions.aspx` | — | ❌ | |
-| 54 | `SearchTest.aspx` | — | ❌ | |
-| 55 | `SearchUnUsedHistologyRefs.aspx` | — | ❌ | |
-| 56 | `SubmissionDetails.aspx` | — | ❌ | Distinct from `Batches/BatchDetails.cshtml` — no submission-level detail page exists. |
-| 57 | `SubmissionDetailsBlock.aspx` | — | ❌ | |
-| 58 | `SubmissionForm.aspx` | — | ❌* | *Possible overlap with `AddSubmission.cshtml` — recommend a source-level confirmation (read `SubmissionForm.aspx.vb`) before treating as fully distinct, since legacy WebForms occasionally split a single logical form into two ASPX files (list + form partial). |
-| 59 | `SubmissionNotes.aspx` | — | ❌ | |
+| 47 | `SearchArchiveLocation.aspx` | [Search/SearchArchiveLocation.cshtml](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml) | ✅ | Built in Run #27 — hierarchical expand/collapse grids reproduced as flat GOV.UK tables (documented simplification). |
+| 48 | `SearchBlockRefs.aspx` | [Search/SearchBlockRefs.cshtml](../src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml) | ✅ | Built in Run #27. |
+| 49 | `SearchMenu.aspx` | [Search/SearchMenu.cshtml](../src/Histo.Web/Pages/Search/SearchMenu.cshtml) | ✅ | All 8 linked search screens now built (Runs #27, #35) — **ISS-020 resolved**, no more dead links. |
+| 50 | `SearchPMDates.aspx` | [Search/SearchPMDates.cshtml](../src/Histo.Web/Pages/Search/SearchPMDates.cshtml) | ✅ | Built in Run #27. |
+| 51 | `SearchSample.aspx` | [Search/SearchSample.cshtml](../src/Histo.Web/Pages/Search/SearchSample.cshtml) | ✅ | Built in Run #27; wired an "Add to batch" action in Batch D1. |
+| 52 | `SearchSender.aspx` | [Search/SearchSender.cshtml](../src/Histo.Web/Pages/Search/SearchSender.cshtml) | ✅ | Built in Run #35. |
+| 53 | `SearchSubmissions.aspx` | [Search/SearchSubmissions.cshtml](../src/Histo.Web/Pages/Search/SearchSubmissions.cshtml) | ✅ | Built in Run #35. |
+| 54 | `SearchTest.aspx` | [Search/SearchTest.cshtml](../src/Histo.Web/Pages/Search/SearchTest.cshtml) | ✅ | Built in Run #35 — simplified to test-item counts only, not the full legacy cross-tab analytics engine (documented simplification). |
+| 55 | `SearchUnUsedHistologyRefs.aspx` | [Search/SearchUnUsedHistologyRefs.cshtml](../src/Histo.Web/Pages/Search/SearchUnUsedHistologyRefs.cshtml) | ✅ | Built in Run #35. |
+| 56 | `SubmissionDetails.aspx` | [Submissions/SubmissionDetails.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml) | ✅ | Built in Batch C. |
+| 57 | `SubmissionDetailsBlock.aspx` | [Submissions/SubmissionDetailsBlock.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml) | ✅ | Built in Batch C. |
+| 58 | `SubmissionForm.aspx` | — | ❌ | Confirmed in Batch C to be a pure Crystal Reports PDF-export popup (invoked from `FinalPrintBatch.aspx`), not a duplicate of `AddSubmission.cshtml` — reclassified as Phase 2 (Reporting) scope, not a Phase 5 UI gap. |
+| 59 | `SubmissionNotes.aspx` | — | ❌ | Confirmed in Batch C to be a pure Crystal Reports PDF-export popup — same disposition as `SubmissionForm.aspx` above. |
 | 60 | `SubmissionsOnHold.aspx` | [Batches/SubmissionsOnHold.cshtml](../src/Histo.Web/Pages/Batches/SubmissionsOnHold.cshtml) | ✅ | |
 | 61 | `UserMaintenance.aspx` | [Admin/UserMaintenance.cshtml](../src/Histo.Web/Pages/Admin/UserMaintenance.cshtml) + [Admin/AddUser.cshtml](../src/Histo.Web/Pages/Admin/AddUser.cshtml) + [Admin/EditUser.cshtml](../src/Histo.Web/Pages/Admin/EditUser.cshtml) | ✅ | Full CRUD restored per ISS-017 |
-| 62 | `ViewImportedData.aspx` | — | ❌ | |
+| 62 | `ViewImportedData.aspx` | [Search/ViewImportedData.cshtml](../src/Histo.Web/Pages/Search/ViewImportedData.cshtml) | ✅ | Built in Batch F — standalone data view, confirmed not dependent on Crystal Reports. |
 | 63 | `ViewSamples.aspx` | [Submissions/ViewSamples.cshtml](../src/Histo.Web/Pages/Submissions/ViewSamples.cshtml) | ✅ | |
 | 64 | `ViewSubmissions.aspx` | [Submissions/ViewSubmissions.cshtml](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml) | ✅ | |
 
-**Totals:** 30 ✅ fully migrated · 2 ⚠️ partial (already tracked as ISS-018, plus SearchMenu newly identified) · 1 ❌* not a real gap (CalendarPopup) · 31 ❌ genuinely missing.
+**Totals (as of 2026-08-03):** 60 ✅ fully migrated or functionally superseded · 1 ❌* not a real gap (`CalendarPopup`, superseded by native GDS date input) · 3 ❌ genuinely blocked, all on Phase 2 Reporting (`FinalPrintBatch`, `SubmissionForm`, `SubmissionNotes`). No pages remain in the ⚠️ partial state — ISS-018 (PickListMaintenance CRUD) and the SearchMenu dead-link gap (ISS-020) are both resolved.
+
+*Historical totals (2026-08-01, pre-remediation): 30 ✅ fully migrated · 2 ⚠️ partial · 1 ❌* not a real gap · 31 ❌ genuinely missing.*
 
 ---
 
@@ -110,8 +128,8 @@ All 8 legacy user controls have a **functional** (not literal 1:1) replacement:
 | `Batch.ascx` | Inlined into `Batches/*.cshtml` partials/view models | ✅ Replaced |
 | `HistologyRef.ascx` | Inlined into `Bookings/BookHistologyRef.cshtml` / `Blocks/BlockDetails.cshtml` | ✅ Replaced |
 | `CalendarDate.ascx` | Native `<input type="date">` / GDS date input | ✅ Replaced |
-| `MouseNumber.ascx` | Not confirmed — no direct reference found in current page set | ⚠️ Verify usage in submission/animal forms once `AddSample.aspx` equivalent is built |
-| `SenderRef.ascx` | Not confirmed — depends on `SearchSender.aspx`/sender lookups, which are missing (see §2, item 52) | ❌ Effectively missing, tied to Search module gap |
+| `MouseNumber.ascx` | `Histo.Core.Domain.ValidationHelpers.ValidateMouseNumber` exists but is called from **zero** Razor Pages (confirmed via full-tree grep, 2026-08-03) | ⚠️ Backend logic ported but unwired — low severity, see F-08 |
+| `SenderRef.ascx` | Functionally replaced by inline Sample/Sender Ref input fields on [Submissions/AddSample.cshtml](../src/Histo.Web/Pages/Submissions/AddSample.cshtml), [Search/SearchSender.cshtml](../src/Histo.Web/Pages/Search/SearchSender.cshtml), and [Admin/EditAnimalRef.cshtml](../src/Histo.Web/Pages/Admin/EditAnimalRef.cshtml) | ✅ Replaced (no direct 1:1 port needed — Search module and AddSample built in Runs #35/#37) |
 
 ---
 
@@ -134,15 +152,15 @@ This is the most important nuance of this audit: **the backend domain layer (Pha
 | Module | Repository | Create | Update | Delete | UI exposure |
 |---|---|---|---|---|---|
 | `Histo.Administration` | `IUserRepository` | ✅ `CreateUserAsync` (ISS-017) | ✅ `UpdateUserAsync` (ISS-017) | n/a (legacy has no hard delete either — deactivate via Active flag) | ✅ Full (AddUser/EditUser/UserMaintenance) |
-| `Histo.Administration` | `ILookupRepository` | ❌ None | ❌ None | n/a | ⚠️ Read-only list only — **ISS-018, open** |
-| `Histo.Submissions` | `IBatchRepository` | ✅ `AddAsync` | ✅ `UpdateAsync`, `UpdateStatusAsync` | n/a | ✅ Partial (EditBatch/BatchDetails exist; Copy-batch workflow pages #26–29 missing) |
-| `Histo.Submissions` | `ISubmissionRepository` | ✅ `AddSubmissionAsync`, `AddAnimalAsync`, `AddTissueAsync` | ✅ `UpdateSubmissionAsync`, `UpdateAnimalAsync`, `UpdateTissueAsync` | ✅ `DeleteAnimalAsync`, `DeleteTissueAsync` | ⚠️ Only `AddSubmission` is exposed; no UI for `SubmissionDetails`/`SubmissionNotes`/animal or tissue edit-delete |
-| `Histo.Histology` | `IBlockRepository` | Not confirmed in this pass — recommend explicit check | — | ✅ `DeleteAsync` | ⚠️ `BlockDetails` (view) exists; no Add/Copy-blocks UI (#27–29) |
-| `Histo.Histology` | `IHistologyRepository` | Not confirmed in this pass | ✅ `UpdateRefAsync` | — | ❌ No `EditHistologyRef` UI page exists to call `UpdateRefAsync` |
-| `Histo.QualityControl` | `IQCNoteRepository` | ✅ `AddAsync` | ✅ `UpdateAsync` (rowstamp concurrency) | — | ⚠️ Only Edit is exposed (`EditQCNote`); no "Add QC Note" page to call `AddAsync` (legacy `QCNoteForm.aspx`) |
+| `Histo.Administration` | `ILookupRepository` | ✅ `CreateLookupItemAsync` (ISS-018) | ✅ `UpdateLookupItemAsync` (ISS-018) | n/a | ✅ Full (EditLookupItem, PickListUserArea) — **ISS-018 resolved** |
+| `Histo.Submissions` | `IBatchRepository` | ✅ `AddAsync` | ✅ `UpdateAsync`, `UpdateStatusAsync` | n/a | ✅ Full (EditBatch/BatchDetails plus Copy-batch workflow, Batch D2) |
+| `Histo.Submissions` | `ISubmissionRepository` | ✅ `AddSubmissionAsync`, `AddAnimalAsync`, `AddTissueAsync` | ✅ `UpdateSubmissionAsync`, `UpdateAnimalAsync`, `UpdateTissueAsync`, `UpdateAnimalSenderRefAsync`/`UpdateAnimalHistologyRefAsync` (ISS-022, 2026-08-03) | ✅ `DeleteAnimalAsync`, `DeleteTissueAsync` | ✅ Full (AddSubmission, SubmissionDetails/SubmissionDetailsBlock, ViewSamples edit/delete, EditAnimalRef) |
+| `Histo.Histology` | `IBlockRepository` | ✅ Confirmed — `AddAsync` exists, used by CopyBlocks/CopySamples workflows | — | ✅ `DeleteAsync` | ✅ Full (BlockDetails, CopyBlocks, CopySamples) |
+| `Histo.Histology` | `IHistologyRepository` | ✅ Confirmed | ✅ `UpdateRefAsync` | — | ✅ Full — two distinct pages: `Bookings/EditHistologyRef` (pool counter) and `Admin/EditAnimalRef` (per-animal rename, ISS-022) |
+| `Histo.QualityControl` | `IQCNoteRepository` | ✅ `AddAsync` | ✅ `UpdateAsync` (rowstamp concurrency) | — | ✅ Full (AddQCNote, EditQCNote) |
 | `Histo.AuditLog` | `IAuditLogRepository` | n/a (audit logs are append-only by design) | n/a | n/a | ✅ Read-only by design — not a gap |
 
-**Conclusion:** Beyond the already-tracked ISS-018 (Lookup/PickList CRUD), there is **no additional repository-layer CRUD gap** of the same severity as ISS-017 was. The remaining CRUD-shaped gaps are all "backend method exists, UI page does not" — i.e., they are properly UI-migration backlog items, not domain-layer regressions.
+**Conclusion (updated 2026-08-03):** Every repository-layer CRUD gap identified in the original audit (ISS-017, ISS-018) and every subsequent "backend exists, UI page missing" gap (ISS-020, ISS-021, ISS-022) has been resolved. There are no remaining CRUD-shaped gaps between the domain/repository layer and the UI layer.
 
 ---
 
@@ -165,14 +183,14 @@ This is the most important nuance of this audit: **the backend domain layer (Pha
 |---|---|---|---|---|
 | F-01 | 34 of 64 legacy pages (53%) have no current equivalent, spanning Sample creation, Batch/Block copy workflows (7 pages), the entire Search module (8 of 9 pages), Submission detail/notes, Excel export, and admin data-fix utilities | **High** | New (quantifies existing ISS-004) | Prioritize a Phase 5 backlog ordered by business criticality: Search module and Submission Details are likely highest-traffic; Copy-workflow and admin fix-up pages are likely lowest. Re-plan against `docs/Migration-Plan.md` Batch 6+. |
 | F-02 | Reporting module (9 Crystal Reports) at 0% — blocks `FinalPrintBatch`, `ViewImportedData`, and all Submission sub-reports | High | Already tracked (Phase 2 "Not Started") | No new action beyond existing plan; flag as a hard dependency for F-01's Submission/Print pages. |
-| F-03 | `ILookupRepository` has no Create/Update for pick-list items; `PickListMaintenanceID.aspx` equivalent missing | Medium | Already tracked as **ISS-018** | No new action — implement per the existing ISS-018 remediation plan. |
-| F-04 | `SearchMenu.cshtml` is a live menu page linking to 8 search screens, none of which exist — a functional dead end for any user navigating to Search | High | New | Treat the Search module as a dedicated Phase 5 batch; until built, consider hiding or disabling the non-functional links from `SearchMenu.cshtml` to avoid presenting broken navigation to users. |
-| F-05 | No "Add QC Note" page exists — `IQCNoteRepository.AddAsync` is unreachable from the UI; only note-editing is exposed | Medium | New | Add a `QC/AddQCNote.cshtml` page mirroring the existing `EditQCNote` pattern; this is a small, self-contained slice since the repository/service method already exists. |
-| F-06 | `EditHistologyRef.aspx` has no current equivalent despite `IHistologyRepository.UpdateRefAsync` already existing | Medium | New | Small, self-contained slice — same shape as F-05. |
-| F-07 | Authentication/authorization is entirely unimplemented in `Histo.Web` — only a Development-only stub identity exists; no `[Authorize]` policies replace any of the ~60+ legacy `CheckPermissions()` call sites | **Critical (pre-production blocker)** | Already tracked (ISS-001, D-004, Phase 1 "In Progress") but this audit confirms **0% code-level progress**, not partial progress | This must be resolved before any environment beyond local development is exposed. Recommend engaging the `Identity Migration Agent (Entra ID for .NET Framework 4.8)`-equivalent workflow for .NET 10/Entra ID as the next priority slice, ahead of further page migration, since every currently-migrated page is unprotected. |
-| F-08 | `MouseNumber.ascx` and `SenderRef.ascx` have no confirmed current replacement | Low | New | Re-verify once `AddSample.aspx` and `SearchSender.aspx` equivalents are built (F-01) — these controls are tied to those missing pages. |
-| F-09 | `SubmissionForm.aspx` vs. `AddSubmission.cshtml` overlap is unconfirmed | Low | New (needs verification) | Read `SubmissionForm.aspx.vb` to confirm whether this is a duplicate of `AddSubmission` or a genuinely distinct edit form, before adding it to the missing-pages backlog. |
-| F-10 | Plaintext SQL credential and `debug="true"` in legacy `Web.config` | High | Already tracked (ISS-006, ISS-007) | No new action — remediate per existing plan before any Azure deployment, per `azure-infra.instructions.md` §3. |
+| F-03 | `ILookupRepository` has no Create/Update for pick-list items; `PickListMaintenanceID.aspx` equivalent missing | Medium | **Resolved** (ISS-018, Batch E1, 2026-08-01) | `CreateLookupItemAsync`/`UpdateLookupItemAsync` added; `Admin/EditLookupItem.cshtml` and `Admin/PickListUserArea.cshtml` built. |
+| F-04 | `SearchMenu.cshtml` is a live menu page linking to 8 search screens, none of which exist — a functional dead end for any user navigating to Search | High | **Resolved** (ISS-020, Runs #27/#35, 2026-08-01) | All 8 search screens built; menu links now all functional. |
+| F-05 | No "Add QC Note" page exists — `IQCNoteRepository.AddAsync` is unreachable from the UI; only note-editing is exposed | Medium | **Resolved** (ISS-021, Batch A, 2026-08-01) | `QC/AddQCNote.cshtml` built, mirroring the `EditQCNote` pattern. |
+| F-06 | `EditHistologyRef.aspx` has no current equivalent despite `IHistologyRepository.UpdateRefAsync` already existing | Medium | **Resolved** (ISS-021, Batch A, 2026-08-01) | `Bookings/EditHistologyRef.cshtml` built for the pool-counter workflow. **Note:** this uncovered a second, distinct gap — the true per-animal renamer — tracked separately as ISS-022 and also now resolved (see below). |
+| F-07 | Authentication/authorization is entirely unimplemented in `Histo.Web` — only a Development-only stub identity exists; no `[Authorize]` policies replace any of the ~60+ legacy `CheckPermissions()` call sites | **Critical (pre-production blocker)** | **Still Open — unchanged since original audit** (ISS-001, D-004) | This must be resolved before any environment beyond local development is exposed. Now the **only** remaining critical-severity finding in this report — all page-migration and CRUD-parity findings (F-01–F-06, F-09) are resolved. Recommend engaging the `Identity Migration Agent (Entra ID for .NET Framework 4.8)`-equivalent workflow for .NET 10/Entra ID as the next priority. |
+| F-08 | `MouseNumber.ascx` and `SenderRef.ascx` have no confirmed current replacement | Low | **Partially resolved** — `SenderRef.ascx` confirmed replaced (Search module + AddSample built); `MouseNumber.ascx` confirmed as dead/unwired code, not a missing feature | `ValidateMouseNumber` exists in `Histo.Core` but is never called — low-severity cleanup item, see §11. |
+| F-09 | `SubmissionForm.aspx` vs. `AddSubmission.cshtml` overlap is unconfirmed | Low | **Resolved** (Batch C, 2026-08-01) | Confirmed distinct — `SubmissionForm.aspx`/`SubmissionNotes.aspx` are pure Crystal Reports PDF-export popups, reclassified as Phase 2 (Reporting) scope, not a Phase 5 UI gap. |
+| F-10 | Plaintext SQL credential and `debug="true"` in legacy `Web.config` | High | Open — **scope expanded 2026-08-03** | The identical plaintext credential (`HistologyUser`/`HistologyUser9245`) is now also committed in the **current, migrated app's** [src/Histo.Web/appsettings.json](../src/Histo.Web/appsettings.json) and `appsettings.Development.json`, not only the legacy `Web.config` — this is a more severe finding than originally scoped, since it is in the actively-shipped codebase. Remediate per `azure-infra.instructions.md` §3 (Managed Identity + Key Vault) before any Azure deployment. |
 
 ---
 
@@ -189,9 +207,9 @@ This is the most important nuance of this audit: **the backend domain layer (Pha
 
 ---
 
-## 9. Cross-Reference to Existing Open Issues
+## 9. Cross-Reference to Existing Open Issues (updated 2026-08-03)
 
-This audit does not duplicate but **confirms and quantifies** the following existing journal issues: ISS-001 (auth wiring), ISS-004 (all 64 pages required before cutover — this audit shows only 30 done), ISS-006/ISS-007 (Web.config secrets/debug), ISS-009 (NT login→UPN mapping), ISS-018 (PickListMaintenance CRUD). No issue in this report contradicts the existing journal; F-01 through F-09 (excluding duplicates) are **new** findings raised by this audit and should be added to Open Issues as ISS-019 through ISS-02x by the next journal update.
+As of this update, ISS-018, ISS-020, ISS-021, and ISS-022 (all raised by this audit or its remediation batches) are **Resolved**. The following issues remain **Open** and require action before further deployment: ISS-001 (auth wiring — critical), ISS-006 (Web.config secrets, now scope-expanded to include `src/Histo.Web/appsettings*.json`), ISS-007 (`debug="true"`), ISS-009 (NT login→UPN mapping), ISS-010 (key-person risk), ISS-011 (Azure admin/Entra ID dependency). ISS-004 (all 64 pages required before cutover) is now effectively satisfied for every non-reporting-blocked page — see §1/§2. See §11 for the consolidated list of everything still pending.
 
 ---
 
@@ -230,10 +248,60 @@ Following the original audit above, the user directed a full remediation pass pr
 ### What remains open (unaffected by this remediation)
 
 - **F-07 / ISS-001 (Critical):** Authentication/authorization is still 0% implemented. No page — old or newly built in this remediation — has any `[Authorize]` gating. This remains the top-priority blocker for any non-development deployment.
-- **ISS-022 (new, found during Batch A):** The true legacy `EditHistologyRef.aspx` per-animal Sender/Histology Ref renamer has no repository support at all (distinct from the pool-level counter update that was built). Open, medium severity.
+- ~~**ISS-022 (new, found during Batch A):** The true legacy `EditHistologyRef.aspx` per-animal Sender/Histology Ref renamer has no repository support at all (distinct from the pool-level counter update that was built). Open, medium severity.~~ **Resolved 2026-08-03** (Run Log #43) — see §11.
 - **Phase 2 (Reporting):** Still 0% — all 9 Crystal Reports, plus the 3 print-popup pages, remain unmigrated.
 - **F-08/F-09 verification items** from the original audit were resolved during remediation (SubmissionForm confirmed distinct/reporting-only; MouseNumber.ascx/SenderRef.ascx dependencies resolved as part of the AddSample/Search work).
 
 ---
 
-*Generation date: 2026-08-01. This report is a point-in-time audit based on static code/directory inspection — no live application testing was performed as part of this pass.*
+## 11. Pending Migrations / Unresolved Parity Gaps (as of 2026-08-03)
+
+This section consolidates every gap still open across the application, superseding the
+now-resolved items in §7 (Consolidated Findings). Cross-referenced against
+`docs/migration-run-journal.md` Open Issues as of the ISS-022 fix (Run Log #43).
+
+| Gap | Area | Status | Severity | Tracking |
+|---|---|---|---|---|
+| Authentication / Authorization (Entra ID) | `src/Histo.Web/Program.cs` | 0% — `app.UseAuthentication()`/`app.UseAuthorization()` commented out at line 132; no `[Authorize]` attribute anywhere | **Critical** | ISS-001, F-07 |
+| NT-login → UPN mapping | `Histo.Administration::UserService` | Open — required before Auth cutover can resolve real users | High | ISS-009 |
+| Azure Entra app registration / group IDs | Programme / Azure admin | Open — external dependency, blocks Phase 1 start | High | ISS-011 |
+| Reporting Phase 2 (9 Crystal Reports) | `src/Histo.Reporting/` | 0% — empty project stub, no source files | High | Phase Tracker Phase 2 |
+| `FinalPrintBatch.aspx`, `SubmissionForm.aspx`, `SubmissionNotes.aspx` | `src/Histo.Web/Pages/` | Blocked on Reporting Phase 2 — confirmed non-functional shells would add no value until then | High | Run #36, #42 |
+| Plaintext SQL credential in **current app** config | `src/Histo.Web/appsettings.json`, `appsettings.Development.json` | Open — same credential as legacy `Web.config`, now also committed in the migrated codebase | High | Scope-expanded ISS-006 |
+| Plaintext SQL credential in legacy config | `HistopathologySystem/Web.config` | Open | High | ISS-006 |
+| `debug="true"` in legacy Web.config | `HistopathologySystem/Web.config` | Open | Medium | ISS-007 |
+| Testing & Cutover (Phase 6) | Programme | Not Started — 90 unit tests exist; zero integration/E2E coverage of the 28 pages built in Batches A–F | Medium | Phase Tracker Phase 6 |
+| `MouseNumber.ascx` validation logic unwired | `Histo.Core.Domain.ValidationHelpers.ValidateMouseNumber` | Confirmed dead code — method exists but is called from zero Razor Pages | Low | F-08 |
+| Agent filename defect | `.github/agents/modernisation.agent .md` | Trivial, unresolved — trailing space prevents VS Code from loading it | Low | ISS-005 |
+| Key-person risk | Programme | Open — Sr Dev 1 sole VB.NET business-rule knowledge holder | High | ISS-010 |
+
+**Note:** All page-migration gaps from the original §2/§7 (F-01, F-03, F-04, F-05, F-06, F-09) are now
+**Resolved** per Batches A–F and the 2026-08-03 ISS-022 fix — see §10 addendum and the corrected
+§2 table. They are intentionally omitted from this table to avoid re-litigating closed items.
+
+### Prioritized migration plan
+
+**P0 — Critical, blocks any non-dev deployment**
+1. **Authentication (Phase 1):** Wire `AddAuthentication`/`AddMicrosoftIdentityWebApp` + `UseAuthentication`/`UseAuthorization` in `Program.cs`; map legacy `CheckPermissions()` groups (Customer/Histopathology User/Maintenance) to Entra ID groups/claims; add `[Authorize]` to all 60 pages.
+   - *Dependency:* ISS-011 (Azure admin must create the app registration + group IDs first) — escalate now, it is the longest lead-time item.
+   - *Risk:* Every migrated page is currently wide open; the application cannot go beyond local dev without this.
+2. **Secrets hardening:** Replace the plaintext credential in `appsettings.json`/`appsettings.Development.json` and legacy `Web.config` with Managed Identity connection strings; move remaining secrets to Key Vault.
+   - *Dependency:* Key Vault + Azure SQL provisioning (`azure-infra.instructions.md` §3).
+
+**P1 — High, required before hard-switch cutover (ISS-004: no strangler-fig path)**
+3. **Reporting (Phase 2):** Build the `ReportDefinition.json` pipeline for the 9 `.rpt` files; unblocks `FinalPrintBatch`/`SubmissionForm`/`SubmissionNotes`.
+   - *Risk:* `HistologyReport.rpt` sub-report nesting needs manual ViewModel design (ISS-002); no Phase 0 baseline PDFs captured yet for RMSE validation.
+4. **NT-login → UPN mapping (ISS-009):** Must land before or alongside the Phase 1 cutover, or user resolution breaks for every account.
+
+**P2 — Medium, quality/cleanup, can run in parallel**
+5. **Testing & Cutover (Phase 6):** Add integration/E2E (Playwright) coverage for the 28 pages built in Batches A–F before any environment cutover, given the hard-switch constraint.
+6. **Minor cleanup:** Remove or wire up `MouseNumber.ascx`/`ValidateMouseNumber` (F-08); rename `modernisation.agent .md` (ISS-005); confirm `IBlockRepository` Create/Update completeness is fully exercised by the Copy workflows.
+
+**Suggested sequencing:** P0 items 1–2 run in parallel now (Auth is the long pole via ISS-011). P1 item 3
+(Reporting) can start immediately in parallel — no dependency on Auth. P1 item 4 must complete before
+the Auth cutover goes live. P2 starts once P0/P1 are substantially underway, and must complete before
+the hard-switch cutover per ISS-004.
+
+---
+
+*Generation date: 2026-08-01, updated 2026-08-03. This report is a point-in-time audit based on static code/directory inspection — no live application testing was performed as part of this pass.*

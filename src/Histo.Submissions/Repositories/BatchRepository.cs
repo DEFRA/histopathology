@@ -76,6 +76,7 @@ public sealed class BatchRepository : IBatchRepository
         parameters.Add("SubmittedByUserID",   batch.SubmittedByUserID);
         parameters.Add("UserAreaCode",        batch.UserAreaCode);
         parameters.Add("IsPreCassetted",      batch.IsPreCassetted);
+        parameters.Add("BatchType",           batch.BatchType);
         parameters.Add("UserID",              userId);
 
         await conn.ExecuteAsync("AddBatch", parameters,

@@ -29,6 +29,7 @@ public class EditBatchModel : HistoPageModel
         CustomerRef    = Batch.CustomerRef;
         Comments       = Batch.Comments;
         IsPreCassetted = Batch.IsPreCassetted;
+        Session.BatchType = Batch.BatchType;  // ISS-023: restore from DB
         return Page();
     }
 

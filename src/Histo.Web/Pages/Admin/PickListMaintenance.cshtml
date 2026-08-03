@@ -1,8 +1,12 @@
 @page
 @model Histo.Web.Pages.Admin.PickListMaintenanceModel
 @{
-    ViewData["Title"] = "Pick List Maintenance";
-    ViewData["PageTitle"] = "Pick List Maintenance";
+    ViewData["Title"] = "Pick list maintenance";
+    ViewData["PageTitle"] = "Pick list maintenance";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Index" class="govuk-back-link">Back</a>
 }
 
 <table class="govuk-table">

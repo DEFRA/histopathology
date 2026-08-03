@@ -1,8 +1,12 @@
 @page
 @model Histo.Web.Pages.Archive.ArchiveTissuesModel
 @{
-    ViewData["Title"] = "Archive Tissues";
-    ViewData["PageTitle"] = "Archive Tissues";
+    ViewData["Title"] = "Archive tissues";
+    ViewData["PageTitle"] = "Archive tissues";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Archive/ArchiveMenu" class="govuk-back-link">Back</a>
 }
 
 <table class="govuk-table">

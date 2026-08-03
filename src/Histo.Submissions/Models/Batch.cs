@@ -9,6 +9,7 @@ namespace Histo.Submissions.Models;
 /// from <c>GetCommonBatchTablesByID</c>.
 ///
 /// Batch status string values are defined in <see cref="BatchStatus"/>.
+/// Batch type constants are defined in <see cref="BatchTypeConstants"/>.
 /// </summary>
 public sealed class Batch
 {
@@ -22,6 +23,29 @@ public sealed class Batch
     public int UserAreaCode { get; init; }
     public bool IsPreCassetted { get; init; }
     public byte[]? RowStamp { get; init; }
+
+    /// <summary>
+    /// Submission type: 0 = TSE, 1 = Non-TSE.
+    /// Legacy source: <c>Common.vb</c> — SUBMISSION_TSE = 0, SUBMISSION_NONTSE = 1.
+    /// Drives which antibody and histology lookup tables are shown in BatchDetails.
+    /// </summary>
+    public int BatchType { get; init; } = BatchTypeConstants.Tse;
+}
+
+/// <summary>
+/// Integer constants for <see cref="Batch.BatchType"/>.
+/// Legacy source: HistopathologySystem/Common.vb.
+/// </summary>
+public static class BatchTypeConstants
+{
+    /// <summary>TSE submission (default). Legacy: SUBMISSION_TSE = 0.</summary>
+    public const int Tse = 0;
+
+    /// <summary>Non-TSE submission. Legacy: SUBMISSION_NONTSE = 1.</summary>
+    public const int NonTse = 1;
+
+    public static string DisplayName(int batchType) =>
+        batchType == NonTse ? "Non-TSE" : "TSE";
 }
 
 /// <summary>

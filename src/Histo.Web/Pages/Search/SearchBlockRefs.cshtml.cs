@@ -21,14 +21,14 @@ public class SearchBlockRefsModel : HistoPageModel
 
     public void OnGet()
     {
-        ViewData["Title"] = "Search Block Refs";
-        ViewData["PageTitle"] = "Search Block Refs";
+        ViewData["Title"] = "Search block refs";
+        ViewData["PageTitle"] = "Search block refs";
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Search Block Refs";
-        ViewData["PageTitle"] = "Search Block Refs";
+        ViewData["Title"] = "Search block refs";
+        ViewData["PageTitle"] = "Search block refs";
 
         var hasSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
         var hasHistologyRef = !string.IsNullOrWhiteSpace(HistologyRef);

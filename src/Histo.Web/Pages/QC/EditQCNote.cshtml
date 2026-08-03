@@ -1,5 +1,13 @@
 @page "{NoteId:int}"
 @model Histo.Web.Pages.QC.EditQCNoteModel
+@{
+    ViewData["Title"] = "Edit QC note";
+    ViewData["PageTitle"] = "Edit QC note";
+}
+
+@section BeforeHeading {
+    <a asp-page="/QC/QCNotes" class="govuk-back-link">Back</a>
+}
 
 @if (!string.IsNullOrEmpty(Model.ConcurrencyError))
 {

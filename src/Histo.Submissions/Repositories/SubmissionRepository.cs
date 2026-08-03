@@ -132,6 +132,52 @@ public sealed class SubmissionRepository : ISubmissionRepository
             commandType: System.Data.CommandType.StoredProcedure);
     }
 
+    /// <inheritdoc/>
+    public async Task UpdateAnimalSenderRefAsync(string senderRef, string newSenderRef, int userId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var parameters = new DynamicParameters();
+        parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
+        parameters.Add("SenderRef", senderRef);
+        parameters.Add("NewSenderRef", newSenderRef);
+        parameters.Add("UserID", userId);
+
+        await conn.ExecuteAsync("EditAnimalSenderRef", parameters,
+            commandType: System.Data.CommandType.StoredProcedure);
+
+        var returnValue = parameters.Get<int>("RETURN_VALUE");
+        switch (returnValue)
+        {
+            case 1:
+                throw new AnimalRefUpdateException("The Sample Sender Reference was not found.");
+            case 3:
+                throw new AnimalRefUpdateException("The New Sender Reference has already been used for another sample.");
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task UpdateAnimalHistologyRefAsync(string senderRef, string? newHistologyRef, int userId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var parameters = new DynamicParameters();
+        parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
+        parameters.Add("SenderRef", senderRef);
+        parameters.Add("NewHistologyRef", (object?)newHistologyRef ?? DBNull.Value);
+        parameters.Add("UserID", userId);
+
+        await conn.ExecuteAsync("EditAnimalHistologyRef", parameters,
+            commandType: System.Data.CommandType.StoredProcedure);
+
+        var returnValue = parameters.Get<int>("RETURN_VALUE");
+        switch (returnValue)
+        {
+            case 1:
+                throw new AnimalRefUpdateException("The Sample Sender Reference was not found.");
+            case 3:
+                throw new AnimalRefUpdateException("The new Histology Reference has already been used for another sample.");
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Tissues
     // -----------------------------------------------------------------------

@@ -1,8 +1,12 @@
 @page
 @model QCNotesModel
 @{
-    ViewData["Title"] = "QC Notes";
-    ViewData["PageTitle"] = "Quality Control Notes";
+    ViewData["Title"] = "QC notes";
+    ViewData["PageTitle"] = "Quality control notes";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Batches/BatchDetails" class="govuk-back-link">Back</a>
 }
 
 <p class="govuk-body"><strong>Batch No:</strong> @Model.BatchID</p>

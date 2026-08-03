@@ -1,8 +1,12 @@
 @page
 @model SearchSubmissionsModel
 @{
-    ViewData["Title"] = "Search Submissions";
-    ViewData["PageTitle"] = "Search Submissions";
+    ViewData["Title"] = "Search submissions";
+    ViewData["PageTitle"] = "Search submissions";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Search/SearchMenu" class="govuk-back-link">Back</a>
 }
 
 <form method="post">
