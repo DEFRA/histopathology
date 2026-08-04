@@ -21,6 +21,15 @@
     </div>
 }
 
+<form method="get" class="govuk-form-group">
+    <div class="govuk-checkboxes govuk-checkboxes--small">
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" type="checkbox" id="ShowInactive" name="ShowInactive" value="true" @(Model.ShowInactive ? "checked" : "") onchange="this.form.submit()" />
+            <label class="govuk-label govuk-checkboxes__label" for="ShowInactive">Show deactivated users</label>
+        </div>
+    </div>
+</form>
+
 <p class="govuk-body">
     <a asp-page="/Admin/AddUser" class="govuk-button" data-module="govuk-button">Add user</a>
 </p>

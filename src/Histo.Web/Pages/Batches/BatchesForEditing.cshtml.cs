@@ -15,18 +15,29 @@ public class BatchesForEditingModel : HistoPageModel
     public BatchesForEditingModel(ISessionService session, BatchService batches)
         : base(session) => _batches = batches;
 
-    public IReadOnlyList<Batch> Batches { get; private set; } = [];
+    public IReadOnlyList<BatchListResult> Batches { get; private set; } = [];
+
+    /// <summary>Quick-Go: direct navigation by submission number.</summary>
+    [BindProperty]
+    public int? QuickGoId { get; set; }
 
     public async Task OnGetAsync()
     {
-        ViewData["Title"] = "Batches for Editing";
-        ViewData["PageTitle"] = "Batches for Editing";
+        ViewData["Title"] = "Batches for editing";
+        ViewData["PageTitle"] = "Batches for editing";
         Batches = await _batches.GetInProgressAsync();
     }
 
     public IActionResult OnPostSelect(int batchId)
     {
         Session.BatchID = batchId;
+        return RedirectToPage("/Batches/EditBatch");
+    }
+
+    public IActionResult OnPostGoAsync()
+    {
+        if (QuickGoId.HasValue)
+            Session.BatchID = QuickGoId.Value;
         return RedirectToPage("/Batches/EditBatch");
     }
 }

@@ -30,31 +30,41 @@ public sealed class BatchService
     }
 
     /// <summary>Returns all received batches.</summary>
-    public async Task<IReadOnlyList<Batch>> GetReceivedAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<BatchListResult>> GetReceivedAsync(CancellationToken ct = default)
     {
         try { return await _batches.GetReceivedAsync(ct); }
         catch (Exception ex) { _logger.LogError("Failed to get received batches.", ex); return []; }
     }
 
     /// <summary>Returns all in-progress batches.</summary>
-    public async Task<IReadOnlyList<Batch>> GetInProgressAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<BatchListResult>> GetInProgressAsync(CancellationToken ct = default)
     {
         try { return await _batches.GetInProgressAsync(ct); }
         catch (Exception ex) { _logger.LogError("Failed to get in-progress batches.", ex); return []; }
     }
 
     /// <summary>Returns all batches on hold.</summary>
-    public async Task<IReadOnlyList<Batch>> GetOnHoldAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<BatchListResult>> GetOnHoldAsync(CancellationToken ct = default)
     {
         try { return await _batches.GetOnHoldAsync(ct); }
         catch (Exception ex) { _logger.LogError("Failed to get on-hold batches.", ex); return []; }
     }
 
     /// <summary>Returns batches not yet received.</summary>
-    public async Task<IReadOnlyList<Batch>> GetNotReceivedAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<BatchListResult>> GetNotReceivedAsync(CancellationToken ct = default)
     {
         try { return await _batches.GetNotReceivedAsync(ct); }
         catch (Exception ex) { _logger.LogError("Failed to get not-received batches.", ex); return []; }
+    }
+
+    /// <summary>
+    /// Returns batches awaiting Quality Data entry.
+    /// Legacy source: BatchesForDispatch.aspx — <c>clsBatch.GetBatchesForDispatch</c>.
+    /// </summary>
+    public async Task<IReadOnlyList<BatchListResult>> GetForDispatchAsync(CancellationToken ct = default)
+    {
+        try { return await _batches.GetForDispatchAsync(ct); }
+        catch (Exception ex) { _logger.LogError("Failed to get batches for dispatch.", ex); return []; }
     }
 
     /// <summary>Creates a new batch and returns its ID.</summary>

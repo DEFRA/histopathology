@@ -1,0 +1,12 @@
+{
+  "name": "histo-web",
+  "private": true,
+  "description": "GOV.UK Frontend asset version pin for Histo.Web. Run 'npm ci' in CI/CD to restore assets into wwwroot/govuk/.",
+  "version": "1.0.0",
+  "dependencies": {
+    "govuk-frontend": "6.4.0"
+  },
+  "scripts": {
+    "copy-assets": "node scripts/copy-govuk-assets.js"
+  }
+}

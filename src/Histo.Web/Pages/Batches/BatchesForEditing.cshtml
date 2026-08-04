@@ -9,6 +9,14 @@
     <a asp-page="/Index" class="govuk-back-link">Back</a>
 }
 
+<div class="govuk-form-group">
+    <form method="post" asp-page-handler="Go">
+        <label class="govuk-label govuk-!-display-inline" asp-for="QuickGoId">Go directly to submission number</label>
+        <input class="govuk-input govuk-input--width-10 govuk-!-display-inline govuk-!-margin-left-2" type="number" asp-for="QuickGoId" min="1" />
+        <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0 govuk-!-margin-left-2">Go</button>
+    </form>
+</div>
+
 @if (!Model.Batches.Any())
 {
     <p class="govuk-body">No batches currently in progress.</p>
@@ -19,8 +27,13 @@ else
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
                 <th scope="col" class="govuk-table__header">Batch No</th>
-                <th scope="col" class="govuk-table__header">Customer ref</th>
+                <th scope="col" class="govuk-table__header">Project</th>
+                <th scope="col" class="govuk-table__header">Pathologist</th>
+                <th scope="col" class="govuk-table__header">Species</th>
+                <th scope="col" class="govuk-table__header">Batch date</th>
                 <th scope="col" class="govuk-table__header">Received date</th>
+                <th scope="col" class="govuk-table__header">Customer ref</th>
+                <th scope="col" class="govuk-table__header">Status</th>
                 <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
             </tr>
         </thead>
@@ -29,8 +42,13 @@ else
             {
                 <tr class="govuk-table__row">
                     <td class="govuk-table__cell">@b.ID</td>
-                    <td class="govuk-table__cell">@b.CustomerRef</td>
+                    <td class="govuk-table__cell">@b.ProjectDescription</td>
+                    <td class="govuk-table__cell">@b.ContactDescription</td>
+                    <td class="govuk-table__cell">@b.Species</td>
+                    <td class="govuk-table__cell">@b.BatchDate?.ToShortDateString()</td>
                     <td class="govuk-table__cell">@b.ReceivedDate?.ToShortDateString()</td>
+                    <td class="govuk-table__cell">@b.CustomerRef</td>
+                    <td class="govuk-table__cell">@b.Status</td>
                     <td class="govuk-table__cell">
                         <form method="post">
                             <input type="hidden" name="batchId" value="@b.ID" />

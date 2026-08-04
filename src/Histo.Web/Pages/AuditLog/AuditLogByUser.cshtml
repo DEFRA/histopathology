@@ -11,8 +11,14 @@
 
 <form method="post">
     <div class="govuk-form-group">
-        <label class="govuk-label" for="UserID">User ID</label>
-        <input class="govuk-input govuk-input--width-10" type="number" asp-for="UserID" />
+        <label class="govuk-label" for="UserID">User</label>
+        <select class="govuk-select" asp-for="UserID">
+            <option value="0">-- Select user --</option>
+            @foreach (var u in Model.Users)
+            {
+                <option value="@u.UserID">@u.Name</option>
+            }
+        </select>
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="StartDate">From</label>
@@ -34,22 +40,28 @@
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <th scope="col" class="govuk-table__header">Date</th>
+                <th scope="col" class="govuk-table__header">Table</th>
+                <th scope="col" class="govuk-table__header">Field</th>
+                <th scope="col" class="govuk-table__header">Date/Time</th>
                 <th scope="col" class="govuk-table__header">User</th>
-                <th scope="col" class="govuk-table__header">Action</th>
-                <th scope="col" class="govuk-table__header">Entity</th>
-                <th scope="col" class="govuk-table__header">Detail</th>
+                <th scope="col" class="govuk-table__header">Before</th>
+                <th scope="col" class="govuk-table__header">After</th>
+                <th scope="col" class="govuk-table__header">Reason</th>
+                <th scope="col" class="govuk-table__header">Key</th>
             </tr>
         </thead>
         <tbody class="govuk-table__body">
             @foreach (var e in Model.Results)
             {
                 <tr class="govuk-table__row">
-                    <td class="govuk-table__cell">@e.ChangedAt.ToShortDateString()</td>
+                    <td class="govuk-table__cell">@e.TableName</td>
+                    <td class="govuk-table__cell">@e.FieldName</td>
+                    <td class="govuk-table__cell">@e.ChangedAt.ToString("G")</td>
                     <td class="govuk-table__cell">@e.UserName</td>
-                    <td class="govuk-table__cell">@e.Action</td>
-                    <td class="govuk-table__cell">@e.EntityType @e.EntityID</td>
-                    <td class="govuk-table__cell">@e.Detail</td>
+                    <td class="govuk-table__cell">@e.BeforeValue</td>
+                    <td class="govuk-table__cell">@e.AfterValue</td>
+                    <td class="govuk-table__cell">@e.Reason</td>
+                    <td class="govuk-table__cell">@e.KeyID</td>
                 </tr>
             }
         </tbody>

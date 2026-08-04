@@ -78,4 +78,13 @@ public interface ILookupRepository
     /// (<c>PickListMaintenanceID.aspx</c> / <c>PickListUserArea.aspx</c> grid "Edit" row).
     /// </summary>
     Task UpdateLookupItemAsync(int tableId, LookupItem item, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns all species from the species lookup table.
+    /// Uses the dedicated <c>GetSpeciesLookup</c> stored procedure (not the generic
+    /// editable-lookup route) because species uses a non-standard column shape
+    /// (<c>SpeciesID</c> / <c>Species</c>) rather than the standard <c>ID</c>/<c>Name</c> shape.
+    /// Legacy source: <c>LookupData.GetSpeciesLookup</c>.
+    /// </summary>
+    Task<IReadOnlyList<LookupItem>> GetSpeciesLookupAsync(CancellationToken ct = default);
 }

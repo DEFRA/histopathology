@@ -57,6 +57,30 @@ public sealed class BatchSearchCriteria
 }
 
 /// <summary>
+/// One result row for the status-filtered batch list pages
+/// (Batches Received, Not Received, For Editing, For Dispatch, On Hold).
+///
+/// Legacy source: <c>GetReceivedBatches</c>, <c>GetBatchesNotReceived</c>,
+/// <c>GetInProgressBatches</c>, <c>GetBatchesOnHold</c>, <c>GetBatchesForDispatch</c>
+/// stored procedures — column shape from BatchesReceived/NotReceived/ForEditing/
+/// ForDispatch/SubmissionsOnHold .aspx grdBatches BoundColumns.
+/// </summary>
+public sealed class BatchListResult
+{
+    public int ID { get; init; }
+    public string? ProjectDescription { get; init; }
+    public string? ContactDescription { get; init; }
+    public string? Species { get; init; }
+    public DateTime? BatchDate { get; init; }
+    public DateTime? ReceivedDate { get; init; }
+    public DateTime? CompletedDate { get; init; }
+    public string? CustomerRef { get; init; }
+    public string Status { get; init; } = string.Empty;
+    /// <summary>Used by Batches Received only — checkbox column from the SP result set.</summary>
+    public bool AllTissuesAssigned { get; init; }
+}
+
+/// <summary>
 /// One result row of the multi-field Submission search.
 ///
 /// Legacy source: <c>GetSearchBatchDetails</c> stored procedure, column shape
@@ -69,6 +93,9 @@ public sealed class BatchSearchResult
     public string? ContactDescription { get; init; }
     public string? Species { get; init; }
     public DateTime? BatchDate { get; init; }
+    public DateTime? DateReceived { get; init; }
+    public DateTime? DateCompleted { get; init; }
+    public DateTime? CustomerReceivedDate { get; init; }
     public string? Status { get; init; }
     public int? SubmittedBy { get; init; }
 }

@@ -94,6 +94,20 @@ public sealed class LookupRepository : ILookupRepository
     }
 
     /// <inheritdoc/>
+    public async Task<IReadOnlyList<LookupItem>> GetSpeciesLookupAsync(CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<dynamic>(
+            "GetSpeciesLookup",
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.Select(r => new LookupItem
+        {
+            ID   = (int)r.SpeciesID,
+            Name = (string)(r.Species ?? string.Empty),
+        }).ToList();
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<LookupItem>> GetUserAreasAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
