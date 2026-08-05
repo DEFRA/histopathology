@@ -45,7 +45,7 @@
             <option value="">-- Select --</option>
             @foreach (var g in Model.Groups)
             {
-                <option value="@g.ID" selected="@(g.ID == Model.GroupCode)">@g.Name</option>
+                <option value="@g.ID" selected="@(g.ID == Model.GroupCode ? "selected" : null)">@g.Name</option>
             }
         </select>
     </div>
@@ -55,7 +55,7 @@
             <option value="">-- Select --</option>
             @foreach (var a in Model.Areas)
             {
-                <option value="@a.ID" selected="@(a.ID == Model.AreaCode)">@a.Name</option>
+                <option value="@a.ID" selected="@(a.ID == Model.AreaCode ? "selected" : null)">@a.Name</option>
             }
         </select>
     </div>
