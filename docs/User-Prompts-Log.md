@@ -169,6 +169,37 @@ A chronological record of the user's prompts/requests in this conversation sessi
 
 ---
 
+## Prompt 25 — PickListMaintenance + EditUser CRUD and pre-population gap analysis, fix ISS-031/032/033
+
+> Can you analyze the Pick List Maintenance module in the legacy codebase and compare it with the new application? The PickListMaintenance page appears to show a raw table of stored procedure configuration instead of a user-friendly list of pick list names. Also analyze the EditUser page — the Change link appears to navigate to /Admin/EditUser/0 for every user, and the Group and Area dropdowns on the edit form are always blank.
+>
+> Findings and fixes requested:
+> - ISS-031: PickListMaintenance shows SP config dump; pick list names blank (TableName Dapper mismatch).
+> - ISS-032: All pick-list dropdowns across the entire application render blank option labels (LookupItem.Name/Active Dapper column-name mismatch against Description/IsActive returned by legacy SPs).
+> - ISS-033: EditUser Change link always goes to /Admin/EditUser/0; Group and Area dropdowns blank on edit form (User.UserID/GroupCode/AreaCode Dapper mismatch against ID/UserGroup/UserArea returned by GetUsers SP).
+>
+> Fix all three issues and update the Open Issues table, Session Metrics, and this prompts log.
+
+---
+
+## Prompt 26 — User Maintenance page empty after ISS-033 fix — root cause, prevention, fix ISS-034
+
+> Why is the User Maintenance page showing as empty? What caused this issue, and how can we prevent similar issues in the future?
+>
+> I originally requested a fix for the Edit functionality, but it appears that the change has also impacted the user listing feature, which is now not displaying any users.
+>
+> Please investigate the root cause, explain why this happened, and identify the steps needed to ensure that fixes to one feature do not unintentionally break existing functionality.
+>
+> Add this in run Journal and prompt and fixing time.
+
+---
+
+## Prompt 27 — User Maintenance still empty after ISS-034 fix — ISS-035
+
+> Still user list is not listed in the page in following https://localhost:57879/Admin/UserMaintenance
+
+---
+
 ## Prompt 23 — Investigate ViewSubmissions column and filter discrepancy vs legacy
 
 > Investigate the discrepancy in the View Submission screen between the legacy application and the new application.
