@@ -65,6 +65,16 @@ public sealed class BatchRepository : IBatchRepository
     }
 
     /// <inheritdoc/>
+    public async Task<IReadOnlyList<BatchListResult>> GetCompletedAsync(CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<BatchListResult>(
+            "GetCompletedBatches",
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<BatchListResult>> GetForDispatchAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
@@ -106,6 +116,7 @@ public sealed class BatchRepository : IBatchRepository
                 batch.Status,
                 batch.CustomerRef,
                 batch.Comments,
+                batch.StatusComments,
                 batch.ReceivedDate,
                 batch.CompletedDate,
                 batch.RowStamp,

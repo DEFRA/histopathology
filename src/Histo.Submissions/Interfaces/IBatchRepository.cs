@@ -30,6 +30,12 @@ public interface IBatchRepository
     Task<IReadOnlyList<BatchListResult>> GetOnHoldAsync(CancellationToken ct = default);
 
     /// <summary>
+    /// Returns completed batches available for archiving. Maps to <c>GetCompletedBatches</c>.
+    /// Legacy source: BatchesForArchiving.aspx.vb — <c>clsBatch.GetBatchesWithStatus(STATUS_COMPLETED)</c>.
+    /// </summary>
+    Task<IReadOnlyList<BatchListResult>> GetCompletedAsync(CancellationToken ct = default);
+
+    /// <summary>
     /// Returns batches awaiting Quality Data entry. Maps to <c>GetBatchesForDispatch</c>.
     /// Legacy source: BatchesForDispatch.aspx.vb — <c>clsBatch.GetBatchesForDispatch</c>.
     /// </summary>

@@ -17,6 +17,8 @@ public sealed class Batch
     public string Status { get; init; } = BatchStatus.Submitted;
     public string CustomerRef { get; init; } = string.Empty;
     public string? Comments { get; init; }
+    public string? StatusComments { get; init; }
+    public DateTime? BatchDate { get; init; }
     public DateTime? ReceivedDate { get; init; }
     public DateTime? CompletedDate { get; init; }
     public int SubmittedByUserID { get; init; }
@@ -30,6 +32,20 @@ public sealed class Batch
     /// Drives which antibody and histology lookup tables are shown in BatchDetails.
     /// </summary>
     public int BatchType { get; init; } = BatchTypeConstants.Tse;
+
+    // ---- Display-only fields populated by GetCommonBatchTablesByID ----
+
+    /// <summary>Project/contract description (joined from luProjects). Matches BatchListResult.ProjectDescription.</summary>
+    public string? ProjectDescription { get; init; }
+
+    /// <summary>Pathologist/contact description (joined from luContacts). Matches BatchListResult.ContactDescription.</summary>
+    public string? ContactDescription { get; init; }
+
+    /// <summary>Species name (joined from species lookup). Matches BatchListResult.Species.</summary>
+    public string? Species { get; init; }
+
+    /// <summary>Fixation/fixative description (joined from luFixation).</summary>
+    public string? FixationDescription { get; init; }
 }
 
 /// <summary>

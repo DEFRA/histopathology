@@ -29,10 +29,10 @@ public sealed class LookupRepository : ILookupRepository
         if (includeInactive) procName += "All";
 
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<LookupItem>(
+        var rows = await conn.QueryAsync<dynamic>(
             procName,
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+        return rows.Select(MapLookupItem).ToList();
     }
 
     /// <inheritdoc/>
@@ -44,11 +44,11 @@ public sealed class LookupRepository : ILookupRepository
         var procName = await ResolveSelectProcAsync(tableId);
 
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<LookupItem>(
+        var rows = await conn.QueryAsync<dynamic>(
             procName,
             new { UserArea = userArea },
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+        return rows.Select(MapLookupItem).ToList();
     }
 
     /// <inheritdoc/>
@@ -65,22 +65,22 @@ public sealed class LookupRepository : ILookupRepository
     public async Task<IReadOnlyList<LookupItem>> GetContactsByAreaAsync(string area, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<LookupItem>(
+        var rows = await conn.QueryAsync<dynamic>(
             "GetContactsArea",
             new { Area = area },
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+        return rows.Select(MapLookupItem).ToList();
     }
 
     /// <inheritdoc/>
     public async Task<IReadOnlyList<LookupItem>> GetProjectsByAreaAsync(string area, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<LookupItem>(
+        var rows = await conn.QueryAsync<dynamic>(
             "GetProjectsArea",
             new { Area = area },
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+        return rows.Select(MapLookupItem).ToList();
     }
 
     /// <inheritdoc/>
@@ -121,10 +121,10 @@ public sealed class LookupRepository : ILookupRepository
     public async Task<IReadOnlyList<LookupItem>> GetImportedTablesAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<LookupItem>(
+        var rows = await conn.QueryAsync<dynamic>(
             "GetluImportedTables",
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+        return rows.Select(MapLookupItem).ToList();
     }
 
     /// <inheritdoc/>
@@ -193,6 +193,50 @@ public sealed class LookupRepository : ILookupRepository
         Name   = (string)(row.Description ?? string.Empty),
         Active = true,
     };
+
+    // -----------------------------------------------------------------------
+    // Shared dynamic mapper
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Maps a dynamic Dapper row to a <see cref="LookupItem"/>.
+    ///
+    /// Legacy stored procedures use inconsistent column naming: some return
+    /// <c>Name</c>, others return <c>Description</c> (e.g. Contacts/Projects
+    /// tables 18/19, Fixation table 10). Similarly, the active flag may be
+    /// <c>Active</c> or <c>IsActive</c>. This method handles both conventions
+    /// so every lookup table is correctly populated regardless of its SP shape.
+    /// </summary>
+    private static LookupItem MapLookupItem(dynamic r)
+    {
+        var d = (IDictionary<string, object>)r;
+
+        var id = d.TryGetValue("ID", out var idVal) ? Convert.ToInt32(idVal) : 0;
+
+        string name;
+        if (d.TryGetValue("Name", out var nameVal) && nameVal is not null)
+            name = nameVal.ToString()!;
+        else if (d.TryGetValue("Description", out var descVal) && descVal is not null)
+            name = descVal.ToString()!;
+        else
+            name = string.Empty;
+
+        bool active;
+        if (d.TryGetValue("IsActive", out var isActiveVal) && isActiveVal is not null)
+            active = Convert.ToBoolean(isActiveVal);
+        else if (d.TryGetValue("Active", out var activeVal) && activeVal is not null)
+            active = Convert.ToBoolean(activeVal);
+        else
+            active = true;
+
+        string? area = d.TryGetValue("Area", out var areaVal) ? areaVal?.ToString() : null;
+
+        // Capture the raw Code column for "Code-keyed" pick-list tables (e.g. QC Code,
+        // Remedial Action, Archive Location) whose SPs expose a Code column instead of ID.
+        string? code = d.TryGetValue("Code", out var codeVal) ? codeVal?.ToString() : null;
+
+        return new LookupItem { ID = id, Name = name, Active = active, Area = area, Code = code };
+    }
 
     /// <summary>
     /// Calls <c>GetEditableLookupProcs</c> to resolve the select stored procedure

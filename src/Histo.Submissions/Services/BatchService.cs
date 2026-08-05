@@ -50,6 +50,16 @@ public sealed class BatchService
         catch (Exception ex) { _logger.LogError("Failed to get on-hold batches.", ex); return []; }
     }
 
+    /// <summary>
+    /// Returns completed batches available for archiving.
+    /// Legacy source: BatchesForArchiving.aspx.vb — <c>clsBatch.GetBatchesWithStatus(STATUS_COMPLETED)</c>.
+    /// </summary>
+    public async Task<IReadOnlyList<BatchListResult>> GetCompletedAsync(CancellationToken ct = default)
+    {
+        try { return await _batches.GetCompletedAsync(ct); }
+        catch (Exception ex) { _logger.LogError("Failed to get completed batches.", ex); return []; }
+    }
+
     /// <summary>Returns batches not yet received.</summary>
     public async Task<IReadOnlyList<BatchListResult>> GetNotReceivedAsync(CancellationToken ct = default)
     {
@@ -72,6 +82,16 @@ public sealed class BatchService
     {
         try { return await _batches.AddAsync(batch, userId, ct); }
         catch (Exception ex) { _logger.LogError("Failed to add batch.", ex); return 0; }
+    }
+
+    /// <summary>
+    /// Updates the editable batch header fields (CustomerRef, Comments, IsPreCassetted).
+    /// Returns <see langword="false"/> and logs on failure.
+    /// </summary>
+    public async Task<bool> UpdateAsync(Batch batch, int userId, CancellationToken ct = default)
+    {
+        try { await _batches.UpdateAsync(batch, userId, ct); return true; }
+        catch (Exception ex) { _logger.LogError("Failed to update batch {BatchId}.", ex, batch.ID); return false; }
     }
 
     /// <summary>
