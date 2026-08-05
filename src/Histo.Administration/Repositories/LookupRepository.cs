@@ -32,7 +32,7 @@ public sealed class LookupRepository : ILookupRepository
         var rows = await conn.QueryAsync<dynamic>(
             procName,
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.Select(MapLookupItem).ToList();
+        return rows.Select(MapDescriptionIsActive).ToList();
     }
 
     /// <inheritdoc/>
@@ -48,17 +48,17 @@ public sealed class LookupRepository : ILookupRepository
             procName,
             new { UserArea = userArea },
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.Select(MapLookupItem).ToList();
+        return rows.Select(MapDescriptionIsActive).ToList();
     }
 
     /// <inheritdoc/>
     public async Task<IReadOnlyList<EditableLookup>> ListEditableLookupsAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<EditableLookup>(
+        var rows = await conn.QueryAsync<dynamic>(
             "GetEditableLookups",
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+        return rows.Select(MapEditableLookup).ToList();
     }
 
     /// <inheritdoc/>
@@ -69,7 +69,7 @@ public sealed class LookupRepository : ILookupRepository
             "GetContactsArea",
             new { Area = area },
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.Select(MapLookupItem).ToList();
+        return rows.Select(MapDescriptionIsActive).ToList();
     }
 
     /// <inheritdoc/>
@@ -80,7 +80,7 @@ public sealed class LookupRepository : ILookupRepository
             "GetProjectsArea",
             new { Area = area },
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.Select(MapLookupItem).ToList();
+        return rows.Select(MapDescriptionIsActive).ToList();
     }
 
     /// <inheritdoc/>
@@ -124,7 +124,7 @@ public sealed class LookupRepository : ILookupRepository
         var rows = await conn.QueryAsync<dynamic>(
             "GetluImportedTables",
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.Select(MapLookupItem).ToList();
+        return rows.Select(MapDescriptionIsActive).ToList();
     }
 
     /// <inheritdoc/>
@@ -187,12 +187,70 @@ public sealed class LookupRepository : ILookupRepository
     /// Maps a "Code"/"Description" row (the shape returned by <c>GetluUserGroup</c>
     /// and <c>GetluUserArea</c>) into a <see cref="LookupItem"/>.
     /// </summary>
-    private static LookupItem MapCodeDescription(dynamic row) => new()
+    private static LookupItem MapCodeDescription(dynamic row)
     {
-        ID     = Convert.ToInt32(row.Code),
-        Name   = (string)(row.Description ?? string.Empty),
-        Active = true,
-    };
+        var d = (IDictionary<string, object>)row;
+        return new LookupItem
+        {
+            ID     = d.TryGetValue("Code",        out var code) ? ToIntSafe(code)               : 0,
+            Name   = d.TryGetValue("Description", out var desc) ? Convert.ToString(desc) ?? ""   : "",
+            Active = true,
+        };
+    }
+
+    /// <summary>
+    /// Maps a standard pick-list row where the SP returns <c>ID</c>, <c>Description</c>,
+    /// and optionally <c>IsActive</c>. Uses <see cref="IDictionary{TKey,TValue}"/> + TryGetValue
+    /// to avoid <c>RuntimeBinderException</c> when <c>IsActive</c> is absent from a particular
+    /// stored procedure result set — accessing a missing member on a Dapper <c>ExpandoObject</c>
+    /// via dynamic dispatch throws at runtime and is silently swallowed by the service-layer catch,
+    /// resulting in an empty list with no visible error.
+    /// </summary>
+    private static LookupItem MapDescriptionIsActive(dynamic row)
+    {
+        var d = (IDictionary<string, object>)row;
+        return new LookupItem
+        {
+            ID     = d.TryGetValue("ID",          out var id)     ? ToIntSafe(id)                : 0,
+            Name   = d.TryGetValue("Description", out var desc)   ? Convert.ToString(desc) ?? "" : "",
+            Active = d.TryGetValue("IsActive",     out var active) ? Convert.ToBoolean(active)    : true,
+        };
+    }
+
+    /// <summary>
+    /// Maps a row from <c>GetEditableLookups</c> where the SP returns <c>Description</c>
+    /// (the user-friendly pick-list name) but the model property is <c>TableName</c>.
+    /// Uses the dictionary approach for the same RuntimeBinderException safety reason.
+    /// </summary>
+    private static EditableLookup MapEditableLookup(dynamic row)
+    {
+        var d = (IDictionary<string, object>)row;
+        return new EditableLookup
+        {
+            ID                    = d.TryGetValue("ID",                    out var id)    ? ToIntSafe(id)                : 0,
+            TableName             = d.TryGetValue("Description",           out var desc)  ? Convert.ToString(desc) ?? "" : "",
+            SelectStoredProcedure = d.TryGetValue("SelectStoredProcedure", out var sel)   ? Convert.ToString(sel)  ?? "" : "",
+            UpdateStoredProcedure = d.TryGetValue("UpdateStoredProcedure", out var upd)   ? Convert.ToString(upd)  ?? "" : "",
+            InsertStoredProcedure = d.TryGetValue("InsertStoredProcedure", out var ins)   ? Convert.ToString(ins)  ?? "" : "",
+            DeleteStoredProcedure = d.TryGetValue("DeleteStoredProcedure", out var del)   ? Convert.ToString(del)  ?? "" : "",
+        };
+    }
+
+    /// <summary>
+    /// Converts a dictionary value to int without throwing.
+    /// Handles the case where the SP returns a numeric column as a <c>string</c> —
+    /// <c>Convert.ToInt32("")</c> throws <c>FormatException</c> for empty strings;
+    /// <c>int.TryParse</c> safely returns 0.
+    /// </summary>
+    private static int ToIntSafe(object? val)
+    {
+        if (val is null) return 0;
+        if (val is int i) return i;
+        if (val is long l) return (int)l;
+        if (val is short s) return s;
+        if (val is decimal dec) return (int)dec;
+        return int.TryParse(Convert.ToString(val), out var n) ? n : 0;
+    }
 
     // -----------------------------------------------------------------------
     // Shared dynamic mapper
