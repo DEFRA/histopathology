@@ -220,4 +220,68 @@ A chronological record of the user's prompts/requests in this conversation sessi
 
 ---
 
-*Updated on 2026-08-04.*
+
+---
+
+## Prompt 28 — Booking/Archive/Quality Data/nav naming discrepancy investigation (2026-08-06)
+
+> In the legacy application, the Booking section contains the following links:
+> Book Non-PG Histology Ref
+> Book Blocks
+>
+> However, in the new application, the corresponding links are:
+> Book Histology Reference
+> Book Block Reference
+> Edit Histology References
+>
+> Could you clarify the reason for this naming discrepancy between the legacy and new applications? Has the terminology been intentionally updated, and if so, is there any business or user requirement that drove the change?
+>
+> In the legacy application, the Archive section contains:
+> Archive Blocks
+> Archive Tissues
+>
+> In the new application, the Archive section contains:
+> Archive Blocks
+> Archive Tissues
+> Batches for Archiving
+>
+> Could you explain why "Batches for Archiving" has been added to the new application? Is this a new feature, or does it correspond to an existing function in the legacy system under a different name?
+>
+> In the legacy application:
+> BatchesForDispatch.aspx is displayed as Enter Quality Data
+> There is also Edit QC Notes
+>
+> In the new application:
+> The navigation menu shows Quality Data
+> The home page shows QC Notes
+>
+> Could you clarify the reasoning behind these naming differences? Are Enter Quality Data, Quality Data, Edit QC Notes, and QC Notes intended to represent the same functionality, or have there been changes to the underlying business processes?
+>
+> The new application also includes the following navigation links:
+> Edit Batches
+> Dispatch Batches
+>
+> Could you explain the purpose of these additional navigation items? Were they present in the legacy system under different names, or have they been introduced as new functionalities? Understanding the business need for these entries would help ensure feature parity and consistent terminology between the legacy and new applications.
+>
+> Need to update run journal user prompt log
+
+**Findings:** "Book Non-PG Histology Ref" → "Book histology reference": "Non-PG" qualifier silently dropped — no documented business decision; the qualifier signals PG-numbered sender refs are excluded from a booking range. "Edit histology references": not in legacy `BookingMenu.aspx`; added in Run #21 (ISS-021) with no legacy menu precedent. "Batches for archiving" is not a new feature — it is the legacy `BatchesForArchiving.aspx` ("Archive Submission"), reorganised from home page into the Archive sub-menu and renamed. Home page labels correct vs legacy; nav bar inconsistent: "Quality data" linked to `QCNotes` while "Dispatch batches" linked to `BatchesForDispatch` (the page the home calls "Enter quality data"). "Edit batches" and "Dispatch batches" in the nav were agent-introduced names inconsistent with both the home page and legacy.
+
+---
+
+## Prompt 29 — Implement Booking/Archive/nav label parity fixes (2026-08-06)
+
+> Can you implement the above the suggestion remove if something is not present in legacy
+
+**Changes applied (Run #63):**
+- `BookingMenu.cshtml`: restored "Book Non-PG histology ref" and "Book blocks"; removed "Edit histology references" (not in legacy booking menu).
+- `BookHistologyRef.cshtml`: page title restored to "Book Non-PG histology ref".
+- `BookBlockRef.cshtml`: page title restored to "Book blocks".
+- `ArchiveMenu.cshtml`: removed "Batches for archiving" (was never in legacy `ArchiveMenu.aspx`; page remains on home page as "Archive batches").
+- `_NavPartial.cshtml`: "Edit batches" → "Edit submission status"; "Dispatch batches" → "Enter quality data"; "Quality data" → "QC notes". Nav bar now consistent with home page and legacy.
+
+Build: 0 errors, 0 warnings. Tests: 90 pass, 1 skipped, 0 fail.
+
+---
+
+*Updated on 2026-08-06.*
