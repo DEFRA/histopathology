@@ -1,0 +1,228 @@
+// ============================================================
+// PlaywrightPdfService.cs.template
+//
+// USAGE: Copy to <TargetProject>/Services/Pdf/PlaywrightPdfService.cs
+// Replace {{Namespace}} with the project's root namespace.
+// Add NuGet: Microsoft.Playwright 1.44.0+
+// ============================================================
+ 
+using Microsoft.Playwright;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+ 
+namespace {{Namespace}}.Services.Pdf;
+ 
+// ── Interfaces ──────────────────────────────────────────────────────────────
+ 
+public interface IPlaywrightPdfService
+{
+    /// <summary>
+    /// Renders the given URL to a PDF using Playwright headless Chromium.
+    /// </summary>
+    /// <param name="url">Absolute URL of the Razor view to render.</param>
+    /// <param name="options">Paper size, margins, and rendering options.</param>
+    /// <returns>PDF bytes. Always starts with %PDF magic bytes.</returns>
+    /// <exception cref="PdfRenderException">
+    /// Thrown on any rendering failure. Never returns null or partial bytes.
+    /// </exception>
+    Task<byte[]> RenderAsync(string url, PdfRenderOptions options);
+}
+ 
+public class PdfRenderOptions
+{
+    /// <summary>"A4" or "Letter"</summary>
+    public string PaperFormat { get; set; } = "A4";
+ 
+    public bool Landscape { get; set; } = false;
+ 
+    public float MarginTopMm { get; set; } = 15;
+    public float MarginBottomMm { get; set; } = 15;
+    public float MarginLeftMm { get; set; } = 15;
+    public float MarginRightMm { get; set; } = 15;
+ 
+    /// <summary>Required for CSS background colours and images to appear in PDF.</summary>
+    public bool PrintBackground { get; set; } = true;
+ 
+    /// <summary>
+    /// JavaScript expression to wait for before capturing the PDF.
+    /// Used for chart rendering: set to "chartRendered" for Archetype D reports.
+    /// Null means no wait (most reports).
+    /// </summary>
+    public string? WaitForFunction { get; set; }
+ 
+    /// <summary>Navigation timeout in milliseconds. Default: 30 seconds.</summary>
+    public int TimeoutMs { get; set; } = 30_000;
+}
+ 
+public class PdfRenderException : Exception
+{
+    public string ReportUrl { get; }
+ 
+    public PdfRenderException(string url, string message, Exception? inner = null)
+        : base($"PDF render failed for '{url}': {message}", inner)
+    {
+        ReportUrl = url;
+    }
+}
+ 
+// ── Implementation ───────────────────────────────────────────────────────────
+ 
+/// <summary>
+/// Renders Razor views to PDF bytes using Playwright headless Chromium.
+/// Register as Singleton in Program.cs — the IBrowser is shared across requests;
+/// a new IBrowserContext is created per render for isolation.
+/// </summary>
+public sealed class PlaywrightPdfService : IPlaywrightPdfService, IAsyncDisposable
+{
+    private readonly SemaphoreSlim _semaphore;
+    private readonly ILogger<PlaywrightPdfService> _logger;
+    private IPlaywright? _playwright;
+    private IBrowser? _browser;
+    private bool _initialized;
+    private readonly SemaphoreSlim _initLock = new(1, 1);
+ 
+    public PlaywrightPdfService(
+        IConfiguration configuration,
+        ILogger<PlaywrightPdfService> logger)
+    {
+        _logger = logger;
+        var maxConcurrent = configuration.GetValue<int>(
+            "PdfGeneration:MaxConcurrentRenders", defaultValue: 3);
+        _semaphore = new SemaphoreSlim(maxConcurrent, maxConcurrent);
+    }
+ 
+    public async Task<byte[]> RenderAsync(string url, PdfRenderOptions options)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(url);
+        ArgumentNullException.ThrowIfNull(options);
+ 
+        await EnsureInitializedAsync();
+ 
+        await _semaphore.WaitAsync();
+        try
+        {
+            return await RenderInternalAsync(url, options);
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
+ 
+    private async Task<byte[]> RenderInternalAsync(string url, PdfRenderOptions options)
+    {
+        await using var context = await _browser!.NewContextAsync(new BrowserNewContextOptions
+        {
+            // Emulate print media so CSS @media print rules are honoured
+            ForcedColors = ForcedColors.None
+        });
+ 
+        await using var page = await context.NewPageAsync();
+ 
+        try
+        {
+            // Navigate to the Razor view URL
+            var response = await page.GotoAsync(url, new PageGotoOptions
+            {
+                WaitUntil = WaitUntilState.NetworkIdle,
+                Timeout = options.TimeoutMs
+            });
+ 
+            if (response is null || !response.Ok)
+            {
+                throw new PdfRenderException(url,
+                    $"HTTP {response?.Status ?? 0} returned by report URL");
+            }
+ 
+            // Wait for chart rendering if required (Archetype D reports)
+            if (options.WaitForFunction is not null)
+            {
+                await page.WaitForFunctionAsync(
+                    options.WaitForFunction,
+                    new PageWaitForFunctionOptions { Timeout = options.TimeoutMs });
+            }
+ 
+            // Emit PDF
+            var pdfOptions = BuildPdfOptions(options);
+            var bytes = await page.PdfAsync(pdfOptions);
+ 
+            // Validate PDF magic bytes — never return partial/corrupt output
+            if (bytes is null || bytes.Length < 4
+                || bytes[0] != '%' || bytes[1] != 'P' || bytes[2] != 'D' || bytes[3] != 'F')
+            {
+                throw new PdfRenderException(url,
+                    "Playwright returned data that does not start with %PDF magic bytes");
+            }
+ 
+            _logger.LogInformation(
+                "PDF rendered successfully for {Url}: {Bytes} bytes", url, bytes.Length);
+ 
+            return bytes;
+        }
+        catch (PdfRenderException)
+        {
+            throw; // Already typed — re-throw as-is
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PDF render failed for {Url}", url);
+            throw new PdfRenderException(url, ex.Message, ex);
+        }
+    }
+ 
+    private static PagePdfOptions BuildPdfOptions(PdfRenderOptions options) =>
+        new()
+        {
+            Format = options.PaperFormat,
+            Landscape = options.Landscape,
+            PrintBackground = options.PrintBackground,
+            Margin = new Margin
+            {
+                Top    = $"{options.MarginTopMm}mm",
+                Bottom = $"{options.MarginBottomMm}mm",
+                Left   = $"{options.MarginLeftMm}mm",
+                Right  = $"{options.MarginRightMm}mm"
+            }
+        };
+ 
+    private async Task EnsureInitializedAsync()
+    {
+        if (_initialized) return;
+ 
+        await _initLock.WaitAsync();
+        try
+        {
+            if (_initialized) return;
+            _playwright = await Playwright.CreateAsync();
+            _browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
+            {
+                Headless = true
+            });
+            _initialized = true;
+            _logger.LogInformation("Playwright Chromium browser initialized");
+        }
+        finally
+        {
+            _initLock.Release();
+        }
+    }
+ 
+    public async ValueTask DisposeAsync()
+    {
+        if (_browser is not null) await _browser.DisposeAsync();
+        _playwright?.Dispose();
+        _semaphore.Dispose();
+        _initLock.Dispose();
+    }
+}
+ 
+// ── Registration helper (add to Program.cs) ─────────────────────────────────
+//
+//   builder.Services.AddSingleton<IPlaywrightPdfService, PlaywrightPdfService>();
+//
+//   // In development, install Chromium automatically:
+//   if (app.Environment.IsDevelopment())
+//   {
+//       var exitCode = Microsoft.Playwright.Program.Main(new[] { "install", "chromium" });
+//       if (exitCode != 0) throw new Exception("Playwright Chromium install failed");
+//   }

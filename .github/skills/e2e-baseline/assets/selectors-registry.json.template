@@ -1,0 +1,60 @@
+{
+  "page": "{{PageName}}",
+  "status": "complete",
+  "generatedAt": "{{GeneratedAt}}",
+  "selectors": {
+    "fields": {
+      "{{fieldKey}}": {
+        "type": "semantic|role|text|telerik|unsupported",
+        "locator": "getByLabel|getByRole|getByText",
+        "role": null,
+        "value": "{{LabelOrButtonText}}",
+        "controlType": "{{ControlType}}",
+        "clientConfirm": false,
+        "confirmText": null,
+        "telerik": false,
+        "controlId": null,
+        "generatedIdPattern": null,
+        "associatedLabel": null,
+        "duplicate": false
+      }
+    },
+    "actions": {
+      "{{actionKey}}": {
+        "type": "role",
+        "locator": "getByRole",
+        "role": "button|link",
+        "value": "{{ButtonText}}",
+        "clientConfirm": false,
+        "confirmText": null
+      }
+    },
+    "feedback": {
+      "success": {
+        "type": "text",
+        "locator": "getByText",
+        "value": "{{SuccessMessageText}}"
+      },
+      "errorSummary": {
+        "type": "role",
+        "locator": "getByRole",
+        "role": "alert",
+        "value": null,
+        "group": "{{ValidationGroup}}"
+      },
+      "{{fieldErrorKey}}": {
+        "type": "text",
+        "locator": "getByText",
+        "value": "{{ErrorMessageText}}"
+      }
+    },
+    "navigation": {
+      "pageHeading": {
+        "type": "role",
+        "locator": "getByRole",
+        "role": "heading",
+        "value": "{{PageHeadingText}}"
+      }
+    }
+  }
+}

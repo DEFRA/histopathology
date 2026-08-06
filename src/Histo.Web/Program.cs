@@ -19,6 +19,8 @@ using Histo.QualityControl.Services;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Repositories;
 using Histo.Submissions.Services;
+using Histo.Reporting.Reports;
+using Histo.Reporting.Services;
 
 // Bootstrap Serilog before the host is built so startup errors are captured.
 Log.Logger = new LoggerConfiguration()
@@ -110,6 +112,10 @@ try
     builder.Services.AddScoped<BatchService>();
     builder.Services.AddScoped<ISubmissionRepository, SubmissionRepository>();
     builder.Services.AddScoped<SubmissionService>();
+
+    // ── Reporting module ──────────────────────────────────────────────────────
+    builder.Services.AddTransient<HistologyReportDataSetBuilder>();
+    builder.Services.AddTransient<HistologyReportRenderer>();
 
     // ── Application Insights telemetry ──────────────────────────────────────
     var aiConnString = builder.Configuration["AppSettings:ApplicationInsightsConnectionString"];

@@ -1,0 +1,439 @@
+{
+  "reportName": "HistologyReport",
+  "_sourceFile": "HistopathologySystem.2018/HistopathologySystem/HistologyReport.rpt",
+  "_designerClass": "HistopathologySystem.2018/HistopathologySystem/HistologyReport.vb",
+  "_callingPage": "HistopathologySystem.2018/HistopathologySystem/SubmissionForm.aspx.vb",
+  "_xsdDataset": "HistopathologySystem.2018/HistopathologySystem/HistologyReportDataset.xsd",
+  "_extractedDate": "2026-08-05",
+  "_extractionSources": [
+    "HistologyReportDataset.xsd — definitive field schema (5 tables, 31 fields)",
+    "HistologyReport.vb — 5 sections confirmed (Sections(0)–Sections(4))",
+    "SubmissionForm.aspx.vb — DataSet construction, column definitions, SetDataSource call",
+    "ADR-004-crystal-reports-pdf-generation.md — sub-report nesting confirmed",
+    "HistologyReport.rpt OLE compound document — 'Subdocument 1' stream confirms one embedded sub-report"
+  ],
+  "pageSettings": {
+    "width": 210,
+    "height": 297,
+    "orientation": "portrait",
+    "marginTop": 12,
+    "marginBottom": 12,
+    "marginLeft": 12,
+    "marginRight": 12,
+    "_review": true,
+    "_reviewNote": "A4 portrait assumed (UK-standard); exact margin values require Crystal Reports designer inspection of the .rpt binary"
+  },
+  "dataFields": [
+    { "name": "ProjectContractCode", "dataType": "string",   "dataSource": "Batch" },
+    { "name": "ContactName",         "dataType": "string",   "dataSource": "Batch" },
+    { "name": "BatchDate",           "dataType": "dateTime", "dataSource": "Batch" },
+    { "name": "Species",             "dataType": "string",   "dataSource": "Batch" },
+    { "name": "DateReceived",        "dataType": "dateTime", "dataSource": "Batch" },
+    { "name": "TimeReceived",        "dataType": "string",   "dataSource": "Batch" },
+    { "name": "SafeToHandle",        "dataType": "boolean",  "dataSource": "Batch" },
+    { "name": "Comments",            "dataType": "string",   "dataSource": "Batch" },
+    { "name": "Fixation",            "dataType": "string",   "dataSource": "Batch" },
+    { "name": "ID",                  "dataType": "int",      "dataSource": "Batch" },
+    { "name": "PostFixationOther",   "dataType": "string",   "dataSource": "Batch" },
+    { "name": "CommentLengthOK",     "dataType": "string",   "dataSource": "Batch" },
+    { "name": "OtherSubmittedBy",    "dataType": "string",   "dataSource": "Batch" },
+    { "name": "NumberSamples",       "dataType": "string",   "dataSource": "Batch" },
+    { "name": "BatchType",           "dataType": "string",   "dataSource": "Batch" },
+    { "name": "SubmittedAs",         "dataType": "string",   "dataSource": "Batch" },
+    { "name": "MoreHistology",       "dataType": "string",   "dataSource": "Batch" },
+    { "name": "BatchID",             "dataType": "int",      "dataSource": "BatchHistology" },
+    { "name": "Code",                "dataType": "string",   "dataSource": "BatchHistology" },
+    { "name": "BatchID",             "dataType": "int",      "dataSource": "BatchPostFixation" },
+    { "name": "Decal",               "dataType": "string",   "dataSource": "BatchPostFixation" },
+    { "name": "Phenol",              "dataType": "string",   "dataSource": "BatchPostFixation" },
+    { "name": "Formic",              "dataType": "string",   "dataSource": "BatchPostFixation" },
+    { "name": "Other",               "dataType": "string",   "dataSource": "BatchPostFixation" },
+    { "name": "BatchID",             "dataType": "int",      "dataSource": "BatchSubmission" },
+    { "name": "SenderRef",           "dataType": "string",   "dataSource": "BatchSubmission" },
+    { "name": "HistologyRef",        "dataType": "string",   "dataSource": "BatchSubmission" },
+    { "name": "BlockRef",            "dataType": "string",   "dataSource": "BatchSubmission" },
+    { "name": "TissueDetails",       "dataType": "string",   "dataSource": "BatchSubmission" },
+    { "name": "RepeatBlock",         "dataType": "string",   "dataSource": "BatchSubmission" },
+    { "name": "CustomerRef",         "dataType": "string",   "dataSource": "BatchSubmission" },
+    { "name": "Version",             "dataType": "string",   "dataSource": "Version" }
+  ],
+  "parameters": [],
+  "formulaFields": [],
+  "sections": [
+    {
+      "sectionIndex": 0,
+      "type": "header",
+      "sectionLabel": "ReportHeader",
+      "sectionHeight": null,
+      "_review": true,
+      "_reviewNote": "Section height requires Crystal Reports designer measurement. Contains all batch-level form fields and embedded HistologySubReport sub-report.",
+      "elements": [
+        {
+          "type": "TextElement",
+          "label": "ReportTitle",
+          "token": "{{Static.ReportTitle}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": true, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "center",
+          "_review": true,
+          "_reviewNote": "Title text and exact position require designer inspection"
+        },
+        {
+          "type": "FieldElement",
+          "label": "ProjectContractCode",
+          "token": "{{Batch.ProjectContractCode}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "FieldElement",
+          "label": "ContactName",
+          "token": "{{Batch.ContactName}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "FieldElement",
+          "label": "BatchDate",
+          "token": "{{Batch.BatchDate}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "FieldElement",
+          "label": "Species",
+          "token": "{{Batch.Species}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "FieldElement",
+          "label": "DateReceived",
+          "token": "{{Batch.DateReceived}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "FieldElement",
+          "label": "TimeReceived",
+          "token": "{{Batch.TimeReceived}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "FieldElement",
+          "label": "SafeToHandle",
+          "token": "{{Batch.SafeToHandle}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "FieldElement",
+          "label": "Comments",
+          "token": "{{Batch.Comments}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "FieldElement",
+          "label": "CommentLengthOK",
+          "token": "{{Batch.CommentLengthOK}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true,
+          "_reviewNote": "Renders Chr(252) wingdings checkmark when comments exceed 150 chars — per SubmissionForm.aspx.vb"
+        },
+        {
+          "type": "FieldElement",
+          "label": "Fixation",
+          "token": "{{Batch.Fixation}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "FieldElement",
+          "label": "PostFixationOther",
+          "token": "{{Batch.PostFixationOther}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "FieldElement",
+          "label": "Decal",
+          "token": "{{BatchPostFixation.Decal}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "center",
+          "_review": true,
+          "_reviewNote": "Renders Chr(252) wingdings checkmark when Decal post-fixation selected"
+        },
+        {
+          "type": "FieldElement",
+          "label": "Phenol",
+          "token": "{{BatchPostFixation.Phenol}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "center",
+          "_review": true,
+          "_reviewNote": "Renders Chr(252) wingdings checkmark when Phenol post-fixation selected"
+        },
+        {
+          "type": "FieldElement",
+          "label": "Formic",
+          "token": "{{BatchPostFixation.Formic}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "center",
+          "_review": true,
+          "_reviewNote": "Renders Chr(252) wingdings checkmark when Formic acid post-fixation selected"
+        },
+        {
+          "type": "FieldElement",
+          "label": "PostFixation_Other",
+          "token": "{{BatchPostFixation.Other}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "center",
+          "_review": true,
+          "_reviewNote": "Renders Chr(252) wingdings checkmark when Other post-fixation selected"
+        },
+        {
+          "type": "FieldElement",
+          "label": "OtherSubmittedBy",
+          "token": "{{Batch.OtherSubmittedBy}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "FieldElement",
+          "label": "NumberSamples",
+          "token": "{{Batch.NumberSamples}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "FieldElement",
+          "label": "BatchType",
+          "token": "{{Batch.BatchType}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true,
+          "_reviewNote": "Displays 'TSE' or 'NON TSE' — per SubmissionForm.aspx.vb"
+        },
+        {
+          "type": "FieldElement",
+          "label": "SubmittedAs",
+          "token": "{{Batch.SubmittedAs}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "FieldElement",
+          "label": "MoreHistology",
+          "token": "{{Batch.MoreHistology}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true,
+          "_reviewNote": "Displays '*' when histology tests exceed display limit (8 or 9 rows) — per SubmissionForm.aspx.vb"
+        },
+        {
+          "type": "SubReportElement",
+          "label": "HistologySubReport",
+          "subReportName": "HistologySubReport.rpt",
+          "token": "{{SubReport.HistologySubReport}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "linkedFields": [
+            { "parentField": "Batch.ID", "childField": "BatchHistology.BatchID" }
+          ],
+          "_review": true,
+          "_reviewNote": "Sub-report confirmed by: ADR-004 ('One sub-report nesting exists: HistologyReport.rpt embeds HistologySubReport.rpt') and OLE compound document stream 'Subdocument 1' in HistologyReport.rpt binary. Exact position and link field require designer inspection."
+        }
+      ]
+    },
+    {
+      "sectionIndex": 1,
+      "type": "header",
+      "sectionLabel": "PageHeader",
+      "sectionHeight": null,
+      "_review": true,
+      "_reviewNote": "Column header labels for submission table. Exact text and positions require designer inspection.",
+      "elements": [
+        {
+          "type": "TextElement",
+          "label": "ColHeader_SenderRef",
+          "token": "{{Static.SenderRefLabel}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": true, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "TextElement",
+          "label": "ColHeader_HistologyRef",
+          "token": "{{Static.HistologyRefLabel}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": true, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "TextElement",
+          "label": "ColHeader_BlockRef",
+          "token": "{{Static.BlockRefLabel}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": true, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "TextElement",
+          "label": "ColHeader_TissueDetails",
+          "token": "{{Static.TissueDetailsLabel}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": true, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "TextElement",
+          "label": "ColHeader_CustomerRef",
+          "token": "{{Static.CustomerRefLabel}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": true, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        }
+      ]
+    },
+    {
+      "sectionIndex": 2,
+      "type": "detail",
+      "sectionLabel": "Detail",
+      "sectionHeight": null,
+      "_review": true,
+      "_reviewNote": "Repeating section — one row per BatchSubmission entry. Row height ~6mm estimated; exact value requires designer inspection. Rows repeat up to 17 per page (per SubmissionForm.aspx.vb modulo logic).",
+      "elements": [
+        {
+          "type": "FieldElement",
+          "label": "SenderRef",
+          "token": "{{BatchSubmission.SenderRef}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "FieldElement",
+          "label": "HistologyRef",
+          "token": "{{BatchSubmission.HistologyRef}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "FieldElement",
+          "label": "BlockRef",
+          "token": "{{BatchSubmission.BlockRef}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true,
+          "_reviewNote": "May display '*' suffix when RepeatBlock=true or block Comment is non-empty — per CreateBlockRefString in SubmissionForm.aspx.vb"
+        },
+        {
+          "type": "FieldElement",
+          "label": "TissueDetails",
+          "token": "{{BatchSubmission.TissueDetails}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "FieldElement",
+          "label": "CustomerRef",
+          "token": "{{BatchSubmission.CustomerRef}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        },
+        {
+          "type": "FieldElement",
+          "label": "RepeatBlock",
+          "token": "{{BatchSubmission.RepeatBlock}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true
+        }
+      ]
+    },
+    {
+      "sectionIndex": 3,
+      "type": "footer",
+      "sectionLabel": "ReportFooter",
+      "sectionHeight": null,
+      "_review": true,
+      "_reviewNote": "Section contents unknown — requires designer inspection. May be empty.",
+      "elements": []
+    },
+    {
+      "sectionIndex": 4,
+      "type": "footer",
+      "sectionLabel": "PageFooter",
+      "sectionHeight": null,
+      "_review": true,
+      "_reviewNote": "Contains version number from Version.Version field. May also contain page number formula.",
+      "elements": [
+        {
+          "type": "FieldElement",
+          "label": "Version",
+          "token": "{{Version.Version}}",
+          "x": null, "y": null, "width": null, "height": null,
+          "font": { "family": null, "size": null, "bold": false, "italic": false, "underline": false, "strikethrough": false, "color": "#000000" },
+          "alignment": "left",
+          "_review": true,
+          "_reviewNote": "Version value sourced from Web.config key SubmissionFormVersionTSE or SubmissionFormVersionNonTSE depending on BatchType"
+        }
+      ]
+    }
+  ],
+  "renderHints": {
+    "repeatHeaderOnEachPage": true,
+    "pageBreakOnGroup": false,
+    "_reviewNote": "repeatHeaderOnEachPage inferred from PageHeader section and 17-row-per-page modulo logic in SubmissionForm.aspx.vb"
+  },
+  "complexity": "high",
+  "_complexityReason": "SubReportElement detected: HistologyReport.rpt embeds HistologySubReport.rpt (confirmed by ADR-004 and OLE 'Subdocument 1' stream). complexity set to 'high' per RptDefinitionGenerationSkill rule. Human review required before Stage 2 proceeds."
+}

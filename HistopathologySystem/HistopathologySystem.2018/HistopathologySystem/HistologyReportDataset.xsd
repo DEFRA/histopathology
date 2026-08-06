@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<xs:schema id="DatasetTest" targetNamespace="http://tempuri.org/DatasetTest.xsd" elementFormDefault="qualified"
+	attributeFormDefault="qualified" xmlns="http://tempuri.org/DatasetTest.xsd" xmlns:mstns="http://tempuri.org/DatasetTest.xsd"
+	xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+	<xs:element name="DatasetTest" msdata:IsDataSet="true">
+		<xs:complexType>
+			<xs:choice maxOccurs="unbounded">
+				<xs:element name="Batch">
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="ProjectContractCode" type="xs:string" minOccurs="0" />
+							<xs:element name="ContactName" type="xs:string" minOccurs="0" />
+							<xs:element name="BatchDate" type="xs:dateTime" minOccurs="0" />
+							<xs:element name="Species" type="xs:string" minOccurs="0" />
+							<xs:element name="DateReceived" type="xs:dateTime" minOccurs="0" />
+							<xs:element name="TimeReceived" type="xs:string" minOccurs="0" />
+							<xs:element name="SafeToHandle" type="xs:boolean" minOccurs="0" />
+							<xs:element name="Comments" type="xs:string" minOccurs="0" />
+							<xs:element name="Fixation" type="xs:string" minOccurs="0" />
+							<xs:element name="ID" type="xs:int" minOccurs="0" />
+							<xs:element name="PostFixationOther" type="xs:string" minOccurs="0" />
+							<xs:element name="CommentLengthOK" type="xs:string" minOccurs="0" />
+							<xs:element name="OtherSubmittedBy" type="xs:string" minOccurs="0" />
+							<xs:element name="NumberSamples" type="xs:string" minOccurs="0" />
+							<xs:element name="BatchType" type="xs:string" minOccurs="0" />
+							<xs:element name="SubmittedAs" type="xs:string" minOccurs="0" />
+							<xs:element name="MoreHistology" type="xs:string" minOccurs="0" />
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="BatchHistology">
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="BatchID" type="xs:int" minOccurs="0" />
+							<xs:element name="Code" type="xs:string" minOccurs="0" />
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="BatchPostFixation">
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="BatchID" type="xs:int" minOccurs="0" />
+							<xs:element name="Decal" type="xs:string" minOccurs="0" />
+							<xs:element name="Phenol" type="xs:string" minOccurs="0" />
+							<xs:element name="Formic" type="xs:string" minOccurs="0" />
+							<xs:element name="Other" type="xs:string" minOccurs="0" />
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="BatchSubmission">
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="BatchID" type="xs:int" minOccurs="0" />
+							<xs:element name="SenderRef" type="xs:string" minOccurs="0" />
+							<xs:element name="HistologyRef" type="xs:string" minOccurs="0" />
+							<xs:element name="BlockRef" type="xs:string" minOccurs="0" />
+							<xs:element name="TissueDetails" type="xs:string" minOccurs="0" />
+							<xs:element name="RepeatBlock" type="xs:string" minOccurs="0" />
+							<xs:element name="CustomerRef" type="xs:string" minOccurs="0" />
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="Version">
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="Version" type="xs:string" minOccurs="0" />
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+			</xs:choice>
+		</xs:complexType>
+		<xs:key name="key1">
+			<xs:selector xpath=".//mstns:BatchHistology" />
+			<xs:field xpath="mstns:BatchID" />
+		</xs:key>
+		<xs:key name="DatasetTestKey1">
+			<xs:selector xpath=".//mstns:Batch" />
+			<xs:field xpath="mstns:ID" />
+		</xs:key>
+		<xs:key name="key2">
+			<xs:selector xpath=".//mstns:BatchPostFixation" />
+			<xs:field xpath="mstns:BatchID" />
+		</xs:key>
+		<xs:key name="DatasetTestKey2">
+			<xs:selector xpath=".//mstns:Batch" />
+			<xs:field xpath="mstns:ID" />
+		</xs:key>
+		<xs:key name="DatasetTestKey3">
+			<xs:selector xpath=".//mstns:Batch" />
+			<xs:field xpath="mstns:ID" />
+		</xs:key>
+		<xs:key name="key3">
+			<xs:selector xpath=".//mstns:BatchSubmission" />
+			<xs:field xpath="mstns:BatchID" />
+		</xs:key>
+		<xs:key name="DatasetTestKey4">
+			<xs:selector xpath=".//mstns:Batch" />
+			<xs:field xpath="mstns:ID" />
+		</xs:key>
+	</xs:element>
+</xs:schema>

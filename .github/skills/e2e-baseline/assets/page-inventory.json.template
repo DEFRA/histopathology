@@ -1,0 +1,74 @@
+{
+  "status": "complete",
+  "generatedAt": "{{GeneratedAt}}",
+  "webProjectPath": "{{WebProjectPath}}",
+  "masterPage": {
+    "file": "{{MasterPageFile}}",
+    "globalJsFiles": [],
+    "globalCssFiles": [],
+    "embeddedUserControls": []
+  },
+  "pages": [
+    {
+      "name": "{{PageName}}",
+      "aspxPath": "{{AspxPath}}",
+      "codeBehindPath": "{{CodeBehindPath}}",
+      "urlPattern": "{{UrlPattern}}",
+      "title": "{{PageTitle}}",
+      "masterPageFile": "{{MasterPageFile}}",
+      "contentPlaceholderId": "{{ContentPlaceholderId}}",
+      "complexity": "simple|medium|complex",
+      "hasUpdatePanel": false,
+      "hasTelerik": false,
+      "inScope": true,
+      "parseError": false,
+      "parseErrorReason": null,
+      "fields": [
+        {
+          "labelText": "{{LabelText}}",
+          "associatedControlId": "{{ControlId}}",
+          "controlType": "{{ControlType}}"
+        }
+      ],
+      "actions": [
+        {
+          "text": "{{ButtonText}}",
+          "controlType": "Button|LinkButton|ImageButton|HyperLink",
+          "onClientClick": null,
+          "causesValidation": true,
+          "validationGroup": null
+        }
+      ],
+      "validation": [
+        {
+          "validatorType": "RequiredFieldValidator|RegularExpressionValidator|CustomValidator|ValidationSummary",
+          "errorMessage": "{{ErrorMessage}}",
+          "controlToValidate": "{{ControlId}}",
+          "validationGroup": "{{ValidationGroup}}",
+          "validationExpression": null,
+          "clientValidationFunction": null,
+          "headerText": null
+        }
+      ],
+      "telerikControls": [
+        {
+          "controlType": "{{TelerikControlType}}",
+          "controlId": "{{ControlId}}",
+          "onClientNodeChecked": null,
+          "onClientNodeClicking": null,
+          "onClientSelectionChanged": null
+        }
+      ],
+      "userControls": [
+        {
+          "srcPath": "{{UserControlPath}}",
+          "tagPrefix": "{{TagPrefix}}",
+          "tagName": "{{TagName}}"
+        }
+      ],
+      "pageSpecificJs": [
+        "{{JsFilePath}}"
+      ]
+    }
+  ]
+}

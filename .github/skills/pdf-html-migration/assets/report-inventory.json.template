@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "report-inventory.json.template — output schema for the pdf-discovery agent. All fields are required. Use null only where explicitly noted as nullable.",
+ 
+  "discoveredAt": "{{ISO-8601 timestamp}}",
+  "status": "{{complete | incomplete}}",
+ 
+  "library": {
+    "name": "{{e.g. TallPDF.NET | iText 7 | FastReport | Crystal Reports}}",
+    "assemblyName": "{{e.g. TallComponents.PDF.Layout}}",
+    "version": "{{e.g. 3.0.23.0}}",
+    "source": "{{local-dll | nuget}}",
+    "dllPaths": [
+      "{{relative path to DLL 1}}",
+      "{{relative path to DLL 2 if duplicate copies exist}}"
+    ],
+    "isWindowsOnly": true,
+    "licenceKeyLocations": [
+      "{{relative path to file containing licence key}}"
+    ]
+  },
+ 
+  "targetProject": {
+    "name": "{{e.g. Profiles.Web}}",
+    "path": "{{relative path to .csproj}}",
+    "framework": "{{e.g. net10.0 | net4.8}}"
+  },
+ 
+  "baseClasses": [
+    {
+      "className": "{{e.g. PdfBase}}",
+      "filePath": "{{relative path to .vb or .cs}}",
+      "features": {
+        "pageHeader": true,
+        "pageFooter": true,
+        "pageNumbers": true,
+        "draftWatermark": true,
+        "tableOfContents": true,
+        "portraitLandscapeSwitching": true,
+        "embeddedImageResources": true,
+        "documentMetadata": true
+      }
+    }
+  ],
+ 
+  "sharedComponents": [
+    {
+      "className": "{{e.g. ContributionsTable}}",
+      "filePath": "{{relative path}}",
+      "usedByReports": [
+        "{{ReportClassName}}"
+      ],
+      "responsibility": "{{short description of what this component renders}}",
+      "proposedRazorPartial": "{{e.g. _ContributionsTable.cshtml}}"
+    }
+  ],
+ 
+  "requiredScenarios": [
+    "{{published-profile-version}}",
+    "{{draft-profile-version}}",
+    "{{all-sections-populated}}",
+    "{{comparison-pair}}",
+    "{{bespoke-template}}",
+    "{{ranking-filter-all}}",
+    "{{ranking-filter-fish}}",
+    "{{ranking-filter-terrestrial}}"
+  ],
+ 
+  "discoveryGaps": [],
+ 
+  "reports": [
+    {
+      "className": "{{e.g. FullProfilePdf}}",
+      "filePath": "{{e.g. Profiles.Reports/FullProfilePdf.vb}}",
+      "baseClassName": "{{e.g. ProfileReportPdfBase}}",
+      "linesOfCode": 0,
+      "archetype": "{{A | B | C | D}}",
+      "archetypeReason": "{{one-line justification for the archetype classification}}",
+      "complexityTier": "{{Low | Medium | High | Very High}}",
+      "complexityReason": "{{one-line justification}}",
+ 
+      "constructorParams": [
+        {
+          "name": "{{e.g. profileVersionId}}",
+          "type": "{{e.g. Guid}}",
+          "role": "{{e.g. primary data entity ID}}"
+        }
+      ],
+ 
+      "isDataDriven": true,
+      "hasHardcodedMapping": false,
+      "hardcodedMappingPairs": [],
+ 
+      "chartDependency": {
+        "hasChart": false,
+        "libraryUsed": null,
+        "replacementApproach": null
+      },
+ 
+      "sharedComponentsUsed": [
+        "{{SharedComponentClassName}}"
+      ],
+ 
+      "entryPoint": {
+        "filePath": "{{e.g. Profiles.Web/ShowDraftSummaryProfileReport.aspx.vb}}",
+        "type": "{{WebForms | RazorPage | MvcController | ApiController}}",
+        "route": "{{e.g. /ShowDraftSummaryProfileReport.aspx}}",
+        "queryParams": [
+          {
+            "name": "{{e.g. ProfileVersionId}}",
+            "type": "{{e.g. Guid}}",
+            "required": true
+          }
+        ],
+        "pdfReturnMethod": "{{e.g. Response.DownloadPdfBytes | File(bytes, application/pdf)}}"
+      },
+ 
+      "proposedRazorView": "{{e.g. Views/Reports/SummaryProfile.cshtml}}",
+      "proposedViewModel": "{{e.g. ViewModels/Reports/SummaryProfileViewModel.cs}}",
+      "proposedRoute": "{{e.g. GET /reports/summary-profile?profileVersionId=}}"
+    }
+  ]
+}

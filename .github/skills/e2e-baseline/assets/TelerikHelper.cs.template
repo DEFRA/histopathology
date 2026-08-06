@@ -1,0 +1,82 @@
+namespace {{Namespace}}.Infrastructure;
+ 
+/// <summary>
+/// Wraps interactions with Telerik Web Forms controls (RadDatePicker, RadTreeView,
+/// RadGrid, RadComboBox) that have no semantic HTML equivalent in the pre-migration app.
+///
+/// Pre-migration: methods use generated CSS ID patterns to locate Telerik sub-elements.
+/// Post-migration: replace each method body with a semantic Playwright locator call
+/// (getByLabel, getByRole, etc.) — the calling code in page objects is unchanged.
+/// </summary>
+public static class TelerikHelper
+{
+    /// <summary>
+    /// Types a date into a RadDatePicker input using its generated ID pattern.
+    /// Post-migration replacement:
+    ///   await page.GetByLabel(selector.AssociatedLabel).FillAsync(date.ToString("yyyy-MM-dd"));
+    /// </summary>
+    public static async Task FillDatePicker(IPage page, TelerikSelector selector, DateTime date)
+    {
+        var input = page.Locator(selector.GeneratedIdPattern);
+        await input.FillAsync(date.ToString("dd/MM/yyyy"));
+        await input.PressAsync("Tab");
+    }
+ 
+    /// <summary>
+    /// Selects a value from a RadComboBox dropdown by typing and clicking the list item.
+    /// Post-migration replacement:
+    ///   await page.GetByLabel(selector.AssociatedLabel).SelectOptionAsync(value);
+    /// </summary>
+    public static async Task SelectComboBox(IPage page, TelerikSelector selector, string value)
+    {
+        var input = page.Locator(selector.GeneratedIdPattern);
+        await input.FillAsync(value);
+        await page.Locator($".rcbList li:has-text('{value}')").ClickAsync();
+    }
+ 
+    /// <summary>
+    /// Checks a node in a RadTreeView by its visible label text.
+    /// Post-migration replacement:
+    ///   await page.GetByRole(AriaRole.Treeitem, new() {{ Name = nodeText }}).ClickAsync();
+    /// </summary>
+    public static async Task CheckTreeNode(IPage page, TelerikSelector selector, string nodeText)
+    {
+        var tree = page.Locator(selector.GeneratedIdPattern);
+        var nodeText_ = tree.Locator($".rtText:has-text('{nodeText}')");
+        var checkbox = nodeText_.Locator("xpath=preceding-sibling::input[@type='checkbox']");
+        await checkbox.CheckAsync();
+    }
+ 
+    /// <summary>
+    /// Unchecks a node in a RadTreeView by its visible label text.
+    /// </summary>
+    public static async Task UncheckTreeNode(IPage page, TelerikSelector selector, string nodeText)
+    {
+        var tree = page.Locator(selector.GeneratedIdPattern);
+        var nodeText_ = tree.Locator($".rtText:has-text('{nodeText}')");
+        var checkbox = nodeText_.Locator("xpath=preceding-sibling::input[@type='checkbox']");
+        await checkbox.UncheckAsync();
+    }
+ 
+    /// <summary>
+    /// Gets the text of a specific cell in a RadGrid body row.
+    /// </summary>
+    public static async Task<string> GetGridCellText(
+        IPage page, TelerikSelector selector, int rowIndex, int columnIndex)
+    {
+        var grid = page.Locator(selector.GeneratedIdPattern);
+        var cell = grid.Locator($"tr.rgRow:nth-child({rowIndex + 1}) td:nth-child({columnIndex + 1})");
+        return await cell.InnerTextAsync();
+    }
+ 
+    /// <summary>
+    /// Clicks a command link (e.g. Edit, Delete) in a specific RadGrid row.
+    /// </summary>
+    public static async Task ClickGridRowCommand(
+        IPage page, TelerikSelector selector, int rowIndex, string commandText)
+    {
+        var grid = page.Locator(selector.GeneratedIdPattern);
+        var row = grid.Locator($"tr.rgRow:nth-child({rowIndex + 1})");
+        await row.GetByText(commandText).ClickAsync();
+    }
+}

@@ -1,0 +1,95 @@
+namespace {{Namespace}}.Pages;
+ 
+/// <summary>
+/// Page object for {{PageName}}.
+///
+/// Encapsulates all Playwright locators and interaction methods for this page.
+/// Test specs never access selectors directly — always through this class.
+///
+/// Post-migration guidance:
+/// - ILocator properties: unchanged if selector registry values are correct.
+/// - TelerikHelper method calls: replace with semantic locator calls.
+/// - clientSideBehaviour methods: update wait strategy if JS framework changed.
+/// </summary>
+public class {{PageName}}Page(IPage page)
+{
+    // -------------------------------------------------------------------------
+    // Locators — resolved from selector registry via SemanticLocatorExtensions
+    // -------------------------------------------------------------------------
+ 
+    // Fields
+    // Generated: one ILocator property per selectors.fields entry
+    // Example:
+    // public ILocator FirstNameField =>
+    //     {{PageName}}Selectors.Fields.FirstName.ToLocator(page);
+    //
+    // For Telerik fields: no ILocator property — use TelerikHelper methods below
+ 
+    // Actions
+    // Generated: one ILocator property per selectors.actions entry
+    // Example:
+    // public ILocator SaveButton =>
+    //     {{PageName}}Selectors.Actions.Save.ToLocator(page);
+ 
+    // Feedback
+    // Generated: one ILocator property per selectors.feedback entry
+    // Example:
+    // public ILocator SuccessMessage =>
+    //     {{PageName}}Selectors.Feedback.Success.ToLocator(page);
+    // public ILocator ErrorSummary =>
+    //     {{PageName}}Selectors.Feedback.ErrorSummary.ToLocator(page);
+ 
+    // Navigation
+    // Generated: one ILocator property per selectors.navigation entry
+    // Example:
+    // public ILocator PageHeading =>
+    //     {{PageName}}Selectors.Navigation.PageHeading.ToLocator(page);
+ 
+    // -------------------------------------------------------------------------
+    // Scenario Action Methods
+    // -------------------------------------------------------------------------
+ 
+    // Generated: one async Task method per logical scenario action group
+    // Named after the user action, not the underlying controls
+ 
+    // Happy path example:
+    // public async Task FillAndSave(string fieldValue)
+    // {
+    //     await FirstNameField.FillAsync(fieldValue);
+    //     await SaveButton.ClickAsync();
+    // }
+ 
+    // Client confirm dialog example:
+    // public async Task DeleteWithConfirmation()
+    // {
+    //     await DeleteButton.ClickAsync();
+    //     await page.GetByRole(AriaRole.Button, new() { Name = "OK" }).ClickAsync();
+    // }
+ 
+    // public async Task DeleteAndCancel()
+    // {
+    //     await DeleteButton.ClickAsync();
+    //     await page.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
+    // }
+ 
+    // Telerik field example (pre-migration):
+    // Post-migration: replace body with page.GetByLabel("Date of Birth").FillAsync(...)
+    // public async Task FillDateOfBirth(DateTime date) =>
+    //     await TelerikHelper.FillDatePicker(
+    //         page, {{PageName}}Selectors.Fields.DateOfBirth, date);
+ 
+    // TinyMCE rich-text field example (requiresIframeHandling: true):
+    // public async Task FillRichTextField(string text)
+    // {
+    //     var editor = page.FrameLocator("iframe.tox-edit-area__iframe");
+    //     await editor.Locator("body").FillAsync(text);
+    // }
+ 
+    // UpdatePanel/partial render example (clientSideBehaviour: true):
+    // public async Task SearchByKeyword(string keyword)
+    // {
+    //     await SearchField.FillAsync(keyword);
+    //     await SearchButton.ClickAsync();
+    //     await Expect(ResultsArea).ToBeVisibleAsync();
+    // }
+}

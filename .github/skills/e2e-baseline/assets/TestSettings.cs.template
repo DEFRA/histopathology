@@ -1,0 +1,16 @@
+namespace {{Namespace}}.Config;
+ 
+/// <summary>
+/// Reads test configuration from environment variables.
+/// No hard-coded values — the test project has zero external dependencies.
+/// Set E2E_BASE_URL before running: $env:E2E_BASE_URL = "http://localhost:5000"
+/// </summary>
+public static class TestSettings
+{
+    public static string BaseUrl =>
+        Environment.GetEnvironmentVariable("E2E_BASE_URL")
+        ?? throw new InvalidOperationException(
+            "E2E_BASE_URL environment variable must be set before running tests. " +
+            "Example (PowerShell): $env:E2E_BASE_URL = 'http://localhost:5000' " +
+            "Example (bash): export E2E_BASE_URL='http://localhost:5000'");
+}

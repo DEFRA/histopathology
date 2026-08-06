@@ -1,0 +1,7 @@
+global using Microsoft.Playwright;
+global using Microsoft.Playwright.NUnit;
+global using NUnit.Framework;
+global using {{Namespace}}.Infrastructure;
+global using {{Namespace}}.Config;
+global using {{Namespace}}.Selectors;
+global using {{Namespace}}.Pages;

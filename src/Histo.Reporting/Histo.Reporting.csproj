@@ -10,7 +10,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- QuestPDF Community Edition — free open-source PDF engine (no native binary required).
+         Community licence is declared at runtime via QuestPDF.Settings.License = LicenseType.Community
+         in each renderer's static constructor.
+         Pin to a specific patch version before production release. -->
+    <PackageReference Include="QuestPDF" Version="2024.3.5" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Histo.Infrastructure\Histo.Infrastructure.csproj" />
+    <ProjectReference Include="..\Histo.Submissions\Histo.Submissions.csproj" />
   </ItemGroup>
 
 </Project>

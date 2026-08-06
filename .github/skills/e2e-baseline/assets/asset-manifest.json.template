@@ -1,0 +1,14 @@
+{
+  "page": "{{PageName}}",
+  "status": "complete",
+  "generatedAt": "{{GeneratedAt}}",
+  "assets": [
+    {
+      "file": "{{RelativeFilePath}}",
+      "category": "page-markup|code-behind|designer|user-control|user-control-code-behind|master-code-behind|page-js|user-control-js|global-js|webservice|business-class",
+      "keyBehaviours": [
+        "{{PlainEnglishBehaviourDescription}}"
+      ]
+    }
+  ]
+}

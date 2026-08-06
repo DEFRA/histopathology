@@ -1,0 +1,61 @@
+namespace {{Namespace}}.Infrastructure;
+ 
+/// <summary>
+/// Value types representing selector descriptors stored in the JSON selector registry.
+/// Each type maps to the Playwright locator strategy it represents.
+/// Use ToLocator() extension methods to convert to ILocator for use in page objects.
+/// </summary>
+ 
+/// <summary>
+/// Represents a field associated with a visible HTML label (getByLabel).
+/// The most stable selector type — survives layout changes.
+/// </summary>
+public readonly record struct SemanticSelector(string Value);
+ 
+/// <summary>
+/// Represents an element identified by its ARIA role and visible name (getByRole).
+/// Used for buttons, links, headings, alerts.
+/// </summary>
+public readonly record struct RoleSelector(AriaRole Role, string? Name)
+{
+    /// <summary>
+    /// True if clicking this element triggers a client-side confirmation dialog.
+    /// The page object method must handle the dialog before asserting the outcome.
+    /// </summary>
+    public bool ClientConfirm { get; init; }
+}
+ 
+/// <summary>
+/// Represents an element identified by its exact visible text (getByText).
+/// Used for status messages, feedback labels, and confirmation text.
+/// </summary>
+public readonly record struct TextSelector(string Value);
+ 
+/// <summary>
+/// Represents a Telerik Web Forms control that has no semantic HTML equivalent.
+/// Interactions are routed through TelerikHelper — never via direct Playwright locators.
+/// Post-migration: replace TelerikHelper calls with semantic locator calls.
+/// </summary>
+public readonly record struct TelerikSelector(
+    string ControlType,
+    string GeneratedIdPattern,
+    string? AssociatedLabel);
+ 
+/// <summary>
+/// Extension methods to convert selector registry value types into Playwright ILocators.
+/// </summary>
+public static class SemanticLocatorExtensions
+{
+    public static ILocator ToLocator(this SemanticSelector selector, IPage page) =>
+        page.GetByLabel(selector.Value);
+ 
+    public static ILocator ToLocator(this RoleSelector selector, IPage page) =>
+        selector.Name is null
+            ? page.GetByRole(selector.Role)
+            : page.GetByRole(selector.Role, new() { Name = selector.Name });
+ 
+    public static ILocator ToLocator(this TextSelector selector, IPage page) =>
+        page.GetByText(selector.Value, new() { Exact = true });
+ 
+    // TelerikSelector has no ToLocator — use TelerikHelper methods instead.
+}

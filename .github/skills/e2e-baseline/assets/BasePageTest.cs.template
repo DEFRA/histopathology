@@ -1,0 +1,15 @@
+namespace {{Namespace}}.Infrastructure;
+ 
+/// <summary>
+/// Base class for all E2E page tests.
+/// Extends Microsoft.Playwright.NUnit.PageTest with project-wide browser configuration.
+/// </summary>
+public class BasePageTest : PageTest
+{
+    public override BrowserNewContextOptions ContextOptions() =>
+        new()
+        {
+            IgnoreHTTPSErrors = true,
+            ViewportSize = new ViewportSize { Width = 1280, Height = 900 }
+        };
+}

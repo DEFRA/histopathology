@@ -1,0 +1,11 @@
+{
+  "status": "configured",
+  "executionMode": "{{ExecutionMode}}",
+  "baseUrl": "{{BaseUrl}}",
+  "webProjectPath": "{{WebProjectPath}}",
+  "outputProjectName": "{{OutputProjectName}}",
+  "namespace": "{{Namespace}}"
+}
+ 
+// executionMode: "live-run" | "static-only"
+// baseUrl: set to null when executionMode is "static-only"

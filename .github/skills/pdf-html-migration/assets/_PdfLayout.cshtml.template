@@ -1,0 +1,335 @@
+@* ============================================================
+   _PdfLayout.cshtml.template
+   USAGE: Copy to <TargetProject>/Views/Shared/_PdfLayout.cshtml
+   Replace {{Namespace}} with the project's root namespace.
+   Add any logo images referenced in the existing PDF base class to wwwroot/images/.
+   ============================================================ *@
+ 
+@using {{Namespace}}.ViewModels.Reports
+@model PdfLayoutModel
+ 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>@Model.ReportTitle</title>
+<style>
+ 
+        /* ── Base typography ─────────────────────────────────────────── */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+ 
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10pt;
+            color: #000;
+            line-height: 1.45;
+            margin: 0;
+            padding: 0;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+ 
+        /* ── Print page setup ────────────────────────────────────────── */
+        @@media print {
+ 
+            /* Default page: A4 portrait */
+            @@page {
+                size: A4 portrait;
+                margin: 15mm 15mm 20mm 15mm;
+ 
+                @@top-left {
+                    content: url('/images/logo-primary-small.png');
+                    margin-top: 4mm;
+                }
+ 
+                @@top-center {
+                    content: "@Model.ReportTitle";
+                    font-family: Arial, Helvetica, sans-serif;
+                    font-size: 8pt;
+                    color: #555;
+                    vertical-align: middle;
+                }
+ 
+                @@bottom-center {
+                    content: "Page " counter(page) " of " counter(pages);
+                    font-family: Arial, Helvetica, sans-serif;
+                    font-size: 8pt;
+                    color: #555;
+                }
+            }
+ 
+            /* Named page for landscape sections */
+            @@page landscape {
+                size: A4 landscape;
+                margin: 15mm 15mm 20mm 15mm;
+ 
+                @@top-center {
+                    content: "@Model.ReportTitle";
+                    font-family: Arial, Helvetica, sans-serif;
+                    font-size: 8pt;
+                    color: #555;
+                }
+ 
+                @@bottom-center {
+                    content: "Page " counter(page) " of " counter(pages);
+                    font-family: Arial, Helvetica, sans-serif;
+                    font-size: 8pt;
+                    color: #555;
+                }
+            }
+ 
+            /* Apply landscape named page to marked sections */
+            .landscape-section {
+                page: landscape;
+            }
+ 
+            /* Page break utilities */
+            .page-break-before  { break-before: page; }
+            .page-break-after   { break-after: page; }
+            .page-break-avoid   { break-inside: avoid; }
+            .keep-with-next     { break-after: avoid; }
+        }
+ 
+        /* ── DRAFT watermark ─────────────────────────────────────────── */
+        .draft-watermark::before {
+            content: "DRAFT";
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 120pt;
+            font-weight: bold;
+            font-family: Arial, Helvetica, sans-serif;
+            color: rgba(180, 0, 0, 0.12);
+            white-space: nowrap;
+            z-index: -1;
+            pointer-events: none;
+        }
+ 
+        /* ── Logo header ─────────────────────────────────────────────── */
+        .pdf-logo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            border-bottom: 2px solid #555;
+            padding-bottom: 6px;
+            margin-bottom: 18px;
+        }
+ 
+        .pdf-logo-header img {
+            height: 52px;
+            width: auto;
+        }
+ 
+        /* ── Report title ────────────────────────────────────────────── */
+        .pdf-report-title {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+ 
+        .pdf-report-title h1 {
+            font-size: 15pt;
+            font-weight: bold;
+            margin: 0 0 6px 0;
+        }
+ 
+        .pdf-report-title .profile-name {
+            font-size: 12pt;
+            color: #222;
+        }
+ 
+        .pdf-report-title .report-status {
+            display: inline-block;
+            margin-top: 4px;
+            font-size: 9pt;
+            color: #c00;
+            font-weight: bold;
+            letter-spacing: 0.05em;
+        }
+ 
+        /* ── Section headings ────────────────────────────────────────── */
+        h2 {
+            font-size: 12pt;
+            font-weight: bold;
+            margin: 16px 0 6px 0;
+            padding-bottom: 2px;
+            border-bottom: 1px solid #999;
+        }
+ 
+        h3 {
+            font-size: 10pt;
+            font-weight: bold;
+            margin: 10px 0 4px 0;
+        }
+ 
+        /* ── Table of contents ───────────────────────────────────────── */
+        .pdf-toc {
+            margin-bottom: 24px;
+        }
+ 
+        .pdf-toc h2 {
+            font-size: 13pt;
+        }
+ 
+        .pdf-toc ol {
+            padding-left: 20px;
+            margin: 0;
+        }
+ 
+        .pdf-toc li {
+            margin-bottom: 4px;
+            font-size: 10pt;
+        }
+ 
+        .pdf-toc a {
+            color: #000;
+            text-decoration: none;
+        }
+ 
+        .pdf-toc a:hover {
+            text-decoration: underline;
+        }
+ 
+        /* ── Tables ──────────────────────────────────────────────────── */
+        .pdf-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 14px;
+            font-size: 9pt;
+        }
+ 
+        .pdf-table th,
+        .pdf-table td {
+            border: 1px solid #bbb;
+            padding: 4px 7px;
+            vertical-align: top;
+        }
+ 
+        .pdf-table th {
+            background-color: #e8e8e8;
+            font-weight: bold;
+            text-align: left;
+        }
+ 
+        .pdf-table tr:nth-child(even) td {
+            background-color: #f9f9f9;
+        }
+ 
+        /* ── Question / answer blocks ────────────────────────────────── */
+        .question-block {
+            margin-bottom: 10px;
+        }
+ 
+        .question-text {
+            margin: 0 0 3px 0;
+            font-weight: bold;
+        }
+ 
+        .answer-value {
+            margin: 0;
+            padding-left: 8px;
+        }
+ 
+        .answer-value p {
+            margin: 2px 0;
+        }
+ 
+        /* ── Diff highlighting (comparison reports) ──────────────────── */
+        .diff-changed  { background-color: #fff3cd !important; }
+        .diff-added    { background-color: #d4edda !important; }
+        .diff-removed  { background-color: #f8d7da !important; }
+ 
+        /* ── Side-by-side comparison grid ───────────────────────────── */
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+ 
+        .comparison-side {
+            border: 1px solid #bbb;
+            padding: 8px;
+        }
+ 
+        .comparison-side-header {
+            font-weight: bold;
+            font-size: 9pt;
+            background-color: #e8e8e8;
+            margin: -8px -8px 6px -8px;
+            padding: 4px 8px;
+        }
+ 
+        /* ── Footnotes / links ───────────────────────────────────────── */
+        .pdf-footer-links {
+            margin-top: 20px;
+            font-size: 8pt;
+            color: #555;
+            border-top: 1px solid #bbb;
+            padding-top: 6px;
+        }
+ 
+        .pdf-footer-links a {
+            color: #555;
+        }
+ 
+    </style>
+</head>
+<body class="@(Model.IsDraft ? "draft-watermark" : string.Empty)">
+ 
+    {{!-- Logo header rendered on the first page only.
+          Running page headers are handled by CSS @page @@top-center rules. --}}
+<div class="pdf-logo-header">
+<img src="~/images/logo-primary.png" alt="primary logo" />
+        @if (Model.LogoVariant == PdfLogoVariant.PrimaryAndSecondary)
+        {
+<img src="~/images/logo-secondary.png" alt="secondary logo" />
+        }
+</div>
+ 
+    {{!-- Report title block --}}
+<div class="pdf-report-title">
+<h1>@Html.Raw(Model.ReportTitle)</h1>
+        @if (!string.IsNullOrEmpty(Model.ProfileName))
+        {
+<div class="profile-name">@Html.Raw(Model.ProfileName)</div>
+        }
+        @if (Model.IsDraft)
+        {
+<span class="report-status">DRAFT</span>
+        }
+</div>
+ 
+    {{!-- Report-specific body --}}
+    @RenderBody()
+ 
+</body>
+</html>
+ 
+@*
+── PdfLayoutModel class (add to <TargetProject>/ViewModels/Reports/PdfLayoutModel.cs) ──
+ 
+namespace {{Namespace}}.ViewModels.Reports;
+ 
+public enum PdfLogoVariant { PrimaryOnly, PrimaryAndSecondary }
+{
+    /// <summary>The report type title, e.g. "Full profile".</summary>
+    public string ReportTitle { get; set; } = string.Empty;
+ 
+    /// <summary>Profile name/title shown beneath the report title. May contain HTML.</summary>
+    public string? ProfileName { get; set; }
+ 
+    /// <summary>When true, applies the DRAFT CSS watermark class to the body.</summary>
+    public bool IsDraft { get; set; }
+ 
+    /// <summary>Which logo combination to display in the page header.</summary>
+    public PdfLogoVariant LogoVariant { get; set; } = PdfLogoVariant.PrimaryAndSecondary;
+}
+ 
+All report-specific view models must inherit from PdfLayoutModel:
+ 
+public class FullProfileViewModel : PdfLayoutModel { ... }
+*@
