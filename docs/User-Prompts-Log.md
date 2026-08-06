@@ -285,3 +285,79 @@ Build: 0 errors, 0 warnings. Tests: 90 pass, 1 skipped, 0 fail.
 ---
 
 *Updated on 2026-08-06.*
+
+---
+
+## Prompt 30 — Search functionality and navigation audit: Receive Submission, Edit Submission Status, Entry Quality Data, QC Notes (2026-08-06)
+
+> Analyze the following modules:
+>
+> - Receive Submission
+> - Edit Submission Status
+> - Entry Quality Data
+> - QC Notes
+>
+> In the legacy application, each of these screens contains a grid that is loaded when the page is accessed. Each module also provides a search field that allows users to search using the relevant reference number, such as:
+>
+> - QC Note Reference Number (for QC Notes)
+> - Submission Number (for Submission-related modules)
+> - Any other module-specific reference number
+>
+> Verify that the search functionality is wired correctly. Specifically, confirm that when the user enters a valid reference number and clicks the Check or Go button, the application navigates to or loads the correct page and displays the expected data/results.
+>
+> Please review and validate:
+>
+> 1. Grid loading behavior for each module.
+> 2. Search field functionality and input validation.
+> 3. Check/Go button event handling.
+> 4. Navigation to the correct target page.
+> 5. Retrieval and display of the correct records based on the entered reference number.
+> 6. Any inconsistencies, broken links, missing mappings, or functional issues compared to the legacy behavior.
+>
+> Needs to capture in run journal file and user prompt file.
+
+**Legacy-to-modern module mapping (confirmed from Home.aspx):**
+
+| User-facing label | Legacy file | Modern Razor Page |
+|---|---|---|
+| Receive Submission | `BatchesNotReceived.aspx` | `Batches/BatchesNotReceived.cshtml` |
+| Edit Submission Status | `BatchesForEditing.aspx` | `Batches/BatchesForEditing.cshtml` |
+| Enter Quality Data | `BatchesForDispatch.aspx` | `Batches/BatchesForDispatch.cshtml` |
+| Edit QC Notes | `QCNotes.aspx` | `QC/QCNotes.cshtml` |
+
+**Findings (Run #64):**
+
+| # | Module | Area | Legacy | Modern | Verdict |
+|---|--------|------|--------|--------|---------|
+| 1 | All 3 batch modules | Grid loading | `clsBatch.GetBatchesWithStatus` / `GetBatchesForDispatch` on `Page_Load` | `BatchService.GetNotReceivedAsync` / `GetInProgressAsync` / `GetForDispatchAsync` on `OnGetAsync` | ✅ Grid data loaded correctly on page access |
+| 2 | QC Notes | Grid loading | `clsQCNote.GetBatchQCNotes()` — all notes, no batch filter | `_qc.GetBySubmissionAsync(Session.BatchID.Value)` — batch-scoped | ⚠️ Scope changed; see ISS-045 |
+| 3 | Receive Submission | Search/Go | Validates `STATUS_SUBMITTED` via `CheckBatchExists`; shows red error if not found | Sets `Session.BatchID` unconditionally; redirects; no validation | ❌ ISS-042: No status/existence check |
+| 4 | Edit Submission Status | Search/Go | Validates any status (0) via `CheckBatchExists`; shows red error if not found | Sets `Session.BatchID` unconditionally; redirects; no validation | ❌ ISS-042 + ISS-044: No existence check; grid only shows in-progress |
+| 5 | Entry Quality Data | Search/Go | Validates `STATUS_INPROGRESS` or `STATUS_RECEIVED`+cassetted; shows red error | Sets `Session.BatchID` unconditionally; redirects; no validation | ❌ ISS-042: No status/existence check |
+| 6 | QC Notes | Quick-Go | Calls `GetBatchQCNotes(noteRef)` to verify existence; shows red error if not found | Redirects to EditQCNote unconditionally; target redirects back if null | ⚠️ No inline error; EditQCNote handles null gracefully |
+| 7 | QC Notes | Edit button (grid) | `grdQCNotes.DataKeys` = `QCNoteRef`; navigates to `EditQCNote.aspx?QCNoteRef=<ref>` | `value="@n.ID"` (Submission Number) passed as `noteId` — wrong field | ❌ ISS-043: Critical bug — Edit navigates to wrong note |
+| 8 | Edit Submission Status | Grid scope | `GetBatchesWithStatus(0)` — all statuses shown | `GetInProgressAsync()` — only in-progress | ❌ ISS-044: Grid shows only in-progress, not all statuses |
+| 9 | QC Notes | Page entry path | Standalone; loaded from Home page "Edit QC Notes" | Batch-scoped; `Session.BatchID` required | ⚠️ ISS-045: Home nav link leads to empty page without prior batch selection |
+| 10 | All 3 batch modules | Input validation | `RequiredFieldValidator` + `RegularExpressionValidator` (`^[1-9]+[0-9]*$`) client + server | `type="number" min="1"` HTML attribute only; no server-side revalidation in handler | ⚠️ Server-side validation bypassed if form manipulated; acceptable risk for internal app |
+| 11 | All 3 batch modules | Navigation target | `ReceiveBatch.aspx`, `EditBatch.aspx`, `QualityData.aspx` respectively | `/Batches/ReceiveBatch`, `/Batches/EditBatch`, `/QC/QualityData` respectively | ✅ Correct target pages |
+
+**Issues raised:** ISS-042 (High), ISS-043 (Critical), ISS-044 (High), ISS-045 (Medium). All captured in `docs/migration-run-journal.md` Open Issues table. No code changes in this run — issues require team review before fix implementation.
+
+---
+
+## Prompt 31 — Fix ISS-042, ISS-043, ISS-044, ISS-045 and update run journal session metrics (2026-08-06)
+
+> Can you please fix the issues and update the session matrix in the migration runjournal?
+
+**Scope:** ISS-042, ISS-043, ISS-044, ISS-045 — all raised in Run #64. All 4 issues fixed end-to-end in Run #65. Run journal updated with Run #65 Run Log entry, Session Metrics row #31, and all 4 issues marked Resolved in the Open Issues table.
+
+**Changes implemented (Run #65):**
+
+| ISS | Severity | Fix summary | Files changed |
+|-----|----------|-------------|---------------|
+| ISS-043 | Critical | `QCNotes.cshtml` `value="@n.ID"` → `value="@n.QCNoteRef"` | `QCNotes.cshtml` |
+| ISS-042 | High | Async `OnPostGoAsync` with `GetByIdAsync()` + status check + `GoError` + `govuk-error-summary` on all 3 batch list pages | `BatchesNotReceived.cshtml.cs`, `BatchesForEditing.cshtml.cs`, `BatchesForDispatch.cshtml.cs`, `BatchesNotReceived.cshtml`, `BatchesForEditing.cshtml`, `BatchesForDispatch.cshtml` |
+| ISS-044 | High | `GetAllBatchesAsync()` added to interface/repo/service; `BatchesForEditingModel` switched from `GetInProgressAsync()` | `IBatchRepository.cs`, `BatchRepository.cs`, `BatchService.cs`, `BatchesForEditing.cshtml.cs` |
+| ISS-045 | Medium | `GetAllAsync()` added to interface/repo/service; `QCNotesModel` uses `IsGlobalView` bool to route between global and batch-scoped load | `IQCNoteRepository.cs`, `QCNoteRepository.cs`, `QCNoteService.cs`, `QCNotes.cshtml.cs`, `QCNotes.cshtml` |
+
+**Build:** 0 errors, 0 warnings. **Tests:** 90 pass, 1 skipped (integration), 0 fail.

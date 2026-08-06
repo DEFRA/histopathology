@@ -6,7 +6,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace Histo.Web.Pages.Batches;
 
 /// <summary>
-/// Lists in-progress batches available for editing — replaces <c>BatchesForEditing.aspx</c>.
+/// Lists all batches available for editing — replaces <c>BatchesForEditing.aspx</c>.
+/// Legacy source: <c>clsBatch.GetBatchesWithStatus(0)</c> where status 0 returns all batches.
 /// </summary>
 public class BatchesForEditingModel : HistoPageModel
 {
@@ -21,11 +22,15 @@ public class BatchesForEditingModel : HistoPageModel
     [BindProperty]
     public int? QuickGoId { get; set; }
 
+    /// <summary>Inline error message for Quick-Go validation failures.</summary>
+    public string? GoError { get; private set; }
+
     public async Task OnGetAsync()
     {
-        ViewData["Title"] = "Batches for editing";
-        ViewData["PageTitle"] = "Batches for editing";
-        Batches = await _batches.GetInProgressAsync();
+        ViewData["Title"] = "Submissions available for editing";
+        ViewData["PageTitle"] = "Submissions available for editing";
+        // ISS-044: use GetAllBatchesAsync (maps to GetAllBatches SP) — legacy showed all statuses
+        Batches = await _batches.GetAllBatchesAsync();
     }
 
     public IActionResult OnPostSelect(int batchId)
@@ -34,10 +39,26 @@ public class BatchesForEditingModel : HistoPageModel
         return RedirectToPage("/Batches/EditBatch");
     }
 
-    public IActionResult OnPostGoAsync()
+    public async Task<IActionResult> OnPostGoAsync()
     {
-        if (QuickGoId.HasValue)
-            Session.BatchID = QuickGoId.Value;
+        ViewData["Title"] = "Submissions available for editing";
+        ViewData["PageTitle"] = "Submissions available for editing";
+        Batches = await _batches.GetAllBatchesAsync();
+
+        if (!QuickGoId.HasValue || QuickGoId.Value <= 0)
+        {
+            GoError = "Enter a submission number.";
+            return Page();
+        }
+
+        var batch = await _batches.GetByIdAsync(QuickGoId.Value);
+        if (batch is null)
+        {
+            GoError = $"Submission {QuickGoId.Value} could not be found.";
+            return Page();
+        }
+
+        Session.BatchID = QuickGoId.Value;
         return RedirectToPage("/Batches/EditBatch");
     }
 }

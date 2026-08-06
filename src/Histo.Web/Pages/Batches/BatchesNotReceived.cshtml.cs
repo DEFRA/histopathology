@@ -1,3 +1,4 @@
+using Histo.Core.Domain;
 using Histo.Submissions.Models;
 using Histo.Submissions.Services;
 using Histo.Web.Services;
@@ -22,6 +23,9 @@ public class BatchesNotReceivedModel : HistoPageModel
     [BindProperty]
     public int? QuickGoId { get; set; }
 
+    /// <summary>Inline error message for Quick-Go validation failures.</summary>
+    public string? GoError { get; private set; }
+
     public async Task OnGetAsync()
     {
         ViewData["Title"] = "Batches not received";
@@ -35,10 +39,26 @@ public class BatchesNotReceivedModel : HistoPageModel
         return RedirectToPage("/Batches/ReceiveBatch");
     }
 
-    public IActionResult OnPostGoAsync()
+    public async Task<IActionResult> OnPostGoAsync()
     {
-        if (QuickGoId.HasValue)
-            Session.BatchID = QuickGoId.Value;
+        ViewData["Title"] = "Batches not received";
+        ViewData["PageTitle"] = "Batches not received";
+        Batches = await _batches.GetNotReceivedAsync();
+
+        if (!QuickGoId.HasValue || QuickGoId.Value <= 0)
+        {
+            GoError = "Enter a submission number.";
+            return Page();
+        }
+
+        var batch = await _batches.GetByIdAsync(QuickGoId.Value);
+        if (batch is null || batch.Status != BatchStatus.Submitted)
+        {
+            GoError = $"Submission {QuickGoId.Value} could not be found or is not awaiting receipt.";
+            return Page();
+        }
+
+        Session.BatchID = QuickGoId.Value;
         return RedirectToPage("/Batches/ReceiveBatch");
     }
 }

@@ -73,4 +73,21 @@ public sealed class QCNoteService
             return 0;
         }
     }
+
+    /// <summary>
+    /// Returns all QC notes system-wide. Used when no batch is selected in session,
+    /// matching legacy <c>QCNotes.aspx</c> global load behaviour.
+    /// </summary>
+    public async Task<IReadOnlyList<QCNote>> GetAllAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repo.GetAllAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to retrieve all QC notes.", ex);
+            return [];
+        }
+    }
 }

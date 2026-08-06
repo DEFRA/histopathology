@@ -1,3 +1,4 @@
+using Histo.Core.Domain;
 using Histo.Submissions.Models;
 using Histo.Submissions.Services;
 using Histo.Web.Services;
@@ -22,10 +23,13 @@ public class BatchesForDispatchModel : HistoPageModel
     [BindProperty]
     public int? QuickGoId { get; set; }
 
+    /// <summary>Inline error message for Quick-Go validation failures.</summary>
+    public string? GoError { get; private set; }
+
     public async Task OnGetAsync()
     {
-        ViewData["Title"] = "Batches for dispatch";
-        ViewData["PageTitle"] = "Batches for dispatch";
+        ViewData["Title"] = "Submissions available for quality data entry";
+        ViewData["PageTitle"] = "Submissions available for quality data entry";
         Batches = await _batches.GetForDispatchAsync();
     }
 
@@ -35,10 +39,29 @@ public class BatchesForDispatchModel : HistoPageModel
         return RedirectToPage("/QC/QualityData");
     }
 
-    public IActionResult OnPostGoAsync()
+    public async Task<IActionResult> OnPostGoAsync()
     {
-        if (QuickGoId.HasValue)
-            Session.BatchID = QuickGoId.Value;
+        ViewData["Title"] = "Submissions available for quality data entry";
+        ViewData["PageTitle"] = "Submissions available for quality data entry";
+        Batches = await _batches.GetForDispatchAsync();
+
+        if (!QuickGoId.HasValue || QuickGoId.Value <= 0)
+        {
+            GoError = "Enter a submission number.";
+            return Page();
+        }
+
+        var batch = await _batches.GetByIdAsync(QuickGoId.Value);
+        // Legacy accepted InProgress OR (Received + cassetted); check both here
+        if (batch is null ||
+            (batch.Status != BatchStatus.InProgress &&
+             batch.Status != BatchStatus.Received))
+        {
+            GoError = $"Submission {QuickGoId.Value} could not be found or is not ready for quality data entry.";
+            return Page();
+        }
+
+        Session.BatchID = QuickGoId.Value;
         return RedirectToPage("/QC/QualityData");
     }
 }

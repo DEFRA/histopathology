@@ -26,6 +26,12 @@ public interface IBatchRepository
     /// <summary>Returns batches not yet received. Maps to <c>GetBatchesNotReceived</c>.</summary>
     Task<IReadOnlyList<BatchListResult>> GetNotReceivedAsync(CancellationToken ct = default);
 
+    /// <summary>
+    /// Returns all batches regardless of status. Maps to <c>GetAllBatches</c>.
+    /// Legacy source: BatchesForEditing.aspx.vb — <c>clsBatch.GetBatchesWithStatus(0)</c> (status 0 = all).
+    /// </summary>
+    Task<IReadOnlyList<BatchListResult>> GetAllBatchesAsync(CancellationToken ct = default);
+
     /// <summary>Returns batches on hold. Maps to <c>GetBatchesOnHold</c>.</summary>
     Task<IReadOnlyList<BatchListResult>> GetOnHoldAsync(CancellationToken ct = default);
 

@@ -68,6 +68,16 @@ public sealed class BatchService
     }
 
     /// <summary>
+    /// Returns all batches regardless of status.
+    /// Legacy source: BatchesForEditing.aspx.vb — <c>clsBatch.GetBatchesWithStatus(0)</c>.
+    /// </summary>
+    public async Task<IReadOnlyList<BatchListResult>> GetAllBatchesAsync(CancellationToken ct = default)
+    {
+        try { return await _batches.GetAllBatchesAsync(ct); }
+        catch (Exception ex) { _logger.LogError("Failed to get all batches.", ex); return []; }
+    }
+
+    /// <summary>
     /// Returns batches awaiting Quality Data entry.
     /// Legacy source: BatchesForDispatch.aspx — <c>clsBatch.GetBatchesForDispatch</c>.
     /// </summary>
