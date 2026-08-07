@@ -19,6 +19,10 @@ else
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
                 <th scope="col" class="govuk-table__header">Batch No</th>
+                <th scope="col" class="govuk-table__header">Project</th>
+                <th scope="col" class="govuk-table__header">Pathologist</th>
+                <th scope="col" class="govuk-table__header">Species</th>
+                <th scope="col" class="govuk-table__header">Batch date</th>
                 <th scope="col" class="govuk-table__header">Customer ref</th>
                 <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
             </tr>
@@ -28,6 +32,10 @@ else
             {
                 <tr class="govuk-table__row">
                     <td class="govuk-table__cell">@b.ID</td>
+                    <td class="govuk-table__cell">@b.ProjectDescription</td>
+                    <td class="govuk-table__cell">@b.ContactDescription</td>
+                    <td class="govuk-table__cell">@b.Species</td>
+                    <td class="govuk-table__cell">@b.BatchDate?.ToShortDateString()</td>
                     <td class="govuk-table__cell">@b.CustomerRef</td>
                     <td class="govuk-table__cell">
                         <form method="post">

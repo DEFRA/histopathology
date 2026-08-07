@@ -59,7 +59,7 @@
             <option value="">Select</option>
             @foreach (var c in Model.QCCodes)
             {
-                <option value="@c.ID">@c.Name</option>
+                <option value="@(c.Code ?? c.Name)">@c.Name</option>
             }
         </select>
     </div>
@@ -75,7 +75,7 @@
             <option value="">Select</option>
             @foreach (var r in Model.RemedialActions)
             {
-                <option value="@r.ID">@r.Name</option>
+                <option value="@(r.Code ?? r.Name)">@r.Name</option>
             }
         </select>
     </div>
@@ -112,7 +112,7 @@
             <option value="">Select</option>
             @foreach (var a in Model.ArchiveLocations)
             {
-                <option value="@a.ID">@a.Name</option>
+                <option value="@(a.Code ?? a.Name)">@a.Name</option>
             }
         </select>
     </div>

@@ -1,8 +1,9 @@
 @page
 @model Histo.Web.Pages.Batches.EditBatchModel
+@using Histo.Core.Domain
 @{
-    ViewData["Title"] = "Edit batch";
-    ViewData["PageTitle"] = "Edit batch";
+    ViewData["Title"] = "Edit submission status";
+    ViewData["PageTitle"] = "Edit submission status";
 }
 
 @section BeforeHeading {
@@ -24,6 +25,26 @@
 }
 
 <form method="post">
+    <input type="hidden" asp-for="OriginalStatus" />
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Status">Submission status</label>
+        <select class="govuk-select" asp-for="Status">
+            <option value="@BatchStatus.Submitted" selected="@(Model.Status == BatchStatus.Submitted)">Submitted</option>
+            <option value="@BatchStatus.Received"  selected="@(Model.Status == BatchStatus.Received)">Received</option>
+            <option value="@BatchStatus.InProgress" selected="@(Model.Status == BatchStatus.InProgress)">In progress</option>
+            <option value="@BatchStatus.OnHold"    selected="@(Model.Status == BatchStatus.OnHold)">On hold</option>
+            <option value="@BatchStatus.Completed" selected="@(Model.Status == BatchStatus.Completed)">Completed</option>
+            <option value="@BatchStatus.Rejected"  selected="@(Model.Status == BatchStatus.Rejected)">Rejected</option>
+        </select>
+        <div id="status-hint" class="govuk-hint govuk-!-margin-top-2">
+            Note: To mark a submission as Received, use the <a asp-page="/Batches/BatchesNotReceived" class="govuk-link">Receive Submissions</a> workflow.
+        </div>
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="StatusComments">Reason / comments for status change</label>
+        <textarea class="govuk-textarea" asp-for="StatusComments" rows="3"></textarea>
+    </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="CustomerRef">Customer reference</label>
         <input class="govuk-input" asp-for="CustomerRef" />
@@ -41,5 +62,5 @@
         </div>
     </div>
     <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
-    <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    <a asp-page="/Batches/BatchesForEditing" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
 </form>

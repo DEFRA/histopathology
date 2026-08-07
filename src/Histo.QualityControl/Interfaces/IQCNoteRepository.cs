@@ -37,4 +37,11 @@ public interface IQCNoteRepository
     /// Returns the new QC note ID.
     /// </summary>
     Task<int> AddAsync(int submissionId, int createdByUserId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns all QC notes system-wide (no batch filter).
+    /// Maps to <c>GetBatchQCNotes</c> with no ID parameter — matches legacy <c>QCNotes.aspx</c>
+    /// global load behaviour.
+    /// </summary>
+    Task<IReadOnlyList<QCNote>> GetAllAsync(CancellationToken ct = default);
 }

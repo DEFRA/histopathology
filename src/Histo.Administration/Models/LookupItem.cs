@@ -13,6 +13,19 @@ public sealed class LookupItem
     public bool Active { get; init; } = true;
 
     /// <summary>
+    /// The raw pick-list code value returned by the stored procedure's <c>Code</c>
+    /// column. Populated for "Code-keyed" pick-list tables (e.g. QC Code table 14,
+    /// Remedial Action table 15, Archive Location table 16) whose SPs return a
+    /// <c>Code</c> column rather than an integer <c>ID</c>. Null for "ID-keyed"
+    /// tables such as Contacts (18) and Projects (19).
+    ///
+    /// UI dropdowns for these tables must bind their option value to this property
+    /// rather than <see cref="ID"/> so that the correct code string is round-tripped
+    /// to and from the database.
+    /// </summary>
+    public string? Code { get; init; }
+
+    /// <summary>
     /// Optional user-area code. Only meaningful for the area-scoped pick-list tables
     /// (Contacts/Projects — table IDs 18/19), where the legacy <c>LookupData.SaveLookupData</c>
     /// insert path requires an Area value. Ignored (and not sent to the database) when creating

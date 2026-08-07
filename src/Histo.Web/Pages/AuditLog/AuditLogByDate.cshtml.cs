@@ -20,14 +20,14 @@ public class AuditLogByDateModel : HistoPageModel
 
     public void OnGet()
     {
-        ViewData["Title"] = "Audit Log by Date";
-        ViewData["PageTitle"] = "Audit Log — Search by Date";
+        ViewData["Title"] = "Audit log by date";
+        ViewData["PageTitle"] = "Audit log — search by date";
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Audit Log by Date";
-        ViewData["PageTitle"] = "Audit Log — Search by Date";
+        ViewData["Title"] = "Audit log by date";
+        ViewData["PageTitle"] = "Audit log — search by date";
         Results = await _auditLog.GetByDateAsync(StartDate, EndDate);
         return Page();
     }
@@ -38,10 +38,11 @@ public class AuditLogByDateModel : HistoPageModel
         var results = await _auditLog.GetByDateAsync(StartDate, EndDate);
         return CsvExportHelper.BuildCsv(
             "AuditLogByDate.csv",
-            ["Date", "User", "Action", "Entity", "Detail"],
+            ["Table", "Field", "Date/Time", "User", "Before", "After", "Reason", "Key"],
             results.Select(e => (IReadOnlyList<string?>)new string?[]
             {
-                e.ChangedAt.ToShortDateString(), e.UserName, e.Action, $"{e.EntityType} {e.EntityID}", e.Detail
+                e.TableName, e.FieldName, e.ChangedAt.ToString("G"), e.UserName,
+                e.BeforeValue, e.AfterValue, e.Reason, e.KeyID
             }));
     }
 }

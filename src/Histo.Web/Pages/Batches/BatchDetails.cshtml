@@ -27,12 +27,36 @@ else
             <dd class="govuk-summary-list__value">@Model.Batch.ID</dd>
         </div>
         <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Date submitted</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.BatchDate?.ToShortDateString()</dd>
+        </div>
+        <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Customer ref</dt>
             <dd class="govuk-summary-list__value">@Model.Batch.CustomerRef</dd>
         </div>
         <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Project / contract code</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.ProjectDescription</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Pathologist</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.ContactDescription</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Species</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.Species</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Fixation</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.FixationDescription</dd>
+        </div>
+        <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Status</dt>
             <dd class="govuk-summary-list__value">@Model.Batch.Status</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Status comments</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.StatusComments</dd>
         </div>
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Received date</dt>
@@ -55,7 +79,8 @@ else
             <dd class="govuk-summary-list__value">@(Model.Batch.IsPreCassetted ? "Yes" : "No")</dd>
         </div>
     </dl>
-    <a asp-page="/Batches/EditBatch" class="govuk-button" data-module="govuk-button">Edit batch</a>
+    <a asp-page="/Batches/EditBatch" class="govuk-button" data-module="govuk-button">Edit submission status</a>
+    <a asp-page="/Blocks/BlockDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Assign blocks</a>
     <a asp-page="/Submissions/ViewSamples" class="govuk-button govuk-button--secondary" data-module="govuk-button">View samples</a>
     <a asp-page="/Batches/CopyBatch" asp-route-sourceBatchId="@Model.Batch.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy batch</a>
     <a asp-page="/Index" class="govuk-button govuk-button--secondary" data-module="govuk-button">Home</a>

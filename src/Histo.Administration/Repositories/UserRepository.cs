@@ -51,21 +51,67 @@ public sealed class UserRepository : IUserRepository
     public async Task<IReadOnlyList<User>> GetUsersAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<User>(
+        var rows = await conn.QueryAsync<dynamic>(
             "GetUsers",
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+        return rows.Select(MapUser).ToList();
     }
 
     /// <inheritdoc/>
     public async Task<IReadOnlyList<User>> GetUsersByAreaAsync(string userArea, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<User>(
+        var rows = await conn.QueryAsync<dynamic>(
             "GetUsersByUserArea",
             new { UserArea = userArea },
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+        return rows.Select(MapUser).ToList();
+    }
+
+    // -----------------------------------------------------------------------
+    // Private helpers
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Converts a dictionary value to int without throwing.
+    /// Handles the case where the SP returns a numeric column as a <c>string</c> (e.g. UserGroup,
+    /// UserArea in <c>GetUsers</c>) — <c>Convert.ToInt32("")</c> throws <c>FormatException</c>;
+    /// <c>int.TryParse</c> safely returns 0 for empty or non-numeric strings.
+    /// </summary>
+    private static int ToIntSafe(object? val)
+    {
+        if (val is null) return 0;
+        if (val is int i) return i;
+        if (val is long l) return (int)l;
+        if (val is short s) return s;
+        if (val is decimal dec) return (int)dec;
+        return int.TryParse(Convert.ToString(val), out var n) ? n : 0;
+    }
+
+    /// <summary>
+    /// Maps a row from the <c>GetUsers</c> / <c>GetUsersByUserArea</c> stored procedures.
+    /// <para>
+    /// Uses <see cref="IDictionary{TKey,TValue}"/> + TryGetValue rather than direct dynamic
+    /// property access (<c>row.Property</c>). Uses <see cref="ToIntSafe"/> for numeric columns
+    /// because the SP may return <c>UserGroup</c> and <c>UserArea</c> as string columns;
+    /// <c>Convert.ToInt32("")</c> throws <c>FormatException</c> for empty strings.
+    /// </para>
+    /// </summary>
+    private static User MapUser(dynamic row)
+    {
+        var d = (IDictionary<string, object>)row;
+        return new User
+        {
+            UserID    = d.TryGetValue("ID",        out var id)   ? ToIntSafe(id)                 : 0,
+            Name      = d.TryGetValue("Name",      out var nm)   ? Convert.ToString(nm)  ?? ""   : "",
+            NtLogin   = d.TryGetValue("NTLogin",   out var ntl)  ? Convert.ToString(ntl) ?? ""   : "",
+            GroupCode = d.TryGetValue("UserGroup",  out var grp)  ? ToIntSafe(grp)               : 0,
+            GroupName = d.TryGetValue("GroupName",  out var gn)   ? Convert.ToString(gn)  ?? ""  : "",
+            AreaCode  = d.TryGetValue("UserArea",   out var area) ? ToIntSafe(area)              : 0,
+            AreaName  = d.TryGetValue("AreaName",   out var an)   ? Convert.ToString(an)  ?? ""  : "",
+            Email     = d.TryGetValue("Email",      out var em)   ? Convert.ToString(em)  ?? ""  : "",
+            Active    = d.TryGetValue("Active",     out var act)  ? Convert.ToBoolean(act)        : false,
+        };
     }
 
     /// <inheritdoc/>

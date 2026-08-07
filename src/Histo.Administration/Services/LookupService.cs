@@ -116,6 +116,23 @@ public sealed class LookupService
     }
 
     /// <summary>
+    /// Returns all species from the dedicated <c>GetSpeciesLookup</c> stored procedure.
+    /// Used to populate the Species drop-down on ViewSubmissions and SearchSubmissions.
+    /// </summary>
+    public async Task<IReadOnlyList<LookupItem>> GetSpeciesLookupAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _lookups.GetSpeciesLookupAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get species lookup.", ex);
+            return [];
+        }
+    }
+
+    /// <summary>
     /// Creates a new pick-list row in the table identified by <paramref name="tableId"/>.
     /// Replaces the legacy <c>LookupData.SaveLookupData</c> insert path
     /// (<c>PickListMaintenanceID.aspx</c> / <c>PickListUserArea.aspx</c> grid "Add new" row).

@@ -9,7 +9,22 @@
     <a asp-page="/Batches/BatchDetails" class="govuk-back-link">Back</a>
 }
 
-<p class="govuk-body"><strong>Batch No:</strong> @Model.BatchID</p>
+@if (!Model.IsGlobalView)
+{
+    <p class="govuk-body"><strong>Batch No:</strong> @Model.BatchID</p>
+}
+else
+{
+    <p class="govuk-body">Showing all QC notes (no batch selected).</p>
+}
+
+<div class="govuk-form-group">
+    <form method="post" asp-page-handler="Go">
+        <label class="govuk-label govuk-!-display-inline" asp-for="QuickGoRef">Go directly to QC note ref</label>
+        <input class="govuk-input govuk-input--width-10 govuk-!-display-inline govuk-!-margin-left-2" type="number" asp-for="QuickGoRef" min="1" />
+        <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0 govuk-!-margin-left-2">Go</button>
+    </form>
+</div>
 
 <p class="govuk-body">
     <a asp-page="/QC/AddQCNote" class="govuk-button" data-module="govuk-button">Add QC note</a>
@@ -20,7 +35,11 @@
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <th scope="col" class="govuk-table__header">ID</th>
+                <th scope="col" class="govuk-table__header">QC note ref</th>
+                <th scope="col" class="govuk-table__header">Submission No</th>
+                <th scope="col" class="govuk-table__header">Stain ref</th>
+                <th scope="col" class="govuk-table__header">Project</th>
+                <th scope="col" class="govuk-table__header">Species</th>
                 <th scope="col" class="govuk-table__header">Created by</th>
                 <th scope="col" class="govuk-table__header">Date</th>
                 <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
@@ -30,12 +49,16 @@
             @foreach (var n in Model.Notes)
             {
                 <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@n.QCNoteRef</td>
                     <td class="govuk-table__cell">@n.ID</td>
+                    <td class="govuk-table__cell">@n.StainRef</td>
+                    <td class="govuk-table__cell">@n.ProjectDescription</td>
+                    <td class="govuk-table__cell">@n.Species</td>
                     <td class="govuk-table__cell">@n.CreatedBy</td>
                     <td class="govuk-table__cell">@n.DateCreated</td>
                     <td class="govuk-table__cell">
                         <form method="post">
-                            <input type="hidden" name="noteId" value="@n.ID" />
+                            <input type="hidden" name="noteId" value="@n.QCNoteRef" />
                             <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-page-handler="Edit">Edit</button>
                         </form>
                     </td>

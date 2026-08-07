@@ -1,3 +1,5 @@
+using Histo.Administration.Models;
+using Histo.Administration.Services;
 using Histo.AuditLog.Models;
 using Histo.AuditLog.Services;
 using Histo.Web.Services;
@@ -9,26 +11,34 @@ namespace Histo.Web.Pages.AuditLog;
 public class AuditLogByUserModel : HistoPageModel
 {
     private readonly AuditLogService _auditLog;
+    private readonly UserService _users;
 
-    public AuditLogByUserModel(ISessionService session, AuditLogService auditLog)
-        : base(session) => _auditLog = auditLog;
+    public AuditLogByUserModel(ISessionService session, AuditLogService auditLog, UserService users)
+        : base(session)
+    {
+        _auditLog = auditLog;
+        _users    = users;
+    }
 
     [BindProperty] public int       UserID    { get; set; }
     [BindProperty] public DateTime? StartDate { get; set; }
     [BindProperty] public DateTime? EndDate   { get; set; }
 
+    public IReadOnlyList<User> Users { get; private set; } = [];
     public IReadOnlyList<AuditLogEntry> Results { get; private set; } = [];
 
-    public void OnGet()
+    public async Task OnGetAsync()
     {
-        ViewData["Title"] = "Audit Log by User";
-        ViewData["PageTitle"] = "Audit Log — By User";
+        ViewData["Title"] = "Audit log by user";
+        ViewData["PageTitle"] = "Audit log — by user";
+        Users = await _users.GetAllUsersAsync();
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Audit Log by User";
-        ViewData["PageTitle"] = "Audit Log — By User";
+        ViewData["Title"] = "Audit log by user";
+        ViewData["PageTitle"] = "Audit log — by user";
+        Users = await _users.GetAllUsersAsync();
         Results = await _auditLog.GetByUserAsync(UserID, StartDate, EndDate);
         return Page();
     }
@@ -39,10 +49,11 @@ public class AuditLogByUserModel : HistoPageModel
         var results = await _auditLog.GetByUserAsync(UserID, StartDate, EndDate);
         return CsvExportHelper.BuildCsv(
             "AuditLogByUser.csv",
-            ["Date", "User", "Action", "Entity", "Detail"],
+            ["Table", "Field", "Date/Time", "User", "Before", "After", "Reason", "Key"],
             results.Select(e => (IReadOnlyList<string?>)new string?[]
             {
-                e.ChangedAt.ToShortDateString(), e.UserName, e.Action, $"{e.EntityType} {e.EntityID}", e.Detail
+                e.TableName, e.FieldName, e.ChangedAt.ToString("G"), e.UserName,
+                e.BeforeValue, e.AfterValue, e.Reason, e.KeyID
             }));
     }
 }

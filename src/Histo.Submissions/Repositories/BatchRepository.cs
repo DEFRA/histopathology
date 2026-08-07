@@ -25,41 +25,71 @@ public sealed class BatchRepository : IBatchRepository
     }
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<Batch>> GetReceivedAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<BatchListResult>> GetReceivedAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<Batch>(
+        var rows = await conn.QueryAsync<BatchListResult>(
             "GetReceivedBatches",
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<Batch>> GetInProgressAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<BatchListResult>> GetInProgressAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<Batch>(
+        var rows = await conn.QueryAsync<BatchListResult>(
             "GetInProgressBatches",
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<Batch>> GetNotReceivedAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<BatchListResult>> GetNotReceivedAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<Batch>(
+        var rows = await conn.QueryAsync<BatchListResult>(
             "GetBatchesNotReceived",
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<Batch>> GetOnHoldAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<BatchListResult>> GetAllBatchesAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<Batch>(
+        var rows = await conn.QueryAsync<BatchListResult>(
+            "GetAllBatches",
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BatchListResult>> GetOnHoldAsync(CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<BatchListResult>(
             "GetBatchesOnHold",
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BatchListResult>> GetCompletedAsync(CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<BatchListResult>(
+            "GetCompletedBatches",
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BatchListResult>> GetForDispatchAsync(CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<BatchListResult>(
+            "GetBatchesForDispatch",
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
@@ -96,6 +126,7 @@ public sealed class BatchRepository : IBatchRepository
                 batch.Status,
                 batch.CustomerRef,
                 batch.Comments,
+                batch.StatusComments,
                 batch.ReceivedDate,
                 batch.CompletedDate,
                 batch.RowStamp,
