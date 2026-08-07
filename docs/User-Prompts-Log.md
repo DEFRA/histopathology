@@ -284,7 +284,41 @@ Build: 0 errors, 0 warnings. Tests: 90 pass, 1 skipped, 0 fail.
 
 ---
 
-*Updated on 2026-08-06.*
+---
+
+## Prompt 30 — Remove stub identity; load user/group/area from database (2026-08-07)
+
+> We are planning to integrate Entra ID in the future. Until that implementation is completed, I want the application to launch without requiring Entra ID authentication.
+>
+> Please review the EntraID-Implementation-plan.md document for context, but do not make any changes related to the Entra ID implementation itself. The current requirement is only to bypass the login process and allow the application to launch successfully.
+>
+> User validation is already handled through the existing database logic, which checks whether the user is active. Reuse this existing mechanism and retrieve the user details directly from the database.
+>
+> The application should display the following user information from the database:
+> - User Name
+> - Group
+> - Area
+>
+> For example, the displayed values should reflect the actual database records, such as:
+> User: Silambarasan Duraiswamy
+> Group: Maintenance
+> Area: Other VLA
+>
+> Please investigate where the current values are being populated from, remove any hardcoded or stubbed user information, and ensure that all displayed user, group, and area details are sourced from the database while keeping the future Entra ID integration untouched.
+
+**Root cause:** `HttpContext.User.Identity.Name` is empty under Kestrel (no Windows Auth active). The code fell through to a hardcoded stub `User { Name = "Dev User (stub)", AreaName = "Development" }` instead of querying the database.
+
+**Fix applied to `src/Histo.Web/Pages/HistoPageModel.cs`:**
+- Removed `using Histo.Administration.Models` and `using Microsoft.Extensions.Hosting` (no longer needed).
+- Removed the `IHostEnvironment env` variable and all `IsDevelopment()` guards.
+- The `Environment.UserDomainName\Environment.UserName` fallback is now unconditional when `User.Identity.Name` is empty — safe because IIS always populates it in production; only empty under Kestrel.
+- Removed the entire hardcoded stub `User` block.
+- If `ResolveUserAsync` returns null (user not in DB or inactive) → `ForbidResult()` — mirrors the legacy redirect to `unauthorized.htm`.
+- `appsettings.Development.json` (gitignored) already in place with the real local connection string, enabling the DB lookup to succeed.
+
+---
+
+*Updated on 2026-08-07.*
 
 ---
 
