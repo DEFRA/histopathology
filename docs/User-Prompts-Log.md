@@ -318,7 +318,63 @@ Build: 0 errors, 0 warnings. Tests: 90 pass, 1 skipped, 0 fail.
 
 ---
 
+**Fix applied to `src/Histo.Web/Pages/HistoPageModel.cs`:**
+- Removed auto-NT-detection logic entirely (was unreliable on non-domain-joined machines: `Environment.UserDomainName` returns `WORKGROUP`).
+- Replaced with a pure session gate: if `Session.GroupName` is empty → redirect to `/Login`.
+- `AccessDenied` redirect removed from this class (no longer needed — unauthenticated users go to `/Login`).
+- `Login.cshtml` and `Login.cshtml.cs` created as a pre-Entra-ID bridge (ADR-006).
+- `AccessDenied.cshtml` retained for future use when Entra ID auth denies access.
+
 *Updated on 2026-08-07.*
+
+---
+
+## Prompt 32 — ADR decommission tracking for Login bridge page (2026-08-07)
+
+> Can you tell how to track that how to decommission this page when actual Entra id is integrated
+
+**Answer:** The recommended approach is (1) create an ADR recording the bridge decision and decommission trigger; (2) add `// BRIDGE (ADR-006):` comments to all three affected source files — discoverable via `grep -r "BRIDGE (ADR-006)" src/`; (3) a GitHub Issue tagged `entra-id`, `tech-debt` linked to Phase B milestone; (4) update the run journal Phase Tracker for Phase B with a reference to merging/closing ADR-006. Decommission trigger: Phase B Step 5 — ITfoxtec SAML ACS endpoint live and calling `Session.PopulateFromUser(user)`. Files to delete: `Login.cshtml`, `Login.cshtml.cs`. Files to update: `HistoPageModel.cs` — change `RedirectToPageResult("/Login")` to SAML challenge redirect.
+
+---
+
+## Prompt 33 — Implement Login bridge page (ADR-006, HistoPageModel simplification) (2026-08-07)
+
+> Can you implement the changes now?
+
+**Changes applied (Run #66):**
+- `docs/ADR/ADR-006-manual-login-page-bridge.md` — ADR created with full decision rationale, decommission trigger, files inventory, and `// BRIDGE (ADR-006):` marker strategy.
+- `src/Histo.Web/Pages/HistoPageModel.cs` — Simplified to a 4-line session gate (`if (string.IsNullOrEmpty(Session.GroupName)) → RedirectToPage("/Login")`). All auto-NT-detection and DB lookup logic removed from base class.
+- `src/Histo.Web/Pages/Login.cshtml` — GDS-compliant NTLogin entry form with error summary and inline error states. `Layout = null`. `// BRIDGE (ADR-006):` comment in template.
+- `src/Histo.Web/Pages/Login.cshtml.cs` — `LoginModel : PageModel` (not `HistoPageModel` — prevents redirect loop). `OnGet` short-circuits if already signed in. `OnPostAsync` strips domain prefix → `UserService.ResolveUserAsync` → `Session.PopulateFromUser` → redirect to `/Index`.
+
+Build: 0 errors, 0 warnings. Tests: 90 pass, 1 skipped, 0 fail.
+
+---
+
+## Prompt 34 — Help Pages investigation, GDS implementation, and Run Journal update (2026-08-07)
+
+> Check why the Help Pages were not migrated from the legacy application during the .NET migration.
+>
+> Implement the Help Pages in the .NET 10 application by referring to the legacy implementation and ensure they follow GDS standards.
+> Verify that all Help Page content, links, and user journeys work correctly after migration.
+>
+> Finally, provide a Run Journal including:
+> - Tasks completed
+> - Issues and resolutions
+> - Start and end times
+> - Total time taken to implement
+> - Testing and verification summary
+>
+> Include the Run Journal in the final output. add this prompt in user prompt file
+
+**Root cause (why not migrated):** The legacy help was delivered as two static `.htm` files (`HistoHelp_CustomerGroup.htm` and `HistoHelp_HistoGroup.htm`), not `.aspx` pages. The migration agent inventoried `.aspx` pages only — the `.htm` files were invisible to the migration scope. The Help link in `VLAHeader.ascx` (`lnkHelp`, Target="_blank") was dynamically set to `HistoHelp_CustomerGroup.htm#{PageName}` (Customer) or `HistoHelp_HistoGroup.htm#{PageName}` (all others) but was never ported when `VLAHeader.ascx` was replaced by `_Layout.cshtml` and `_NavPartial.cshtml`.
+
+**Changes applied (Run #67):**
+- `src/Histo.Web/Pages/Help/Index.cshtml` — Single GDS-compliant help page. Customer group: 15 sections (general, submission workflow, viewing). Histopathology User / Maintenance: 37 sections (all customer sections + receive, quality data, archive, QC notes, search, booking, admin, audit logs, imported data). All legacy VLA toolbar-icon descriptions modernised to GDS plain English. Numbered table of contents. Anchor IDs match legacy `#PageName` pattern for future context-sensitive deep-linking. GDS `govuk-heading-l/m`, `govuk-body`, `govuk-list`, `govuk-summary-list` throughout.
+- `src/Histo.Web/Pages/Help/Index.cshtml.cs` — `HelpModel : HistoPageModel` (session-gated).
+- `src/Histo.Web/Pages/Shared/_NavPartial.cshtml` — Help link added at the bottom of the nav bar (available to all groups).
+
+Build: 0 errors, 0 warnings. Tests: 90 pass, 1 skipped, 0 fail.
 
 ---
 
