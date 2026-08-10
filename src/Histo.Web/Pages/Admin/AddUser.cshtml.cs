@@ -1,5 +1,5 @@
+using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
-using Histo.Administration.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,10 +12,10 @@ namespace Histo.Web.Pages.Admin;
 /// </summary>
 public class AddUserModel : HistoPageModel
 {
-    private readonly UserService _users;
-    private readonly LookupService _lookups;
+    private readonly IUserService _users;
+    private readonly ILookupService _lookups;
 
-    public AddUserModel(ISessionService session, UserService users, LookupService lookups)
+    public AddUserModel(ISessionService session, IUserService users, ILookupService lookups)
         : base(session)
     {
         _users = users;

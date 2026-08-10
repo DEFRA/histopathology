@@ -1,5 +1,5 @@
+using Histo.QualityControl.Interfaces;
 using Histo.QualityControl.Models;
-using Histo.QualityControl.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,9 +8,9 @@ namespace Histo.Web.Pages.QC;
 /// <summary>Replaces <c>EditQCNote.aspx</c>.</summary>
 public class EditQCNoteModel : HistoPageModel
 {
-    private readonly QCNoteService _qc;
+    private readonly IQCNoteService _qc;
 
-    public EditQCNoteModel(ISessionService session, QCNoteService qc)
+    public EditQCNoteModel(ISessionService session, IQCNoteService qc)
         : base(session) => _qc = qc;
 
     [BindProperty(SupportsGet = true)] public int NoteId { get; set; }

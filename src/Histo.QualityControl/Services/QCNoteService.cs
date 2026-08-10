@@ -11,7 +11,7 @@ namespace Histo.QualityControl.Services;
 /// Surfaces <see cref="QCNoteConcurrencyException"/> for callers to handle
 /// the optimistic-concurrency conflict in the UI layer.
 /// </summary>
-public sealed class QCNoteService
+public sealed class QCNoteService : IQCNoteService
 {
     private readonly IQCNoteRepository _repo;
     private readonly IAppLogger _logger;

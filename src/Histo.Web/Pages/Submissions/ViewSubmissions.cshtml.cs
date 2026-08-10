@@ -1,7 +1,7 @@
+using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
-using Histo.Administration.Services;
+using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
-using Histo.Submissions.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,16 +15,16 @@ namespace Histo.Web.Pages.Submissions;
 /// </summary>
 public class ViewSubmissionsModel : HistoPageModel
 {
-    private readonly BatchService   _batches;
-    private readonly UserService    _users;
-    private readonly LookupService  _lookups;
+    private readonly IBatchService   _batches;
+    private readonly IUserService    _users;
+    private readonly ILookupService  _lookups;
 
     // Constants matching Common.vb
     private const int LookupFixative = 10;
     private const int LookupContacts = 18;
     private const int LookupProjects = 19;
 
-    public ViewSubmissionsModel(ISessionService session, BatchService batches, UserService users, LookupService lookups)
+    public ViewSubmissionsModel(ISessionService session, IBatchService batches, IUserService users, ILookupService lookups)
         : base(session)
     {
         _batches = batches;

@@ -11,7 +11,7 @@ namespace Histo.Administration.Services;
 /// and replaces the VB.NET pattern of catching exceptions and returning
 /// <c>False</c> with an explicit null-return contract.
 /// </summary>
-public sealed class UserService
+public sealed class UserService : IUserService
 {
     private readonly IUserRepository _users;
     private readonly IAppLogger _logger;

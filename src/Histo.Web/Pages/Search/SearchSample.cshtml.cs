@@ -1,5 +1,5 @@
+using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
-using Histo.Submissions.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,9 +17,9 @@ namespace Histo.Web.Pages.Search;
 /// </summary>
 public class SearchSampleModel : HistoPageModel
 {
-    private readonly SubmissionService _submissions;
+    private readonly ISubmissionService _submissions;
 
-    public SearchSampleModel(ISessionService session, SubmissionService submissions)
+    public SearchSampleModel(ISessionService session, ISubmissionService submissions)
         : base(session) => _submissions = submissions;
 
     [BindProperty] public string? SenderRef { get; set; }

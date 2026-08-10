@@ -1,5 +1,5 @@
+using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
-using Histo.Submissions.Services;
 using Histo.Web.Services;
 
 namespace Histo.Web.Pages.Archive;
@@ -7,9 +7,9 @@ namespace Histo.Web.Pages.Archive;
 /// <summary>Replaces <c>ArchiveTissues.aspx</c>.</summary>
 public class ArchiveTissuesModel : HistoPageModel
 {
-    private readonly SubmissionService _submissions;
+    private readonly ISubmissionService _submissions;
 
-    public ArchiveTissuesModel(ISessionService session, SubmissionService submissions)
+    public ArchiveTissuesModel(ISessionService session, ISubmissionService submissions)
         : base(session) => _submissions = submissions;
 
     public IReadOnlyList<Animal> Animals { get; private set; } = [];

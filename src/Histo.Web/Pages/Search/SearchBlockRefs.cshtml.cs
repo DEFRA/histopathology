@@ -1,5 +1,5 @@
 using Histo.Core.Domain;
-using Histo.Histology.Services;
+using Histo.Histology.Interfaces;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,9 +8,9 @@ namespace Histo.Web.Pages.Search;
 /// <summary>Replaces <c>SearchBlockRefs.aspx</c>.</summary>
 public class SearchBlockRefsModel : HistoPageModel
 {
-    private readonly BlockService _blocks;
+    private readonly IBlockService _blocks;
 
-    public SearchBlockRefsModel(ISessionService session, BlockService blocks)
+    public SearchBlockRefsModel(ISessionService session, IBlockService blocks)
         : base(session) => _blocks = blocks;
 
     [BindProperty] public string? SenderRef { get; set; }

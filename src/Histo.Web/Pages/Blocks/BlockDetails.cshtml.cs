@@ -1,5 +1,5 @@
+using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
-using Histo.Histology.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,9 +8,9 @@ namespace Histo.Web.Pages.Blocks;
 /// <summary>Replaces <c>BlockDetails.aspx</c> / <c>BatchBlocks.aspx</c> — lists blocks for the current animal.</summary>
 public class BlockDetailsModel : HistoPageModel
 {
-    private readonly BlockService _blocks;
+    private readonly IBlockService _blocks;
 
-    public BlockDetailsModel(ISessionService session, BlockService blocks)
+    public BlockDetailsModel(ISessionService session, IBlockService blocks)
         : base(session) => _blocks = blocks;
 
     public IReadOnlyList<Block> Blocks { get; private set; } = [];

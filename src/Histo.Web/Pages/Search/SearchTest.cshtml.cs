@@ -1,6 +1,6 @@
-using Histo.Administration.Services;
+using Histo.Administration.Interfaces;
+using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
-using Histo.Submissions.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -24,10 +24,10 @@ public class SearchTestModel : HistoPageModel
 {
     private const int LookupProjects = 19; // Legacy source: HistopathologySystem/Common.vb — LOOKUP_PROJECTS
 
-    private readonly BatchService _batches;
-    private readonly LookupService _lookups;
+    private readonly IBatchService _batches;
+    private readonly ILookupService _lookups;
 
-    public SearchTestModel(ISessionService session, BatchService batches, LookupService lookups)
+    public SearchTestModel(ISessionService session, IBatchService batches, ILookupService lookups)
         : base(session)
     {
         _batches = batches;

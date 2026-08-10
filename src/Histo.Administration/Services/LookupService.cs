@@ -10,7 +10,7 @@ namespace Histo.Administration.Services;
 /// Replaces the legacy <c>LookupData</c> VB class. Thin orchestration over
 /// <see cref="ILookupRepository"/> with structured error logging.
 /// </summary>
-public sealed class LookupService
+public sealed class LookupService : ILookupService
 {
     private readonly ILookupRepository _lookups;
     private readonly IAppLogger _logger;

@@ -1,5 +1,5 @@
+using Histo.AuditLog.Interfaces;
 using Histo.AuditLog.Models;
-using Histo.AuditLog.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,9 +8,9 @@ namespace Histo.Web.Pages.AuditLog;
 /// <summary>Replaces <c>AuditLogByDate.aspx</c>.</summary>
 public class AuditLogByDateModel : HistoPageModel
 {
-    private readonly AuditLogService _auditLog;
+    private readonly IAuditLogService _auditLog;
 
-    public AuditLogByDateModel(ISessionService session, AuditLogService auditLog)
+    public AuditLogByDateModel(ISessionService session, IAuditLogService auditLog)
         : base(session) => _auditLog = auditLog;
 
     [BindProperty] public DateTime StartDate { get; set; } = DateTime.Today.AddDays(-7);

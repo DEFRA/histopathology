@@ -1,5 +1,5 @@
+using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
-using Histo.Submissions.Services;
 using Histo.Web.Services;
 
 namespace Histo.Web.Pages.Batches;
@@ -7,9 +7,9 @@ namespace Histo.Web.Pages.Batches;
 /// <summary>Replaces <c>BatchesForArchiving.aspx</c>.</summary>
 public class BatchesForArchivingModel : HistoPageModel
 {
-    private readonly BatchService _batches;
+    private readonly IBatchService _batches;
 
-    public BatchesForArchivingModel(ISessionService session, BatchService batches)
+    public BatchesForArchivingModel(ISessionService session, IBatchService batches)
         : base(session) => _batches = batches;
 
     public IReadOnlyList<BatchListResult> Batches { get; private set; } = [];

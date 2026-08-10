@@ -3,22 +3,12 @@ using Histo.Infrastructure;
 using Histo.Web.Services;
 using Microsoft.Extensions.Options;
 
-// Domain module service + repository imports
-using Histo.Administration.Interfaces;
-using Histo.Administration.Repositories;
-using Histo.Administration.Services;
-using Histo.AuditLog.Interfaces;
-using Histo.AuditLog.Repositories;
-using Histo.AuditLog.Services;
-using Histo.Histology.Interfaces;
-using Histo.Histology.Repositories;
-using Histo.Histology.Services;
-using Histo.QualityControl.Interfaces;
-using Histo.QualityControl.Repositories;
-using Histo.QualityControl.Services;
-using Histo.Submissions.Interfaces;
-using Histo.Submissions.Repositories;
-using Histo.Submissions.Services;
+// Modular monolith — each module registers its own internals via extension method
+using Histo.Administration;
+using Histo.AuditLog;
+using Histo.Histology;
+using Histo.QualityControl;
+using Histo.Submissions;
 
 // Bootstrap Serilog before the host is built so startup errors are captured.
 Log.Logger = new LoggerConfiguration()
@@ -84,32 +74,19 @@ try
     builder.Services.AddScoped<ISessionService, SessionService>();
 
     // ── Administration module ─────────────────────────────────────────────────
-    builder.Services.AddScoped<IUserRepository, UserRepository>();
-    builder.Services.AddScoped<UserService>();
-    builder.Services.AddScoped<ILookupRepository, LookupRepository>();
-    builder.Services.AddScoped<LookupService>();
+    builder.Services.AddAdministrationModule();
 
     // ── AuditLog module ───────────────────────────────────────────────────────
-    builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
-    builder.Services.AddScoped<AuditLogService>();
+    builder.Services.AddAuditLogModule();
 
     // ── Histology module ──────────────────────────────────────────────────────
-    builder.Services.AddScoped<IBlockRepository, BlockRepository>();
-    builder.Services.AddScoped<BlockService>();
-    builder.Services.AddScoped<IHistologyRepository, HistologyRepository>();
-    builder.Services.AddScoped<HistologyRefService>();
-    builder.Services.AddScoped<IBlockTestRepository, BlockTestRepository>();
-    builder.Services.AddScoped<BlockTestService>();
+    builder.Services.AddHistologyModule();
 
     // ── QualityControl module ─────────────────────────────────────────────────
-    builder.Services.AddScoped<IQCNoteRepository, QCNoteRepository>();
-    builder.Services.AddScoped<QCNoteService>();
+    builder.Services.AddQualityControlModule();
 
     // ── Submissions module ────────────────────────────────────────────────────
-    builder.Services.AddScoped<IBatchRepository, BatchRepository>();
-    builder.Services.AddScoped<BatchService>();
-    builder.Services.AddScoped<ISubmissionRepository, SubmissionRepository>();
-    builder.Services.AddScoped<SubmissionService>();
+    builder.Services.AddSubmissionsModule();
 
     // ── Application Insights telemetry ──────────────────────────────────────
     var aiConnString = builder.Configuration["AppSettings:ApplicationInsightsConnectionString"];

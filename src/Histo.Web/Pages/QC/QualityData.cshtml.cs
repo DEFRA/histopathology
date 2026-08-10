@@ -1,5 +1,5 @@
+using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
-using Histo.Histology.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,9 +17,9 @@ namespace Histo.Web.Pages.QC;
 /// </summary>
 public class QualityDataModel : HistoPageModel
 {
-    private readonly BlockTestService _tests;
+    private readonly IBlockTestService _tests;
 
-    public QualityDataModel(ISessionService session, BlockTestService tests)
+    public QualityDataModel(ISessionService session, IBlockTestService tests)
         : base(session) => _tests = tests;
 
     public IReadOnlyList<BlockTest> Tests { get; private set; } = [];
