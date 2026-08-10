@@ -12,7 +12,8 @@
     Generated: 2026-08-05
     Complexity: high — SubReportElement present (HistologySubReport inlined per ADR-004)
     renderHints: repeatHeaderOnEachPage=true → submission table uses <thead> for page repeat
-    Page:      A4 portrait 210mm × 297mm, margins 12mm all sides
+    Page:      A4 landscape 297mm × 210mm, margins 12mm all sides
+               (confirmed from legacy PDF MediaBox [0 0 841 595])
 
     Tokens: 34 / 34 (100%)
       Section 0 — ReportHeader (batch-level fields + sub-report)
@@ -70,7 +71,7 @@
   -->
   <style>
     @page {
-      size: 210mm 297mm;
+      size: 297mm 210mm landscape;
       margin: 12mm;
     }
     body {

@@ -13,15 +13,15 @@
     "HistologyReport.rpt OLE compound document — 'Subdocument 1' stream confirms one embedded sub-report"
   ],
   "pageSettings": {
-    "width": 210,
-    "height": 297,
-    "orientation": "portrait",
+    "width": 297,
+    "height": 210,
+    "orientation": "landscape",
     "marginTop": 12,
     "marginBottom": 12,
     "marginLeft": 12,
     "marginRight": 12,
-    "_review": true,
-    "_reviewNote": "A4 portrait assumed (UK-standard); exact margin values require Crystal Reports designer inspection of the .rpt binary"
+    "_review": false,
+    "_reviewNote": "A4 landscape confirmed from legacy PDF binary MediaBox [0 0 841 595] (841pt = 296.8mm ≈ 297mm, 595pt = 210mm). Was incorrectly assumed portrait in initial extraction."
   },
   "dataFields": [
     { "name": "ProjectContractCode", "dataType": "string",   "dataSource": "Batch" },

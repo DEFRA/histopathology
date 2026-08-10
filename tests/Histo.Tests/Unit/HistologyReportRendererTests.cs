@@ -52,22 +52,21 @@ public class HistologyReportRendererTests
         batch.Columns.Add("MoreHistology");
         var br = batch.NewRow();
         br["ID"]                 = batchId.ToString();
-        br["ProjectContractCode"] = "VLA/TSE/2026";
-        br["ContactName"]        = "Dr A Smith";
-        br["BatchDate"]          = "01/08/2026";
-        br["Species"]            = "Bovine";
-        br["DateReceived"]       = "02/08/2026";
-        br["TimeReceived"]       = "Morning";
-        br["SafeToHandle"]       = true;
-        // Comments > 150 chars to trigger CommentLengthOK checkmark (✓)
-        br["Comments"]           = new string('x', 160);
-        br["CommentLengthOK"]    = "\u2713"; // renderer sets this; provided here for completeness
-        br["Fixation"]           = "10% Formal Saline";
+        br["ProjectContractCode"] = "TBA";
+        br["ContactName"]        = "A. Schock";          // Pathologist
+        br["BatchDate"]          = "04/07/2011";          // Submission Date
+        br["Species"]            = "Porcine";
+        br["DateReceived"]       = "04/07/2011";
+        br["TimeReceived"]       = "before 11.00";
+        br["SafeToHandle"]       = true;                  // Adequately Fixed? → Yes
+        br["Comments"]           = "Blocks & Slides returned to Lasswade 13.7.11 HS";
+        br["CommentLengthOK"]    = "";                   // short comment — no overflow flag
+        br["Fixation"]           = "Other";
         br["PostFixationOther"]  = "";
-        br["OtherSubmittedBy"]   = "J Jones";
-        br["NumberSamples"]      = "2";
-        br["BatchType"]          = "TSE";
-        br["SubmittedAs"]        = "Brain";
+        br["OtherSubmittedBy"]   = "VLA Lasswade";        // Submitted By
+        br["NumberSamples"]      = "1";
+        br["BatchType"]          = "NON TSE";
+        br["SubmittedAs"]        = "Wax Block";
         br["MoreHistology"]      = "";
         batch.Rows.Add(br);
         ds.Tables.Add(batch);
@@ -89,10 +88,8 @@ public class HistologyReportRendererTests
         var histology = new DataTable("BatchHistology");
         histology.Columns.Add("BatchID", typeof(int));
         histology.Columns.Add("Code");
-        var h1 = histology.NewRow(); h1["BatchID"] = batchId; h1["Code"] = "HE";
-        var h2 = histology.NewRow(); h2["BatchID"] = batchId; h2["Code"] = "IHC";
+        var h1 = histology.NewRow(); h1["BatchID"] = batchId; h1["Code"] = "H1N2";
         histology.Rows.Add(h1);
-        histology.Rows.Add(h2);
         ds.Tables.Add(histology);
 
         // ── BatchSubmission ──────────────────────────────────────────────────
@@ -107,30 +104,29 @@ public class HistologyReportRendererTests
 
         var s1 = submissions.NewRow();
         s1["BatchID"]      = batchId.ToString();
-        s1["SenderRef"]    = "PG0001/26";
-        s1["HistologyRef"] = "26/00001";
+        s1["SenderRef"]    = "15/P220/06/11";
+        s1["HistologyRef"] = "11/42879";
         s1["BlockRef"]     = "01";
-        s1["TissueDetails"] = "Brain stem, medulla";
+        s1["TissueDetails"] = "Viscera";
         s1["RepeatBlock"]  = "";
-        s1["CustomerRef"]  = "CUST-001";
+        s1["CustomerRef"]  = "visc 1";   // populates the Comments column
         submissions.Rows.Add(s1);
 
-        // Second row with RepeatBlock set → renderer appends " *" to BlockRef
         var s2 = submissions.NewRow();
         s2["BatchID"]      = batchId.ToString();
-        s2["SenderRef"]    = "PG0002/26";
-        s2["HistologyRef"] = "26/00002";
+        s2["SenderRef"]    = "15/P220/06/11";
+        s2["HistologyRef"] = "11/42879";
         s2["BlockRef"]     = "02";
-        s2["TissueDetails"] = "Cerebellum";
-        s2["RepeatBlock"]  = "1";
-        s2["CustomerRef"]  = "CUST-002";
+        s2["TissueDetails"] = "Viscera";
+        s2["RepeatBlock"]  = "";
+        s2["CustomerRef"]  = "visc 2";
         submissions.Rows.Add(s2);
         ds.Tables.Add(submissions);
 
         // ── Version ──────────────────────────────────────────────────────────
         var version = new DataTable("Version");
         version.Columns.Add("Version");
-        var vr = version.NewRow(); vr["Version"] = "1.0 TSE";
+        var vr = version.NewRow(); vr["Version"] = "Form: PAT1 123  version 4  (14/08/06)";
         version.Rows.Add(vr);
         ds.Tables.Add(version);
 
