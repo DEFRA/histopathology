@@ -106,7 +106,7 @@ Public Class clsUser
             Email = Convert.ToString(ParamsOut.Item("Email").Value)
             AreaCode = Convert.ToInt32(ParamsOut.Item("UserArea").Value)
             AreaName = Convert.ToString(ParamsOut.Item("AreaName").Value)
-            Active = Convert.ToString(ParamsOut.Item("Active").Value)
+            Active = CBool(ParamsOut.Item("Active").Value)
 
             If Not Active Then
                 Return False

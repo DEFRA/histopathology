@@ -1,0 +1,267 @@
+{
+  "reportName": "SubmissionNotesReport",
+  "generatedDate": "2026-08-10",
+  "sourceFile": "HistopathologySystem/HistopathologySystem.2018/HistopathologySystem/SubmissionNotesReport.rpt",
+  "stage": "Stage 1",
+  "status": "Converted",
+  "pageSettings": {
+    "size": "A4",
+    "orientation": "Portrait",
+    "marginTopMm": 15,
+    "marginBottomMm": 15,
+    "marginLeftMm": 15,
+    "marginRightMm": 15
+  },
+  "complexity": "medium",
+  "sections": [
+    {
+      "name": "PageHeader",
+      "type": "PageHeader",
+      "repeatsOnEveryPage": true,
+      "elements": [
+        {
+          "type": "Text",
+          "token": "{{SubmissionNumber}}",
+          "alignment": "Left",
+          "style": "Bold",
+          "description": "Left-aligned header: label 'Submission notes for Submission:' (bold) followed by bold SubmissionNumber value",
+          "dataSource": "Submission.SubmissionNumber"
+        },
+        {
+          "type": "Text",
+          "token": "{{ReportDate}}",
+          "alignment": "Right",
+          "description": "Right-aligned: today's date formatted 'dd/MM/yyyy'",
+          "dataSource": "System.DateTime.Now"
+        }
+      ]
+    },
+    {
+      "name": "SubmissionComments",
+      "type": "Detail",
+      "elements": [
+        {
+          "type": "TwoColumnRow",
+          "description": "Two equal-width columns side by side",
+          "columns": [
+            {
+              "heading": "Submission Comments",
+              "headingStyle": "Bold",
+              "token": "{{SubmissionComments}}",
+              "dataSource": "Submission.SubmissionComments"
+            },
+            {
+              "heading": "Submission Status Comments",
+              "headingStyle": "Bold",
+              "token": "{{SubmissionStatusComment}}",
+              "dataSource": "Submission.SubmissionStatusComment"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SubmissionTissueComments",
+      "type": "Detail",
+      "conditionalOnRowCount": "SubmissionTissues",
+      "elements": [
+        {
+          "type": "SectionHeading",
+          "style": "BoldItalic",
+          "text": "Submission tissue comments:"
+        },
+        {
+          "type": "HorizontalRule",
+          "thicknessPt": 0.5
+        },
+        {
+          "type": "TableHeader",
+          "fontSize": 8,
+          "columns": ["SenderRef", "Tissue Code", "Tissue Comment", "Tissue Archive Comment"]
+        },
+        {
+          "type": "DataTable",
+          "dataSource": "SubmissionTissues",
+          "columnWidthsPct": [25, 25, 25, 25],
+          "columns": [
+            { "name": "SenderRef",            "token": "{{SenderRef}}" },
+            { "name": "TissueCode",           "token": "{{TissueCode}}" },
+            { "name": "TissueComment",        "token": "{{TissueComment}}" },
+            { "name": "TissueArchiveComment", "token": "{{TissueArchiveComment}}" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SubmissionBlocksComments",
+      "type": "Detail",
+      "conditionalOnRowCount": "SubmissionBlocks",
+      "elements": [
+        {
+          "type": "SectionHeading",
+          "style": "BoldItalic",
+          "text": "Submission blocks comments:"
+        },
+        {
+          "type": "HorizontalRule",
+          "thicknessPt": 0.5
+        },
+        {
+          "type": "TableHeader",
+          "fontSize": 8,
+          "columns": ["SenderRef", "Block Ref", "Block Comment", "Block Archive Comment"]
+        },
+        {
+          "type": "DataTable",
+          "dataSource": "SubmissionBlocks",
+          "columnWidthsPct": [25, 25, 25, 25],
+          "columns": [
+            { "name": "SenderRef",           "token": "{{SenderRef}}" },
+            { "name": "BlockRef",            "token": "{{BlockRef}}" },
+            { "name": "BlockComment",        "token": "{{BlockComment}}" },
+            { "name": "BlockArchiveComment", "token": "{{BlockArchiveComment}}" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "HistologyTestsComments",
+      "type": "Detail",
+      "conditionalOnRowCount": "BlockHistology",
+      "elements": [
+        {
+          "type": "SectionHeading",
+          "style": "BoldItalic",
+          "text": "Histology tests comments:"
+        },
+        {
+          "type": "HorizontalRule",
+          "thicknessPt": 0.5
+        },
+        {
+          "type": "TableHeader",
+          "fontSize": 8,
+          "columns": ["Block Ref", "Test", "Test Comment", "Test Archive Comment"]
+        },
+        {
+          "type": "DataTable",
+          "dataSource": "BlockHistology",
+          "columnWidthsPct": [25, 25, 25, 25],
+          "columns": [
+            { "name": "BlockRef",            "token": "{{BlockRef}}" },
+            { "name": "Test",                "token": "{{Test}}" },
+            { "name": "TestComment",         "token": "{{TestComment}}" },
+            { "name": "TestArchiveComment",  "token": "{{TestArchiveComment}}" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SpecialStainTestsComments",
+      "type": "Detail",
+      "conditionalOnRowCount": "BlockSpecialStain",
+      "elements": [
+        {
+          "type": "SectionHeading",
+          "style": "BoldItalic",
+          "text": "Special stain tests comments:"
+        },
+        {
+          "type": "HorizontalRule",
+          "thicknessPt": 0.5
+        },
+        {
+          "type": "TableHeader",
+          "fontSize": 8,
+          "columns": ["Block Ref", "Test", "Test Comment", "Test Archive Comment"]
+        },
+        {
+          "type": "DataTable",
+          "dataSource": "BlockSpecialStain",
+          "columnWidthsPct": [25, 25, 25, 25],
+          "columns": [
+            { "name": "BlockRef",           "token": "{{BlockRef}}" },
+            { "name": "Test",               "token": "{{Test}}" },
+            { "name": "TestComment",        "token": "{{TestComment}}" },
+            { "name": "TestArchiveComment", "token": "{{TestArchiveComment}}" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AntibodiesTestsComments",
+      "type": "Detail",
+      "conditionalOnRowCount": "BlockAntibodies",
+      "elements": [
+        {
+          "type": "SectionHeading",
+          "style": "BoldItalic",
+          "text": "Antibodies tests comments:"
+        },
+        {
+          "type": "HorizontalRule",
+          "thicknessPt": 0.5
+        },
+        {
+          "type": "TableHeader",
+          "fontSize": 8,
+          "columns": ["BlockRef", "Test", "Test Comment", "Test Archive Comment"]
+        },
+        {
+          "type": "DataTable",
+          "dataSource": "BlockAntibodies",
+          "columnWidthsPct": [25, 25, 25, 25],
+          "columns": [
+            { "name": "BlockRef",           "token": "{{BlockRef}}" },
+            { "name": "Test",               "token": "{{Test}}" },
+            { "name": "TestComment",        "token": "{{TestComment}}" },
+            { "name": "TestArchiveComment", "token": "{{TestArchiveComment}}" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "PageFooter",
+      "type": "PageFooter",
+      "repeatsOnEveryPage": true,
+      "elements": [
+        {
+          "type": "PageNumber",
+          "alignment": "Right",
+          "format": "Page {current} of {total}"
+        }
+      ]
+    }
+  ],
+  "dataSources": [
+    {
+      "tableName": "Submission",
+      "columns": ["SubmissionNumber", "SubmissionComments", "SubmissionStatusComment"]
+    },
+    {
+      "tableName": "SubmissionTissues",
+      "columns": ["SenderRef", "TissueCode", "TissueComment", "TissueArchiveComment"]
+    },
+    {
+      "tableName": "SubmissionBlocks",
+      "columns": ["SenderRef", "BlockRef", "BlockComment", "BlockArchiveComment"]
+    },
+    {
+      "tableName": "BlockHistology",
+      "columns": ["BlockRef", "Test", "TestComment", "TestArchiveComment"]
+    },
+    {
+      "tableName": "BlockSpecialStain",
+      "columns": ["BlockRef", "Test", "TestComment", "TestArchiveComment"]
+    },
+    {
+      "tableName": "BlockAntibodies",
+      "columns": ["BlockRef", "Test", "TestComment", "TestArchiveComment"]
+    }
+  ],
+  "gateChecks": {
+    "containsSubReport": false,
+    "containsRunningTotal": false,
+    "requiresHumanReview": false
+  }
+}

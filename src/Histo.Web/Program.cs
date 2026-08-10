@@ -116,6 +116,10 @@ try
     // ── Reporting module ──────────────────────────────────────────────────────
     builder.Services.AddTransient<HistologyReportDataSetBuilder>();
     builder.Services.AddTransient<HistologyReportRenderer>();
+    builder.Services.AddTransient<QCNoteDataSetBuilder>();
+    builder.Services.AddTransient<QCNoteRenderer>();
+    builder.Services.AddTransient<SubmissionNotesDataSetBuilder>();
+    builder.Services.AddTransient<SubmissionNotesRenderer>();
 
     // ── Application Insights telemetry ──────────────────────────────────────
     var aiConnString = builder.Configuration["AppSettings:ApplicationInsightsConnectionString"];
