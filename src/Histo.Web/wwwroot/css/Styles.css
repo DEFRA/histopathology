@@ -4,8 +4,17 @@
  * markup/classes throughout the application — no bespoke CSS is required.
  *
  * ISS-015 (10 pages using .data-table/.filter-form) was resolved — see
- * docs/migration-run-journal.md. This file intentionally contains no rules;
- * it is kept as a stable @Styles.css link target in _Layout.cshtml.
+ * docs/migration-run-journal.md.
  */
+
+/* User context in service navigation header.
+ * The govuk-service-navigation__container uses display:flex — margin-left:auto
+ * pushes this element to the far right of the navigation bar.
+ */
+.app-header-user {
+    margin-left: auto;
+    white-space: nowrap;
+    align-self: center;
+}
 
 
