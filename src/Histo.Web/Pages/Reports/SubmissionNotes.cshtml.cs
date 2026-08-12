@@ -1,7 +1,6 @@
 using Histo.Reporting.Reports;
 using Histo.Reporting.Services;
 using Histo.Web.Services;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Histo.Web.Pages.Reports;
@@ -11,12 +10,10 @@ namespace Histo.Web.Pages.Reports;
 /// Crystal Reports export). Returns the generated PDF directly to the browser.
 ///
 /// Route: /Reports/SubmissionNotes
-/// Requires an authenticated session with a valid BatchID.
 ///
 /// Legacy equivalent: <c>SubmissionNotes.aspx.vb — CreateReport(iBatchID)</c> which called
 /// Crystal Reports <c>SubmissionNotesReport.rpt</c> and streamed the PDF via <c>Response.WriteFile</c>.
 /// </summary>
-[Authorize]
 public class SubmissionNotesModel : HistoPageModel
 {
     private readonly SubmissionNotesDataSetBuilder _dataSetBuilder;

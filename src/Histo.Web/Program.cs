@@ -138,8 +138,7 @@ try
     app.UseStaticFiles();
     app.UseRouting();
     app.UseSession();
-
-    // Phase 2: app.UseAuthentication(); app.UseAuthorization();
+    app.UseAuthorization();
 
     app.MapHealthChecks("/health");
     app.MapRazorPages();

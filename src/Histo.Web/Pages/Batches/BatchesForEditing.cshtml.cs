@@ -27,6 +27,6 @@ public class BatchesForEditingModel : HistoPageModel
     public IActionResult OnPostSelect(int batchId)
     {
         Session.BatchID = batchId;
-        return RedirectToPage("/Batches/EditBatch");
+        return RedirectToPage("/Batches/BatchDetails");
     }
 }

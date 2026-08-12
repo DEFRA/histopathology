@@ -1,7 +1,6 @@
 using Histo.Reporting.Reports;
 using Histo.Reporting.Services;
 using Histo.Web.Services;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Histo.Web.Pages.Reports;
@@ -11,13 +10,11 @@ namespace Histo.Web.Pages.Reports;
 /// Crystal Reports export). Returns the generated PDF directly to the browser.
 ///
 /// Route: /Reports/HistologyReport
-/// Requires an authenticated session with a valid BatchID.
 ///
 /// Legacy equivalent: <c>SubmissionForm.aspx.vb — Page_Load</c> which called
 /// Crystal Reports <c>HistologyReport.rpt</c> (with embedded sub-report
 /// <c>HistologySubReport.rpt</c>) and streamed the PDF via <c>Response.WriteFile</c>.
 /// </summary>
-[Authorize]
 public class HistologyReportModel : HistoPageModel
 {
     private readonly HistologyReportDataSetBuilder _dataSetBuilder;

@@ -67,15 +67,15 @@ public sealed class QCNoteRepository : IQCNoteRepository
         using var conn = _db.CreateConnection();
 
         var parameters = new DynamicParameters();
-        parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
-        parameters.Add("BatchSubmissionID", submissionId);
-        parameters.Add("CreatedBy",         createdByUserId);
+        parameters.Add("CreatedBy",   createdByUserId);
+        parameters.Add("DateCreated", DateTime.Now);
+        parameters.Add("NewID",       dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync(
             "AddQCNote",
             parameters,
             commandType: System.Data.CommandType.StoredProcedure);
 
-        return parameters.Get<int>("RETURN_VALUE");
+        return parameters.Get<int>("NewID");
     }
 }

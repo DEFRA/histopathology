@@ -72,7 +72,7 @@ public sealed class HistologyReportDataSetBuilder
         // used to build the BatchSubmission table in the legacy SubmissionForm report.
         var rawSubmissions = (await conn.QueryAsync(
             "GetBatchSubmissionDetailsByBatchID",
-            new { BatchID = batchId },
+            new { ID = batchId },
             commandType: CommandType.StoredProcedure))
             .Cast<IDictionary<string, object>>().ToList();
 
