@@ -1,5 +1,5 @@
+using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
-using Histo.Administration.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,9 +13,9 @@ namespace Histo.Web.Pages.Admin;
 /// </summary>
 public class EditLookupItemModel : HistoPageModel
 {
-    private readonly LookupService _lookups;
+    private readonly ILookupService _lookups;
 
-    public EditLookupItemModel(ISessionService session, LookupService lookups)
+    public EditLookupItemModel(ISessionService session, ILookupService lookups)
         : base(session) => _lookups = lookups;
 
     [BindProperty(SupportsGet = true)] public int TableId { get; set; }

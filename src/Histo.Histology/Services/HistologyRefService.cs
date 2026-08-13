@@ -12,7 +12,7 @@ namespace Histo.Histology.Services;
 /// FindUnusedHistologyRef, etc.) are now implemented as simple LINQ queries
 /// over the collections returned by this service and do not require a service method.
 /// </summary>
-public sealed class HistologyRefService
+public sealed class HistologyRefService : IHistologyRefService
 {
     private readonly IHistologyRepository _repo;
     private readonly IAppLogger _logger;

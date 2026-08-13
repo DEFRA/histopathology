@@ -1,4 +1,4 @@
-using Histo.Histology.Services;
+using Histo.Histology.Interfaces;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,9 +17,9 @@ namespace Histo.Web.Pages.Bookings;
 /// </summary>
 public class EditHistologyRefModel : HistoPageModel
 {
-    private readonly HistologyRefService _refs;
+    private readonly IHistologyRefService _refs;
 
-    public EditHistologyRefModel(ISessionService session, HistologyRefService refs)
+    public EditHistologyRefModel(ISessionService session, IHistologyRefService refs)
         : base(session) => _refs = refs;
 
     [BindProperty] public int HistologyType { get; set; }

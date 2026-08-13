@@ -1,5 +1,5 @@
+using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
-using Histo.Administration.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -8,9 +8,9 @@ namespace Histo.Web.Pages.Admin;
 /// <summary>Replaces <c>UserMaintenance.aspx</c>.</summary>
 public class UserMaintenanceModel : HistoPageModel
 {
-    private readonly UserService _users;
+    private readonly IUserService _users;
 
-    public UserMaintenanceModel(ISessionService session, UserService users)
+    public UserMaintenanceModel(ISessionService session, IUserService users)
         : base(session) => _users = users;
 
     /// <summary>

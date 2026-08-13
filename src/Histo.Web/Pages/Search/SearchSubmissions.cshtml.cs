@@ -1,7 +1,7 @@
-using Histo.Administration.Services;
+using Histo.Administration.Interfaces;
 using Histo.Core.Domain;
+using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
-using Histo.Submissions.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -20,10 +20,10 @@ namespace Histo.Web.Pages.Search;
 /// </summary>
 public class SearchSubmissionsModel : HistoPageModel
 {
-    private readonly BatchService _batches;
-    private readonly UserService _users;
+    private readonly IBatchService _batches;
+    private readonly IUserService _users;
 
-    public SearchSubmissionsModel(ISessionService session, BatchService batches, UserService users)
+    public SearchSubmissionsModel(ISessionService session, IBatchService batches, IUserService users)
         : base(session)
     {
         _batches = batches;

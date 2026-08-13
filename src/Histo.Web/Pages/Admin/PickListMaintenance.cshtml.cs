@@ -1,5 +1,5 @@
+using Histo.Administration.Interfaces;
 using Histo.Administration.Models; // EditableLookup is in LookupItem.cs
-using Histo.Administration.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,9 +8,9 @@ namespace Histo.Web.Pages.Admin;
 /// <summary>Replaces <c>PickListMaintenance.aspx</c>.</summary>
 public class PickListMaintenanceModel : HistoPageModel
 {
-    private readonly LookupService _lookups;
+    private readonly ILookupService _lookups;
 
-    public PickListMaintenanceModel(ISessionService session, LookupService lookups)
+    public PickListMaintenanceModel(ISessionService session, ILookupService lookups)
         : base(session) => _lookups = lookups;
 
     public IReadOnlyList<EditableLookup> Lookups { get; private set; } = [];

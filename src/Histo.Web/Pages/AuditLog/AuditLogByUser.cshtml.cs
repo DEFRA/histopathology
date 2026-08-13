@@ -1,7 +1,7 @@
+using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
-using Histo.Administration.Services;
+using Histo.AuditLog.Interfaces;
 using Histo.AuditLog.Models;
-using Histo.AuditLog.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,10 +10,10 @@ namespace Histo.Web.Pages.AuditLog;
 /// <summary>Replaces <c>AuditLogByUser.aspx</c>.</summary>
 public class AuditLogByUserModel : HistoPageModel
 {
-    private readonly AuditLogService _auditLog;
-    private readonly UserService _users;
+    private readonly IAuditLogService _auditLog;
+    private readonly IUserService _users;
 
-    public AuditLogByUserModel(ISessionService session, AuditLogService auditLog, UserService users)
+    public AuditLogByUserModel(ISessionService session, IAuditLogService auditLog, IUserService users)
         : base(session)
     {
         _auditLog = auditLog;

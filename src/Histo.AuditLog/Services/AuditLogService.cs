@@ -11,7 +11,7 @@ namespace Histo.AuditLog.Services;
 /// structured error logging. Replaces direct calls to <c>clsAuditLog</c>
 /// methods from the ASPX code-behind files.
 /// </summary>
-public sealed class AuditLogService
+public sealed class AuditLogService : IAuditLogService
 {
     private readonly IAuditLogRepository _repo;
     private readonly IAppLogger _logger;

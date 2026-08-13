@@ -1,8 +1,8 @@
+using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
-using Histo.Administration.Services;
 using Histo.Core.Domain;
+using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
-using Histo.Submissions.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -28,10 +28,10 @@ public class CassettedModel : HistoPageModel
 {
     private const int LookupSubmittedAs = 11; // Legacy source: HistopathologySystem/Common.vb — LOOKUP_SUBMITTEDAS
 
-    private readonly LookupService _lookups;
-    private readonly BatchService _batches;
+    private readonly ILookupService _lookups;
+    private readonly IBatchService _batches;
 
-    public CassettedModel(ISessionService session, LookupService lookups, BatchService batches)
+    public CassettedModel(ISessionService session, ILookupService lookups, IBatchService batches)
         : base(session)
     {
         _lookups = lookups;

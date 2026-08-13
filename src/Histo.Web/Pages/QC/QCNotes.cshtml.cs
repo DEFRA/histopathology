@@ -1,5 +1,5 @@
+using Histo.QualityControl.Interfaces;
 using Histo.QualityControl.Models;
-using Histo.QualityControl.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,9 +16,9 @@ namespace Histo.Web.Pages.QC;
 /// </summary>
 public class QCNotesModel : HistoPageModel
 {
-    private readonly QCNoteService _qc;
+    private readonly IQCNoteService _qc;
 
-    public QCNotesModel(ISessionService session, QCNoteService qc)
+    public QCNotesModel(ISessionService session, IQCNoteService qc)
         : base(session) => _qc = qc;
 
     public IReadOnlyList<QCNote> Notes { get; private set; } = [];

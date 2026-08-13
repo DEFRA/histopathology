@@ -4,7 +4,7 @@
 // Files to delete at decommission: Login.cshtml, Login.cshtml.cs
 // Files to update at decommission: HistoPageModel.cs — redirect /Login → SAML challenge
 
-using Histo.Administration.Services;
+using Histo.Administration.Interfaces;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -29,10 +29,10 @@ namespace Histo.Web.Pages;
 /// </summary>
 public class LoginModel : PageModel
 {
-    private readonly UserService _userService;
+    private readonly IUserService _userService;
     private readonly ISessionService _session;
 
-    public LoginModel(UserService userService, ISessionService session)
+    public LoginModel(IUserService userService, ISessionService session)
     {
         _userService = userService;
         _session = session;

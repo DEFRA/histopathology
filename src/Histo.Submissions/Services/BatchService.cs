@@ -11,7 +11,7 @@ namespace Histo.Submissions.Services;
 /// Replaces the database-persistence methods of legacy <c>clsBatch.vb</c>.
 /// Batch status constants remain in <see cref="BatchStatus"/> (Histo.Core).
 /// </summary>
-public sealed class BatchService
+public sealed class BatchService : IBatchService
 {
     private readonly IBatchRepository _batches;
     private readonly IAppLogger _logger;

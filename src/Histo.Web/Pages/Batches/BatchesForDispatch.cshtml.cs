@@ -1,6 +1,6 @@
 using Histo.Core.Domain;
+using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
-using Histo.Submissions.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,9 +12,9 @@ namespace Histo.Web.Pages.Batches;
 /// </summary>
 public class BatchesForDispatchModel : HistoPageModel
 {
-    private readonly BatchService _batches;
+    private readonly IBatchService _batches;
 
-    public BatchesForDispatchModel(ISessionService session, BatchService batches)
+    public BatchesForDispatchModel(ISessionService session, IBatchService batches)
         : base(session) => _batches = batches;
 
     public IReadOnlyList<BatchListResult> Batches { get; private set; } = [];

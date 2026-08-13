@@ -1,8 +1,8 @@
 using Histo.Core.Domain;
+using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
-using Histo.Histology.Services;
+using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
-using Histo.Submissions.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -23,10 +23,10 @@ namespace Histo.Web.Pages.Blocks;
 /// </summary>
 public class CopyBlocksModel : HistoPageModel
 {
-    private readonly BlockService _blocks;
-    private readonly SubmissionService _submissions;
+    private readonly IBlockService _blocks;
+    private readonly ISubmissionService _submissions;
 
-    public CopyBlocksModel(ISessionService session, BlockService blocks, SubmissionService submissions)
+    public CopyBlocksModel(ISessionService session, IBlockService blocks, ISubmissionService submissions)
         : base(session)
     {
         _blocks = blocks;

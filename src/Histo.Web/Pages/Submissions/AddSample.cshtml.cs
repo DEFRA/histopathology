@@ -1,4 +1,4 @@
-using Histo.Submissions.Services;
+using Histo.Submissions.Interfaces;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,9 +19,9 @@ namespace Histo.Web.Pages.Submissions;
 /// </summary>
 public class AddSampleModel : HistoPageModel
 {
-    private readonly SubmissionService _submissions;
+    private readonly ISubmissionService _submissions;
 
-    public AddSampleModel(ISessionService session, SubmissionService submissions)
+    public AddSampleModel(ISessionService session, ISubmissionService submissions)
         : base(session) => _submissions = submissions;
 
     [BindProperty] public string SenderRef   { get; set; } = string.Empty;
