@@ -1,0 +1,69 @@
+trigger:
+  branches:
+    include:
+      - develop
+
+variables:
+  - name: buildConfiguration
+    value: 'Release'
+
+  - name: solution
+    value: 'HistopathologySystem.slnx'
+
+  - name: webProject
+    value: 'src/Histo.Web/Histo.Web.csproj'
+
+stages:
+
+- stage: Build
+  displayName: Build and test
+  jobs:
+  - job: build
+    pool:
+      vmImage: 'ubuntu-24.04'
+    steps:
+
+    - checkout: self
+      fetchDepth: 1
+      persistCredentials: false
+
+    - task: UseDotNet@2
+      displayName: 'Install .NET 10 SDK'
+      inputs:
+        version: '10.0.x'
+        includePreviewVersions: true
+
+    - script: |
+        dotnet --info
+        echo "--- files in working directory ---"
+        ls -la
+      displayName: 'Diagnostics'
+
+    - script: dotnet restore $(solution)
+      displayName: 'Restore dependencies'
+
+    - script: dotnet build $(solution) --configuration $(buildConfiguration) --no-restore
+      displayName: 'Build'
+
+    - script: dotnet test $(solution) --configuration $(buildConfiguration) --no-build --logger trx
+      displayName: 'Run tests'
+
+    - task: PublishTestResults@2
+      displayName: 'Publish test results'
+      condition: succeededOrFailed()
+      inputs:
+        testResultsFormat: VSTest
+        testResultsFiles: '**/*.trx'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Publish Histo.Web'
+      inputs:
+        command: publish
+        publishWebProjects: false
+        projects: '$(webProject)'
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+        zipAfterPublish: true
+
+    - publish: '$(Build.ArtifactStagingDirectory)'
+      artifact: drop
+      displayName: 'Publish artifact'
