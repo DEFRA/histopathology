@@ -3,7 +3,7 @@
 @{
     ViewData["Title"] = "Help";
     ViewData["PageTitle"] = "Help";
-    var isCustomer = Model.Session.GroupName == "Customer";
+    var isCustomer = Model.Session.IsCustomer;
 }
 
 @* ── Table of Contents ─────────────────────────────────────────────────── *@
