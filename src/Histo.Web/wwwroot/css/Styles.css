@@ -1,11 +1,7 @@
 /* Histo.Web site theme — migrated to the GOV.UK Design System (govuk-frontend v6).
  * The header, footer, navigation, page title, home panels, and all page content
  * (tables, forms, buttons, selects) are now rendered with real govuk-frontend
- * markup/classes throughout the application — no bespoke CSS is required.
- *
- * ISS-015 (10 pages using .data-table/.filter-form) was resolved — see
- * docs/migration-run-journal.md.
- */
+ * markup/classes throughout the application.
 
 /* User context in service navigation header.
  * The govuk-service-navigation__container uses display:flex — margin-left:auto
