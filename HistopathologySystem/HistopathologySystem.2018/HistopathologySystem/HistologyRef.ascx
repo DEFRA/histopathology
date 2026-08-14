@@ -1,4 +1,0 @@
-<%@ Control Language="vb" AutoEventWireup="false" Codebehind="HistologyRef.ascx.vb" Inherits="HistopathologySystem.HistologyRef" TargetSchema="http://schemas.microsoft.com/intellisense/ie5" %>
-<div style="LEFT: 0px; POSITION: absolute; TOP: 0px"><asp:textbox id="txtHistologyRef" MaxLength="20" Width="160px" runat="server"></asp:textbox></div>
-<div style="LEFT: 163px; POSITION: absolute; TOP: 2px"><asp:requiredfieldvalidator id="rfvHistologyRef" runat="server" ToolTip="Required Field" ControlToValidate="txtHistologyRef" CssClass="ValidatorText">*</asp:requiredfieldvalidator></div>
-<div style="LEFT: 163px; POSITION: absolute; TOP: 2px"><asp:customvalidator id="valHistologyRef" runat="server" ToolTip="Format: NN/NNNNN. Year part must not be greater than current year." ControlToValidate="txtHistologyRef" CssClass="ValidatorText" ClientValidationFunction="ClientValidateHistologyRef" OnServerValidate="ValidateHistologyRef">*</asp:customvalidator></div>
