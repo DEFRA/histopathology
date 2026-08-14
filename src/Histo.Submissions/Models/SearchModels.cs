@@ -97,7 +97,13 @@ public sealed class BatchSearchResult
     public DateTime? DateCompleted { get; init; }
     public DateTime? CustomerReceivedDate { get; init; }
     public string? Status { get; init; }
-    public int? SubmittedBy { get; init; }
+    /// <summary>
+    /// The display name of the user who submitted the batch.
+    /// The <c>GetSearchBatchDetails</c> SP returns this as a VARCHAR display name
+    /// (e.g. "Gunjan Arya"), not the integer UserID. Hidden column — not rendered
+    /// in the results grid but preserved for completeness.
+    /// </summary>
+    public string? SubmittedBy { get; init; }
 }
 
 /// <summary>

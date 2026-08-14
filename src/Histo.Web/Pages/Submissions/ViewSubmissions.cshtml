@@ -121,9 +121,34 @@
 {
     @if (Model.Results.Any())
     {
+        @* Hidden form used by per-row Select buttons and Export to CSV.
+           All current filter values are carried so the search can be re-run
+           server-side. Each row's Select button overrides SelectedBatchId via
+           its own name/value pair using HTML5 form association. *@
+        @* asp-page triggers FormTagHelper to inject the antiforgery token.
+           SelectedBatchId is NOT included here — the per-row Select buttons
+           supply it directly via name/value, avoiding a duplicate-binding clash. *@
+        <form id="view-action-form" method="post" asp-page="/Submissions/ViewSubmissions">
+            <input type="hidden" name="SubmissionNumber"    value="@Model.SubmissionNumber" />
+            <input type="hidden" name="Status"              value="@Model.Status" />
+            <input type="hidden" name="ProjectContractCode" value="@Model.ProjectContractCode" />
+            <input type="hidden" name="ContactName"         value="@Model.ContactName" />
+            <input type="hidden" name="Species"             value="@Model.Species" />
+            <input type="hidden" name="Fixation"            value="@Model.Fixation" />
+            <input type="hidden" name="SubmittedBy"         value="@Model.SubmittedBy" />
+            <input type="hidden" name="EnteredBy"           value="@Model.EnteredBy" />
+            <input type="hidden" name="HistologyRef"        value="@Model.HistologyRef" />
+            <input type="hidden" name="SenderRef"           value="@Model.SenderRef" />
+            <input type="hidden" name="SubmittedDateFrom"   value="@Model.SubmittedDateFrom?.ToString("yyyy-MM-dd")" />
+            <input type="hidden" name="SubmittedDateTo"     value="@Model.SubmittedDateTo?.ToString("yyyy-MM-dd")" />
+            <input type="hidden" name="ReceivedDateFrom"    value="@Model.ReceivedDateFrom?.ToString("yyyy-MM-dd")" />
+            <input type="hidden" name="ReceivedDateTo"      value="@Model.ReceivedDateTo?.ToString("yyyy-MM-dd")" />
+        </form>
+
         <table class="govuk-table">
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header govuk-table__header--numeric">Select</th>
                     <th scope="col" class="govuk-table__header">Sub. Number</th>
                     <th scope="col" class="govuk-table__header">Project Code</th>
                     <th scope="col" class="govuk-table__header">Pathologist</th>
@@ -133,13 +158,24 @@
                     <th scope="col" class="govuk-table__header">Date Completed</th>
                     <th scope="col" class="govuk-table__header">Customer Received Date</th>
                     <th scope="col" class="govuk-table__header">Status</th>
-                    <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
                 </tr>
             </thead>
             <tbody class="govuk-table__body">
                 @foreach (var r in Model.Results)
                 {
-                    <tr class="govuk-table__row">
+                    var isSelected = r.ID == Model.SelectedBatchId;
+                    <tr class="govuk-table__row" @(isSelected ? "style=background-color:#bbd4ea" : "")>
+                        <td class="govuk-table__cell govuk-table__cell--numeric">
+                            <button form="view-action-form"
+                                    formaction="?handler=Select"
+                                    type="submit"
+                                    name="SelectedBatchId"
+                                    value="@r.ID"
+                                    class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0"
+                                    data-module="govuk-button">
+                                Select
+                            </button>
+                        </td>
                         <td class="govuk-table__cell">@r.ID</td>
                         <td class="govuk-table__cell">@r.ProjectDescription</td>
                         <td class="govuk-table__cell">@r.ContactDescription</td>
@@ -149,19 +185,72 @@
                         <td class="govuk-table__cell">@r.DateCompleted?.ToShortDateString()</td>
                         <td class="govuk-table__cell">@r.CustomerReceivedDate?.ToShortDateString()</td>
                         <td class="govuk-table__cell">@r.Status</td>
-                        <td class="govuk-table__cell">
-                            <form method="post">
-                                <input type="hidden" name="batchId" value="@r.ID" />
-                                <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-page-handler="Select">Select</button>
-                            </form>
-                        </td>
                     </tr>
                 }
             </tbody>
         </table>
+
+        @* Export to CSV — mirrors legacy lbExportExcel (all result rows). *@
+        <button form="view-action-form"
+                formaction="?handler=ExportCsv"
+                type="submit"
+                class="govuk-button govuk-button--secondary"
+                data-module="govuk-button">
+            Export to CSV
+        </button>
     }
     else
     {
         <p class="govuk-body">No submissions found matching the search criteria.</p>
+    }
+
+    @* ── Action panel — shown only when a row has been selected ──────────────── *@
+    @if (Model.SelectedBatchId > 0)
+    {
+        <div class="govuk-inset-text">
+            <p class="govuk-body govuk-!-font-weight-bold">Selected: Submission #@Model.SelectedBatchId</p>
+        </div>
+
+        <div class="govuk-button-group">
+
+            @* Print Submission — blocked on Phase 2 (Crystal Reports SubmissionForm.aspx) *@
+            <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Print submission will be available in Phase 2">Print submission</button>
+
+            @* Print Submission Notes — blocked on Phase 2 (Crystal Reports SubmissionNotes.aspx) *@
+            <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Print submission notes will be available in Phase 2">Print submission notes</button>
+
+            @* Copy submission — always available once a row is selected.
+               CopyBatchModel.OnGetAsync expects sourceBatchId as a query/route param. *@
+            @if (Model.CanCopySubmission)
+            {
+                <a asp-page="/Batches/CopyBatch" asp-route-sourceBatchId="@Model.SelectedBatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy submission</a>
+            }
+
+            @* Edit submission — Submitted and Rejected statuses only *@
+            @if (Model.CanEditSubmission)
+            {
+                <a asp-page="/Batches/EditBatch" class="govuk-button govuk-button--secondary" data-module="govuk-button">Edit submission</a>
+            }
+            else
+            {
+                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Editing is only available for submissions in Submitted or Rejected status">Edit submission</button>
+            }
+
+            @* View submission — always available once a row is selected *@
+            @if (Model.CanViewSubmission)
+            {
+                <a asp-page="/Batches/BatchDetails" class="govuk-button" data-module="govuk-button">View submission</a>
+            }
+
+            @* Date Returned — Completed status only *@
+            @if (Model.CanDateReturned)
+            {
+                <a asp-page="/Batches/ReceiveBatch" class="govuk-button govuk-button--secondary" data-module="govuk-button">Date returned</a>
+            }
+            else
+            {
+                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Date Returned is only available for completed submissions">Date returned</button>
+            }
+        </div>
     }
 }

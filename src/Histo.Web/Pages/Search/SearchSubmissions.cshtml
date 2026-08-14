@@ -97,9 +97,36 @@
 {
     @if (Model.Results.Any())
     {
+        @* Hidden form used by per-row Select buttons and the Export to CSV button.
+           All current filter values are included so the search can be re-run server-side
+           without a separate round-trip to retrieve stored criteria from session.
+           Each row's Select button overrides SelectedBatchId via its own name/value pair.
+           Technique: HTML5 form association (form attribute on button elements). *@
+        @* asp-page triggers FormTagHelper to inject the antiforgery token.
+           SelectedBatchId is NOT included here — the per-row Select buttons
+           supply it directly via name/value, avoiding a duplicate-binding clash. *@
+        <form id="submission-action-form" method="post" asp-page="/Search/SearchSubmissions">
+            <input type="hidden" name="SubmissionNumber"    value="@Model.SubmissionNumber" />
+            <input type="hidden" name="Status"              value="@Model.Status" />
+            <input type="hidden" name="ProjectContractCode" value="@Model.ProjectContractCode" />
+            <input type="hidden" name="ContactName"         value="@Model.ContactName" />
+            <input type="hidden" name="Species"             value="@Model.Species" />
+            <input type="hidden" name="Fixation"            value="@Model.Fixation" />
+            <input type="hidden" name="SubmittedArea"       value="@Model.SubmittedArea" />
+            <input type="hidden" name="SubmittedBy"         value="@Model.SubmittedBy" />
+            <input type="hidden" name="EnteredBy"           value="@Model.EnteredBy" />
+            <input type="hidden" name="HistologyRef"        value="@Model.HistologyRef" />
+            <input type="hidden" name="SenderRef"           value="@Model.SenderRef" />
+            <input type="hidden" name="SubmittedDateFrom"   value="@Model.SubmittedDateFrom?.ToString("yyyy-MM-dd")" />
+            <input type="hidden" name="SubmittedDateTo"     value="@Model.SubmittedDateTo?.ToString("yyyy-MM-dd")" />
+            <input type="hidden" name="ReceivedDateFrom"    value="@Model.ReceivedDateFrom?.ToString("yyyy-MM-dd")" />
+            <input type="hidden" name="ReceivedDateTo"      value="@Model.ReceivedDateTo?.ToString("yyyy-MM-dd")" />
+        </form>
+
         <table class="govuk-table">
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header govuk-table__header--numeric">Select</th>
                     <th scope="col" class="govuk-table__header">Submission number</th>
                     <th scope="col" class="govuk-table__header">Project code</th>
                     <th scope="col" class="govuk-table__header">Pathologist</th>
@@ -111,7 +138,21 @@
             <tbody class="govuk-table__body">
                 @foreach (var r in Model.Results)
                 {
-                    <tr class="govuk-table__row">
+                    var isSelected = r.ID == Model.SelectedBatchId;
+                    <tr class="govuk-table__row" @(isSelected ? "style=background-color:#bbd4ea" : "")>
+                        <td class="govuk-table__cell govuk-table__cell--numeric">
+                            @* HTML5 form association: this button submits submission-action-form
+                               with SelectedBatchId overridden to this row's ID. *@
+                            <button form="submission-action-form"
+                                    formaction="?handler=Select"
+                                    type="submit"
+                                    name="SelectedBatchId"
+                                    value="@r.ID"
+                                    class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0"
+                                    data-module="govuk-button">
+                                Select
+                            </button>
+                        </td>
                         <td class="govuk-table__cell">@r.ID</td>
                         <td class="govuk-table__cell">@r.ProjectDescription</td>
                         <td class="govuk-table__cell">@r.ContactDescription</td>
@@ -122,9 +163,83 @@
                 }
             </tbody>
         </table>
+
+        @* Export to CSV — mirrors legacy lbExportExcel behaviour (all result rows, not just selected). *@
+        <button form="submission-action-form"
+                formaction="?handler=ExportCsv"
+                type="submit"
+                class="govuk-button govuk-button--secondary"
+                data-module="govuk-button">
+            Export to CSV
+        </button>
     }
     else
     {
         <p class="govuk-body">No submissions found matching the search criteria.</p>
+    }
+
+    @* ── Action panel — shown only when a row has been selected ─────────────── *@
+    @if (Model.SelectedBatchId > 0)
+    {
+        <div class="govuk-inset-text">
+            <p class="govuk-body govuk-!-font-weight-bold">Selected: Submission #@Model.SelectedBatchId</p>
+        </div>
+
+        <div class="govuk-button-group">
+
+            @* View submission — available for all statuses except Submitted *@
+            @if (Model.CanViewSubmission)
+            {
+                <a asp-page="/Batches/BatchDetails" class="govuk-button" data-module="govuk-button">View submission</a>
+            }
+            else
+            {
+                <button class="govuk-button" disabled aria-disabled="true" title="Not available for submissions in Submitted status">View submission</button>
+            }
+
+            @* Edit submission — available for Received / On Hold / In Progress only *@
+            @if (Model.CanEditSubmission)
+            {
+                <a asp-page="/Batches/EditBatch" class="govuk-button govuk-button--secondary" data-module="govuk-button">Edit submission</a>
+            }
+            else
+            {
+                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Editing is only available for submissions in Received, On Hold or In Progress status">Edit submission</button>
+            }
+
+            @* View receipt — available for all statuses except Submitted *@
+            @if (Model.CanViewReceipt)
+            {
+                <a asp-page="/Batches/ReceiveBatch" class="govuk-button govuk-button--secondary" data-module="govuk-button">View receipt</a>
+            }
+            else
+            {
+                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Not available for submissions in Submitted status">View receipt</button>
+            }
+
+            @* View quality data — Completed / Received / On Hold / In Progress *@
+            @if (Model.CanViewQualityData)
+            {
+                <a asp-page="/QC/QualityData" class="govuk-button govuk-button--secondary" data-module="govuk-button">View quality data</a>
+            }
+            else
+            {
+                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Quality data is not available for this submission status">View quality data</button>
+            }
+
+            @* View archive — Completed / Received / On Hold / In Progress *@
+            @if (Model.CanViewArchiveData)
+            {
+                <a asp-page="/Archive/ArchiveMenu" class="govuk-button govuk-button--secondary" data-module="govuk-button">View archive</a>
+            }
+            else
+            {
+                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Archive is not available for this submission status">View archive</button>
+            }
+
+            @* Print submission — blocked on Phase 2 (report engine replacement) *@
+            <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Print submission will be available in Phase 2">Print submission</button>
+
+        </div>
     }
 }

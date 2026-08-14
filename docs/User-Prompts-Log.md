@@ -451,3 +451,98 @@ Build: 0 errors, 0 warnings. Tests: 90 pass, 1 skipped, 0 fail.
 | ISS-045 | Medium | `GetAllAsync()` added to interface/repo/service; `QCNotesModel` uses `IsGlobalView` bool to route between global and batch-scoped load | `IQCNoteRepository.cs`, `QCNoteRepository.cs`, `QCNoteService.cs`, `QCNotes.cshtml.cs`, `QCNotes.cshtml` |
 
 **Build:** 0 errors, 0 warnings. **Tests:** 90 pass, 1 skipped (integration), 0 fail.
+
+---
+
+## Prompt 35 — Restore SearchSubmissions row-select action panel (2026-08-07)
+
+> In the Legacy View Submission screen, there is a specific link and button action that becomes enabled only when a row is selected in the View Submission grid. However, in the new application, selecting a row immediately navigates to the Batch Details page. Could you please analyse the discrepancy and fix the new application if required?
+
+**Scope:** Behavioural gap between SearchSubmissions.aspx (row-select enables action buttons) and new SearchSubmissions.cshtml (no row-select, no action buttons).
+
+**Root cause:** The new page had no row-selection mechanism and no action panel. The legacy grdSearchResults_SelectedIndexChanged handler enabled/disabled 6 action buttons based on the selected row's BatchStatus. This logic was not ported when SearchSubmissions.cshtml was first built.
+
+**Changes implemented (Run #72):**
+
+| File | Change |
+|------|--------|
+| src/Histo.Web/Pages/Search/SearchSubmissions.cshtml.cs | Added `[BindProperty] int SelectedBatchId`; added `SelectedBatchStatus` computed property; added 6 `Can*` availability properties mirroring legacy status-gate logic; extracted `BuildCriteria()` helper; added `OnPostSelectAsync()` (stores `Session.BatchID`, re-runs search, returns `Page()`); added `OnPostExportCsvAsync()` (CSV download). |
+| src/Histo.Web/Pages/Search/SearchSubmissions.cshtml | Added a hidden `submission-action-form` with all filter-value hidden inputs; added Select column to results table; each row's Select button uses HTML5 `form` association + `formaction="?handler=Select"`; highlighted selected row; added Export to CSV button; added action panel (inset text + `govuk-button-group`) shown when `SelectedBatchId > 0` with availability gating per legacy status rules. |
+
+**Button availability matrix (from legacy grdSearchResults_SelectedIndexChanged):**
+
+| Status | View | Edit | Print | Receipt | Quality | Archive |
+|--------|------|------|-------|---------|---------|---------|
+| Submitted ("1") | ✗ | ✗ | ✓* | ✗ | ✗ | ✗ |
+| Completed ("4") | ✓ | ✗ | ✓* | ✓ | ✓ | ✓ |
+| Rejected ("3") | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ |
+| Received/On Hold/In Progress | ✓ | ✓ | ✓* | ✓ | ✓ | ✓ |
+
+*Print submission is rendered disabled in the new app — FinalPrintBatch.aspx is blocked on Phase 2 (report engine replacement).
+
+**Build:** 0 errors, 0 warnings (CoreCompile; copy step skipped — dev server running).
+---
+
+## Prompt 37 — Fix Select button not working in ViewSubmissions; check routing navigation; GDS alignment and journal update (2026-08-14)
+
+> No action is happening on the click of select button in view submission screen
+>
+> check the routing navigation on these button links properly
+
+**Follow-up (same session):**
+> update journal and prompts logs with session duration to fix
+>
+> Also check these issue fix is aligned GDS and finally add them into journal and prompts logs with session duration to fix
+
+**Root causes found and fixed (Run #74):**
+
+| # | Bug | Root cause | Fix |
+|---|-----|-----------|-----|
+| 1 | Select does nothing (`ViewSubmissions` + `SearchSubmissions`) | Hidden carrier form has no `asp-*` attribute → `FormTagHelper` never runs → no `__RequestVerificationToken` injected → ASP.NET Core rejects every POST with 400 Bad Request | Added `asp-page` to both hidden forms |
+| 2 | `OnPostSelectAsync` always receives `SelectedBatchId = 0` | Hidden form contained `<input name="SelectedBatchId" value="0">` duplicating the per-row button's submission; ASP.NET Core model binding picks the hidden input's value (0) | Removed the duplicate hidden `SelectedBatchId` from both forms |
+| 3 | Copy submission → "submission not found" | `CopyBatchModel.OnGetAsync(int sourceBatchId)` requires a route/query parameter; anchor link had none → `sourceBatchId = 0` | Added `asp-route-sourceBatchId="@Model.SelectedBatchId"` to the Copy submission link |
+
+**Files changed:** [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml), [src/Histo.Web/Pages/Search/SearchSubmissions.cshtml](../src/Histo.Web/Pages/Search/SearchSubmissions.cshtml)
+
+**GDS alignment check:** Fixes are functional/security corrections only — no GDS components added or removed. The action panel (from Run #73) uses `govuk-inset-text`, `govuk-button-group`, `govuk-button--secondary`, `disabled aria-disabled="true"` on Phase-2-blocked and status-locked buttons, sentence-case labels, and a `govuk-table` with correct `th scope="col"` headers — all GDS-compliant. One pre-existing minor deviation (not introduced in this run): selected row uses inline `style=background-color:#bbd4ea` rather than a CSS class; addressable as a future CSS housekeeping task.
+
+**Build:** 0 errors, 0 warnings. **Duration:** ~15 minutes.
+
+---
+
+## Prompt 36 — Restore ViewSubmissions row-select action panel (2026-08-14)
+
+> In the Legacy View Submission screen, there is a specific link and button action that becomes enabled only when a row is selected in the View Submission grid. However, in the new application, selecting a row immediately navigates to the Batch Details page of but seeing different button and actions.
+>
+> Buttons: Print Submission, Edit Submission, View Submission, Date Returned, Print Submission Notes, Copy Submission
+> Link: Export to Excel
+
+**Clarification confirmed:** `ViewSubmissions.aspx` (`Submissions/ViewSubmissions.cshtml`) and `SearchSubmissions.aspx` (`Search/SearchSubmissions.cshtml`) are **two distinct pages** with different purposes and different button sets.
+
+| Page | Purpose | Button set |
+|------|---------|-----------|
+| `Search/SearchSubmissions` | Histopath staff search (admin/QC context) | View Quality Data, View Archive, View Receipt |
+| `Submissions/ViewSubmissions` | Lab's main submission browsing page | **Print Submission, Print Submission Notes, Copy Submission, Edit Submission, View Submission, Date Returned** |
+
+**Root cause:** `ViewSubmissions.cshtml` had a Select button per row but `OnPostSelect(int batchId)` immediately redirected to BatchDetails — it never stored a `SelectedBatchId`, re-ran the search, or rendered an action panel. The legacy `grdviewResults_SelectedIndexChanged` status-gate logic was never ported.
+
+**Changes implemented (Run #73):**
+
+| File | Change |
+|------|--------|
+| `src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs` | Added `[BindProperty] int SelectedBatchId`; added `SelectedBatchStatus` computed property; added 4 `Can*` availability properties mirroring legacy status-gate logic; extracted `BuildCriteria()` helper; replaced `OnPostSelect(int batchId)` → `OnPostSelectAsync()` (stores `Session.BatchID`, re-runs search, returns `Page()`); added `OnPostExportCsvAsync()` (CSV download replacing `lbExportExcel`). |
+| `src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml` | Added hidden `view-action-form` with all filter hidden inputs outside the table; removed inline `<form>` from each `<tr>`; per-row Select button now uses HTML5 `form` association + `formaction="?handler=Select"` + `name="SelectedBatchId" value="@r.ID"`; highlighted selected row; added Export to CSV button; added action panel (`govuk-inset-text` + `govuk-button-group`) shown when `SelectedBatchId > 0` with status-gated buttons. |
+
+**Button availability matrix (from legacy `grdviewResults_SelectedIndexChanged`):**
+
+| Status | View | Edit | Copy | Date Returned | Print | Print Notes |
+|--------|------|------|------|---------------|-------|-------------|
+| Submitted ("1") | ✓ | ✓ | ✓ | ✗ | Phase 2 | Phase 2 |
+| Rejected ("3") | ✓ | ✓ | ✓ | ✗ | Phase 2 | Phase 2 |
+| Completed ("4") | ✓ | ✗ | ✓ | ✓ | Phase 2 | Phase 2 |
+| Received/On Hold/In Progress | ✓ | ✗ | ✓ | ✗ | Phase 2 | Phase 2 |
+
+Print Submission → `SubmissionForm.aspx` (Crystal Reports popup) — Phase 2 blocked.
+Print Submission Notes → `SubmissionNotes.aspx` (Crystal Reports popup) — Phase 2 blocked.
+
+**Build:** 0 errors, 0 warnings (CoreCompile).

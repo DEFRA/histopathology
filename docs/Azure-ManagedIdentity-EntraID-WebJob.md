@@ -153,7 +153,21 @@ dotnet add src/Histo.Web/Histo.Web.csproj package Sustainsys.Saml2.AspNetCore2
 
 ### 3.2 appsettings.json additions
 
-Add the `Saml2` section. Use placeholder tokens — `TenantId` is stored in Key Vault and injected as an App Service application setting (see [Section 3.6](#36-key-vault-secrets-for-entra-id)):
+Add the `Saml2` section. Use placeholder tokens — `TenantId` is stored in Key Vault and injected as an App Service application setting (see [Section 3.6](#36-key-vault-secrets-for-entra-id)).
+
+**Dev environment** (confirmed DEFRA hosting URLs — 2026-08-14):
+
+```json
+{
+  "Saml2": {
+    "EntityId": "https://dev-cde.azure.defra.cloud",
+    "ReturnUrl": "https://dev-cde.azure.defra.cloud/",
+    "TenantId": "__TENANT_ID__"
+  }
+}
+```
+
+**Production / other environments** (replace hostname when confirmed):
 
 ```json
 {
@@ -366,6 +380,12 @@ The `EntityId` and `ReturnUrl` values are not secrets and can be stored as plain
 ### 3.7 Enterprise Application setup — manual steps
 
 SAML 2.0 uses an **Enterprise Application** in Entra ID, not an OAuth App Registration. These steps must be performed in the Azure Portal and cannot be automated by Bicep.
+
+> **Confirmed DEFRA hosting URLs (dev environment — 2026-08-14):**
+> - Entity ID: `https://dev-cde.azure.defra.cloud`
+> - ACS URL: `https://dev-cde.azure.defra.cloud/Saml2/Acs`
+>
+> These confirmed values must be used for all Entra ID Enterprise App configuration and in `appsettings.json` / Bicep for the dev environment. Production URLs will follow the same pattern with the prod hostname.
 
 1. Navigate to **Entra ID → Enterprise applications → New application → Create your own application**.
 2. **Name:** `Histo.Web {environment}` → select **Integrate any other application you don't find in the gallery** → Create.

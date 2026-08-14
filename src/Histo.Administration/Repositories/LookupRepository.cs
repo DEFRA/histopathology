@@ -98,7 +98,7 @@ public sealed class LookupRepository : ILookupRepository
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<dynamic>(
-            "GetSpeciesLookup",
+            "GetluSpecies",
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.Select(r => new LookupItem
         {
