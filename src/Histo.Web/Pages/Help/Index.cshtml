@@ -48,7 +48,13 @@
             <li><a class="govuk-link" href="#edit-histology-ref">Edit sender / histology reference</a></li>
             <li><a class="govuk-link" href="#user-maintenance">User maintenance</a></li>
             <li><a class="govuk-link" href="#audit-logs">Audit logs</a></li>
-            <li><a class="govuk-link" href="#view-imported-data">View old ICC_Sub data</a></li>
+                <li><a class="govuk-link" href="#view-imported-data">View old ICC_Sub data</a></li>
+            <li><a class="govuk-link" href="#pick-list-maintenance">Pick list maintenance</a></li>
+            <li><a class="govuk-link" href="#search-test-totals">Search test totals</a></li>
+            <li><a class="govuk-link" href="#search-block-refs">Search block refs</a></li>
+            <li><a class="govuk-link" href="#search-archive-location">Search archive location</a></li>
+            <li><a class="govuk-link" href="#submissions-awaiting-quality-data">Submissions awaiting quality data</a></li>
+            <li><a class="govuk-link" href="#print-submission">Print submission</a></li>
         }
     </ol>
 </nav>
@@ -78,6 +84,11 @@
 
     <h3 class="govuk-heading-m" id="General_ExportToExcel">Export to Excel</h3>
     <p class="govuk-body">Several tables include an <strong>Export to Excel</strong> link. Selecting this link downloads the current table results as a spreadsheet file that can be opened in Excel.</p>
+
+    <h3 class="govuk-heading-m" id="General_ApplicationError">Application error</h3>
+    <p class="govuk-body">If the system encounters an unexpected problem, an application error screen is displayed. Details of the error are shown, which a system administrator may be able to use to determine the cause of the problem. The error will also have been recorded in the system log.</p>
+    <p class="govuk-body">You can record additional information about what you were doing when the error occurred in the text box at the bottom of the screen. Select <strong>Save</strong> and your notes will also be saved to the system log for later analysis.</p>
+    <p class="govuk-body">After an error has occurred, use the home link to return to the home screen. If the error occurred before the data you were working on was saved, that data will have been lost.</p>
 
     <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
 </section>
@@ -517,7 +528,16 @@
             <li>Submitted date range</li>
             <li>Received date range</li>
         </ul>
-        <p class="govuk-body">Select <strong>Search</strong> to run the search. Select <strong>Print submission</strong> to generate a PDF for the selected submission. Select <strong>Done</strong> to return to the home screen.</p>
+    <p class="govuk-body">Select <strong>Search</strong> to run the search. Select <strong>Done</strong> to return to the home screen.</p>
+    <p class="govuk-body">Row actions (active only when a submission is selected):</p>
+    <ul class="govuk-list govuk-list--bullet">
+        <li><strong>Print submission</strong> — generate a PDF submission form. For wet tissue submissions where tissues have been assigned to blocks, this prints the Histopathology version (block/tissue). To see the original tissue-only version, use Print Submission on the <a class="govuk-link" href="#view-submissions">View submissions</a> screen.</li>
+        <li><strong>Edit submission</strong> — available only if the submission is not Completed. Takes you to <a class="govuk-link" href="#submission-details">Submission details</a> with full edit capability.</li>
+        <li><strong>View submission</strong> — view the submission details without editing.</li>
+        <li><strong>View quality data</strong> — view the quality data for the submission without editing.</li>
+        <li><strong>View archive</strong> — view block or tissue archive details for the submission without editing.</li>
+        <li><strong>View receipt</strong> — view the receipt details recorded when the submission was originally received.</li>
+    </ul>
         <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
     </section>
 
@@ -525,7 +545,7 @@
 
     <section id="search-menu">
         <h2 class="govuk-heading-l" id="SearchMenu">28. Search outputs menu</h2>
-        <p class="govuk-body">The search outputs menu provides links to search screens for TSE and non-TSE submission outputs. Select the search type you require.</p>
+        <p class="govuk-body">The search outputs menu provides links to search screens for TSE and non-TSE submission outputs. Select <strong>Search TSE Outputs</strong> or <strong>Search Non-TSE Outputs</strong> to go to the <a class="govuk-link" href="#search-test-totals">Search test totals</a> screen.</p>
         <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
     </section>
 
@@ -545,7 +565,14 @@
 
     <section id="book-block-ref">
         <h2 class="govuk-heading-l" id="BookBlockRef">30. Book block references</h2>
-        <p class="govuk-body">This screen allows you to pre-book block references for a submission before the submission is created. Enter the required details and select <strong>Book</strong> to reserve the block references.</p>
+        <p class="govuk-body">This screen allows you to pre-book block references for samples before a submission is created.</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li>To book blocks for a single sample, enter the sender reference in the <strong>Sender ref to</strong> field.</li>
+            <li>To book blocks for a range of sender references, enter the starting reference in <strong>Sender ref from</strong> and the ending reference in <strong>Sender ref to</strong>. Only PG numbers and mouse numbers can be entered as ranges. Blocks will be booked for each sender reference in the range.</li>
+            <li>To book a range of block references, enter the starting block in <strong>Block ref from</strong> and the ending block in <strong>Block ref to</strong>. For a single block, enter it in <strong>Block ref from</strong> only.</li>
+        </ul>
+        <p class="govuk-body">Select <strong>Book</strong>. A confirmation prompt will appear — check the details before confirming. The system will report any blocks that could not be booked. Select <strong>Done</strong> to return to the booking menu.</p>
+        <p class="govuk-body">Use the <strong>Check used block refs</strong> link to check which block references have already been used for a histology reference.</p>
         <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
     </section>
 
@@ -553,7 +580,14 @@
 
     <section id="book-histology-ref">
         <h2 class="govuk-heading-l" id="BookHistologyRef">31. Book histology references</h2>
-        <p class="govuk-body">This screen allows you to block-book histology references (non-PG). Enter the required details and select <strong>Book</strong> to reserve the references.</p>
+        <p class="govuk-body">This screen allows you to block-book histology references. The table at the top shows the current next histology reference for each histology type.</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li>Select the <strong>Histology type</strong> from the drop-down list.</li>
+            <li>Enter the <strong>Number required</strong> — the number of histology references to book.</li>
+            <li>If blocks need to be booked for each histology reference, enter the block range in <strong>Block ref from</strong> and <strong>Block ref to</strong>. For a single block, enter only in <strong>Block ref to</strong>. Blocks will be booked for each histology reference requested.</li>
+        </ul>
+        <p class="govuk-body">Select <strong>Book</strong>. A confirmation prompt will appear — check the details before confirming. The system will report the references booked at the bottom of the screen. Select <strong>Done</strong> to return to the booking menu.</p>
+        <p class="govuk-body">Use the <strong>Check used block refs</strong> link to check which block references have already been used for a histology reference.</p>
         <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
     </section>
 
@@ -561,7 +595,10 @@
 
     <section id="edit-submission-status">
         <h2 class="govuk-heading-l" id="EditBatch">32. Edit submission status</h2>
-        <p class="govuk-body">This screen lets you edit the status of a submission and put samples on hold. Select the submission from the table, update the status or hold fields, and select <strong>Done</strong> to save.</p>
+        <p class="govuk-body">This screen lets you change the status of a submission and record a reason for the change. Select the submission from the table or enter the submission number in the <strong>Enter submission number</strong> field and select <strong>Go</strong>.</p>
+        <p class="govuk-body">Update the <strong>Submission status</strong> field and enter a reason in the <strong>Reason</strong> field. Select <strong>Done</strong> to apply the change, or <strong>Cancel</strong> to exit without saving.</p>
+        <p class="govuk-body">The screen also provides access to <strong>Edit submission</strong> (taking you to <a class="govuk-link" href="#submission-details">Submission details</a>) and to the <a class="govuk-link" href="#samples-on-hold">Samples on hold</a> screen for the chosen submission.</p>
+        <p class="govuk-body">If a submission has a Completed status and you need to add archive details, temporarily set the status to <strong>In progress</strong>, enter the archive details via the Quality data screen, then exit. As all tests are already dispatched, the status will automatically revert to Completed when you exit. If you change a test to not dispatched, the status will remain In progress.</p>
         <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
     </section>
 
@@ -587,7 +624,14 @@
         <h2 class="govuk-heading-l" id="UserMaintenance">35. User maintenance</h2>
         <p class="govuk-body">This screen lists all system users. Use it to add new users or edit existing user details.</p>
         <p class="govuk-body">Select <strong>Add user</strong> to create a new user. Select a user row and then <strong>Edit user</strong> to update their details.</p>
-        <p class="govuk-body">Each user must have a Windows username (NTLogin), a name, group (role), user area and an active status.</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li><strong>Username (NTLogin)</strong> — the user's system login identifier.</li>
+            <li><strong>Name</strong> — the user's name (first name followed by surname).</li>
+            <li><strong>Group</strong> — select Customer, Histopathology User or Maintenance. Maintenance should only be assigned to Histopathology super users as it gives access to user maintenance, pick list maintenance and the audit log.</li>
+            <li><strong>Area</strong> — denotes the customer area (for example, External Customers, Histopath, Mouse Bioassay, Neuropath).</li>
+            <li><strong>Active</strong> — uncheck this box to deactivate a user who has left, rather than deleting them.</li>
+            <li><strong>Show deactivated items</strong> — check this to include deactivated users in the list.</li>
+        </ul>
         <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
     </section>
 
@@ -597,10 +641,11 @@
         <h2 class="govuk-heading-l" id="AuditLogMenu">36. Audit logs</h2>
         <p class="govuk-body">The audit log menu provides three search options:</p>
         <ul class="govuk-list govuk-list--bullet">
-            <li><strong>Search by date</strong> — view all audit events within a date range.</li>
-            <li><strong>Search by user</strong> — view all audit events for a specific user.</li>
-            <li><strong>Search by submission</strong> — view all audit events for a specific submission number.</li>
+            <li><strong>Search by date</strong> — select the date using the <strong>Log entries on</strong> field, then select <strong>Search</strong> to view all audit events for that day.</li>
+            <li><strong>Search by user</strong> — select the date range using the <strong>Log entries between</strong> fields, select the user, then select <strong>Search</strong>.</li>
+            <li><strong>Search by submission</strong> — select the date range using the <strong>Log entries between</strong> fields, enter the submission number, then select <strong>Search</strong>. If no date range is entered, it may take some time for results to be returned.</li>
         </ul>
+        <p class="govuk-body">Results are displayed in a table showing the audit trail. Results can be exported to Excel.</p>
         <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
     </section>
 
@@ -610,6 +655,81 @@
         <h2 class="govuk-heading-l" id="ViewImportedData">37. View old ICC_Sub data</h2>
         <p class="govuk-body">Use this screen to view data imported from the legacy ICC_Sub database. Select a table from the <strong>Table</strong> list to display its records, showing sender ref, histology ref, block ref, project, date submitted, species, tissue and comments.</p>
         <p class="govuk-body">Use the <strong>Filter</strong> field to search across fields (similar to a keyword search). Enclose a phrase in quotes for an exact match. Select <strong>Go</strong> to apply the filter, or <strong>Clear</strong> to reset it and show all records. If no table is selected but a filter is entered, the search applies across all tables.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="pick-list-maintenance">
+        <h2 class="govuk-heading-l" id="PickListMaintenance">38. Pick list maintenance</h2>
+        <p class="govuk-body">This screen allows you to modify the lookup tables used throughout the system. Use <strong>Select a table</strong> to choose which lookup table to modify. Use the table controls to add or edit entries.</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li>There is no delete option. If a value is no longer required, deactivate it by unchecking the <strong>Active</strong> column for that entry.</li>
+            <li><strong>Show deactivated items</strong> — check this to include deactivated entries in the list.</li>
+        </ul>
+        <p class="govuk-body">Take care when modifying lookup tables, as changes affect the option lists presented to all users throughout the system.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="search-test-totals">
+        <h2 class="govuk-heading-l" id="SearchTestTotals">39. Search test totals</h2>
+        <p class="govuk-body">Use this screen to produce outputs relating to charges applied to tests. This screen is accessed from the <a class="govuk-link" href="#search-menu">Search outputs menu</a>.</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li>Select a <strong>Start date</strong> and <strong>End date</strong> to define the date range to search within.</li>
+            <li>Select the <strong>Project or contract code</strong>.</li>
+            <li>Use the middle selection to specify which tests to search for.</li>
+        </ul>
+        <p class="govuk-body">Select <strong>Analyse results</strong>. Depending on the search criteria, results may take some time to appear. Do not interact with the page while the search is running. Results are displayed in a table at the bottom of the screen and can be exported to Excel.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="search-block-refs">
+        <h2 class="govuk-heading-l" id="SearchBlockRefs">40. Search block refs</h2>
+        <p class="govuk-body">Use this screen to see which block references have been used, not used, or pre-booked for a particular histology reference or sender reference.</p>
+        <p class="govuk-body">Enter the <strong>Histology ref</strong> or the <strong>Sender ref</strong> in the relevant field, then select <strong>Search</strong>. Results can be exported to Excel.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="search-archive-location">
+        <h2 class="govuk-heading-l" id="SearchArchiveLocation">41. Search archive location</h2>
+        <p class="govuk-body">Use this screen to view archive details for any given sample.</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li>Enter either the <strong>Histology ref</strong> or <strong>Sender ref</strong>.</li>
+            <li>Select whether you want to see <strong>Tissue archive</strong>, <strong>Block archive</strong> or <strong>Slide archive</strong>.</li>
+            <li>Select <strong>Search</strong>.</li>
+        </ul>
+        <p class="govuk-body">To filter the results further: for Tissue archive, use the pick list to select the tissue type; for Block archive, enter the block reference. If you want to restrict results to a specific archive location, use the <strong>Archive location</strong> pick list.</p>
+        <p class="govuk-body">Results can be exported to Excel.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="submissions-awaiting-quality-data">
+        <h2 class="govuk-heading-l" id="BatchesForDispatch">42. Submissions awaiting quality data</h2>
+        <p class="govuk-body">This screen begins the process of entering quality data for a submission. If you know the submission number, enter it in the <strong>Enter submission number</strong> field and select <strong>Go</strong> to go directly to the <a class="govuk-link" href="#quality-data">Quality data</a> screen. Alternatively, find and select the submission in the table.</p>
+        <p class="govuk-body">Only submissions awaiting quality data are listed. Once all quality data has been entered (all tests have been dispatched), the submission is marked as Completed and no longer appears here. If you enter the number of a submission not awaiting quality data, an error message is shown.</p>
+        <p class="govuk-body">Select <strong>Done</strong> to return to the home screen.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="print-submission">
+        <h2 class="govuk-heading-l" id="FinalPrintBatch">43. Print submission</h2>
+        <p class="govuk-body">This screen appears after a submission has been created or received, and allows you to print a report of the submission.</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li>Select <strong>Print submission</strong> to generate a PDF of the submission form. You should print this form and send it with your samples to Histopathology. The submission form can also be printed at a later date from the <a class="govuk-link" href="#view-submissions">View submissions</a> screen.</li>
+            <li>Select <strong>Print submission notes</strong> to generate a PDF of all comments across the submission.</li>
+        </ul>
+        <p class="govuk-body">Each time you select Print Submission, a new browser window opens. Close the window after printing to avoid having multiple submission form windows open.</p>
+        <p class="govuk-body">Select <strong>Done</strong> to return to the home screen.</p>
         <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
     </section>
 }
