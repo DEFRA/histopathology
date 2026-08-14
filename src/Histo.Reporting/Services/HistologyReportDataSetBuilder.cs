@@ -68,13 +68,18 @@ public sealed class HistologyReportDataSetBuilder
         var rawSubmittedAs = (await commonGrid.ReadAsync()).Cast<IDictionary<string, object>>().ToList();
 
         // ── 2. Submission rows ───────────────────────────────────────────────
-        // GetBatchSubmissionDetailsByBatchID returns the per-submission detail rows
-        // used to build the BatchSubmission table in the legacy SubmissionForm report.
-        var rawSubmissions = (await conn.QueryAsync(
+        // GetBatchSubmissionDetailsByBatchID returns 3 result sets:
+        //   [0] BatchSubmission join rows (ID, BatchID, AnimalID, Order)
+        //   [1] BatchTissues rows         (AnimalID, ID, BatchSubmissionID, TissueCode, Comment, ...)
+        //   [2] Animal rows               (ID, SenderRef, HistologyRef, NextBlockRef, ...)
+        var submissionGrid = await conn.QueryMultipleAsync(
             "GetBatchSubmissionDetailsByBatchID",
             new { ID = batchId },
-            commandType: CommandType.StoredProcedure))
-            .Cast<IDictionary<string, object>>().ToList();
+            commandType: CommandType.StoredProcedure);
+
+        var rawBatchSubmissions = (await submissionGrid.ReadAsync()).Cast<IDictionary<string, object>>().ToList();
+        var rawTissues          = (await submissionGrid.ReadAsync()).Cast<IDictionary<string, object>>().ToList();
+        var rawAnimals          = (await submissionGrid.ReadAsync()).Cast<IDictionary<string, object>>().ToList();
 
         // ── 3. Assemble the report DataSet ───────────────────────────────────
         var ds = new DataSet("HistologyReport");
@@ -82,7 +87,7 @@ public sealed class HistologyReportDataSetBuilder
         ds.Tables.Add(BuildBatchTable(rawBatch, rawSubmittedAs, batchId));
         ds.Tables.Add(BuildPostFixationTable(rawPostFix, batchId));
         ds.Tables.Add(BuildHistologyTable(rawHistology, batchId));
-        ds.Tables.Add(BuildSubmissionTable(rawSubmissions, batchId));
+        ds.Tables.Add(BuildSubmissionTable(rawBatchSubmissions, rawTissues, rawAnimals, batchId));
         ds.Tables.Add(BuildVersionTable(rawBatch));
 
         return ds;
@@ -208,7 +213,9 @@ public sealed class HistologyReportDataSetBuilder
     }
 
     internal static DataTable BuildSubmissionTable(
-        IList<IDictionary<string, object>> rawSubmissions,
+        IList<IDictionary<string, object>> rawBatchSubmissions,
+        IList<IDictionary<string, object>> rawTissues,
+        IList<IDictionary<string, object>> rawAnimals,
         int batchId)
     {
         var dt = new DataTable("BatchSubmission");
@@ -220,16 +227,42 @@ public sealed class HistologyReportDataSetBuilder
         dt.Columns.Add("RepeatBlock");
         dt.Columns.Add("CustomerRef");
 
-        foreach (var row in rawSubmissions)
+        if (rawTissues.Count == 0)
+            return dt;
+
+        // Build animal lookup: AnimalID → animal row
+        var animalById = rawAnimals
+            .Where(a => a.ContainsKey("ID"))
+            .ToDictionary(a => Convert.ToInt32(a["ID"]), a => a);
+
+        // Track per-animal block ref counter (1-based, zero-padded to 2 digits)
+        var blockCounter = new Dictionary<int, int>();
+
+        // Sort tissues by AnimalID then tissue ID for stable ordering
+        var sortedTissues = rawTissues
+            .OrderBy(t => t.TryGetValue("AnimalID", out var aid) ? Convert.ToInt32(aid) : 0)
+            .ThenBy(t => t.TryGetValue("ID", out var tid) ? Convert.ToInt32(tid) : 0)
+            .ToList();
+
+        foreach (var tissue in sortedTissues)
         {
+            var animalId = tissue.TryGetValue("AnimalID", out var aidVal)
+                ? Convert.ToInt32(aidVal) : 0;
+
+            animalById.TryGetValue(animalId, out var animal);
+
+            blockCounter.TryGetValue(animalId, out var counter);
+            counter++;
+            blockCounter[animalId] = counter;
+
             var dr = dt.NewRow();
-            dr["BatchID"]      = batchId.ToString();
-            dr["SenderRef"]    = Str(row, "SenderRef");
-            dr["HistologyRef"] = Str(row, "HistologyRef");
-            dr["BlockRef"]     = Str(row, "BlockRef");
-            dr["TissueDetails"] = Str(row, "TissueDetails");
-            dr["RepeatBlock"]  = Str(row, "RepeatBlock");
-            dr["CustomerRef"]  = Str(row, "CustomerRef");
+            dr["BatchID"]       = batchId.ToString();
+            dr["SenderRef"]     = animal is not null ? Str(animal, "SenderRef")    : string.Empty;
+            dr["HistologyRef"]  = animal is not null ? Str(animal, "HistologyRef") : string.Empty;
+            dr["BlockRef"]      = counter.ToString("D2");
+            dr["TissueDetails"] = Str(tissue, "TissueCode");
+            dr["RepeatBlock"]   = string.Empty;
+            dr["CustomerRef"]   = Str(tissue, "Comment");
             dt.Rows.Add(dr);
         }
 

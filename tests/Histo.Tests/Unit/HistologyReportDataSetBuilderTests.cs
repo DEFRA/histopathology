@@ -281,7 +281,9 @@ public class HistologyReportDataSetBuilderTests
     public void BuildSubmissionTable_EmptyInput_ReturnsZeroRows()
     {
         var table = HistologyReportDataSetBuilder.BuildSubmissionTable(
-            rawSubmissions: [],
+            rawBatchSubmissions: [],
+            rawTissues: [],
+            rawAnimals: [],
             batchId: 1);
 
         Assert.Equal(0, table.Rows.Count);
@@ -289,39 +291,40 @@ public class HistologyReportDataSetBuilderTests
     }
 
     [Fact]
-    public void BuildSubmissionTable_RepeatBlockValuePreserved()
+    public void BuildSubmissionTable_BlockRef_SequentialPerAnimal()
     {
+        var tissue1 = Row(("AnimalID", (object)5), ("ID", (object)10), ("BatchSubmissionID", (object)1), ("TissueCode", "Lung"),  ("Comment", ""));
+        var tissue2 = Row(("AnimalID", (object)5), ("ID", (object)11), ("BatchSubmissionID", (object)1), ("TissueCode", "Liver"), ("Comment", ""));
+        var animal  = Row(("ID", (object)5), ("SenderRef", "REF-1"), ("HistologyRef", "25/001"));
+
         var table = HistologyReportDataSetBuilder.BuildSubmissionTable(
-            rawSubmissions: [Row(
-                ("SenderRef",    "REF-001"),
-                ("HistologyRef", "11/001"),
-                ("BlockRef",     "01"),
-                ("TissueDetails","Lung"),
-                ("RepeatBlock",  "true"),
-                ("CustomerRef",  "cust1"))],
+            rawBatchSubmissions: [],
+            rawTissues: [tissue1, tissue2],
+            rawAnimals: [animal],
             batchId: 1);
 
-        Assert.Equal("true", table.Rows[0]["RepeatBlock"]);
+        Assert.Equal(2, table.Rows.Count);
+        Assert.Equal("01", table.Rows[0]["BlockRef"]);
+        Assert.Equal("02", table.Rows[1]["BlockRef"]);
     }
 
     [Fact]
     public void BuildSubmissionTable_AllColumnsPopulated()
     {
+        var tissue = Row(("AnimalID", (object)42), ("ID", (object)1), ("BatchSubmissionID", (object)1), ("TissueCode", "Kidney"), ("Comment", "c-ref"));
+        var animal = Row(("ID", (object)42), ("SenderRef", "S-001"), ("HistologyRef", "11/999"));
+
         var table = HistologyReportDataSetBuilder.BuildSubmissionTable(
-            rawSubmissions: [Row(
-                ("SenderRef",    "S-001"),
-                ("HistologyRef", "11/999"),
-                ("BlockRef",     "02"),
-                ("TissueDetails","Kidney"),
-                ("RepeatBlock",  ""),
-                ("CustomerRef",  "c-ref"))],
+            rawBatchSubmissions: [],
+            rawTissues: [tissue],
+            rawAnimals: [animal],
             batchId: 7);
 
         var row = table.Rows[0];
         Assert.Equal("7",      row["BatchID"]);
         Assert.Equal("S-001",  row["SenderRef"]);
         Assert.Equal("11/999", row["HistologyRef"]);
-        Assert.Equal("02",     row["BlockRef"]);
+        Assert.Equal("01",     row["BlockRef"]);
         Assert.Equal("Kidney", row["TissueDetails"]);
         Assert.Equal("",       row["RepeatBlock"]);
         Assert.Equal("c-ref",  row["CustomerRef"]);
