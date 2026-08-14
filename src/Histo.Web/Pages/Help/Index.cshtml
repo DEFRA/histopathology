@@ -1,0 +1,615 @@
+@page
+@model Histo.Web.Pages.Help.HelpModel
+@{
+    ViewData["Title"] = "Help";
+    ViewData["PageTitle"] = "Help";
+    var isCustomer = Model.Session.IsCustomer;
+}
+
+@* ── Table of Contents ─────────────────────────────────────────────────── *@
+<nav aria-label="Help contents" class="govuk-!-margin-bottom-8">
+    <h2 class="govuk-heading-m">Contents</h2>
+    <ol class="govuk-list govuk-list--number">
+        <li><a class="govuk-link" href="#general">General information</a></li>
+        <li><a class="govuk-link" href="#saving-data">Saving data</a></li>
+        <li><a class="govuk-link" href="#home-screen">Home screen</a></li>
+        <li><a class="govuk-link" href="#submission-type">Submission type</a></li>
+        <li><a class="govuk-link" href="#submission-details">Submission details</a></li>
+        <li><a class="govuk-link" href="#sample-summary">Sample summary</a></li>
+        <li><a class="govuk-link" href="#add-sample">Add sample</a></li>
+        <li><a class="govuk-link" href="#sample-details">Sample details</a></li>
+        <li><a class="govuk-link" href="#sample-blocks">Sample blocks</a></li>
+        <li><a class="govuk-link" href="#block-details">Block details</a></li>
+        <li><a class="govuk-link" href="#view-submissions">View submissions</a></li>
+        <li><a class="govuk-link" href="#copy-submission">Copy submission</a></li>
+        <li><a class="govuk-link" href="#search-pm-dates">Search PM dates</a></li>
+        <li><a class="govuk-link" href="#view-samples">View samples</a></li>
+        <li><a class="govuk-link" href="#submission-status">Submission status explanation</a></li>
+        @if (!isCustomer)
+        {
+            <li><a class="govuk-link" href="#submissions-awaiting-receipt">Submissions awaiting receipt</a></li>
+            <li><a class="govuk-link" href="#receive-submission">Receive submission</a></li>
+            <li><a class="govuk-link" href="#submissions-received">Submissions received</a></li>
+            <li><a class="govuk-link" href="#submission-block-summary">Submission block summary</a></li>
+            <li><a class="govuk-link" href="#quality-data">Quality data</a></li>
+            <li><a class="govuk-link" href="#archive-submission">Archive submission</a></li>
+            <li><a class="govuk-link" href="#archive-menu">Archive menu</a></li>
+            <li><a class="govuk-link" href="#archive-blocks">Archive blocks</a></li>
+            <li><a class="govuk-link" href="#archive-tissues">Archive tissues</a></li>
+            <li><a class="govuk-link" href="#qc-notes">QC notes</a></li>
+            <li><a class="govuk-link" href="#edit-qc-note">Edit QC note</a></li>
+            <li><a class="govuk-link" href="#search-submissions">Search submissions</a></li>
+            <li><a class="govuk-link" href="#search-menu">Search outputs menu</a></li>
+            <li><a class="govuk-link" href="#booking-menu">Booking menu</a></li>
+            <li><a class="govuk-link" href="#book-block-ref">Book block references</a></li>
+            <li><a class="govuk-link" href="#book-histology-ref">Book histology references</a></li>
+            <li><a class="govuk-link" href="#edit-submission-status">Edit submission status</a></li>
+            <li><a class="govuk-link" href="#samples-on-hold">Samples on hold</a></li>
+            <li><a class="govuk-link" href="#edit-histology-ref">Edit sender / histology reference</a></li>
+            <li><a class="govuk-link" href="#user-maintenance">User maintenance</a></li>
+            <li><a class="govuk-link" href="#audit-logs">Audit logs</a></li>
+            <li><a class="govuk-link" href="#view-imported-data">View old ICC_Sub data</a></li>
+        }
+    </ol>
+</nav>
+
+<hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+@* ── Section: General ──────────────────────────────────────────────────── *@
+<section id="general">
+    <h2 class="govuk-heading-l">1. General information</h2>
+
+    <h3 class="govuk-heading-m" id="General_Header">The page header</h3>
+    <p class="govuk-body">A navigation bar is displayed at the top of every page in the system. It shows the service name and links to the main areas of the system that are available to you based on your user group.</p>
+    <p class="govuk-body">The top-right area of every page shows your name, user group and the area you are assigned to.</p>
+
+    <h3 class="govuk-heading-m" id="General_DateControls">Date entry</h3>
+    <p class="govuk-body">Enter dates directly into date fields using the format <strong>DD/MM/YYYY</strong>. For example, enter <samp>01/04/2025</samp> for 1 April 2025.</p>
+
+    <h3 class="govuk-heading-m" id="General_Grids">Data tables</h3>
+    <p class="govuk-body">Data is displayed in tables. To select a row, use the row-level action link or button. Where present, column headings can be selected to sort the table by that column — select once for ascending order, again for descending.</p>
+    <p class="govuk-body">When a table spans multiple pages, use the pagination links below the table to move between pages.</p>
+
+    <h3 class="govuk-heading-m" id="General_PickLists">Pick lists</h3>
+    <p class="govuk-body">Drop-down lists include a blank first entry. This makes it easy to see which fields have had data entered and lets you clear a previous selection by choosing the blank entry.</p>
+
+    <h3 class="govuk-heading-m" id="General_FieldErrors">Field error messages</h3>
+    <p class="govuk-body">If required data is missing or invalid when a form is submitted, an error summary appears at the top of the page. Each error message links to the relevant field. Correct the highlighted fields and resubmit.</p>
+
+    <h3 class="govuk-heading-m" id="General_ExportToExcel">Export to Excel</h3>
+    <p class="govuk-body">Several tables include an <strong>Export to Excel</strong> link. Selecting this link downloads the current table results as a spreadsheet file that can be opened in Excel.</p>
+
+    <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+</section>
+
+<hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+@* ── Section: Saving Data ──────────────────────────────────────────────── *@
+<section id="saving-data">
+    <h2 class="govuk-heading-l" id="_Saving_Data">2. Saving data</h2>
+    <p class="govuk-body">Data is only saved to the system when you select the <strong>Finish</strong> or <strong>Done</strong> button. Until then, any data you have entered is held on-screen only and will be lost if you navigate away.</p>
+    <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+</section>
+
+<hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+@* ── Section: Home Screen ──────────────────────────────────────────────── *@
+<section id="home-screen">
+    <h2 class="govuk-heading-l" id="Home">3. Home screen</h2>
+    <p class="govuk-body">The <strong>Histopathology System</strong> link in the navigation bar returns you to the home screen from anywhere in the system.</p>
+    <p class="govuk-body">The home screen displays panels with links to all areas of the system that you have access to. Select a link to navigate to that area.</p>
+
+    @if (isCustomer)
+    {
+        <h3 class="govuk-heading-s">Available links (Customer)</h3>
+        <ul class="govuk-list govuk-list--bullet">
+            <li><strong>New submission</strong> — start the process of creating a new submission.</li>
+            <li><strong>View submissions</strong> — view submissions from your area.</li>
+            <li><strong>Search PM dates</strong> — search for submissions with selected PM dates.</li>
+            <li><strong>View samples</strong> — view all tissues submitted for a given sample.</li>
+        </ul>
+    }
+    else
+    {
+        <h3 class="govuk-heading-s">Available links (Histopathology User / Maintenance)</h3>
+        <ul class="govuk-list govuk-list--bullet">
+            <li><strong>New submission</strong> — start the process of creating a new submission.</li>
+            <li><strong>View submissions</strong> — view and manage submissions.</li>
+            <li><strong>Receive submissions</strong> — receive submissions awaiting receipt.</li>
+            <li><strong>Assign tissues to blocks</strong> — assign tissues to blocks for received wet-tissue submissions.</li>
+            <li><strong>Enter quality data</strong> — enter quality data for submissions awaiting dispatch.</li>
+            <li><strong>Archive submission</strong> — archive a completed submission.</li>
+            <li><strong>Search PM dates</strong> — search for submissions with selected PM dates.</li>
+            <li><strong>View samples</strong> — view all tissues submitted for a given sample.</li>
+            <li><strong>Edit QC notes</strong> — search for and edit a previous QC note.</li>
+            <li><strong>Search submissions</strong> — search for submissions using multiple criteria.</li>
+            <li><strong>Search outputs</strong> — view outputs for TSE or non-TSE submissions.</li>
+            <li><strong>Search block refs</strong> — find blocks used for a given sample.</li>
+            <li><strong>Search archive location</strong> — find the archive location for a sample.</li>
+            <li><strong>Booking</strong> — block-book histology references or book block references.</li>
+            <li><strong>Edit submission status</strong> — edit submission status and put samples on hold.</li>
+            <li><strong>User maintenance</strong> — add or edit system users.</li>
+            <li><strong>Pick list maintenance</strong> — manage the option lists used throughout the system.</li>
+            <li><strong>Audit logs</strong> — view daily, user and submission audit logs.</li>
+            <li><strong>Edit sender / histology ref</strong> — edit a sample's sender reference or histology reference.</li>
+        </ul>
+    }
+    <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+</section>
+
+<hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+@* ── Section: Submission Type ──────────────────────────────────────────── *@
+<section id="submission-type">
+    <h2 class="govuk-heading-l" id="Cassetted">4. Submission type</h2>
+    <p class="govuk-body">This screen asks whether the submitted tissue is in the form of cassettes, sections, wax blocks or wet tissue. You must select one option before creating a new submission. Only one type may be selected per submission.</p>
+    <p class="govuk-body">Select <strong>Cancel</strong> to return to the home screen without saving any data.</p>
+    <p class="govuk-body">Select <strong>Next</strong> to continue to the <a class="govuk-link" href="#submission-details">Submission details</a> screen.</p>
+    <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+</section>
+
+<hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+@* ── Section: Submission Details ──────────────────────────────────────── *@
+<section id="submission-details">
+    <h2 class="govuk-heading-l" id="BatchDetails">5. Submission details</h2>
+    <p class="govuk-body">This screen collects general information about the submission.</p>
+    <ul class="govuk-list govuk-list--bullet">
+        <li><strong>Entered by</strong> and <strong>Entered area</strong> are pre-filled and cannot be changed.</li>
+        <li><strong>Submitted by</strong> defaults to the logged-on user. Change this if you are entering the submission on someone else's behalf.</li>
+        <li><strong>Project or contract code</strong> — select from the list. Only one code may be selected per submission.</li>
+        <li><strong>Submission date</strong> — defaults to today. Change it if you are entering the submission in advance.</li>
+        <li><strong>Pathologist</strong> — mandatory. Select from the list.</li>
+        <li><strong>Fixation</strong> — select from the list.</li>
+        <li><strong>Species</strong> — mandatory. Select from the list. If the species is not listed, contact Histopathology.</li>
+        <li><strong>Is it adequately fixed?</strong> — mandatory. Select Yes or No.</li>
+        <li><strong>Histology</strong> — select the histology required for the entire submission.</li>
+        <li><strong>Antibodies</strong> — enabled only when IHC - PrP is selected under Histology. At least one antibody must be selected.</li>
+        <li><strong>Special stain</strong> — enabled only when Special Stain is selected under Histology. At least one stain must be selected.</li>
+        <li><strong>Submission comments</strong> — enter any specific comments. These appear on the printed submission form.</li>
+    </ul>
+    <p class="govuk-body">Select <strong>Samples</strong> to go to the <a class="govuk-link" href="#sample-summary">Sample summary</a> screen to add, edit or remove samples. You must add samples before the submission can be saved, and you must select the histology type before you can add samples.</p>
+    <p class="govuk-body">Select <strong>Cancel</strong> to discard the submission and return to the home screen.</p>
+    <p class="govuk-body">The <strong>Finish</strong> button is only enabled once samples have been added. Selecting Finish saves the submission and takes you to the print submission screen.</p>
+    <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+</section>
+
+<hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+@* ── Section: Sample Summary ───────────────────────────────────────────── *@
+<section id="sample-summary">
+    <h2 class="govuk-heading-l" id="BatchSummary">6. Sample summary</h2>
+    <p class="govuk-body">This screen shows a summary of all samples associated with the submission. It operates in two modes — wet tissue submissions (showing tissues against samples) and block-type submissions (showing samples only).</p>
+    <ul class="govuk-list govuk-list--bullet">
+        <li>Select <strong>Add sample</strong> to go to the <a class="govuk-link" href="#add-sample">Add sample</a> screen.</li>
+        <li>Select <strong>Edit sample</strong> (active only when a sample is selected) to edit that sample's details.</li>
+        <li>Select <strong>Delete sample</strong> (active only when a sample is selected) to remove the sample from the submission.</li>
+        <li>Select <strong>Copy sample</strong> (active only when a sample is selected) to copy the tissue list to a new sample.</li>
+    </ul>
+    <p class="govuk-body">Select <strong>Done</strong> to save all sample data and return to the <a class="govuk-link" href="#submission-details">Submission details</a> screen.</p>
+    <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+</section>
+
+<hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+@* ── Section: Add Sample ───────────────────────────────────────────────── *@
+<section id="add-sample">
+    <h2 class="govuk-heading-l" id="AddSubmission">7. Add sample</h2>
+    <p class="govuk-body">Enter the <strong>Sender reference</strong> for the sample and select <strong>Next</strong>.</p>
+    <p class="govuk-body">A lookup is available — enter part of a sender reference and select the search link to find previously submitted references. Select a result from the list to populate the field.</p>
+    <p class="govuk-body">For some users, the <strong>Project code</strong> and <strong>Species</strong> are imported from another database when <strong>Next</strong> is selected. Confirm the values before proceeding. The project code and species for each sample must match the overall submission selection.</p>
+    <p class="govuk-body">Select <strong>Back</strong> to return to the previous screen without saving.</p>
+    <p class="govuk-body">Select <strong>Next</strong> to proceed to <a class="govuk-link" href="#sample-details">Sample details</a> (wet tissue) or <a class="govuk-link" href="#sample-blocks">Sample blocks</a> (all other types).</p>
+    <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+</section>
+
+<hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+@* ── Section: Sample Details ───────────────────────────────────────────── *@
+<section id="sample-details">
+    <h2 class="govuk-heading-l" id="SubmissionDetails">8. Sample details (wet tissue)</h2>
+    <p class="govuk-body">Add the individual tissues for the sample. Use the table to add, edit and remove entries. For each tissue type, enter the number of pieces and optionally a comment.</p>
+    <p class="govuk-body">Select <strong>Cancel</strong> to discard entries for this sample and return to <a class="govuk-link" href="#sample-summary">Sample summary</a>.</p>
+    <p class="govuk-body">Select <strong>Back</strong> to return to <a class="govuk-link" href="#add-sample">Add sample</a> without saving.</p>
+    <p class="govuk-body">Select <strong>Next</strong> to save the tissue list and return to <a class="govuk-link" href="#sample-summary">Sample summary</a>.</p>
+    <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+</section>
+
+<hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+@* ── Section: Sample Blocks ────────────────────────────────────────────── *@
+<section id="sample-blocks">
+    <h2 class="govuk-heading-l" id="SubmissionDetailsBlock">9. Sample blocks</h2>
+    <p class="govuk-body">This screen shows the blocks associated with the submission for the selected sample. Use the table to add, edit and remove blocks.</p>
+    <p class="govuk-body">Enter the <strong>Histology ref</strong> if known. For pre-cassetted submissions this field is mandatory.</p>
+    <ul class="govuk-list govuk-list--bullet">
+        <li><strong>Add block</strong> — opens the <a class="govuk-link" href="#block-details">Block details</a> screen.</li>
+        <li><strong>Edit block</strong> — active only when a block is selected. Opens Block details to edit that block.</li>
+        <li><strong>Delete block</strong> — active only when a block is selected. Removes the block from the submission.</li>
+        <li><strong>Block ref search</strong> — check which block references have already been used for this sample.</li>
+    </ul>
+    <p class="govuk-body">Select <strong>Done</strong> to save block data and return to <a class="govuk-link" href="#sample-summary">Sample summary</a>.</p>
+    <p class="govuk-body">Select <strong>Back</strong> to return to the previous screen without saving.</p>
+    <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+</section>
+
+<hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+@* ── Section: Block Details ────────────────────────────────────────────── *@
+<section id="block-details">
+    <h2 class="govuk-heading-l" id="BlockDetails">10. Block details</h2>
+    <p class="govuk-body">This screen defines the tissues for each block being submitted.</p>
+    <ul class="govuk-list govuk-list--bullet">
+        <li><strong>Block ref</strong> — the next available block reference is pre-filled. For pre-cassetted submissions, only pre-booked block references can be entered.</li>
+        <li><strong>Customer reference</strong> — your own reference number for the block (optional).</li>
+        <li><strong>Number of blocks</strong> — defaults to 1. Increase this to submit multiple blocks containing the same tissues.</li>
+        <li><strong>Additional request</strong> — check this if it is a repeat request from a previously submitted block.</li>
+    </ul>
+    <p class="govuk-body"><strong>Step 1.</strong> Select the tissues in the block. For each tissue type, enter the number of pieces.</p>
+    <p class="govuk-body"><strong>Step 2.</strong> Select the tests required for this block. Only tests entered on the <a class="govuk-link" href="#submission-details">Submission details</a> screen are available. If EO is selected, no other tests can be selected for this block.</p>
+    <p class="govuk-body">Check <strong>Use these tests for the next block?</strong> to pre-select the same tests for the next block — useful when adding multiple blocks with the same histology.</p>
+    <p class="govuk-body">Select <strong>Next block</strong> to save the current block and clear the form for the next block.</p>
+    <p class="govuk-body">Select <strong>Done</strong> to save the data and return to <a class="govuk-link" href="#sample-blocks">Sample blocks</a>.</p>
+    <p class="govuk-body">Select <strong>Cancel</strong> to discard the data and return to <a class="govuk-link" href="#sample-blocks">Sample blocks</a>.</p>
+    <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+</section>
+
+<hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+@* ── Section: View Submissions ─────────────────────────────────────────── *@
+<section id="view-submissions">
+    <h2 class="govuk-heading-l" id="ViewSubmissions">11. View submissions</h2>
+    <p class="govuk-body">This screen lets you search for and view submissions. By default all submissions from your area are listed. Use the filter fields to narrow the results.</p>
+    <p class="govuk-body">Filter fields include: submission number, entered by, status, submitted date range, received date range, project code, species, fixation and pathologist.</p>
+    <p class="govuk-body">Select <strong>Search</strong> to apply the filters. Select <strong>Clear search</strong> to reset all filters and list all submissions.</p>
+    <p class="govuk-body">Row actions (active only when a submission is selected):</p>
+    <ul class="govuk-list govuk-list--bullet">
+        <li><strong>Print submission</strong> — generate a PDF submission form.</li>
+        <li><strong>Copy submission</strong> — go to <a class="govuk-link" href="#copy-submission">Copy submission</a>.</li>
+        <li><strong>Edit submission</strong> — available only if the submission has not been received by Histopathology, or has been rejected.</li>
+        <li><strong>View submission</strong> — view the submission details without editing.</li>
+    </ul>
+    <p class="govuk-body">Results can be exported to Excel.</p>
+    <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+</section>
+
+<hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+@* ── Section: Copy Submission ──────────────────────────────────────────── *@
+<section id="copy-submission">
+    <h2 class="govuk-heading-l" id="CopyBatchBlocks">12. Copy submission</h2>
+    <p class="govuk-body">This screen lets you create a new submission using an existing one as a template. The tissues or blocks from each sample are copied to new samples on the new submission.</p>
+    <p class="govuk-body">The table lists the samples in the selected submission. Select each row in turn and select <strong>Change</strong> to enter the new sender reference for that sample. Samples without a new sender reference will not be included in the new submission.</p>
+    <p class="govuk-body">Select <strong>Cancel</strong> to return to <a class="govuk-link" href="#view-submissions">View submissions</a> without saving.</p>
+    <p class="govuk-body">Select <strong>Finish</strong> to confirm creation. You will be asked to confirm before being taken to <a class="govuk-link" href="#submission-details">Submission details</a> to complete the new submission.</p>
+    <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+</section>
+
+<hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+@* ── Section: Search PM Dates ──────────────────────────────────────────── *@
+<section id="search-pm-dates">
+    <h2 class="govuk-heading-l" id="SearchPMDates">13. Search PM dates</h2>
+    <p class="govuk-body">Search for all submissions from your area where the PM date falls within the date range you enter. If you enter only one date, you will get all submissions whose PM date is after or before that date. If no dates are entered, all submissions from your area are displayed.</p>
+    <p class="govuk-body">Results can be exported to Excel.</p>
+    <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+</section>
+
+<hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+@* ── Section: View Samples ─────────────────────────────────────────────── *@
+<section id="view-samples">
+    <h2 class="govuk-heading-l" id="ViewSamples">14. View samples</h2>
+    <p class="govuk-body">Search for all submissions containing tissue from a given sample. Enter the <strong>Sender ref</strong> or <strong>Histology ref</strong>, select whether to return block or wet tissue information, then select <strong>Search</strong>.</p>
+    <p class="govuk-body">The table displays all tissues or blocks submitted for the sample and their submission numbers. Use the tissue or project pick lists to filter the results further.</p>
+    <p class="govuk-body">Results can be exported to Excel.</p>
+    <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+</section>
+
+<hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+@* ── Section: Submission Status ────────────────────────────────────────── *@
+<section id="submission-status">
+    <h2 class="govuk-heading-l" id="_Submission_Status_">15. Submission status explanation</h2>
+    <dl class="govuk-summary-list">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Not received</dt>
+            <dd class="govuk-summary-list__value">The submission has been created but the samples have not yet been received by Histopathology.</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Received</dt>
+            <dd class="govuk-summary-list__value">Histopathology has received the submission and recorded a received date and time.</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">In progress</dt>
+            <dd class="govuk-summary-list__value">For wet tissue submissions: some or all tissues have been assigned to blocks. For other types: some quality data has been entered.</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">On hold</dt>
+            <dd class="govuk-summary-list__value">Histopathology has placed the submission on hold due to a discrepancy. No quality data can be entered until it is taken off hold.</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Rejected</dt>
+            <dd class="govuk-summary-list__value">The submission was rejected on receipt. The status reverts to "Not received" when the customer edits the submission.</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Completed</dt>
+            <dd class="govuk-summary-list__value">All tests on the submission have been dispatched.</dd>
+        </div>
+    </dl>
+    <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+</section>
+
+@* ── Histo / Maintenance sections ─────────────────────────────────────── *@
+@if (!isCustomer)
+{
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="submissions-awaiting-receipt">
+        <h2 class="govuk-heading-l" id="BatchesNotReceived">16. Submissions awaiting receipt</h2>
+        <p class="govuk-body">This screen begins the process of receiving a submission. If you know the submission number (shown on the bottom-right of the printed submission form), enter it in the <strong>Enter submission number</strong> field and select <strong>Go</strong> to go directly to the <a class="govuk-link" href="#receive-submission">Receive submission</a> screen. Otherwise, select the submission from the table.</p>
+        <p class="govuk-body">Only submissions awaiting receipt are listed. Once received, a submission no longer appears here.</p>
+        <p class="govuk-body">Select <strong>Done</strong> to return to the home screen.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="receive-submission">
+        <h2 class="govuk-heading-l" id="ReceiveBatch">17. Receive submission</h2>
+        <p class="govuk-body">This screen lets you record the receipt of a submission. A summary of the submission is shown at the top.</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li>Change <strong>Submission status</strong> to Received if the submission is correct, or Rejected if the customer needs to resubmit.</li>
+            <li>If set to Received, enter <strong>Date received</strong> (defaults to today), <strong>Received by</strong> (defaults to your name) and <strong>Time received</strong>.</li>
+            <li>Enter <strong>Post fixations</strong> — if Other is selected, add details in the comment box.</li>
+            <li>If the status is Rejected, a <strong>Reason</strong> is mandatory. The submission will revert to Not Received when the customer edits it.</li>
+            <li><strong>Edit submission</strong> — allows minor edits to the submission before receiving. For significant errors, reject and ask the customer to resubmit.</li>
+        </ul>
+        <p class="govuk-body">Select <strong>Cancel</strong> to discard changes and return to <a class="govuk-link" href="#submissions-awaiting-receipt">Submissions awaiting receipt</a>.</p>
+        <p class="govuk-body">Select <strong>Done</strong> to save and complete the receipt process.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="submissions-received">
+        <h2 class="govuk-heading-l" id="BatchesReceived">18. Submissions received (assign tissues to blocks)</h2>
+        <p class="govuk-body">This screen begins the process of assigning tissues to blocks. Enter the submission number and select <strong>Go</strong>, or find the submission in the table.</p>
+        <p class="govuk-body">Submissions remain on this list until they have a status of Completed. It is advisable to enter the submission number directly rather than searching the table.</p>
+        <p class="govuk-body">Select <strong>Done</strong> to return to the home screen.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="submission-block-summary">
+        <h2 class="govuk-heading-l" id="BatchBlocks">19. Submission block summary</h2>
+        <p class="govuk-body">This screen shows all samples, blocks, tissues and tests for the selected submission. Use the expand and collapse links to show or hide block details.</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li><strong>Add sample</strong> — assign tissues to blocks for a sample not yet shown, or add more blocks to an existing sample.</li>
+            <li><strong>Edit sample</strong> (active only when selected) — opens <a class="govuk-link" href="#sample-blocks">Sample blocks</a> to add or edit blocks.</li>
+            <li><strong>Delete sample</strong> (active only when selected) — removes all blocks for that sample.</li>
+            <li><strong>Copy from previous submission</strong> — copy blocks from a previous submission. Enter the previous submission number, select the source sample and target sample, then choose which blocks to copy.</li>
+        </ul>
+        <p class="govuk-body">Select <strong>Cancel</strong> to discard changes and return to <a class="govuk-link" href="#submissions-received">Submissions received</a>.</p>
+        <p class="govuk-body">Select <strong>Done</strong> to save data.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="quality-data">
+        <h2 class="govuk-heading-l" id="QualityData">20. Quality data</h2>
+        <p class="govuk-body">Enter quality data for the selected submission. A summary appears at the top; the table below shows quality data for each block.</p>
+        <p class="govuk-body">Use <strong>Filter</strong> to restrict the table by histology ref or test. Select <strong>All</strong> to clear the filter.</p>
+        <p class="govuk-body">Row colour indicates test status: green = awaiting result entry; grey = Passed; purple = Failed; white background = dispatched.</p>
+        <p class="govuk-body">To enter quality data, select the rows you want to update (using the Select column), then enter values in the fields below the table:</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li><strong>Test result</strong> — Passed or Failed.</li>
+            <li><strong>Stain ref</strong> — enter if applicable.</li>
+            <li><strong>Dispatched</strong> — tick to dispatch. Dispatched to, dispatched date and dispatched by default to current values and can be changed.</li>
+            <li><strong>Number of blocks / slides</strong> — defaults to 1.</li>
+            <li><strong>QC code</strong> — mandatory if test result is Failed.</li>
+            <li><strong>QC note</strong> — tick to attach a QC note. The system generates the reference automatically. You can view, edit and print QC notes when you save.</li>
+            <li><strong>Remedial action</strong> — select if test result is Failed.</li>
+            <li><strong>Archive location, archive date, archive comment</strong> — complete if the slide is being archived.</li>
+            <li><strong>Charges</strong> — select the appropriate charges.</li>
+            <li><strong>Comment</strong> — optional comment for the selected tests.</li>
+        </ul>
+        <p class="govuk-body">Select <strong>Update selected</strong> to apply the entered data to all selected rows. If no rows are selected, the button is disabled.</p>
+        <p class="govuk-body">Select <strong>Cancel</strong> to discard changes and return to <a class="govuk-link" href="#quality-data">Submissions awaiting quality data</a>.</p>
+        <p class="govuk-body">Select <strong>Done</strong> to save. If QC notes were applied, you will be taken to the <a class="govuk-link" href="#qc-notes">QC notes</a> screen to edit and print them.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="archive-submission">
+        <h2 class="govuk-heading-l" id="BatchesForArchiving">21. Archive submission</h2>
+        <p class="govuk-body">Search for a submission or select it from the table. You will be taken to the <a class="govuk-link" href="#archive-menu">Archive menu</a> screen. If the submission number is known, enter it and select <strong>Go</strong>.</p>
+        <p class="govuk-body">Select <strong>Done</strong> to return to the home screen.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="archive-menu">
+        <h2 class="govuk-heading-l" id="ArchiveMenu">22. Archive menu</h2>
+        <p class="govuk-body">Select what you want to archive for the selected submission:</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li><strong>Archive blocks</strong> — go to the <a class="govuk-link" href="#archive-blocks">Archive blocks</a> screen.</li>
+            <li><strong>Archive tissues</strong> — go to the <a class="govuk-link" href="#archive-tissues">Archive tissues</a> screen.</li>
+        </ul>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="archive-blocks">
+        <h2 class="govuk-heading-l" id="ArchiveBlocks">23. Archive blocks</h2>
+        <p class="govuk-body">Select the blocks to archive and enter their archive details. This screen can also be used to view existing archive details for any block on the submission.</p>
+        <p class="govuk-body">Use <strong>Filter</strong> to restrict the table by histology ref or block ref. Select <strong>All</strong> to clear the filter.</p>
+        <p class="govuk-body">Use the <strong>Select</strong> column to choose rows. Use the <strong>All</strong> checkbox to select all rows across all pages.</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li><strong>Archive location</strong> — specify where the blocks are stored.</li>
+            <li><strong>Archived date</strong> — enter the archive date.</li>
+            <li><strong>Comment</strong> — optional comment.</li>
+        </ul>
+        <p class="govuk-body">Select <strong>Update selected</strong> to apply the archive location, date and comment to all selected rows.</p>
+        <p class="govuk-body">Select <strong>Done</strong> to save changes and return to <a class="govuk-link" href="#archive-submission">Archive submission</a>.</p>
+        <p class="govuk-body">Select <strong>Cancel</strong> to return to <a class="govuk-link" href="#archive-submission">Archive submission</a> without saving.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="archive-tissues">
+        <h2 class="govuk-heading-l" id="ArchiveTissues">24. Archive tissues</h2>
+        <p class="govuk-body">Select the tissues to archive and enter their archive details. This screen can also be used to view existing archive details.</p>
+        <p class="govuk-body">Use <strong>Filter</strong> to restrict the table by histology ref or tissue type. Select <strong>All</strong> to clear the filter.</p>
+        <p class="govuk-body">Use the <strong>Select</strong> column to choose rows. Use the <strong>All</strong> checkbox to select all rows across all pages.</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li><strong>Archive location</strong> — specify where the tissues are stored.</li>
+            <li><strong>Archived date</strong> — enter the archive date.</li>
+            <li><strong>Comment</strong> — optional comment.</li>
+        </ul>
+        <p class="govuk-body">Select <strong>Update selected</strong> to apply the details to all selected rows.</p>
+        <p class="govuk-body">Select <strong>Done</strong> to save and return to <a class="govuk-link" href="#archive-submission">Archive submission</a>.</p>
+        <p class="govuk-body">Select <strong>Cancel</strong> to return without saving.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="qc-notes">
+        <h2 class="govuk-heading-l" id="QCNotes">25. QC notes</h2>
+        <p class="govuk-body">Use this screen to edit or print previously created QC notes. You are also directed here automatically after entering quality data if you attached QC notes to any tests.</p>
+        <p class="govuk-body">Select a QC note from the table and select <strong>Edit</strong> to edit it, or <strong>Print</strong> to print it. If you know the QC note reference, enter it in the <strong>Enter QC note ref</strong> field and select <strong>Go</strong> to go directly to <a class="govuk-link" href="#edit-qc-note">Edit QC note</a>.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="edit-qc-note">
+        <h2 class="govuk-heading-l" id="EditQCNote">26. Edit QC note</h2>
+        <p class="govuk-body">The upper part of the page shows the read-only header section.</p>
+        <p class="govuk-body">The lower part contains the main body of the QC note. When first created, the system pre-fills this with a table showing the sender ref, histology ref, block ref and test for each related test. You can add text below this table, intersperse it with the table contents, or remove the table headings if they are not needed.</p>
+        <p class="govuk-body">Select <strong>Done</strong> when you have finished editing.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="search-submissions">
+        <h2 class="govuk-heading-l" id="SearchSubmissions">27. Search submissions</h2>
+        <p class="govuk-body">Search for submissions using any combination of the following criteria (results match all criteria entered):</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li>Submission number</li>
+            <li>Submitted area</li>
+            <li>Status</li>
+            <li>Submitted by</li>
+            <li>Project or contract code</li>
+            <li>Fixation</li>
+            <li>Contact name</li>
+            <li>Histology ref</li>
+            <li>Species</li>
+            <li>Sender ref</li>
+            <li>Submitted date range</li>
+            <li>Received date range</li>
+        </ul>
+        <p class="govuk-body">Select <strong>Search</strong> to run the search. Select <strong>Print submission</strong> to generate a PDF for the selected submission. Select <strong>Done</strong> to return to the home screen.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="search-menu">
+        <h2 class="govuk-heading-l" id="SearchMenu">28. Search outputs menu</h2>
+        <p class="govuk-body">The search outputs menu provides links to search screens for TSE and non-TSE submission outputs. Select the search type you require.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="booking-menu">
+        <h2 class="govuk-heading-l" id="BookingMenu">29. Booking menu</h2>
+        <p class="govuk-body">The booking menu provides two options:</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li><a class="govuk-link" href="#book-block-ref">Book block references</a></li>
+            <li><a class="govuk-link" href="#book-histology-ref">Book histology references</a></li>
+        </ul>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="book-block-ref">
+        <h2 class="govuk-heading-l" id="BookBlockRef">30. Book block references</h2>
+        <p class="govuk-body">This screen allows you to pre-book block references for a submission before the submission is created. Enter the required details and select <strong>Book</strong> to reserve the block references.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="book-histology-ref">
+        <h2 class="govuk-heading-l" id="BookHistologyRef">31. Book histology references</h2>
+        <p class="govuk-body">This screen allows you to block-book histology references (non-PG). Enter the required details and select <strong>Book</strong> to reserve the references.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="edit-submission-status">
+        <h2 class="govuk-heading-l" id="EditBatch">32. Edit submission status</h2>
+        <p class="govuk-body">This screen lets you edit the status of a submission and put samples on hold. Select the submission from the table, update the status or hold fields, and select <strong>Done</strong> to save.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="samples-on-hold">
+        <h2 class="govuk-heading-l" id="SamplesOnHold">33. Samples on hold</h2>
+        <p class="govuk-body">This screen shows all submissions that have samples currently on hold. Select a submission to view and manage the hold status of its samples.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="edit-histology-ref">
+        <h2 class="govuk-heading-l" id="EditHistologyRef">34. Edit sender / histology reference</h2>
+        <p class="govuk-body">This screen lets you correct a sample's sender reference or histology reference. Enter the submission number to locate the sample, make the required changes, and select <strong>Done</strong> to save.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="user-maintenance">
+        <h2 class="govuk-heading-l" id="UserMaintenance">35. User maintenance</h2>
+        <p class="govuk-body">This screen lists all system users. Use it to add new users or edit existing user details.</p>
+        <p class="govuk-body">Select <strong>Add user</strong> to create a new user. Select a user row and then <strong>Edit user</strong> to update their details.</p>
+        <p class="govuk-body">Each user must have a Windows username (NTLogin), a name, group (role), user area and an active status.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="audit-logs">
+        <h2 class="govuk-heading-l" id="AuditLogMenu">36. Audit logs</h2>
+        <p class="govuk-body">The audit log menu provides three search options:</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li><strong>Search by date</strong> — view all audit events within a date range.</li>
+            <li><strong>Search by user</strong> — view all audit events for a specific user.</li>
+            <li><strong>Search by submission</strong> — view all audit events for a specific submission number.</li>
+        </ul>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+
+    <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+    <section id="view-imported-data">
+        <h2 class="govuk-heading-l" id="ViewImportedData">37. View old ICC_Sub data</h2>
+        <p class="govuk-body">Use this screen to view data imported from the legacy ICC_Sub database. Select a table from the <strong>Table</strong> list to display its records, showing sender ref, histology ref, block ref, project, date submitted, species, tissue and comments.</p>
+        <p class="govuk-body">Use the <strong>Filter</strong> field to search across fields (similar to a keyword search). Enclose a phrase in quotes for an exact match. Select <strong>Go</strong> to apply the filter, or <strong>Clear</strong> to reset it and show all records. If no table is selected but a filter is entered, the search applies across all tables.</p>
+        <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
+    </section>
+}

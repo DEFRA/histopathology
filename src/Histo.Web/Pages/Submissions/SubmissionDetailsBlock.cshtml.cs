@@ -1,7 +1,7 @@
+using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
-using Histo.Histology.Services;
+using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
-using Histo.Submissions.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,10 +21,10 @@ namespace Histo.Web.Pages.Submissions;
 /// </summary>
 public class SubmissionDetailsBlockModel : HistoPageModel
 {
-    private readonly SubmissionService _submissions;
-    private readonly BlockService _blocks;
+    private readonly ISubmissionService _submissions;
+    private readonly IBlockService _blocks;
 
-    public SubmissionDetailsBlockModel(ISessionService session, SubmissionService submissions, BlockService blocks)
+    public SubmissionDetailsBlockModel(ISessionService session, ISubmissionService submissions, IBlockService blocks)
         : base(session)
     {
         _submissions = submissions;

@@ -1,5 +1,6 @@
 @page
 @model ViewSubmissionsModel
+@using Histo.Core.Domain
 @{
     ViewData["Title"] = "View submissions";
     ViewData["PageTitle"] = "View submissions";
@@ -9,51 +10,158 @@
     <a asp-page="/Index" class="govuk-back-link">Back</a>
 }
 
-<form method="get">
+<form method="post" asp-page-handler="Search">
     <div class="govuk-form-group">
-        <label class="govuk-label" for="StatusFilter">Status</label>
-        <select class="govuk-select" name="StatusFilter" asp-for="StatusFilter">
-            <option value="">— All —</option>
-            <option value="1">Submitted</option>
-            <option value="2">Received</option>
-            <option value="4">Completed</option>
-            <option value="5">On Hold</option>
-            <option value="6">In Progress</option>
+        <label class="govuk-label" for="SubmissionNumber">Submission number</label>
+        <input class="govuk-input govuk-input--width-10" asp-for="SubmissionNumber" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Status">Status</label>
+        <select class="govuk-select" asp-for="Status">
+            <option value="">-- Any --</option>
+            <option value="@BatchStatus.Submitted">Submitted</option>
+            <option value="@BatchStatus.Received">Received</option>
+            <option value="@BatchStatus.Rejected">Rejected</option>
+            <option value="@BatchStatus.Completed">Completed</option>
+            <option value="@BatchStatus.OnHold">On hold</option>
+            <option value="@BatchStatus.InProgress">In progress</option>
         </select>
     </div>
-    <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="ProjectContractCode">Project or contract code</label>
+        <select class="govuk-select" asp-for="ProjectContractCode">
+            <option value="">-- Any --</option>
+            @foreach (var p in Model.Projects)
+            {
+                <option value="@p.Name">@p.Name</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="ContactName">Pathologist</label>
+        <select class="govuk-select" asp-for="ContactName">
+            <option value="">-- Any --</option>
+            @foreach (var c in Model.Contacts)
+            {
+                <option value="@c.Name">@c.Name</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Species">Species</label>
+        <select class="govuk-select" asp-for="Species">
+            <option value="">-- Any --</option>
+            @foreach (var s in Model.SpeciesList)
+            {
+                <option value="@s.Name">@s.Name</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Fixation">Fixation</label>
+        <select class="govuk-select" asp-for="Fixation">
+            <option value="">-- Any --</option>
+            @foreach (var f in Model.Fixations)
+            {
+                <option value="@f.Name">@f.Name</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="SubmittedBy">Submitted by</label>
+        <select class="govuk-select" asp-for="SubmittedBy">
+            <option value="">-- Any --</option>
+            @foreach (var u in Model.Users)
+            {
+                <option value="@u.UserID">@u.Name</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="EnteredBy">Entered by</label>
+        <select class="govuk-select" asp-for="EnteredBy">
+            <option value="">-- Any --</option>
+            @foreach (var u in Model.Users)
+            {
+                <option value="@u.UserID">@u.Name</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="HistologyRef">Histology ref</label>
+        <input class="govuk-input" asp-for="HistologyRef" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="SenderRef">Sender ref</label>
+        <input class="govuk-input" asp-for="SenderRef" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="SubmittedDateFrom">Submitted date from</label>
+        <input class="govuk-input govuk-input--width-10" type="date" asp-for="SubmittedDateFrom" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="SubmittedDateTo">Submitted date to</label>
+        <input class="govuk-input govuk-input--width-10" type="date" asp-for="SubmittedDateTo" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="ReceivedDateFrom">Received date from</label>
+        <input class="govuk-input govuk-input--width-10" type="date" asp-for="ReceivedDateFrom" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="ReceivedDateTo">Received date to</label>
+        <input class="govuk-input govuk-input--width-10" type="date" asp-for="ReceivedDateTo" />
+    </div>
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
+        <a asp-page="/Submissions/ViewSubmissions" class="govuk-link">Clear search</a>
+    </div>
 </form>
 
-@if (!Model.Results.Any())
+@if (Model.Searched)
 {
-    <p class="govuk-body">No submissions found.</p>
-}
-else
-{
-    <table class="govuk-table">
-        <thead class="govuk-table__head">
-            <tr class="govuk-table__row">
-                <th scope="col" class="govuk-table__header">Batch No</th>
-                <th scope="col" class="govuk-table__header">Customer ref</th>
-                <th scope="col" class="govuk-table__header">Status</th>
-                <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
-            </tr>
-        </thead>
-        <tbody class="govuk-table__body">
-            @foreach (var b in Model.Results)
-            {
+    @if (Model.Results.Any())
+    {
+        <table class="govuk-table">
+            <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
-                    <td class="govuk-table__cell">@b.ID</td>
-                    <td class="govuk-table__cell">@b.CustomerRef</td>
-                    <td class="govuk-table__cell">@b.Status</td>
-                    <td class="govuk-table__cell">
-                        <form method="post">
-                            <input type="hidden" name="batchId" value="@b.ID" />
-                            <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-page-handler="Select">Select</button>
-                        </form>
-                    </td>
+                    <th scope="col" class="govuk-table__header">Sub. Number</th>
+                    <th scope="col" class="govuk-table__header">Project Code</th>
+                    <th scope="col" class="govuk-table__header">Pathologist</th>
+                    <th scope="col" class="govuk-table__header">Species</th>
+                    <th scope="col" class="govuk-table__header">Date Submitted</th>
+                    <th scope="col" class="govuk-table__header">Date Received / Rejected</th>
+                    <th scope="col" class="govuk-table__header">Date Completed</th>
+                    <th scope="col" class="govuk-table__header">Customer Received Date</th>
+                    <th scope="col" class="govuk-table__header">Status</th>
+                    <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody class="govuk-table__body">
+                @foreach (var r in Model.Results)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@r.ID</td>
+                        <td class="govuk-table__cell">@r.ProjectDescription</td>
+                        <td class="govuk-table__cell">@r.ContactDescription</td>
+                        <td class="govuk-table__cell">@r.Species</td>
+                        <td class="govuk-table__cell">@r.BatchDate?.ToShortDateString()</td>
+                        <td class="govuk-table__cell">@r.DateReceived?.ToShortDateString()</td>
+                        <td class="govuk-table__cell">@r.DateCompleted?.ToShortDateString()</td>
+                        <td class="govuk-table__cell">@r.CustomerReceivedDate?.ToShortDateString()</td>
+                        <td class="govuk-table__cell">@r.Status</td>
+                        <td class="govuk-table__cell">
+                            <form method="post">
+                                <input type="hidden" name="batchId" value="@r.ID" />
+                                <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-page-handler="Select">Select</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <p class="govuk-body">No submissions found matching the search criteria.</p>
+    }
 }

@@ -10,7 +10,7 @@ namespace Histo.Administration.Services;
 /// Replaces the legacy <c>LookupData</c> VB class. Thin orchestration over
 /// <see cref="ILookupRepository"/> with structured error logging.
 /// </summary>
-public sealed class LookupService
+public sealed class LookupService : ILookupService
 {
     private readonly ILookupRepository _lookups;
     private readonly IAppLogger _logger;
@@ -111,6 +111,23 @@ public sealed class LookupService
         catch (Exception ex)
         {
             _logger.LogError("Failed to get imported tables.", ex);
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// Returns all species from the dedicated <c>GetSpeciesLookup</c> stored procedure.
+    /// Used to populate the Species drop-down on ViewSubmissions and SearchSubmissions.
+    /// </summary>
+    public async Task<IReadOnlyList<LookupItem>> GetSpeciesLookupAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _lookups.GetSpeciesLookupAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get species lookup.", ex);
             return [];
         }
     }

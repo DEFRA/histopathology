@@ -10,7 +10,7 @@ namespace Histo.Histology.Services;
 /// Replaces the per-test data-entry portion of legacy <c>QualityData.aspx.vb</c>.
 /// See <see cref="Histo.Histology.Models.BlockTest"/> for scope notes.
 /// </summary>
-public sealed class BlockTestService
+public sealed class BlockTestService : IBlockTestService
 {
     private readonly IBlockTestRepository _repo;
     private readonly IAppLogger _logger;

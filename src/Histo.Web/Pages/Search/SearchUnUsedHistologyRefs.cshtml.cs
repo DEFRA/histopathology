@@ -1,5 +1,5 @@
+using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
-using Histo.Histology.Services;
 using Histo.Web.Services;
 
 namespace Histo.Web.Pages.Search;
@@ -7,9 +7,9 @@ namespace Histo.Web.Pages.Search;
 /// <summary>Replaces <c>SearchUnUsedHistologyRefs.aspx</c>.</summary>
 public class SearchUnUsedHistologyRefsModel : HistoPageModel
 {
-    private readonly HistologyRefService _histologyRefs;
+    private readonly IHistologyRefService _histologyRefs;
 
-    public SearchUnUsedHistologyRefsModel(ISessionService session, HistologyRefService histologyRefs)
+    public SearchUnUsedHistologyRefsModel(ISessionService session, IHistologyRefService histologyRefs)
         : base(session) => _histologyRefs = histologyRefs;
 
     public IReadOnlyList<HistologyRef> Results { get; private set; } = [];

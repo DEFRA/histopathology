@@ -57,16 +57,15 @@
                             @await Html.PartialAsync("_NavPartial")
                         </ul>
                     </nav>
+                    <p class="govuk-body-s app-header-user govuk-!-margin-bottom-0">
+                        @await Html.PartialAsync("_UserContextPartial")
+                    </p>
                 </div>
             </div>
         </section>
     </header>
 
     <div class="govuk-width-container">
-        <div class="govuk-body-s govuk-!-text-align-right govuk-!-margin-top-2">
-            @await Html.PartialAsync("_UserContextPartial")
-        </div>
-
         <main class="govuk-main-wrapper" id="main-content" role="main">
             @RenderSection("BeforeHeading", required: false)
             @if (ViewData["PageTitle"] is string pt)

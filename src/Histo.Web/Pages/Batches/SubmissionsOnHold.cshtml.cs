@@ -1,26 +1,27 @@
+using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
-using Histo.Submissions.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Histo.Web.Pages.Batches;
 
 /// <summary>
-/// Lists batches on hold — replaces <c>SubmissionsOnHold.aspx</c>.
+/// Lists batches currently on hold — replaces <c>SubmissionsOnHold.aspx</c>.
+/// Shows the batch-level on-hold list with project, pathologist, species, and date columns.
 /// </summary>
 public class SubmissionsOnHoldModel : HistoPageModel
 {
-    private readonly BatchService _batches;
+    private readonly IBatchService _batches;
 
-    public SubmissionsOnHoldModel(ISessionService session, BatchService batches)
+    public SubmissionsOnHoldModel(ISessionService session, IBatchService batches)
         : base(session) => _batches = batches;
 
-    public IReadOnlyList<Batch> Batches { get; private set; } = [];
+    public IReadOnlyList<BatchListResult> Batches { get; private set; } = [];
 
     public async Task OnGetAsync()
     {
-        ViewData["Title"] = "Submissions On Hold";
-        ViewData["PageTitle"] = "Submissions On Hold";
+        ViewData["Title"] = "Submissions on hold";
+        ViewData["PageTitle"] = "Submissions on hold";
         Batches = await _batches.GetOnHoldAsync();
     }
 

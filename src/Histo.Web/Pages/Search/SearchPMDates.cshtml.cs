@@ -1,5 +1,5 @@
+using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
-using Histo.Submissions.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,9 +8,9 @@ namespace Histo.Web.Pages.Search;
 /// <summary>Replaces <c>SearchPMDates.aspx</c>.</summary>
 public class SearchPMDatesModel : HistoPageModel
 {
-    private readonly SubmissionService _submissions;
+    private readonly ISubmissionService _submissions;
 
-    public SearchPMDatesModel(ISessionService session, SubmissionService submissions)
+    public SearchPMDatesModel(ISessionService session, ISubmissionService submissions)
         : base(session) => _submissions = submissions;
 
     [BindProperty] public DateTime StartDate { get; set; } = DateTime.Today.AddDays(-7);

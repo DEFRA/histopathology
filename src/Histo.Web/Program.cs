@@ -4,6 +4,12 @@ using Histo.Web.Services;
 using Microsoft.Extensions.Options;
 
 // Domain module service + repository imports
+using Histo.Administration;
+using Histo.AuditLog;
+using Histo.Histology;
+using Histo.QualityControl;
+using Histo.Submissions;
+
 using Histo.Administration.Interfaces;
 using Histo.Administration.Repositories;
 using Histo.Administration.Services;
@@ -86,28 +92,19 @@ try
     builder.Services.AddScoped<ISessionService, SessionService>();
 
     // ── Administration module ─────────────────────────────────────────────────
-    builder.Services.AddScoped<IUserRepository, UserRepository>();
-    builder.Services.AddScoped<UserService>();
-    builder.Services.AddScoped<ILookupRepository, LookupRepository>();
-    builder.Services.AddScoped<LookupService>();
+    builder.Services.AddAdministrationModule();
 
     // ── AuditLog module ───────────────────────────────────────────────────────
-    builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
-    builder.Services.AddScoped<AuditLogService>();
+    builder.Services.AddAuditLogModule();
 
     // ── Histology module ──────────────────────────────────────────────────────
-    builder.Services.AddScoped<IBlockRepository, BlockRepository>();
-    builder.Services.AddScoped<BlockService>();
-    builder.Services.AddScoped<IHistologyRepository, HistologyRepository>();
-    builder.Services.AddScoped<HistologyRefService>();
-    builder.Services.AddScoped<IBlockTestRepository, BlockTestRepository>();
-    builder.Services.AddScoped<BlockTestService>();
+    builder.Services.AddHistologyModule();
 
     // ── QualityControl module ─────────────────────────────────────────────────
-    builder.Services.AddScoped<IQCNoteRepository, QCNoteRepository>();
-    builder.Services.AddScoped<QCNoteService>();
+    builder.Services.AddQualityControlModule();
 
     // ── Submissions module ────────────────────────────────────────────────────
+    builder.Services.AddSubmissionsModule();
     builder.Services.AddScoped<IBatchRepository, BatchRepository>();
     builder.Services.AddScoped<BatchService>();
     builder.Services.AddScoped<ISubmissionRepository, SubmissionRepository>();
@@ -138,6 +135,9 @@ try
     app.UseStaticFiles();
     app.UseRouting();
     app.UseSession();
+
+    // Phase 2: app.UseAuthentication(); app.UseAuthorization();
+    
     app.UseAuthorization();
 
     app.MapHealthChecks("/health");

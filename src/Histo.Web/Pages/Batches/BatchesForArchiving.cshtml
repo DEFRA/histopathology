@@ -13,6 +13,9 @@
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
             <th scope="col" class="govuk-table__header">Batch ID</th>
+            <th scope="col" class="govuk-table__header">Project</th>
+            <th scope="col" class="govuk-table__header">Pathologist</th>
+            <th scope="col" class="govuk-table__header">Species</th>
             <th scope="col" class="govuk-table__header">Customer ref</th>
             <th scope="col" class="govuk-table__header">Completed date</th>
             <th scope="col" class="govuk-table__header">Actions</th>
@@ -23,19 +26,25 @@
         {
             <tr class="govuk-table__row">
                 <td class="govuk-table__cell">@b.ID</td>
+                <td class="govuk-table__cell">@b.ProjectDescription</td>
+                <td class="govuk-table__cell">@b.ContactDescription</td>
+                <td class="govuk-table__cell">@b.Species</td>
                 <td class="govuk-table__cell">@b.CustomerRef</td>
                 <td class="govuk-table__cell">@b.CompletedDate?.ToShortDateString()</td>
                 <td class="govuk-table__cell">
-                    <a asp-page="/Archive/ArchiveBlocks"
-                       asp-route-batchId="@b.ID" class="govuk-button govuk-button--warning govuk-!-margin-bottom-0" data-module="govuk-button">Archive blocks</a>
-                    <a asp-page="/Archive/ArchiveTissues"
-                       asp-route-batchId="@b.ID" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Archive tissues</a>
+                    <form method="post">
+                        <input type="hidden" name="batchId" value="@b.ID" />
+                        <a asp-page="/Archive/ArchiveBlocks"
+                           asp-route-batchId="@b.ID" class="govuk-button govuk-button--warning govuk-!-margin-bottom-0" data-module="govuk-button">Archive blocks</a>
+                        <a asp-page="/Archive/ArchiveTissues"
+                           asp-route-batchId="@b.ID" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Archive tissues</a>
+                    </form>
                 </td>
             </tr>
         }
         @if (!Model.Batches.Any())
         {
-            <tr class="govuk-table__row"><td colspan="4" class="govuk-table__cell">No batches available for archiving.</td></tr>
+            <tr class="govuk-table__row"><td colspan="7" class="govuk-table__cell">No batches available for archiving.</td></tr>
         }
     </tbody>
 </table>

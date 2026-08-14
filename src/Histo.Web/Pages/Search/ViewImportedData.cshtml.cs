@@ -1,7 +1,7 @@
+using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
-using Histo.Administration.Services;
+using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
-using Histo.Submissions.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,10 +15,10 @@ namespace Histo.Web.Pages.Search;
 /// </summary>
 public class ViewImportedDataModel : HistoPageModel
 {
-    private readonly LookupService _lookups;
-    private readonly SubmissionService _submissions;
+    private readonly ILookupService _lookups;
+    private readonly ISubmissionService _submissions;
 
-    public ViewImportedDataModel(ISessionService session, LookupService lookups, SubmissionService submissions)
+    public ViewImportedDataModel(ISessionService session, ILookupService lookups, ISubmissionService submissions)
         : base(session)
     {
         _lookups = lookups;

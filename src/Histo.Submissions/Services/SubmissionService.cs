@@ -13,7 +13,7 @@ namespace Histo.Submissions.Services;
 ///
 /// PG-number auto-reversal logic is delegated to <see cref="AnimalHelpers.ComputePgAutoHistologyRef"/>.
 /// </summary>
-public sealed class SubmissionService
+public sealed class SubmissionService : ISubmissionService
 {
     private readonly ISubmissionRepository _repo;
     private readonly IAppLogger _logger;

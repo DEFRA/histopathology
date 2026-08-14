@@ -1,5 +1,5 @@
+using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
-using Histo.Submissions.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,10 +12,10 @@ namespace Histo.Web.Pages.Blocks;
 /// </summary>
 public class CopySamplesSummaryModel : HistoPageModel
 {
-    private readonly BatchService _batches;
-    private readonly SubmissionService _submissions;
+    private readonly IBatchService _batches;
+    private readonly ISubmissionService _submissions;
 
-    public CopySamplesSummaryModel(ISessionService session, BatchService batches, SubmissionService submissions)
+    public CopySamplesSummaryModel(ISessionService session, IBatchService batches, ISubmissionService submissions)
         : base(session)
     {
         _batches = batches;

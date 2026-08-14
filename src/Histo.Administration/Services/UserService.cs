@@ -11,7 +11,7 @@ namespace Histo.Administration.Services;
 /// and replaces the VB.NET pattern of catching exceptions and returning
 /// <c>False</c> with an explicit null-return contract.
 /// </summary>
-public sealed class UserService
+public sealed class UserService : IUserService
 {
     private readonly IUserRepository _users;
     private readonly IAppLogger _logger;
@@ -49,29 +49,13 @@ public sealed class UserService
     /// <summary>Returns all active and inactive users.</summary>
     public async Task<IReadOnlyList<User>> GetAllUsersAsync(CancellationToken ct = default)
     {
-        try
-        {
-            return await _users.GetUsersAsync(ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Failed to retrieve users.", ex);
-            return [];
-        }
+        return await _users.GetUsersAsync(ct);
     }
 
     /// <summary>Returns users belonging to the given area code string.</summary>
     public async Task<IReadOnlyList<User>> GetUsersByAreaAsync(string userArea, CancellationToken ct = default)
     {
-        try
-        {
-            return await _users.GetUsersByAreaAsync(userArea, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Failed to retrieve users for area {Area}.", ex, userArea);
-            return [];
-        }
+        return await _users.GetUsersByAreaAsync(userArea, ct);
     }
 
     /// <summary>

@@ -1,6 +1,6 @@
 using Histo.Core.Domain;
+using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
-using Histo.Submissions.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -29,9 +29,9 @@ namespace Histo.Web.Pages.Admin;
 /// </summary>
 public class EditAnimalRefModel : HistoPageModel
 {
-    private readonly SubmissionService _submissions;
+    private readonly ISubmissionService _submissions;
 
-    public EditAnimalRefModel(ISessionService session, SubmissionService submissions)
+    public EditAnimalRefModel(ISessionService session, ISubmissionService submissions)
         : base(session) => _submissions = submissions;
 
     [BindProperty] public string OriginalSenderRef { get; set; } = string.Empty;

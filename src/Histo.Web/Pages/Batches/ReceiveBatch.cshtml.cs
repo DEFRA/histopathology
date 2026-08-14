@@ -1,5 +1,5 @@
+using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
-using Histo.Submissions.Services;
 using static Histo.Core.Domain.BatchStatus;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -9,9 +9,9 @@ namespace Histo.Web.Pages.Batches;
 /// <summary>Replaces <c>ReceiveBatch.aspx</c> — marks a batch as Received.</summary>
 public class ReceiveBatchModel : HistoPageModel
 {
-    private readonly BatchService _batches;
+    private readonly IBatchService _batches;
 
-    public ReceiveBatchModel(ISessionService session, BatchService batches)
+    public ReceiveBatchModel(ISessionService session, IBatchService batches)
         : base(session) => _batches = batches;
 
     public Batch? Batch { get; private set; }

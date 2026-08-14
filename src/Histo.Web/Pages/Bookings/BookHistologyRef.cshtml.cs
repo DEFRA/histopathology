@@ -1,5 +1,5 @@
+using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
-using Histo.Histology.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,9 +8,9 @@ namespace Histo.Web.Pages.Bookings;
 /// <summary>Replaces <c>BookHistologyRef.aspx</c>.</summary>
 public class BookHistologyRefModel : HistoPageModel
 {
-    private readonly HistologyRefService _refs;
+    private readonly IHistologyRefService _refs;
 
-    public BookHistologyRefModel(ISessionService session, HistologyRefService refs)
+    public BookHistologyRefModel(ISessionService session, IHistologyRefService refs)
         : base(session) => _refs = refs;
 
     public IReadOnlyList<HistologyRef> AvailableRefs { get; private set; } = [];

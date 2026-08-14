@@ -11,7 +11,7 @@ namespace Histo.Histology.Services;
 /// Replaces the database-persistence methods of legacy <c>clsBlock.vb</c>.
 /// Pure in-memory ordering logic delegates to <see cref="BlockHelpers.ComputeNextOrder"/>.
 /// </summary>
-public sealed class BlockService
+public sealed class BlockService : IBlockService
 {
     private readonly IBlockRepository _repo;
     private readonly IAppLogger _logger;

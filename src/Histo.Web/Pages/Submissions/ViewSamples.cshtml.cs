@@ -1,5 +1,5 @@
+using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
-using Histo.Submissions.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -20,9 +20,9 @@ namespace Histo.Web.Pages.Submissions;
 /// </summary>
 public class ViewSamplesModel : HistoPageModel
 {
-    private readonly SubmissionService _submissions;
+    private readonly ISubmissionService _submissions;
 
-    public ViewSamplesModel(ISessionService session, SubmissionService submissions)
+    public ViewSamplesModel(ISessionService session, ISubmissionService submissions)
         : base(session) => _submissions = submissions;
 
     public IReadOnlyList<Animal> Animals { get; private set; } = [];

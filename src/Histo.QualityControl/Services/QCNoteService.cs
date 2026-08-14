@@ -11,7 +11,7 @@ namespace Histo.QualityControl.Services;
 /// Surfaces <see cref="QCNoteConcurrencyException"/> for callers to handle
 /// the optimistic-concurrency conflict in the UI layer.
 /// </summary>
-public sealed class QCNoteService
+public sealed class QCNoteService : IQCNoteService
 {
     private readonly IQCNoteRepository _repo;
     private readonly IAppLogger _logger;
@@ -71,6 +71,23 @@ public sealed class QCNoteService
         {
             _logger.LogError("Failed to add QC note for submission {SubmissionId}.", ex, submissionId);
             return 0;
+        }
+    }
+
+    /// <summary>
+    /// Returns all QC notes system-wide. Used when no batch is selected in session,
+    /// matching legacy <c>QCNotes.aspx</c> global load behaviour.
+    /// </summary>
+    public async Task<IReadOnlyList<QCNote>> GetAllAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repo.GetAllAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to retrieve all QC notes.", ex);
+            return [];
         }
     }
 }

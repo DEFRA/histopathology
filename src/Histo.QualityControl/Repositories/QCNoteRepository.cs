@@ -78,4 +78,14 @@ public sealed class QCNoteRepository : IQCNoteRepository
 
         return parameters.Get<int>("NewID");
     }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<QCNote>> GetAllAsync(CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<QCNote>(
+            "GetBatchQCNotes",
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
 }

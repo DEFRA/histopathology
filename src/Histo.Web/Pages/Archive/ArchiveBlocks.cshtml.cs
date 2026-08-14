@@ -1,5 +1,5 @@
+using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
-using Histo.Histology.Services;
 using Histo.Web.Services;
 
 namespace Histo.Web.Pages.Archive;
@@ -7,9 +7,9 @@ namespace Histo.Web.Pages.Archive;
 /// <summary>Replaces <c>ArchiveBlocks.aspx</c>.</summary>
 public class ArchiveBlocksModel : HistoPageModel
 {
-    private readonly BlockService _blocks;
+    private readonly IBlockService _blocks;
 
-    public ArchiveBlocksModel(ISessionService session, BlockService blocks)
+    public ArchiveBlocksModel(ISessionService session, IBlockService blocks)
         : base(session) => _blocks = blocks;
 
     public IReadOnlyList<Block> Blocks { get; private set; } = [];

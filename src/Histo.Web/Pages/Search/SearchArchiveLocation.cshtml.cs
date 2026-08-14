@@ -1,7 +1,7 @@
+using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
-using Histo.Histology.Services;
+using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
-using Histo.Submissions.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,10 +18,10 @@ namespace Histo.Web.Pages.Search;
 /// </summary>
 public class SearchArchiveLocationModel : HistoPageModel
 {
-    private readonly SubmissionService _submissions;
-    private readonly BlockService _blocks;
+    private readonly ISubmissionService _submissions;
+    private readonly IBlockService _blocks;
 
-    public SearchArchiveLocationModel(ISessionService session, SubmissionService submissions, BlockService blocks)
+    public SearchArchiveLocationModel(ISessionService session, ISubmissionService submissions, IBlockService blocks)
         : base(session)
     {
         _submissions = submissions;

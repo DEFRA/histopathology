@@ -1,5 +1,5 @@
+using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
-using Histo.Histology.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,10 +8,10 @@ namespace Histo.Web.Pages.Bookings;
 /// <summary>Replaces <c>BookBlockRef.aspx</c>.</summary>
 public class BookBlockRefModel : HistoPageModel
 {
-    private readonly BlockService _blocks;
-    private readonly HistologyRefService _refs;
+    private readonly IBlockService _blocks;
+    private readonly IHistologyRefService _refs;
 
-    public BookBlockRefModel(ISessionService session, BlockService blocks, HistologyRefService refs)
+    public BookBlockRefModel(ISessionService session, IBlockService blocks, IHistologyRefService refs)
         : base(session) { _blocks = blocks; _refs = refs; }
 
     public IReadOnlyList<Block> PreBookedBlocks { get; private set; } = [];

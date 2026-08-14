@@ -12,12 +12,7 @@
 <table class="govuk-table">
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
-            <th scope="col" class="govuk-table__header">ID</th>
-            <th scope="col" class="govuk-table__header">Table name</th>
-            <th scope="col" class="govuk-table__header">Select SP</th>
-            <th scope="col" class="govuk-table__header">Insert SP</th>
-            <th scope="col" class="govuk-table__header">Update SP</th>
-            <th scope="col" class="govuk-table__header">Delete SP</th>
+            <th scope="col" class="govuk-table__header">Pick list name</th>
             <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
         </tr>
     </thead>
@@ -25,20 +20,15 @@
         @foreach (var l in Model.Lookups)
         {
             <tr class="govuk-table__row">
-                <td class="govuk-table__cell">@l.ID</td>
                 <td class="govuk-table__cell">@l.TableName</td>
-                <td class="govuk-table__cell">@l.SelectStoredProcedure</td>
-                <td class="govuk-table__cell">@l.InsertStoredProcedure</td>
-                <td class="govuk-table__cell">@l.UpdateStoredProcedure</td>
-                <td class="govuk-table__cell">@l.DeleteStoredProcedure</td>
                 <td class="govuk-table__cell">
-                    <a asp-page="/Admin/EditLookupItem" asp-route-tableId="@l.ID" class="govuk-link">Edit</a>
+                    <a asp-page="/Admin/EditLookupItem" asp-route-tableId="@l.ID" class="govuk-link">Edit items</a>
                 </td>
             </tr>
         }
         @if (!Model.Lookups.Any())
         {
-            <tr class="govuk-table__row"><td colspan="7" class="govuk-table__cell">No editable lookups found.</td></tr>
+            <tr class="govuk-table__row"><td colspan="2" class="govuk-table__cell">No editable pick lists found.</td></tr>
         }
     </tbody>
 </table>

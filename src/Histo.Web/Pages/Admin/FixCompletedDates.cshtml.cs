@@ -1,4 +1,4 @@
-using Histo.Submissions.Services;
+using Histo.Submissions.Interfaces;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,9 +12,9 @@ namespace Histo.Web.Pages.Admin;
 /// </summary>
 public class FixCompletedDatesModel : HistoPageModel
 {
-    private readonly BatchService _batches;
+    private readonly IBatchService _batches;
 
-    public FixCompletedDatesModel(ISessionService session, BatchService batches)
+    public FixCompletedDatesModel(ISessionService session, IBatchService batches)
         : base(session) => _batches = batches;
 
     public int? BatchesUpdated { get; private set; }

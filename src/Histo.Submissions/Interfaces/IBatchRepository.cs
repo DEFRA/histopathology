@@ -18,16 +18,34 @@ public interface IBatchRepository
     Task<Batch?> GetByIdAsync(int batchId, CancellationToken ct = default);
 
     /// <summary>Returns all batches in Received status. Maps to <c>GetReceivedBatches</c>.</summary>
-    Task<IReadOnlyList<Batch>> GetReceivedAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<BatchListResult>> GetReceivedAsync(CancellationToken ct = default);
 
     /// <summary>Returns all batches in InProgress status. Maps to <c>GetInProgressBatches</c>.</summary>
-    Task<IReadOnlyList<Batch>> GetInProgressAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<BatchListResult>> GetInProgressAsync(CancellationToken ct = default);
 
     /// <summary>Returns batches not yet received. Maps to <c>GetBatchesNotReceived</c>.</summary>
-    Task<IReadOnlyList<Batch>> GetNotReceivedAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<BatchListResult>> GetNotReceivedAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns all batches regardless of status. Maps to <c>GetAllBatches</c>.
+    /// Legacy source: BatchesForEditing.aspx.vb — <c>clsBatch.GetBatchesWithStatus(0)</c> (status 0 = all).
+    /// </summary>
+    Task<IReadOnlyList<BatchListResult>> GetAllBatchesAsync(CancellationToken ct = default);
 
     /// <summary>Returns batches on hold. Maps to <c>GetBatchesOnHold</c>.</summary>
-    Task<IReadOnlyList<Batch>> GetOnHoldAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<BatchListResult>> GetOnHoldAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns completed batches available for archiving. Maps to <c>GetCompletedBatches</c>.
+    /// Legacy source: BatchesForArchiving.aspx.vb — <c>clsBatch.GetBatchesWithStatus(STATUS_COMPLETED)</c>.
+    /// </summary>
+    Task<IReadOnlyList<BatchListResult>> GetCompletedAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns batches awaiting Quality Data entry. Maps to <c>GetBatchesForDispatch</c>.
+    /// Legacy source: BatchesForDispatch.aspx.vb — <c>clsBatch.GetBatchesForDispatch</c>.
+    /// </summary>
+    Task<IReadOnlyList<BatchListResult>> GetForDispatchAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Adds a new batch. Maps to <c>AddBatch</c>.

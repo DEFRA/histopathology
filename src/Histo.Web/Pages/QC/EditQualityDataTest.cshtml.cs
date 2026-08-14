@@ -1,8 +1,8 @@
+using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
-using Histo.Administration.Services;
+using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
-using Histo.Histology.Services;
-using Histo.QualityControl.Services;
+using Histo.QualityControl.Interfaces;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,10 +22,10 @@ namespace Histo.Web.Pages.QC;
 /// </summary>
 public class EditQualityDataTestModel : HistoPageModel
 {
-    private readonly BlockTestService _tests;
-    private readonly QCNoteService _qc;
-    private readonly LookupService _lookups;
-    private readonly UserService _users;
+    private readonly IBlockTestService _tests;
+    private readonly IQCNoteService _qc;
+    private readonly ILookupService _lookups;
+    private readonly IUserService _users;
 
     private const int LookupQcCode = 14;
     private const int LookupRemedialAction = 15;
@@ -33,10 +33,10 @@ public class EditQualityDataTestModel : HistoPageModel
 
     public EditQualityDataTestModel(
         ISessionService session,
-        BlockTestService tests,
-        QCNoteService qc,
-        LookupService lookups,
-        UserService users)
+        IBlockTestService tests,
+        IQCNoteService qc,
+        ILookupService lookups,
+        IUserService users)
         : base(session)
     {
         _tests = tests;
