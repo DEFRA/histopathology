@@ -203,4 +203,20 @@ public sealed class SubmissionNotesDataSetBuilder
             return string.Empty;
         return Convert.ToString(val) ?? string.Empty;
     }
+
+    /// <summary>
+    /// Returns <see langword="true"/> when at least one of the two comment fields
+    /// in <paramref name="src"/> contains a non-whitespace value.
+    /// Used to filter result-set rows before adding them to report tables,
+    /// matching the legacy <c>SubmissionNotes.aspx.vb</c> filter rule.
+    /// </summary>
+    internal static bool HasContent(
+        IDictionary<string, object> src,
+        string commentKey,
+        string archiveKey)
+    {
+        var comment = Str(src, commentKey).Trim();
+        var archive = Str(src, archiveKey).Trim();
+        return comment != string.Empty || archive != string.Empty;
+    }
 }

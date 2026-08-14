@@ -90,7 +90,7 @@ public sealed class HistologyReportDataSetBuilder
 
     // ── Table builders ───────────────────────────────────────────────────────
 
-    private static DataTable BuildBatchTable(
+    internal static DataTable BuildBatchTable(
         IList<IDictionary<string, object>> rawBatch,
         IList<IDictionary<string, object>> rawSubmittedAs,
         int batchId)
@@ -156,7 +156,7 @@ public sealed class HistologyReportDataSetBuilder
         return dt;
     }
 
-    private static DataTable BuildPostFixationTable(
+    internal static DataTable BuildPostFixationTable(
         IList<IDictionary<string, object>> rawPostFix,
         int batchId)
     {
@@ -188,7 +188,7 @@ public sealed class HistologyReportDataSetBuilder
         return dt;
     }
 
-    private static DataTable BuildHistologyTable(
+    internal static DataTable BuildHistologyTable(
         IList<IDictionary<string, object>> rawHistology,
         int batchId)
     {
@@ -207,7 +207,7 @@ public sealed class HistologyReportDataSetBuilder
         return dt;
     }
 
-    private static DataTable BuildSubmissionTable(
+    internal static DataTable BuildSubmissionTable(
         IList<IDictionary<string, object>> rawSubmissions,
         int batchId)
     {

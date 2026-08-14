@@ -106,10 +106,7 @@ public sealed class QCNoteDataSetBuilder
             createdBy   = Str(c, "Name");
             // Format date as "dd MMMM yyyy" to match legacy "Long Date" format.
             var rawDate = Str(c, "DateCreated");
-            if (DateTime.TryParse(rawDate, out var parsedDate))
-                dateCreated = parsedDate.ToString("dd MMMM yyyy");
-            else
-                dateCreated = rawDate;
+            dateCreated = FormatLongDate(rawDate);
         }
 
         // ── 3. Projects lookup (list type 19) ───────────────────────────────
@@ -156,5 +153,17 @@ public sealed class QCNoteDataSetBuilder
         if (!row.TryGetValue(key, out var val) || val is null || val is DBNull)
             return string.Empty;
         return Convert.ToString(val) ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Formats a raw date string as "dd MMMM yyyy" (UK long date) to match the
+    /// legacy Crystal Reports "Long Date" format used in QCNote.rpt.
+    /// Returns <paramref name="raw"/> unchanged when it cannot be parsed as a date.
+    /// </summary>
+    internal static string FormatLongDate(string raw)
+    {
+        if (DateTime.TryParse(raw, out var parsedDate))
+            return parsedDate.ToString("dd MMMM yyyy");
+        return raw;
     }
 }
