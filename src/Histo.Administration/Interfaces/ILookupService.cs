@@ -29,6 +29,16 @@ public interface ILookupService
     /// <summary>Returns all species from the dedicated species lookup stored procedure.</summary>
     Task<IReadOnlyList<LookupItem>> GetSpeciesLookupAsync(CancellationToken ct = default);
 
+    /// <summary>
+    /// Returns all histology types from <c>GetluHistology</c>.
+    /// Each item's <see cref="LookupItem.Code"/> holds the string code used when storing
+    /// batch-level test-type selections (e.g. "3" = Special Stain, "4" = IHC-PrP,
+    /// "5" = H&amp;E BSE, "6" = IHC-Other).
+    /// Callers should filter by <see cref="Histo.Submissions.Models.BatchTypeConstants"/>:
+    /// hide code "6" (IHC-Other) for TSE; hide codes "4" and "5" for NonTSE.
+    /// </summary>
+    Task<IReadOnlyList<LookupItem>> GetHistologyTypesAsync(CancellationToken ct = default);
+
     /// <summary>Creates a new pick-list row. Returns <see langword="false"/> on failure.</summary>
     Task<bool> CreateLookupItemAsync(int tableId, LookupItem item, int userId, CancellationToken ct = default);
 

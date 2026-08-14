@@ -1,0 +1,98 @@
+@page
+@model Histo.Web.Pages.Batches.DateReturnedModel
+@{
+    ViewData["Title"] = "Date returned";
+    ViewData["PageTitle"] = "Date returned";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Batches/BatchDetails" class="govuk-back-link">Back</a>
+}
+
+@if (Model.Error is not null && Model.Batch is null)
+{
+    @* Status guard — batch not Completed or not found. *@
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <strong class="govuk-warning-text__text">
+            <span class="govuk-visually-hidden">Warning</span>
+            @Model.Error
+        </strong>
+    </div>
+    <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to submission</a>
+}
+else if (Model.Batch is not null)
+{
+    @* Error summary — shown when form validation fails (date missing, date in future, concurrency). *@
+    @if (Model.Error is not null)
+    {
+        <div class="govuk-error-summary" data-module="govuk-error-summary">
+            <div role="alert">
+                <h2 class="govuk-error-summary__title">There is a problem</h2>
+                <div class="govuk-error-summary__body">
+                    <ul class="govuk-list govuk-error-summary__list">
+                        <li><a href="#customer-received-date">@Model.Error</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* Read-only batch summary — mirrors legacy BatchDetails SV_ReceiveBatch mode where
+       all fields except CustomerReceivedDate were disabled. *@
+    <dl class="govuk-summary-list govuk-!-margin-bottom-6">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submission number</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.ID</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Project / contract code</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.ProjectDescription</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Pathologist</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.ContactDescription</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Status</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.Status</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Date submitted</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.BatchDate?.ToShortDateString()</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Date completed</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.CompletedDate?.ToShortDateString()</dd>
+        </div>
+    </dl>
+
+    <form method="post">
+        <div class="govuk-form-group @(Model.Error != null ? "govuk-form-group--error" : "")">
+            <label class="govuk-label govuk-label--s" for="customer-received-date">
+                Date returned to customer
+            </label>
+            <div class="govuk-hint">
+                The date the samples were returned to the customer. Must not be in the future.
+                For example, @DateTime.Today.ToString("dd/MM/yyyy").
+            </div>
+            @if (Model.Error is not null)
+            {
+                <p class="govuk-error-message" id="customer-received-date-error">
+                    <span class="govuk-visually-hidden">Error:</span> @Model.Error
+                </p>
+            }
+            <input class="govuk-input govuk-input--width-10 @(Model.Error != null ? "govuk-input--error" : "")"
+                   id="customer-received-date"
+                   name="CustomerReceivedDate"
+                   type="date"
+                   value="@Model.CustomerReceivedDate?.ToString("yyyy-MM-dd")"
+                   max="@DateTime.Today.ToString("yyyy-MM-dd")" />
+        </div>
+
+        <div class="govuk-button-group">
+            <button type="submit" class="govuk-button" data-module="govuk-button">Save date returned</button>
+            <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        </div>
+    </form>
+}

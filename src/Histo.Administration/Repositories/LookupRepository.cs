@@ -108,6 +108,18 @@ public sealed class LookupRepository : ILookupRepository
     }
 
     /// <inheritdoc/>
+    public async Task<IReadOnlyList<LookupItem>> GetHistologyTypesAsync(CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<dynamic>(
+            "GetluHistology",
+            commandType: System.Data.CommandType.StoredProcedure);
+        // Use MapLookupItem so the Code column (e.g. "3", "4", "5", "6") is preserved
+        // in LookupItem.Code for downstream batch-test-selection storage.
+        return rows.Select(MapLookupItem).ToList();
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<LookupItem>> GetUserAreasAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
@@ -214,6 +226,7 @@ public sealed class LookupRepository : ILookupRepository
             ID     = d.TryGetValue("ID",          out var id)     ? ToIntSafe(id)                : 0,
             Name   = d.TryGetValue("Description", out var desc)   ? Convert.ToString(desc) ?? "" : "",
             Active = d.TryGetValue("IsActive",     out var active) ? Convert.ToBoolean(active)    : true,
+            Code   = d.TryGetValue("Code",         out var code)   ? Convert.ToString(code)       : null,
         };
     }
 

@@ -133,6 +133,23 @@ public sealed class LookupService : ILookupService
     }
 
     /// <summary>
+    /// Returns all histology types from <c>GetluHistology</c>.
+    /// Legacy source: <c>LookupData.vb::GetHistologyLookupData</c>.
+    /// </summary>
+    public async Task<IReadOnlyList<LookupItem>> GetHistologyTypesAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _lookups.GetHistologyTypesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get histology types.", ex);
+            return [];
+        }
+    }
+
+    /// <summary>
     /// Creates a new pick-list row in the table identified by <paramref name="tableId"/>.
     /// Replaces the legacy <c>LookupData.SaveLookupData</c> insert path
     /// (<c>PickListMaintenanceID.aspx</c> / <c>PickListUserArea.aspx</c> grid "Add new" row).

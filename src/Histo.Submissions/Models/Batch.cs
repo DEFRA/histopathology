@@ -46,6 +46,14 @@ public sealed class Batch
 
     /// <summary>Fixation/fixative description (joined from luFixation).</summary>
     public string? FixationDescription { get; init; }
+
+    /// <summary>
+    /// Date the samples were returned to the customer.
+    /// Legacy source: <c>tblBatch.CustomerReceivedDate</c>, set via the
+    /// "Date Returned" workflow on <c>BatchDetails.aspx</c> in receive mode
+    /// (<c>SessionVars.SV_ReceiveBatch = True</c>).
+    /// </summary>
+    public DateTime? CustomerReceivedDate { get; init; }
 }
 
 /// <summary>

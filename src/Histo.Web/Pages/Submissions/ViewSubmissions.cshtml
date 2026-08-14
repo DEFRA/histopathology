@@ -242,14 +242,16 @@
                 <a asp-page="/Batches/BatchDetails" class="govuk-button" data-module="govuk-button">View submission</a>
             }
 
-            @* Date Returned — Completed status only *@
+            @* GAP-2: Date Returned — Completed status only.
+               Legacy: SV_ReceiveBatch=True → BatchDetails.aspx in receive mode (only CustomerReceivedDate editable).
+               New app: dedicated DateReturned.cshtml page (does NOT change status). *@
             @if (Model.CanDateReturned)
             {
-                <a asp-page="/Batches/ReceiveBatch" class="govuk-button govuk-button--secondary" data-module="govuk-button">Date returned</a>
+                <a asp-page="/Batches/DateReturned" class="govuk-button govuk-button--secondary" data-module="govuk-button">Date returned</a>
             }
             else
             {
-                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Date Returned is only available for completed submissions">Date returned</button>
+                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Date returned is only available for completed submissions">Date returned</button>
             }
         </div>
     }

@@ -39,4 +39,37 @@ public interface IBatchService
 
     /// <summary>Recomputes and corrects the CompletedDate of all cassetted batches. Returns the number of batches updated.</summary>
     Task<int> FixCompletedDatesAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Sets the customer received date ("date returned") on a batch without changing any other field.
+    /// Returns <see langword="false"/> on failure.
+    /// Legacy source: <c>BatchDetails.aspx</c> in receive mode (<c>SV_ReceiveBatch = True</c>).
+    /// </summary>
+    Task<bool> SetCustomerReceivedDateAsync(int batchId, DateTime? date, byte[] rowStamp, int userId, CancellationToken ct = default);
+
+    // -----------------------------------------------------------------------
+    // Batch-level test type selections (Histology / Antibodies / Special Stains)
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns the batch-level histology, antibody, and special-stain type selections
+    /// for the given batch.
+    /// Legacy source: <c>BatchDetails.aspx</c> — "Select Histology and required tests" section.
+    /// </summary>
+    Task<BatchTestSelections> GetBatchTestSelectionsAsync(int batchId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Persists the batch-level test type selections.  Existing rows whose code is absent
+    /// from the new selection are deleted; new codes are inserted.
+    /// Returns <see langword="false"/> on failure.
+    /// Legacy source: <c>clsBatch.vb::UpdateBatchDetails</c> — <c>clsCheckBoxData.UpdateTable</c>
+    /// called for BATCH_HISTOLOGY_TABLE, BATCH_ANTIBODIES_TABLE, BATCH_STAIN_TABLE.
+    /// </summary>
+    Task<bool> SaveBatchTestSelectionsAsync(
+        int batchId,
+        IReadOnlyList<string> histologyCodes,
+        IReadOnlyList<string> antibodyCodes,
+        IReadOnlyList<string> stainCodes,
+        int userId,
+        CancellationToken ct = default);
 }

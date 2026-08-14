@@ -87,4 +87,16 @@ public interface ILookupRepository
     /// Legacy source: <c>LookupData.GetSpeciesLookup</c>.
     /// </summary>
     Task<IReadOnlyList<LookupItem>> GetSpeciesLookupAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns all histology types from the dedicated <c>GetluHistology</c> stored procedure.
+    ///
+    /// Unlike the generic pick-list tables, the histology table is keyed by a <em>string</em>
+    /// <c>Code</c> column (e.g. "3" = Special Stain, "4" = IHC-PrP, "5" = H&amp;E BSE,
+    /// "6" = IHC-Other).  The returned <see cref="LookupItem.Code"/> property carries this
+    /// string code; the caller uses it when storing batch-level test-type selections.
+    ///
+    /// Legacy source: <c>LookupData.vb::GetHistologyLookupData</c> — <c>GetluHistology</c> SP.
+    /// </summary>
+    Task<IReadOnlyList<LookupItem>> GetHistologyTypesAsync(CancellationToken ct = default);
 }

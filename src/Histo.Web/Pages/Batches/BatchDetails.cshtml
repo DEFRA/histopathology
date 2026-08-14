@@ -1,13 +1,228 @@
 @page
 @model Histo.Web.Pages.Batches.BatchDetailsModel
+@using Histo.Core.Domain
 @{
     ViewData["Title"] = "Batch details";
     ViewData["PageTitle"] = "Batch details";
 }
 
 @section BeforeHeading {
-    <a asp-page="/Batches/BatchesForEditing" class="govuk-back-link">Back</a>
+    @* GAP-3: context-aware back link — ReturnPage is set by the list page before navigating here. *@
+    <a href="@Url.Page(Model.BackLinkPage)" class="govuk-back-link">Back</a>
 }
+
+@if (Model.Batch is null)
+{
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <strong class="govuk-warning-text__text">
+            <span class="govuk-visually-hidden">Warning</span>
+            Batch not found.
+        </strong>
+    </div>
+}
+else
+{
+    <dl class="govuk-summary-list">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submission number</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.ID</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Date submitted</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.BatchDate?.ToShortDateString()</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Customer ref</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.CustomerRef</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Project / contract code</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.ProjectDescription</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Pathologist</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.ContactDescription</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Species</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.Species</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Fixation</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.FixationDescription</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Status</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.Status</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Status comments</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.StatusComments</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Date received</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.ReceivedDate?.ToShortDateString()</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Date completed</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.CompletedDate?.ToShortDateString()</dd>
+        </div>
+        @* GAP-1: CustomerReceivedDate (date returned) was missing from the summary. *@
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Date returned to customer</dt>
+            <dd class="govuk-summary-list__value">
+                @(Model.Batch.CustomerReceivedDate.HasValue
+                    ? Model.Batch.CustomerReceivedDate.Value.ToShortDateString()
+                    : "Not yet recorded")
+            </dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Comments</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.Comments</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submission category</dt>
+            <dd class="govuk-summary-list__value">@Histo.Submissions.Models.BatchTypeConstants.DisplayName(Model.Batch.BatchType)</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Pre-cassetted</dt>
+            <dd class="govuk-summary-list__value">@(Model.Batch.IsPreCassetted ? "Yes" : "No")</dd>
+        </div>
+    </dl>
+
+    @* ── Selected test types — batch-level histology / antibody / special stain selections ──
+       GAP-5: Legacy BatchDetails.aspx had a "Select Histology and required tests" section with
+       three CheckBoxList controls (chkblHistology, chkblAntibodies, chkblSpecialStain).
+       In the new application these are displayed here as a read-only summary and edited via
+       the dedicated EditBatchTests page. *@
+    <h2 class="govuk-heading-m">Selected test types</h2>
+    <dl class="govuk-summary-list">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Histology</dt>
+            <dd class="govuk-summary-list__value">
+                @if (Model.TestSelections.Histology.Count == 0)
+                {
+                    <span class="govuk-hint">None selected</span>
+                }
+                else
+                {
+                    foreach (var row in Model.TestSelections.Histology)
+                    {
+                        var name = Model.HistologyNames.TryGetValue(row.Code, out var h) ? h : row.Code;
+                        <strong class="govuk-tag govuk-tag--blue govuk-!-margin-right-1">@name</strong>
+                    }
+                }
+            </dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Antibodies</dt>
+            <dd class="govuk-summary-list__value">
+                @if (Model.TestSelections.Antibodies.Count == 0)
+                {
+                    <span class="govuk-hint">None selected</span>
+                }
+                else
+                {
+                    foreach (var row in Model.TestSelections.Antibodies)
+                    {
+                        var name = Model.AntibodyNames.TryGetValue(row.Code, out var a) ? a : row.Code;
+                        <strong class="govuk-tag govuk-tag--purple govuk-!-margin-right-1">@name</strong>
+                    }
+                }
+            </dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Special stains</dt>
+            <dd class="govuk-summary-list__value">
+                @if (Model.TestSelections.Stains.Count == 0)
+                {
+                    <span class="govuk-hint">None selected</span>
+                }
+                else
+                {
+                    foreach (var row in Model.TestSelections.Stains)
+                    {
+                        var name = Model.StainNames.TryGetValue(row.Code, out var s) ? s : row.Code;
+                        <strong class="govuk-tag govuk-tag--green govuk-!-margin-right-1">@name</strong>
+                    }
+                }
+            </dd>
+        </div>
+    </dl>
+
+    @* GAP-4: Action buttons gated on batch status, matching legacy EnableDisableControls(). *@
+    <div class="govuk-button-group">
+
+        @* View samples — always available (replaces legacy btnBatchSummary). *@
+        <a asp-page="/Submissions/ViewSamples" class="govuk-button" data-module="govuk-button">View samples</a>
+
+        @* Edit submission status — Submitted or Rejected only.
+           Legacy: ddlProjectCode/chkblHistology etc. all enabled when SV_EditingBatch=True. *@
+        @if (Model.CanEdit)
+        {
+            <a asp-page="/Batches/EditBatch" class="govuk-button govuk-button--secondary" data-module="govuk-button">Edit submission status</a>
+        }
+        else
+        {
+            <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true"
+                    title="Editing is only available for submissions in Submitted or Rejected status">
+                Edit submission status
+            </button>
+        }
+
+        @* Assign blocks — Received or InProgress only.
+           Legacy: block assignment is part of the active lab workflow; not available for Submitted/Completed batches. *@
+        @if (Model.CanAssignBlocks)
+        {
+            <a asp-page="/Blocks/BlockDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Assign blocks</a>
+        }
+        else
+        {
+            <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true"
+                    title="Blocks can only be assigned when the submission is Received or In Progress">
+                Assign blocks
+            </button>
+        }
+
+        @* Date returned — Completed status only.
+           GAP-2: legacy btnReceiveSubmission navigated to BatchDetails in SV_ReceiveBatch mode
+           (only CustomerReceivedDate editable). New app uses a dedicated DateReturned page. *@
+        @if (Model.CanDateReturned)
+        {
+            <a asp-page="/Batches/DateReturned" class="govuk-button govuk-button--secondary" data-module="govuk-button">Date returned</a>
+        }
+        else
+        {
+            <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true"
+                    title="Date returned can only be set on completed submissions">
+                Date returned
+            </button>
+        }
+
+        @* Copy batch — always available. *@
+        <a asp-page="/Batches/CopyBatch" asp-route-sourceBatchId="@Model.Batch.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy batch</a>
+
+        @* Edit test types — available when Submitted, Received, or InProgress.
+           Legacy: chkblHistology, chkblAntibodies, chkblSpecialStain were editable inline on BatchDetails.aspx.
+           GAP-5: In the new app this is a dedicated GDS page following the one-thing-per-page principle. *@
+        @if (Model.CanEditTestTypes)
+        {
+            <a asp-page="/Batches/EditBatchTests" class="govuk-button govuk-button--secondary" data-module="govuk-button">Edit test types</a>
+        }
+        else
+        {
+            <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true"
+                    title="Test types can only be edited for submissions in Submitted, Received, or In Progress status">
+                Edit test types
+            </button>
+        }
+
+        <a asp-page="/Index" class="govuk-button govuk-button--secondary" data-module="govuk-button">Home</a>
+
+    </div>
+}
+
 
 @if (Model.Batch is null)
 {

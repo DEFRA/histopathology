@@ -119,7 +119,10 @@ public class SearchSubmissionsModel : HistoPageModel
         Users = await _users.GetAllUsersAsync();
 
         if (SelectedBatchId > 0)
-            Session.BatchID = SelectedBatchId;
+        {
+            Session.BatchID    = SelectedBatchId;
+            Session.ReturnPage = "/Search/SearchSubmissions";  // GAP-3: context-aware back link on BatchDetails
+        }
 
         Results = await _batches.SearchAsync(BuildCriteria());
         Searched = true;

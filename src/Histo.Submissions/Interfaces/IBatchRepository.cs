@@ -57,6 +57,19 @@ public interface IBatchRepository
     Task UpdateAsync(Batch batch, int userId, CancellationToken ct = default);
 
     /// <summary>
+    /// Sets the customer received date on a batch without changing any other field.
+    /// Maps to <c>EditBatch</c> SP with <c>CustomerReceivedDate</c> added as a parameter.
+    ///
+    /// NOTE: the <c>EditBatch</c> SP must accept a <c>CustomerReceivedDate</c> named parameter.
+    /// Add it to the SP definition if absent before deploying the Date Returned page.
+    ///
+    /// Legacy source: <c>BatchDetails.aspx.vb::btnSave_Click</c> when
+    /// <c>SessionVars.SV_ReceiveBatch = True</c> — the legacy saved all fields via
+    /// <c>UpdateBatchDetails</c>; this method loads existing values and only changes the date.
+    /// </summary>
+    Task SetCustomerReceivedDateAsync(int batchId, DateTime? date, byte[] rowStamp, int userId, CancellationToken ct = default);
+
+    /// <summary>
     /// Updates batch status. Maps to <c>EditBatchStatus</c>.
     /// Throws <see cref="BatchConcurrencyException"/> on rowstamp mismatch.
     /// </summary>
@@ -124,4 +137,45 @@ public interface IBatchRepository
     /// Legacy source: <c>FixCompletedDates.aspx.vb</c> — <c>UpdateBatchCompletedDate</c>.
     /// </summary>
     Task UpdateCompletedDateAsync(int batchId, DateTime completedDate, CancellationToken ct = default);
+
+    // -----------------------------------------------------------------------
+    // Batch-level test type selections (Histology / Antibodies / Special Stains)
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns the batch-level test type selections (histology types, antibodies,
+    /// special stains) for a given batch ID.
+    ///
+    /// Calls <c>GetCommonBatchTablesByID</c> with <c>QueryMultipleAsync</c> and reads
+    /// result-set indices 1 (BATCH_HISTOLOGY_TABLE), 2 (BATCH_ANTIBODIES_TABLE), and
+    /// 3 (BATCH_STAIN_TABLE).  Result-set 0 (batch header) is discarded.
+    ///
+    /// Legacy source: <c>clsBatch.vb::GetCommonBatchDetails</c> —
+    /// the DataSet sub-tables populated from <c>GetCommonBatchTablesByID</c>.
+    /// </summary>
+    Task<BatchTestSelections> GetBatchTestSelectionsAsync(int batchId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Persists the batch-level test type selections using a delta strategy:
+    /// rows whose code is in the new selection but not in the existing set are inserted;
+    /// rows in the existing set whose code is absent from the new selection are deleted.
+    ///
+    /// Insert/delete stored procedures per type:
+    /// <list type="bullet">
+    /// <item>Histology: <c>AddHistology</c> / <c>DeleteHistology</c></item>
+    /// <item>Antibodies: <c>AddAntibodies</c> / <c>DeleteAntibodies</c></item>
+    /// <item>Special stains: <c>AddSpecialStain</c> / <c>DeleteSpecialStain</c></item>
+    /// </list>
+    ///
+    /// Legacy source: <c>clsCheckBoxData.vb::UpdateTable</c> —
+    /// called from <c>clsBatch.vb::UpdateBatchDetails</c> for BATCH_HISTOLOGY_TABLE,
+    /// BATCH_ANTIBODIES_TABLE, and BATCH_STAIN_TABLE.
+    /// </summary>
+    Task SaveBatchTestSelectionsAsync(
+        int batchId,
+        IReadOnlyList<string> histologyCodes,
+        IReadOnlyList<string> antibodyCodes,
+        IReadOnlyList<string> stainCodes,
+        int userId,
+        CancellationToken ct = default);
 }

@@ -136,6 +136,32 @@ public sealed class BatchRepository : IBatchRepository
     }
 
     /// <inheritdoc/>
+    public async Task SetCustomerReceivedDateAsync(int batchId, DateTime? date, byte[] rowStamp, int userId, CancellationToken ct = default)
+    {
+        // Load existing batch to preserve all current field values — only CustomerReceivedDate changes.
+        var existing = await GetByIdAsync(batchId, ct);
+        if (existing is null) return;
+
+        using var conn = _db.CreateConnection();
+        await conn.ExecuteAsync(
+            "EditBatch",
+            new
+            {
+                existing.ID,
+                existing.Status,
+                existing.CustomerRef,
+                existing.Comments,
+                existing.StatusComments,
+                existing.ReceivedDate,
+                existing.CompletedDate,
+                CustomerReceivedDate = date,
+                RowStamp = rowStamp,
+                UserID = userId,
+            },
+            commandType: System.Data.CommandType.StoredProcedure);
+    }
+
+    /// <inheritdoc/>
     public async Task UpdateStatusAsync(int batchId, string newStatus, byte[] rowStamp, int userId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
@@ -264,5 +290,91 @@ public sealed class BatchRepository : IBatchRepository
             "EditBatchCompletedDate",
             new { CompletedDate = completedDate, BatchID = batchId },
             commandType: System.Data.CommandType.StoredProcedure);
+    }
+
+    // -----------------------------------------------------------------------
+    // Batch-level test type selections (Histology / Antibodies / Special Stains)
+    // -----------------------------------------------------------------------
+
+    /// <inheritdoc/>
+    public async Task<BatchTestSelections> GetBatchTestSelectionsAsync(int batchId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        using var multi = await conn.QueryMultipleAsync(
+            "GetCommonBatchTablesByID",
+            new { ID = batchId },
+            commandType: System.Data.CommandType.StoredProcedure);
+
+        // Result set 0 = BATCH_TABLE (batch header) — read and discard; we only need 1-3.
+        await multi.ReadAsync<dynamic>();
+
+        var histology  = (await multi.ReadAsync<BatchTestSelectionRow>()).ToList(); // index 1
+        var antibodies = (await multi.ReadAsync<BatchTestSelectionRow>()).ToList(); // index 2
+        var stains     = (await multi.ReadAsync<BatchTestSelectionRow>()).ToList(); // index 3
+
+        return new BatchTestSelections
+        {
+            Histology  = histology,
+            Antibodies = antibodies,
+            Stains     = stains,
+        };
+    }
+
+    /// <inheritdoc/>
+    public async Task SaveBatchTestSelectionsAsync(
+        int batchId,
+        IReadOnlyList<string> histologyCodes,
+        IReadOnlyList<string> antibodyCodes,
+        IReadOnlyList<string> stainCodes,
+        int userId,
+        CancellationToken ct = default)
+    {
+        var current = await GetBatchTestSelectionsAsync(batchId, ct);
+
+        using var conn = _db.CreateConnection();
+        await ApplyTestSelectionDeltaAsync(conn, batchId, userId,
+            current.Histology,  histologyCodes,  "AddHistology",   "DeleteHistology");
+        await ApplyTestSelectionDeltaAsync(conn, batchId, userId,
+            current.Antibodies, antibodyCodes,   "AddAntibodies",  "DeleteAntibodies");
+        await ApplyTestSelectionDeltaAsync(conn, batchId, userId,
+            current.Stains,     stainCodes,      "AddSpecialStain","DeleteSpecialStain");
+    }
+
+    /// <summary>
+    /// Applies an insert/delete delta for one test-type table.
+    /// Codes present in <paramref name="newCodes"/> but absent from <paramref name="current"/> are inserted.
+    /// Rows in <paramref name="current"/> whose code is absent from <paramref name="newCodes"/> are deleted.
+    /// </summary>
+    private static async Task ApplyTestSelectionDeltaAsync(
+        System.Data.IDbConnection conn,
+        int batchId,
+        int userId,
+        IReadOnlyList<BatchTestSelectionRow> current,
+        IReadOnlyList<string> newCodes,
+        string addSp,
+        string deleteSp)
+    {
+        var currentSet = current.ToDictionary(r => r.Code, r => r.ID, StringComparer.OrdinalIgnoreCase);
+        var newSet     = newCodes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var row in current)
+        {
+            if (!newSet.Contains(row.Code))
+            {
+                await conn.ExecuteAsync(deleteSp,
+                    new { ID = row.ID },
+                    commandType: System.Data.CommandType.StoredProcedure);
+            }
+        }
+
+        foreach (var code in newCodes)
+        {
+            if (!currentSet.ContainsKey(code))
+            {
+                await conn.ExecuteAsync(addSp,
+                    new { BatchID = batchId, Code = code, UserID = userId },
+                    commandType: System.Data.CommandType.StoredProcedure);
+            }
+        }
     }
 }

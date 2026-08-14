@@ -483,6 +483,43 @@ Build: 0 errors, 0 warnings. Tests: 90 pass, 1 skipped, 0 fail.
 **Build:** 0 errors, 0 warnings (CoreCompile; copy step skipped — dev server running).
 ---
 
+## Prompt 38 — BatchDetails legacy vs new gap analysis, alignment and docs update (2026-08-14)
+
+> Please verify the BatchDetails.aspx screen logic between the legacy and new application, identify any behaviour, implementation, or migration gaps across New, View, Edit, and Returned submission states, and align the new application's functionality with the legacy behaviour while following GDS, Razor Pages, .NET 10, and C# standards. Also update the migration-run-journal, User-Prompts-Log, and session metrics with duration to fix and the findings, analysis, and changes implemented.
+
+**Four gaps found and fixed (Run #75):**
+
+| # | Gap | Legacy behaviour | New app (before fix) | Fix |
+|---|-----|-----------------|---------------------|-----|
+| GAP-1 | `CustomerReceivedDate` missing | `ctlReceivedDate` (CustomerReceivedDate) shown in all modes on `BatchDetails.aspx` | `Batch` model had no `CustomerReceivedDate`; summary list didn't show it | Added `CustomerReceivedDate DateTime?` to `Batch.cs`; added "Date returned to customer" summary row to `BatchDetails.cshtml` |
+| GAP-2 | "Date Returned" workflow broken | Legacy `btnReceiveSubmission_Click` sets `SV_ReceiveBatch=True` → `BatchDetails.aspx` with only `ctlReceivedDate` editable; status NOT changed | `ViewSubmissions` "Date returned" linked to `ReceiveBatch.cshtml` which calls `UpdateStatusAsync(..., Received)` — would change a Completed batch back to Received | Created `DateReturned.cshtml(.cs)` (sets `CustomerReceivedDate` only, no status change); added `SetCustomerReceivedDateAsync` full-stack (IBatchRepository → BatchRepository → IBatchService → BatchService); updated link in `ViewSubmissions.cshtml` |
+| GAP-3 | Back link context-unaware | Legacy uses `SV_RedirectCancelPage` to know where Cancel goes | Back link hardcoded to `/Batches/BatchesForEditing` regardless of entry point | Added `ReturnPage` to `ISessionService`/`SessionService`; `ViewSubmissions` and `SearchSubmissions` `OnPostSelectAsync` set it; `BatchDetails.BackLinkPage` reads it (falls back to `/Index`) |
+| GAP-4 | Action buttons never gated | Legacy `EnableDisableControls()` shows/hides buttons per mode | All buttons always shown regardless of status | `BatchDetailsModel` exposes `CanEdit` (Submitted/Rejected), `CanAssignBlocks` (Received/InProgress), `CanDateReturned` (Completed); `BatchDetails.cshtml` renders `disabled aria-disabled` for unavailable actions |
+
+**Files changed:**
+- `src/Histo.Submissions/Models/Batch.cs` — +`CustomerReceivedDate`
+- `src/Histo.Submissions/Interfaces/IBatchRepository.cs` — +`SetCustomerReceivedDateAsync`
+- `src/Histo.Submissions/Repositories/BatchRepository.cs` — +implementation
+- `src/Histo.Submissions/Interfaces/IBatchService.cs` — +`SetCustomerReceivedDateAsync`
+- `src/Histo.Submissions/Services/BatchService.cs` — +passthrough
+- `src/Histo.Web/Services/ISessionService.cs` — +`ReturnPage`
+- `src/Histo.Web/Services/SessionService.cs` — +`ReturnPage` impl
+- `src/Histo.Web/Pages/Batches/BatchDetails.cshtml.cs` — rewritten with status properties + back link
+- `src/Histo.Web/Pages/Batches/BatchDetails.cshtml` — rewritten with CustomerReceivedDate row, context back link, status-gated buttons
+- `src/Histo.Web/Pages/Batches/DateReturned.cshtml.cs` — new page
+- `src/Histo.Web/Pages/Batches/DateReturned.cshtml` — new page
+- `src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml` — "Date returned" link → `DateReturned`
+- `src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs` — `Session.ReturnPage` set in `OnPostSelectAsync`
+- `src/Histo.Web/Pages/Search/SearchSubmissions.cshtml.cs` — `Session.ReturnPage` set in `OnPostSelectAsync`
+
+**GDS alignment:** `DateReturned.cshtml` uses `govuk-error-summary`, `govuk-form-group--error`, `govuk-error-message`, `govuk-input--error`, `govuk-label--s`, `govuk-hint`, `govuk-button-group`, sentence case labels, back link — GDS-compliant. `BatchDetails.cshtml` `disabled aria-disabled="true" title="..."` pattern on locked buttons — GDS-compliant.
+
+**DB note:** `EditBatch` SP must accept a `CustomerReceivedDate` named parameter for `SetCustomerReceivedDateAsync` to persist the date. Verify SP definition before testing the Date Returned workflow against the database.
+
+**Build:** 0 errors, 0 warnings. **Duration:** ~40 minutes.
+
+---
+
 ## Prompt 37 — Fix Select button not working in ViewSubmissions; check routing navigation; GDS alignment and journal update (2026-08-14)
 
 > No action is happening on the click of select button in view submission screen

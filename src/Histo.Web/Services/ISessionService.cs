@@ -59,4 +59,13 @@ public interface ISessionService
     /// <c>VLAHeader.ascx::getUserDetails()</c>.
     /// </summary>
     void PopulateFromUser(Histo.Administration.Models.User user);
+
+    /// <summary>
+    /// The page path the user navigated from before arriving at BatchDetails.
+    /// Used by <c>BatchDetails.cshtml</c> to provide a context-aware back link.
+    /// Set by <c>ViewSubmissionsModel</c> and <c>SearchSubmissionsModel</c> in their
+    /// <c>OnPostSelectAsync</c> handlers before returning <c>Page()</c>.
+    /// Replaces the legacy <c>SessionVars.SV_RedirectCancelPage</c> pattern.
+    /// </summary>
+    string ReturnPage { get; set; }
 }
