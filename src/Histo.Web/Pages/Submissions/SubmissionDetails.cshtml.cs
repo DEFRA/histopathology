@@ -95,10 +95,10 @@ public class SubmissionDetailsModel : HistoPageModel
     private async Task<IActionResult?> LoadAnimalAsync()
     {
         if (Session.BatchID <= 0) return RedirectToPage("/Index");
-        if (Session.AnimalID is null) return RedirectToPage("/Submissions/ViewSamples");
+        if (Session.AnimalID is null) return RedirectToPage("/Submissions/BatchBlockSummary");
 
         var animals = await _submissions.GetAnimalsByBatchAsync(Session.BatchID ?? 0);
         Animal = animals.FirstOrDefault(a => a.ID == Session.AnimalID);
-        return Animal is null ? RedirectToPage("/Submissions/ViewSamples") : null;
+        return Animal is null ? RedirectToPage("/Submissions/BatchBlockSummary") : null;
     }
 }

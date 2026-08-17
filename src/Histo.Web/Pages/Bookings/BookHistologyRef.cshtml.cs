@@ -27,6 +27,6 @@ public class BookHistologyRefModel : HistoPageModel
         if (Session.AnimalID <= 0) return RedirectToPage("/Index");
         var ok = await _refs.BookRefAsync(histoRef, Session.AnimalID ?? 0, Session.UserID);
         if (!ok) { Error = "Could not book the selected reference."; AvailableRefs = await _refs.GetUnusedRefsAsync(1); return Page(); }
-        return RedirectToPage("/Submissions/ViewSamples");
+        return RedirectToPage("/Submissions/BatchBlockSummary");
     }
 }

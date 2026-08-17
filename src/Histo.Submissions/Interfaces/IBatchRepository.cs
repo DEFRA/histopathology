@@ -178,4 +178,13 @@ public interface IBatchRepository
         IReadOnlyList<string> stainCodes,
         int userId,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the raw "Submitted As" code for a batch from <c>BATCH_SUBMITTEDAS_TABLE</c>
+    /// (result-set index 5 of <c>GetCommonBatchTablesByID</c>).
+    /// Returns <see langword="null"/> when no record exists or the SP does not return that result set.
+    /// Legacy source: <c>BatchDetails.aspx.vb::InitialiseScreenWithBatchDetails</c> —
+    /// reads <c>foundRows(0)("Code")</c> then resolves via <c>GetListType(code, LOOKUP_SUBMITTEDAS)</c>.
+    /// </summary>
+    Task<string?> GetSubmittedAsCodeAsync(int batchId, CancellationToken ct = default);
 }

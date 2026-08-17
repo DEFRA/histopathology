@@ -18,7 +18,7 @@
         <label class="govuk-label" for="Status">Status</label>
         <select class="govuk-select" asp-for="Status">
             <option value="">-- Any --</option>
-            <option value="@Histo.Core.Domain.BatchStatus.Submitted">Submitted</option>
+            <option value="@Histo.Core.Domain.BatchStatus.Submitted">Not started</option>
             <option value="@Histo.Core.Domain.BatchStatus.Received">Received</option>
             <option value="@Histo.Core.Domain.BatchStatus.Rejected">Rejected</option>
             <option value="@Histo.Core.Domain.BatchStatus.Completed">Completed</option>
@@ -194,7 +194,7 @@
             }
             else
             {
-                <button class="govuk-button" disabled aria-disabled="true" title="Not available for submissions in Submitted status">View submission</button>
+                <button class="govuk-button" disabled aria-disabled="true" title="Not available for submissions in Not started status">View submission</button>
             }
 
             @* Edit submission — available for Received / On Hold / In Progress only *@
@@ -214,7 +214,7 @@
             }
             else
             {
-                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Not available for submissions in Submitted status">View receipt</button>
+                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Not available for submissions in Not started status">View receipt</button>
             }
 
             @* View quality data — Completed / Received / On Hold / In Progress *@
@@ -239,6 +239,14 @@
 
             @* Print submission — blocked on Phase 2 (report engine replacement) *@
             <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Print submission will be available in Phase 2">Print submission</button>
+
+            @* Edit test types — Submitted, Received, or InProgress only.
+               Moved from BatchDetails.cshtml (view page) to here (list-page action panel)
+               to match legacy behaviour where BatchDetails in view mode had no editing buttons. *@
+            @if (Model.CanEditTestTypes)
+            {
+                <a asp-page="/Batches/EditBatchTests" class="govuk-button govuk-button--secondary" data-module="govuk-button">Edit test types</a>
+            }
 
         </div>
     }

@@ -35,17 +35,37 @@ public sealed class Batch
 
     // ---- Display-only fields populated by GetCommonBatchTablesByID ----
 
-    /// <summary>Project/contract description (joined from luProjects). Matches BatchListResult.ProjectDescription.</summary>
-    public string? ProjectDescription { get; init; }
+    /// <summary>
+    /// Raw project/contract code stored in tblBatch (foreign key to LOOKUP_PROJECTS = 19).
+    /// Legacy source: <c>GetCommonBatchTablesByID</c> BATCH_TABLE column "ProjectContractCode"
+    /// (see <c>BatchDetails.aspx.vb</c>::<c>SelectItemInDropDownList(ddlProjectCode, .Item("ProjectContractCode")...)</c>).
+    /// Unlike <see cref="BatchListResult.ProjectDescription"/>/<see cref="BatchSearchResult.ProjectDescription"/>
+    /// (which come from SPs that already JOIN to luProjects), this SP does not join — it returns the raw
+    /// code, which must be resolved to a description via <c>ILookupService.GetLookupDataAsync(19)</c> in the view layer.
+    /// </summary>
+    public string? ProjectContractCode { get; init; }
 
-    /// <summary>Pathologist/contact description (joined from luContacts). Matches BatchListResult.ContactDescription.</summary>
-    public string? ContactDescription { get; init; }
+    /// <summary>
+    /// Raw contact/pathologist code stored in tblBatch (foreign key to LOOKUP_CONTACTS = 18).
+    /// Legacy source: <c>GetCommonBatchTablesByID</c> BATCH_TABLE column "ContactName" — despite the
+    /// column name, this holds the numeric Contact ID, not a display name (see
+    /// <c>BatchDetails.aspx.vb</c>::<c>SelectItemInDropDownList(ddlContactName, .Item("ContactName")...)</c>).
+    /// Resolved to a description via <c>ILookupService.GetLookupDataAsync(18)</c> in the view layer.
+    /// </summary>
+    public string? ContactName { get; init; }
 
     /// <summary>Species name (joined from species lookup). Matches BatchListResult.Species.</summary>
     public string? Species { get; init; }
 
-    /// <summary>Fixation/fixative description (joined from luFixation).</summary>
-    public string? FixationDescription { get; init; }
+    /// <summary>
+    /// Raw fixation/fixative code stored in tblBatch (foreign key to LOOKUP_FIXATION = 10).
+    /// Legacy source: <c>GetCommonBatchTablesByID</c> BATCH_TABLE column "Fixation" (see
+    /// <c>BatchDetails.aspx.vb</c>::<c>SelectItemInDropDownList(ddlFixation, .Item("Fixation")...)</c>).
+    /// Like <see cref="ProjectContractCode"/>/<see cref="ContactName"/>, this SP does not join to a
+    /// description — it returns the raw code, which must be resolved via
+    /// <c>ILookupService.GetLookupDataAsync(10)</c> in the view layer.
+    /// </summary>
+    public string? Fixation { get; init; }
 
     /// <summary>
     /// Date the samples were returned to the customer.
@@ -54,6 +74,46 @@ public sealed class Batch
     /// (<c>SessionVars.SV_ReceiveBatch = True</c>).
     /// </summary>
     public DateTime? CustomerReceivedDate { get; init; }
+
+    // ---- User identity fields — raw IDs resolved to names in the view layer ----
+
+    /// <summary>
+    /// ID of the VLA staff member who entered this submission into the system.
+    /// Legacy source: <c>tblBatch.SubmittedBy</c>, label "Entered By" on BatchDetails.aspx.
+    /// Distinct from <see cref="OtherSubmittedBy"/> (the external customer submitter).
+    /// Resolved to a display name via <c>GetAllUsersAsync</c> in the view layer.
+    /// </summary>
+    public int? SubmittedBy { get; init; }
+
+    /// <summary>
+    /// User area ID of the entering VLA staff member.
+    /// Legacy source: <c>tblBatch.SubmittedArea</c>, label "Entered Area" on BatchDetails.aspx.
+    /// Resolved to a description via <c>GetUserAreasAsync</c> in the view layer.
+    /// </summary>
+    public int? SubmittedArea { get; init; }
+
+    /// <summary>
+    /// ID of the external user who submitted this batch (the customer).
+    /// Legacy source: <c>tblBatch.OtherSubmittedBy</c>, label "Submitted By" on BatchDetails.aspx.
+    /// Distinct from <see cref="SubmittedBy"/> (the internal VLA entering user).
+    /// Resolved to a display name via <c>GetAllUsersAsync</c> in the view layer.
+    /// </summary>
+    public int? OtherSubmittedBy { get; init; }
+
+    /// <summary>
+    /// User area ID of the external submitter.
+    /// Legacy source: <c>tblBatch.OtherSubmittedArea</c>, label "Submitted Area" on BatchDetails.aspx.
+    /// Resolved to a description via <c>GetUserAreasAsync</c> in the view layer.
+    /// </summary>
+    public int? OtherSubmittedArea { get; init; }
+
+    /// <summary>
+    /// Whether the samples are adequately fixed (formalin fixation).
+    /// Legacy source: <c>tblBatch.SafeToHandle</c> (SQL bit field),
+    /// label "Is it adequately fixed?" on BatchDetails.aspx.
+    /// Rendered as "Yes", "No", or "Not specified" in the view.
+    /// </summary>
+    public bool? SafeToHandle { get; init; }
 }
 
 /// <summary>

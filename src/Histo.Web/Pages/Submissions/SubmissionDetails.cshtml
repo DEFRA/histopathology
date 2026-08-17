@@ -6,7 +6,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Submissions/ViewSamples" class="govuk-back-link">Back</a>
+    <a asp-page="/Submissions/BatchBlockSummary" class="govuk-back-link">Back</a>
 }
 
 @if (Model.Animal is null)
@@ -90,5 +90,5 @@ else
         <button type="submit" class="govuk-button" data-module="govuk-button">Add tissue</button>
     </form>
 
-    <a asp-page="/Submissions/ViewSamples" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to samples</a>
+    <a asp-page="/Submissions/BatchBlockSummary" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to samples</a>
 }

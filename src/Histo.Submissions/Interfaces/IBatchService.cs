@@ -72,4 +72,11 @@ public interface IBatchService
         IReadOnlyList<string> stainCodes,
         int userId,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the raw "Submitted As" code for a batch (from <c>BATCH_SUBMITTEDAS_TABLE</c>).
+    /// Returns <see langword="null"/> when no record exists.
+    /// Legacy: <c>LOOKUP_SUBMITTEDAS = 11</c> is used by the caller to resolve the code to a display name.
+    /// </summary>
+    Task<string?> GetSubmittedAsCodeAsync(int batchId, CancellationToken ct = default);
 }

@@ -321,6 +321,32 @@ public sealed class BatchRepository : IBatchRepository
     }
 
     /// <inheritdoc/>
+    public async Task<string?> GetSubmittedAsCodeAsync(int batchId, CancellationToken ct = default)
+    {
+        try
+        {
+            using var conn = _db.CreateConnection();
+            using var multi = await conn.QueryMultipleAsync(
+                "GetCommonBatchTablesByID",
+                new { ID = batchId },
+                commandType: System.Data.CommandType.StoredProcedure);
+
+            // BATCH_SUBMITTEDAS_TABLE is at result-set index 5 (clsBatch.vb constant).
+            // Discard result-sets 0–4 (BATCH_TABLE, HISTOLOGY, ANTIBODIES, STAINS, unnamed).
+            for (int i = 0; i < 5; i++)
+                await multi.ReadAsync<dynamic>();
+
+            var rows = (await multi.ReadAsync<dynamic>()).ToList();
+            return rows.Count > 0 ? rows[0].Code?.ToString() : null;
+        }
+        catch
+        {
+            // SP may return fewer result sets for newly-created batches that have no submitted-as record.
+            return null;
+        }
+    }
+
+    /// <inheritdoc/>
     public async Task SaveBatchTestSelectionsAsync(
         int batchId,
         IReadOnlyList<string> histologyCodes,

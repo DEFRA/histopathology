@@ -87,6 +87,10 @@ public class SearchSubmissionsModel : HistoPageModel
                                    || SelectedBatchStatus == BatchStatus.InProgress;
     public bool CanViewArchiveData => CanViewQualityData;
     public bool CanViewReceipt     => SelectedBatchStatus is not null && SelectedBatchStatus != BatchStatus.Submitted;
+    // Edit test types — Submitted, Received, or InProgress only (matches CanEditTestTypes on BatchDetails).
+    public bool CanEditTestTypes   => SelectedBatchStatus == BatchStatus.Submitted
+                                   || SelectedBatchStatus == BatchStatus.Received
+                                   || SelectedBatchStatus == BatchStatus.InProgress;
 
     public async Task OnGetAsync()
     {
@@ -153,19 +157,23 @@ public class SearchSubmissionsModel : HistoPageModel
     private BatchSearchCriteria BuildCriteria() => new()
     {
         SubmissionNumber    = SubmissionNumber,
-        Status              = Status,
-        ProjectContractCode = ProjectContractCode,
-        ContactName         = ContactName,
-        Species             = Species,
-        Fixation            = Fixation,
+        Status              = NullIfEmpty(Status),
+        ProjectContractCode = NullIfEmpty(ProjectContractCode),
+        ContactName         = NullIfEmpty(ContactName),
+        Species             = NullIfEmpty(Species),
+        Fixation            = NullIfEmpty(Fixation),
         SubmittedArea       = SubmittedArea,
         SubmittedBy         = SubmittedBy,
         EnteredBy           = EnteredBy,
-        HistologyRef        = HistologyRef,
-        SenderRef           = SenderRef,
+        HistologyRef        = NullIfEmpty(HistologyRef),
+        SenderRef           = NullIfEmpty(SenderRef),
         SubmittedDateFrom   = SubmittedDateFrom,
         SubmittedDateTo     = SubmittedDateTo,
         ReceivedDateFrom    = ReceivedDateFrom,
         ReceivedDateTo      = ReceivedDateTo,
     };
+
+    // Hidden form sends empty string for null-valued fields; the SP treats "" as a real
+    // filter value and returns 0 rows. Convert to null so the SP applies no filter.
+    private static string? NullIfEmpty(string? v) => string.IsNullOrWhiteSpace(v) ? null : v;
 }

@@ -43,6 +43,6 @@ public class AddSampleModel : HistoPageModel
         await _submissions.AddAnimalAsync(
             Session.BatchSubmissionID ?? 0, SenderRef, IsNeuropath, Session.UserID);
 
-        return RedirectToPage("/Submissions/ViewSamples");
+        return RedirectToPage("/Submissions/BatchBlockSummary");
     }
 }

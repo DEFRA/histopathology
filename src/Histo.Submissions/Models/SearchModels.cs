@@ -135,3 +135,29 @@ public sealed class TissueArchiveInfo
     public short? NoPieces { get; init; }
 }
 
+/// <summary>
+/// One result row for the legacy <c>ViewSamples.aspx</c> tissue/block search — a standalone
+/// (non-batch-scoped) search reached from the Home page, distinct from the in-progress-batch
+/// sample list now served by <c>BatchBlockSummary.cshtml</c>.
+///
+/// Legacy source: HistopathologyLib/clsAnimal.vb — <c>GetAnimalTissues</c> (SP <c>GetAnimalBatchTissues</c>,
+/// "Tissue Information" mode) and <c>GetAnimalBlockTissues</c> (SP <c>GetAnimalBlockTissues</c>,
+/// "Block Information" mode). Column shape from ViewSamples.aspx grdTissuesGrid / grdResults BoundColumns.
+/// <see cref="BlockRef"/> is populated only in Block Information mode (grdResults); it is
+/// <c>null</c> for Tissue Information mode rows (grdTissuesGrid, which has no Block Ref column).
+/// </summary>
+public sealed class AnimalTissueSearchResult
+{
+    public int ID { get; init; }
+    public DateTime? DateSubmitted { get; init; }
+    public DateTime? DateReceived { get; init; }
+    public string? TimeReceived { get; init; }
+    public DateTime? DateCompleted { get; init; }
+    public DateTime? CustomerReceivedDate { get; init; }
+    public string? SubmittedAs { get; init; }
+    public string? BlockRef { get; init; }
+    public string? TissueDescription { get; init; }
+    public int? NoPieces { get; init; }
+}
+
+

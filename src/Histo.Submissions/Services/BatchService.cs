@@ -274,4 +274,18 @@ public sealed class BatchService : IBatchService
             return false;
         }
     }
+
+    /// <inheritdoc/>
+    public async Task<string?> GetSubmittedAsCodeAsync(int batchId, CancellationToken ct = default)
+    {
+        try
+        {
+            return await _batches.GetSubmittedAsCodeAsync(batchId, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to read submitted-as code for batch {BatchId}.", ex, batchId);
+            return null;
+        }
+    }
 }
