@@ -179,16 +179,16 @@ public sealed class LookupService : ILookupService
     /// Returns <see langword="false"/> and logs the error if the update fails —
     /// callers should surface a generic save error to the user.
     /// </summary>
-    public async Task<bool> UpdateLookupItemAsync(int tableId, LookupItem item, int userId, CancellationToken ct = default)
+    public async Task<bool> UpdateLookupItemAsync(int tableId, LookupItem item, int userId, string? originalCode = null, CancellationToken ct = default)
     {
         try
         {
-            await _lookups.UpdateLookupItemAsync(tableId, item, userId, ct);
+            await _lookups.UpdateLookupItemAsync(tableId, item, userId, originalCode, ct);
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError("Failed to update lookup item {ItemId} for table ID {TableId}.", ex, item.ID, tableId);
+            _logger.LogError("Failed to update lookup item for table ID {TableId}.", ex, tableId);
             return false;
         }
     }

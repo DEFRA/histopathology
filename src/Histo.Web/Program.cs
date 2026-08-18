@@ -18,6 +18,8 @@ Log.Logger = new LoggerConfiguration()
 // return date columns as CONVERT(VARCHAR, col, 103) strings (dd/MM/yyyy format).
 // Must be called before any Dapper query executes.
 SqlMapper.AddTypeHandler(new NullableDateTimeTypeHandler());
+// Map the audit log SP column "DateTime" → AuditLogEntry.ChangedAt
+AuditLogDapperSetup.RegisterTypeMaps();
 
 try
 {

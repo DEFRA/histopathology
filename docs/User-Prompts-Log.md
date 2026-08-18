@@ -774,4 +774,149 @@ Print Submission Notes → `SubmissionNotes.aspx` (Crystal Reports popup) — Ph
 
 **Files changed:** `Submissions/BatchBlockSummary.cshtml.cs`, `Submissions/BatchBlockSummary.cshtml`, `Histo.Core/Domain/BatchStatus.cs`, `Submissions/ViewSubmissions.cshtml`, `Search/SearchSubmissions.cshtml`, `Batches/EditBatch.cshtml`.
 
+---
+
+## Prompt 44 — Multi-bug fix: BatchBlockSummary data binding, User Maintenance group/area names, EditUser dropdowns, PicklistMaintenance add/edit, Audit Log date range and column mapping, EditAnimalRef Sender Ref search (2026-08-18)
+
+> Fix the following issues:
+>
+> BatchBlockSummary (BatchBlockSummary.cshtml)
+> - Data not loading. Verify and fix data binding.
+>
+> User Maintenance
+> - Edit user not working (EditUser.cshtml).
+> - User maintenance group name and area is not displaying
+>
+> Picklist Maintenance
+> - Add item not working.
+> - Edit item not working.
+> - Compare with Project Picklist implementation and apply the same approach where applicable.
+>
+> Audit Log
+> - No records returned for selected date range.
+> - Incorrect dates displayed in results.
+>
+> Edit Sender / Histology Ref
+> - Sender Ref search is not working. Investigate and fix search functionality.
+>
+> Ensure all fixes match legacy application behavior and do not introduce regressions.
+>
+> run journal agent to update session metric duration of issue fix and update prompt to user prompt md file
+
+**Six root causes diagnosed and fixed (Run #83):**
+
+| # | Module | Root Cause | Fix |
+|---|--------|-----------|-----|
+| 1 | Audit Log — no records | `GetAuditLogByDate` SP uses `@LogDate` (one call per day), not `@StartDate`/`@EndDate` | `GetByDateAsync` iterates date range, calling SP with `LogDate` per day |
+| 2 | Audit Log — wrong dates | SP returns column `DateTime`; `AuditLogEntry.ChangedAt` never populated by Dapper auto-mapping | All 3 audit methods → `QueryAsync<dynamic>` + `MapAuditLogEntry` with case-insensitive dict mapping `DateTime` → `ChangedAt` |
+| 3 | UserMaintenance blank Group/Area | `IDictionary<string,object>` cast of `ExpandoObject` is case-sensitive; SP column casing can differ | `MapUser` uses `StringComparer.OrdinalIgnoreCase` via `ToDictionary`; page model adds `ILookupService` `ResolveGroupName`/`ResolveAreaName` helpers as fallback chain |
+| 4 | EditUser dropdowns | Manual `@foreach` option loops fragile for ASP.NET Core tag-helper pre-selection | `GroupSelectList`/`AreaSelectList` `SelectList` properties + `asp-items` on both `<select>` elements |
+| 5 | PicklistMaintenance Add/Edit | Area-scoped tables (18=Contacts, 19=Projects) need `@Area` on INSERT SP; was not passed | `Area = Session.UserArea` passed on create (LookupRepository adds the param only when non-empty — safe for non-area-scoped tables) |
+| 6 | EditAnimalRef Sender Ref search | Used `GetAnimalsBySenderRef` (wildcard/partial SP), filtered by exact match — filter always failed due to wrong column mapping | Added `GetAnimalBySenderAsync` full-stack calling `GetAnimalBySender` SP (exact-match, per legacy `clsAnimal.vb`) |
+| 7 | BatchBlockSummary data not loading | `GetBatchSubmissionDetailsByBatchID` is multi-result-set; `BATCH_SUBMISSION_TABLE = 6` (confirmed from `clsBatch.vb`) — submissions at index 6, but code read index 0 → wrong `BatchSubmissionID` → `AddAnimal` called with wrong parent | `QueryMultipleAsync` skipping 6 result sets to reach index 6; `BatchBlockSummary.OnGetAsync` two-tier strategy: primary derives `BatchSubmissionID` from loaded animals; secondary falls back to the fixed `GetSubmissionsByBatchAsync` |
+
+**Build:** 0 errors, 0 warnings. **Tests:** 90 pass, 1 skipped, 0 fail.
+
+**Files changed:** `AuditLog/Repositories/AuditLogRepository.cs`, `Administration/Repositories/UserRepository.cs`, `Web/Pages/Admin/UserMaintenance.cshtml.cs`, `Web/Pages/Admin/UserMaintenance.cshtml`, `Web/Pages/Admin/EditUser.cshtml.cs`, `Web/Pages/Admin/EditUser.cshtml`, `Web/Pages/Admin/EditLookupItem.cshtml.cs`, `Submissions/Interfaces/ISubmissionRepository.cs`, `Submissions/Repositories/SubmissionRepository.cs`, `Submissions/Interfaces/ISubmissionService.cs`, `Submissions/Services/SubmissionService.cs`, `Web/Pages/Admin/EditAnimalRef.cshtml.cs`, `Web/Pages/Submissions/BatchBlockSummary.cshtml.cs`.
+
+---
+
+## Prompt 45 — Picklist Management duplicate code validation check (2026-08-18)
+
+> Can you verify the error validation for Picklist Management when adding or editing an item?
+>
+> In the legacy system, there is a validation that prevents duplicate codes. When editing an item and selecting a code that is already in use, the following error message is displayed:
+>
+> "The code you have selected is already in use."
+>
+> Please check whether this validation is implemented and working correctly in the current version for both Add and Edit scenarios.
+
+Validation was completely absent. Four compounding issues were found and fixed: (1) no duplicate-code check existed; (2) the "Code" form input bound to `ItemId` (int) rather than a string `Code` property — users could not enter a code string; (3) the table displayed `@i.ID` under the Code column instead of `@i.Code`; (4) `CreateLookupItemAsync` never passed `@Code` to Code-keyed table INSERT SPs. Added `[BindProperty] string Code`, `bool TableHasCodes`, GDS inline error display, and the duplicate check mirroring `PickListMaintenance.aspx Pager_RowSave`.
+
+**Build:** Succeeded. 0 warnings, 0 errors.
+
+**Files changed:** `Web/Pages/Admin/EditLookupItem.cshtml.cs`, `Web/Pages/Admin/EditLookupItem.cshtml`, `Administration/Repositories/LookupRepository.cs`.
+
+---
+
+## Prompt 46 — Fix EditluArchiveLocation expects parameter @Original_Code (2026-08-18)
+
+> Fix this issue
+> {"Procedure or function 'EditluArchiveLocation' expects parameter '@Original_Code', which was not supplied."}
+
+Four root causes fixed together: (1) `UpdateLookupItemAsync` passed `@ID` for all tables — Code-keyed SPs expect `@Original_Code` + `@Code`, not `@ID`; (2) Edit links for Code-keyed tables used `asp-route-itemId="@i.ID"` but Code-keyed items have no integer ID (all map to 0); (3) `OnPostAsync` identified Edit vs Add by `ItemId is int` — always false for Code-keyed tables, so edits fell into the Create path; (4) duplicate-check exclusion used integer `i.ID != editId` which incorrectly excluded all rows (all ID = 0). Added `ItemCode` route parameter, `OriginalCode` hidden round-trip field, branched `UpdateLookupItemAsync` signature with optional `string? originalCode`, and fixed duplicate-check exclusion to use `OriginalCode` string comparison.
+
+**Build:** Succeeded. 0 warnings, 0 errors.
+
+**Files changed:** `Administration/Interfaces/ILookupRepository.cs`, `Administration/Interfaces/ILookupService.cs`, `Administration/Repositories/LookupRepository.cs`, `Administration/Services/LookupService.cs`, `Web/Pages/Admin/EditLookupItem.cshtml.cs`, `Web/Pages/Admin/EditLookupItem.cshtml`.
+
+---
+
+## Prompt 47 — Fix AddluArchiveLocation has too many arguments (2026-08-18)
+
+> Fix this issue
+> {"Procedure or function AddluArchiveLocation has too many arguments specified."}
+
+Legacy `BuildParamListCommon` (Code-keyed tables) inserts exactly `Code`, `Description`, `IsActive` — no `Area`. The page model was passing `Area = Session.UserArea` unconditionally on the Add path, giving Archive Location (and all other Code-keyed tables) a 4th parameter their INSERT SPs do not declare. Fix: changed the Add path to `Area = TableHasCodes ? null : Session.UserArea` — Code-keyed tables receive no Area; ID-keyed area-scoped tables (Contacts 18, Projects 19) still receive the session area as required.
+
+**Build:** Succeeded. 0 warnings, 0 errors.
+
+**Files changed:** `Web/Pages/Admin/EditLookupItem.cshtml.cs`.
+
+---
+
+## Prompt 48 — Journal update for this session (2026-08-18)
+
+> @file:journal-updater.agent.md run this agent update the below prompt in user prompt file
+>
+> Update the issue that has fixed from this session and add the prompt in User-Prompts-Log
+
+Journal-updater agent invoked in Mode B (uncommitted Copilot Chat session). Three fix prompts (45, 46, 47) appended to `docs/User-Prompts-Log.md`. `docs/migration-run-journal.md` updated with Run Log entry for this session.
+
+**Files changed:** `docs/User-Prompts-Log.md`, `docs/migration-run-journal.md`.
+
+
+## Prompt 49 -  Multiple bug fix 
+
+AuditLogByDate.cshtml
+
+The page currently loads a default date automatically.
+Legacy behavior should not pre-populate the date fields.
+Remove default date initialization and align with legacy behavior.
+User Maintenance (EditUser)
+
+Fix Edit User functionality.
+Current error:
+"Procedure or function 'EditUser' expects parameter '@UserID', which was not supplied."
+Compare legacy implementation and ensure all required parameters, especially UserID, are correctly passed through UI, controller/service, repository, and stored procedure layers.
+Picklist Maintenance (Edit Pick List)
+
+Fix Edit Pick List functionality.
+Current error:
+"Procedure or function AddluArchiveLocation has too many arguments specified."
+Compare with legacy implementation and Project Picklist pattern.
+Verify stored procedure signatures and parameter mappings.
+Remove any unsupported parameters and ensure parameter count/order matches the stored procedure definition.
+Edit Sender / Histology Ref
+
+Original Histology Ref field is not editable.
+Verify whether this field should be editable based on legacy behavior.
+Correct control configuration, data binding, and permissions if required.
+Review page layout and column alignment.
+Edit Sender / Histology Ref
+
+Fix alignment and positioning of the "Get Histology Ref" button to match legacy UI standards and surrounding controls.
+Audit Log Data Access
+
+Continue using strongly typed models (AuditLogEntry) wherever a model already exists.
+Do not replace:
+QueryAsync<AuditLogEntry>()
+with:
+QueryAsync<dynamic>()
+Use model-to-column mapping through aliases or model updates as required.
+Only use dynamic when the result set is genuinely variable.
+Ensure date fields and result mappings remain strongly typed and consistent with legacy behavior.
+---
+
+
 

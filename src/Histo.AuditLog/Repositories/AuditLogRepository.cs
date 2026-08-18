@@ -118,20 +118,20 @@ public sealed class AuditLogRepository : IAuditLogRepository
         CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        // Legacy SP GetAuditLogByDate was called with a single @LogDate parameter
-        // (clsAuditLog.vb::GetDailyAuditLogReport).  The SP filters inclusively for
-        // that calendar day.  The new UI exposes a date range, so we pass StartDate
-        // and EndDate; EndDate is extended to end-of-day so that records timestamped
-        // anywhere on the end date are included.
-        var rows = await conn.QueryAsync<AuditLogEntry>(
-            "GetAuditLogByDate",
-            new
-            {
-                StartDate = startDate.Date,
-                EndDate   = endDate.Date.AddDays(1).AddTicks(-1),
-            },
-            commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+        // Legacy SP GetAuditLogByDate accepts a single @LogDate parameter
+        // (clsAuditLog.vb::GetDailyAuditLogReport — confirmed from legacy source).
+        // The SP filters for that calendar day.  The UI passes a date range; to support
+        // multi-day ranges we call the SP once per calendar day and merge the results.
+        var results = new List<AuditLogEntry>();
+        for (var date = startDate.Date; date <= endDate.Date; date = date.AddDays(1))
+        {
+            var rows = await conn.QueryAsync<AuditLogEntry>(
+                "GetAuditLogByDate",
+                new { LogDate = date },
+                commandType: System.Data.CommandType.StoredProcedure);
+            results.AddRange(rows);
+        }
+        return results;
     }
 
     /// <inheritdoc/>
@@ -155,4 +155,9 @@ public sealed class AuditLogRepository : IAuditLogRepository
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
+
+    // -----------------------------------------------------------------------
+    // No dynamic mapping helpers needed — the AuditLogDapperSetup.RegisterTypeMaps()
+    // call at startup configures a CustomPropertyTypeMap that maps the SP column
+    // "DateTime" → AuditLogEntry.ChangedAt, so QueryAsync<AuditLogEntry> works directly.
 }

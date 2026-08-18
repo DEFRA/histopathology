@@ -77,7 +77,9 @@ public interface ILookupRepository
     /// Legacy source: <c>LookupData.SaveLookupData</c> update path
     /// (<c>PickListMaintenanceID.aspx</c> / <c>PickListUserArea.aspx</c> grid "Edit" row).
     /// </summary>
-    Task UpdateLookupItemAsync(int tableId, LookupItem item, int userId, CancellationToken ct = default);
+    /// <param name="originalCode">For Code-keyed tables (Archive Location, QC Code, etc.): the existing code
+    /// that identifies the row being updated. Passed as <c>@Original_Code</c> to the SP. Null for ID-keyed tables.</param>
+    Task UpdateLookupItemAsync(int tableId, LookupItem item, int userId, string? originalCode = null, CancellationToken ct = default);
 
     /// <summary>
     /// Returns all species from the species lookup table.

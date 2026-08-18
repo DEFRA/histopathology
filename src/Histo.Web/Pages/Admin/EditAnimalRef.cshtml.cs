@@ -59,9 +59,11 @@ public class EditAnimalRefModel : HistoPageModel
             return Page();
         }
 
-        var matches = await _submissions.GetAnimalsBySenderRefAsync(OriginalSenderRef);
-        var match = matches.FirstOrDefault(m =>
-            string.Equals(m.SenderRef?.Trim(), OriginalSenderRef, StringComparison.OrdinalIgnoreCase));
+        // Use GetAnimalBySender (exact match) rather than GetAnimalsBySenderRef (partial search),
+        // matching the legacy EditHistologyRef.aspx::getHistologyRef behaviour which called
+        // clsAnimal.GetAnimalBySender with the exact sender ref supplied.
+        var matches = await _submissions.GetAnimalBySenderAsync(OriginalSenderRef);
+        var match = matches.FirstOrDefault();
 
         if (match is null)
         {

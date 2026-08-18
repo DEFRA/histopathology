@@ -20,6 +20,12 @@ public interface ISubmissionService
     Task<bool> UpdateAnimalAsync(Animal animal, int userId, CancellationToken ct = default);
     Task<bool> DeleteAnimalAsync(int animalId, int userId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Returns the single animal that exactly matches the given Sender Ref.
+    /// Uses <c>GetAnimalBySender</c> SP (exact match). Returns empty list when not found.
+    /// </summary>
+    Task<IReadOnlyList<SenderSearchResult>> GetAnimalBySenderAsync(string senderRef, CancellationToken ct = default);
+
     /// <summary>Renames the Sender Ref. Throws <see cref="AnimalRefUpdateException"/> on conflict.</summary>
     Task UpdateAnimalSenderRefAsync(string senderRef, string newSenderRef, int userId, CancellationToken ct = default);
 

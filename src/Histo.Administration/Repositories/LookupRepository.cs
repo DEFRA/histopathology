@@ -154,10 +154,16 @@ public sealed class LookupRepository : ILookupRepository
         // parameter be included only when the caller has supplied one, since supplying an
         // undeclared parameter to a stored procedure that doesn't expect it would fail at
         // the database layer for the common (non-area) pick-list tables.
+        // Legacy BuildParamListCommon/BuildParamListID (LookupData.vb) never include
+        // UserID in insert parameters — only in update parameters. Pass only the columns
+        // the SP expects: Description, IsActive, and Area (for area-scoped tables 18/19).
         var parameters = new DynamicParameters();
         parameters.Add("Description", item.Name);
         parameters.Add("IsActive", item.Active);
-        parameters.Add("UserID", userId);
+        // Code-keyed tables (e.g. Archive Location 16, QC Code 14, Remedial Action 15)
+        // have a required @Code parameter on their insert SPs. Pass it when present.
+        if (!string.IsNullOrEmpty(item.Code))
+            parameters.Add("Code", item.Code);
         if (!string.IsNullOrEmpty(item.Area))
             parameters.Add("Area", item.Area);
 
@@ -169,25 +175,36 @@ public sealed class LookupRepository : ILookupRepository
     }
 
     /// <inheritdoc/>
-    public async Task UpdateLookupItemAsync(int tableId, LookupItem item, int userId, CancellationToken ct = default)
+    public async Task UpdateLookupItemAsync(int tableId, LookupItem item, int userId, string? originalCode = null, CancellationToken ct = default)
     {
         var procs = await ResolveLookupProcsAsync(tableId);
         if (string.IsNullOrWhiteSpace(procs.UpdateProc))
             throw new InvalidOperationException(
                 $"The look-up table Update procedure could not be found for table ID {tableId}.");
 
-        // Legacy BuildParamListID/BuildParamListCommon never update the Area column — it is
-        // only ever set on insert — so the update parameter set is fixed for every table.
+        // Code-keyed tables (Archive Location 16, QC Code 14, Remedial Action 15, etc.):
+        // legacy BuildParamListCommon passes @Original_Code (row identifier), @Code (new value),
+        // @Description, @IsActive, @UserID — there is no @ID column on these tables.
+        // ID-keyed tables (Contacts 18, Projects 19 and similar):
+        // legacy BuildParamListID passes @ID, @Description, @IsActive, @UserID.
+        var parameters = new DynamicParameters();
+        if (!string.IsNullOrEmpty(originalCode))
+        {
+            parameters.Add("Original_Code", originalCode);
+            parameters.Add("Code",          item.Code);
+        }
+        else
+        {
+            parameters.Add("ID", item.ID);
+        }
+        parameters.Add("Description", item.Name);
+        parameters.Add("IsActive",    item.Active);
+        parameters.Add("UserID",      userId);
+
         using var conn = _db.CreateConnection();
         await conn.ExecuteAsync(
             procs.UpdateProc,
-            new
-            {
-                ID          = item.ID,
-                Description = item.Name,
-                IsActive    = item.Active,
-                UserID      = userId,
-            },
+            parameters,
             commandType: System.Data.CommandType.StoredProcedure);
     }
 

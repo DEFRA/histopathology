@@ -2,6 +2,7 @@ using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace Histo.Web.Pages.Admin;
 
@@ -33,6 +34,19 @@ public class EditUserModel : HistoPageModel
     public IReadOnlyList<LookupItem> Groups { get; private set; } = [];
     public IReadOnlyList<LookupItem> Areas { get; private set; } = [];
     public List<string> Errors { get; } = [];
+
+    /// <summary>
+    /// SelectList for the Group dropdown — ensures the current <see cref="GroupCode"/>
+    /// value is pre-selected when the form loads, even when option values are integers
+    /// rendered from <c>LookupItem.ID</c> (which maps from the SP's <c>Code</c> column).
+    /// </summary>
+    public SelectList GroupSelectList => new(Groups, nameof(LookupItem.ID), nameof(LookupItem.Name), GroupCode);
+
+    /// <summary>
+    /// SelectList for the Area dropdown — ensures the current <see cref="AreaCode"/>
+    /// value is pre-selected when the form loads.
+    /// </summary>
+    public SelectList AreaSelectList => new(Areas, nameof(LookupItem.ID), nameof(LookupItem.Name), AreaCode);
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -72,7 +86,7 @@ public class EditUserModel : HistoPageModel
             Active    = Active,
         };
 
-        var ok = await _users.UpdateUserAsync(user);
+        var ok = await _users.UpdateUserAsync(user, Session.UserID);
         if (!ok)
         {
             Errors.Add("Failed to save changes. Please try again.");

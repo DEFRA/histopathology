@@ -51,6 +51,17 @@ public interface ISubmissionRepository
     Task DeleteAnimalAsync(int animalId, int userId, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns the animal record that exactly matches the given Sender Ref.
+    /// Maps to <c>GetAnimalBySender</c> (legacy source: <c>clsAnimal.vb::GetAnimalBySender</c>).
+    ///
+    /// This is the exact-match variant used by the Edit Sender/Histology Ref workflow
+    /// (<c>EditHistologyRef.aspx::getHistologyRef</c>). It differs from
+    /// <c>GetAnimalsBySenderRefAsync</c> / <c>GetAnimalsBySenderRef</c>, which may
+    /// perform a partial (wildcard) search used by the search-submission pages.
+    /// </summary>
+    Task<IReadOnlyList<SenderSearchResult>> GetAnimalBySenderAsync(string senderRef, CancellationToken ct = default);
+
+    /// <summary>
     /// Renames the Sender Ref of an existing animal/sample record, cascading to
     /// every submission that references it. Maps to <c>EditAnimalSenderRef</c>.
     ///

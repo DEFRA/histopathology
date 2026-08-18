@@ -43,5 +43,6 @@ public interface ILookupService
     Task<bool> CreateLookupItemAsync(int tableId, LookupItem item, int userId, CancellationToken ct = default);
 
     /// <summary>Updates an existing pick-list row. Returns <see langword="false"/> on failure.</summary>
-    Task<bool> UpdateLookupItemAsync(int tableId, LookupItem item, int userId, CancellationToken ct = default);
+    /// <param name="originalCode">For Code-keyed tables: the original code identifying the row. Null for ID-keyed tables.</param>
+    Task<bool> UpdateLookupItemAsync(int tableId, LookupItem item, int userId, string? originalCode = null, CancellationToken ct = default);
 }

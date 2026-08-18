@@ -21,5 +21,5 @@ public interface IUserService
     Task<bool> CreateUserAsync(User user, CancellationToken ct = default);
 
     /// <summary>Updates an existing user. Returns <see langword="false"/> on failure.</summary>
-    Task<bool> UpdateUserAsync(User user, CancellationToken ct = default);
+    Task<bool> UpdateUserAsync(User user, int userId, CancellationToken ct = default);
 }
