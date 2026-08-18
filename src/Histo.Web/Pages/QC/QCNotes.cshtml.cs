@@ -33,9 +33,7 @@ public class QCNotesModel : HistoPageModel
     {
         ViewData["Title"] = "QC notes";
         ViewData["PageTitle"] = "Quality control notes";
-        Notes = IsGlobalView
-            ? await _qc.GetAllAsync()
-            : await _qc.GetBySubmissionAsync(Session.BatchID!.Value);
+        Notes = await _qc.GetAllAsync();
     }
 
     public IActionResult OnPostEdit(int noteId)

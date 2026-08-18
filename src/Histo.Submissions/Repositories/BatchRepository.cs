@@ -39,7 +39,8 @@ public sealed class BatchRepository : IBatchRepository
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<BatchListResult>(
-            "GetInProgressBatches",
+            "GetBatchesWithStatus",
+            new { BatchStatus = 6 },
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
@@ -49,7 +50,8 @@ public sealed class BatchRepository : IBatchRepository
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<BatchListResult>(
-            "GetBatchesNotReceived",
+            "GetBatchesWithStatus",
+            new { BatchStatus = 1 },
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
@@ -59,7 +61,8 @@ public sealed class BatchRepository : IBatchRepository
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<BatchListResult>(
-            "GetAllBatches",
+            "GetBatchesWithStatus",
+            new { BatchStatus = 0 },
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
@@ -69,7 +72,8 @@ public sealed class BatchRepository : IBatchRepository
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<BatchListResult>(
-            "GetBatchesOnHold",
+            "GetBatchesWithStatus",
+            new { BatchStatus = 5 },
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
@@ -79,7 +83,8 @@ public sealed class BatchRepository : IBatchRepository
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<BatchListResult>(
-            "GetCompletedBatches",
+            "GetBatchesWithStatus",
+            new { BatchStatus = 4 },
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }

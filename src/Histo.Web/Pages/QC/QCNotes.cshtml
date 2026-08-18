@@ -40,8 +40,6 @@ else
                 <th scope="col" class="govuk-table__header">Stain ref</th>
                 <th scope="col" class="govuk-table__header">Project</th>
                 <th scope="col" class="govuk-table__header">Species</th>
-                <th scope="col" class="govuk-table__header">Created by</th>
-                <th scope="col" class="govuk-table__header">Date</th>
                 <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
             </tr>
         </thead>
@@ -54,14 +52,12 @@ else
                     <td class="govuk-table__cell">@n.StainRef</td>
                     <td class="govuk-table__cell">@n.ProjectDescription</td>
                     <td class="govuk-table__cell">@n.Species</td>
-                    <td class="govuk-table__cell">@n.CreatedBy</td>
-                    <td class="govuk-table__cell">@n.DateCreated</td>
                     <td class="govuk-table__cell">
                         <form method="post" style="display:inline">
-                            <input type="hidden" name="noteId" value="@n.ID" />
+                            <input type="hidden" name="noteId" value="@n.QCNoteRef" />
                             <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-page-handler="Edit">Edit</button>
                         </form>
-                        <a href="/Reports/QCNote?qcNoteRef=@n.ID" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Print</a>
+                        <a href="/Reports/QCNote?qcNoteRef=@n.QCNoteRef" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Print</a>
                     </td>
                 </tr>
             }
