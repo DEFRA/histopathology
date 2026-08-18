@@ -69,6 +69,7 @@
 <h2 class="govuk-heading-m">@(Model.ItemId is int ? "Edit item" : "Add item")</h2>
 
 <form method="post">
+    <input type="hidden" asp-for="TableId" />
     <input type="hidden" asp-for="ItemId" />
     <div class="govuk-form-group">
         <label class="govuk-label" for="Description">Description</label>

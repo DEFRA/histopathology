@@ -14,13 +14,12 @@ public class UserMaintenanceModel : HistoPageModel
         : base(session) => _users = users;
 
     /// <summary>
-    /// When true, only active users are shown.
-    /// Legacy <c>cbActive</c> defaulted to <c>Checked="True"</c> ("Show deactivated items")
-    /// which meant ALL users were visible by default.
-    /// This property therefore defaults to <c>false</c> (= show all) to match that behaviour.
+    /// When true, deactivated (inactive) users are included in the list alongside active users.
+    /// Matches the legacy <c>cbActive</c> ("Show deactivated items") checkbox behaviour:
+    /// default unchecked = show active users only; checked = show all users.
     /// </summary>
     [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
-    public bool ShowActiveOnly { get; set; }
+    public bool ShowDeactivated { get; set; }
 
     public IReadOnlyList<User> Users { get; private set; } = [];
     public string? StatusMessage { get; private set; }
@@ -36,7 +35,7 @@ public class UserMaintenanceModel : HistoPageModel
         {
             var all = await _users.GetAllUsersAsync();
             TotalFromDb = all.Count;
-            Users = ShowActiveOnly ? all.Where(u => u.Active).ToList() : all.ToList();
+            Users = ShowDeactivated ? all.ToList() : all.Where(u => u.Active).ToList();
         }
         catch (Exception ex)
         {

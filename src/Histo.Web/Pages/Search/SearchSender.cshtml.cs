@@ -26,6 +26,10 @@ public class SearchSenderModel : HistoPageModel
 
     public IReadOnlyList<SenderSearchResult> Results { get; private set; } = [];
 
+    /// <summary>True once the user has submitted a non-empty search so the view knows
+    /// to show the 'no results' message rather than leaving the page blank.</summary>
+    public bool HasSearched { get; private set; }
+
     public void OnGet()
     {
         ViewData["Title"] = "Search by Sender";
@@ -38,7 +42,10 @@ public class SearchSenderModel : HistoPageModel
         ViewData["PageTitle"] = "Search by Sender";
 
         if (!string.IsNullOrWhiteSpace(SenderRef))
-            Results = await _submissions.GetAnimalsBySenderRefAsync(SenderRef);
+        {
+            HasSearched = true;
+            Results = await _submissions.GetAnimalsBySenderRefAsync(SenderRef.Trim());
+        }
 
         return Page();
     }

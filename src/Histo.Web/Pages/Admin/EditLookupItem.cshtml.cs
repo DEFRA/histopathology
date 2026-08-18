@@ -83,6 +83,7 @@ public class EditLookupItemModel : HistoPageModel
         TempData["StatusMessage"] = ItemId is int
             ? $"'{Description.Trim()}' was updated."
             : $"'{Description.Trim()}' was added.";
+        // After save, return to the list view (clear itemId so form resets to "Add" mode).
         return RedirectToPage("/Admin/EditLookupItem", new { tableId = TableId });
     }
 

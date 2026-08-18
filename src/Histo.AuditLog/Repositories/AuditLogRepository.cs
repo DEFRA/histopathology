@@ -118,9 +118,18 @@ public sealed class AuditLogRepository : IAuditLogRepository
         CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
+        // Legacy SP GetAuditLogByDate was called with a single @LogDate parameter
+        // (clsAuditLog.vb::GetDailyAuditLogReport).  The SP filters inclusively for
+        // that calendar day.  The new UI exposes a date range, so we pass StartDate
+        // and EndDate; EndDate is extended to end-of-day so that records timestamped
+        // anywhere on the end date are included.
         var rows = await conn.QueryAsync<AuditLogEntry>(
             "GetAuditLogByDate",
-            new { StartDate = startDate, EndDate = endDate },
+            new
+            {
+                StartDate = startDate.Date,
+                EndDate   = endDate.Date.AddDays(1).AddTicks(-1),
+            },
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
@@ -132,6 +141,8 @@ public sealed class AuditLogRepository : IAuditLogRepository
         DateTime? endDate,
         CancellationToken ct = default)
     {
+        // Extend endDate to end-of-day so records on the selected date are included.
+        var inclusiveEnd = endDate.HasValue ? endDate.Value.Date.AddDays(1).AddTicks(-1) : (DateTime?)null;
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<AuditLogEntry>(
             "GetAuditLogByUser",
@@ -139,7 +150,7 @@ public sealed class AuditLogRepository : IAuditLogRepository
             {
                 UserID    = userId,
                 StartDate = (object?)startDate ?? DBNull.Value,
-                EndDate   = (object?)endDate   ?? DBNull.Value,
+                EndDate   = (object?)inclusiveEnd ?? DBNull.Value,
             },
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();

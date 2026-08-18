@@ -60,7 +60,8 @@ public class EditAnimalRefModel : HistoPageModel
         }
 
         var matches = await _submissions.GetAnimalsBySenderRefAsync(OriginalSenderRef);
-        var match = matches.FirstOrDefault(m => string.Equals(m.SenderRef, OriginalSenderRef, StringComparison.OrdinalIgnoreCase));
+        var match = matches.FirstOrDefault(m =>
+            string.Equals(m.SenderRef?.Trim(), OriginalSenderRef, StringComparison.OrdinalIgnoreCase));
 
         if (match is null)
         {

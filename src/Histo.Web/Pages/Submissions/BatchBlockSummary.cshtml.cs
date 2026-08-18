@@ -56,10 +56,27 @@ public class BatchBlockSummaryModel : HistoPageModel
     {
         ViewData["Title"] = "Sample summary";
         ViewData["PageTitle"] = "Sample summary";
-        if (Session.BatchID <= 0) return RedirectToPage("/Index");
-        var batchId = Session.BatchID ?? 0;
+        if (Session.BatchID is null or <= 0) return RedirectToPage("/Index");
+        var batchId = Session.BatchID.Value;
         Batch = await _batches.GetByIdAsync(batchId);
         Animals = await _submissions.GetAnimalsByBatchAsync(batchId);
+
+        // Ensure BatchSubmissionID is populated in session so that AddSubmission / AddSample
+        // have a valid parent record when adding a new animal.  The legacy system stored this
+        // via the in-memory DataSet workflow; the migrated pages read it directly from session.
+        var submissions = await _submissions.GetSubmissionsByBatchAsync(batchId);
+        if (submissions.Count > 0)
+        {
+            Session.BatchSubmissionID = submissions[0].ID;
+        }
+        else
+        {
+            // First visit for this batch: create the default batch submission record.
+            var sub = new BatchSubmission { BatchID = batchId, SubmissionName = "Default", Order = 1 };
+            var subId = await _submissions.AddSubmissionAsync(sub, Session.UserID);
+            if (subId > 0) Session.BatchSubmissionID = subId;
+        }
+
         return Page();
     }
 

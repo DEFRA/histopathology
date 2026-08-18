@@ -41,7 +41,7 @@ public class AuditLogByDateModel : HistoPageModel
             ["Table", "Field", "Date/Time", "User", "Before", "After", "Reason", "Key"],
             results.Select(e => (IReadOnlyList<string?>)new string?[]
             {
-                e.TableName, e.FieldName, e.ChangedAt.ToString("G"), e.UserName,
+                e.TableName, e.FieldName, e.ChangedAt.ToString("dd/MM/yyyy HH:mm:ss"), e.UserName,
                 e.BeforeValue, e.AfterValue, e.Reason, e.KeyID
             }));
     }
