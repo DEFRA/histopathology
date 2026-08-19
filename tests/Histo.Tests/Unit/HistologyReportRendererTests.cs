@@ -89,7 +89,9 @@ public class HistologyReportRendererTests
         histology.Columns.Add("BatchID", typeof(int));
         histology.Columns.Add("Code");
         var h1 = histology.NewRow(); h1["BatchID"] = batchId; h1["Code"] = "H1N2";
+        var h2 = histology.NewRow(); h2["BatchID"] = batchId; h2["Code"] = "PAS";
         histology.Rows.Add(h1);
+        histology.Rows.Add(h2);
         ds.Tables.Add(histology);
 
         // ── BatchSubmission ──────────────────────────────────────────────────
@@ -118,7 +120,7 @@ public class HistologyReportRendererTests
         s2["HistologyRef"] = "11/42879";
         s2["BlockRef"]     = "02";
         s2["TissueDetails"] = "Viscera";
-        s2["RepeatBlock"]  = "";
+        s2["RepeatBlock"]  = "1";
         s2["CustomerRef"]  = "visc 2";
         submissions.Rows.Add(s2);
         ds.Tables.Add(submissions);

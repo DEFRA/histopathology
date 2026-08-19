@@ -42,7 +42,7 @@
                     <td class="govuk-table__cell">
                         @if (t.QCNoteRef is > 0)
                         {
-                            <a href="/Reports/QCNote?qcNoteRef=@t.QCNoteRef" class="govuk-link">@t.QCNoteRef</a>
+                            <a asp-page="/Reports/QCNote" asp-route-qcNoteRef="@t.QCNoteRef" class="govuk-link">@t.QCNoteRef</a>
                         }
                         else
                         {

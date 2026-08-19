@@ -162,8 +162,9 @@ public sealed class QCNoteDataSetBuilder
     /// </summary>
     internal static string FormatLongDate(string raw)
     {
-        if (DateTime.TryParse(raw, out var parsedDate))
-            return parsedDate.ToString("dd MMMM yyyy");
+        var culture = System.Globalization.CultureInfo.GetCultureInfo("en-GB");
+        if (DateTime.TryParse(raw, culture, System.Globalization.DateTimeStyles.AllowWhiteSpaces, out var parsedDate))
+            return parsedDate.ToString("dd MMMM yyyy", culture);
         return raw;
     }
 }

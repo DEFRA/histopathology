@@ -32,11 +32,11 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .CreateBootstrapLogger();
 
-// Register Dapper type handler for DateTime? â€” handles legacy stored procedures that
+// Register Dapper type handler for DateTime? — handles legacy stored procedures that
 // return date columns as CONVERT(VARCHAR, col, 103) strings (dd/MM/yyyy format).
 // Must be called before any Dapper query executes.
 SqlMapper.AddTypeHandler(new NullableDateTimeTypeHandler());
-// Map the audit log SP column "DateTime" â†’ AuditLogEntry.ChangedAt
+// Map the audit log SP column "DateTime" → AuditLogEntry.ChangedAt
 AuditLogDapperSetup.RegisterTypeMaps();
 
 try
@@ -45,20 +45,20 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
-    // â”€â”€ Serilog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- Serilog -------------------------------------------------------------
     builder.Host.UseSerilog((ctx, services, cfg) =>
         cfg.ReadFrom.Configuration(ctx.Configuration)
            .ReadFrom.Services(services)
            .Enrich.FromLogContext()
            .WriteTo.Console());
 
-    // â”€â”€ Strongly-typed options â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- Strongly-typed options -----------------------------------------------
     builder.Services.Configure<AppOptions>(
         builder.Configuration.GetSection(AppOptions.SectionName));
 
-    // â”€â”€ DB connection factory â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- DB connection factory ------------------------------------------------
     // Connection string comes from ConnectionStrings:HistologyDb in appsettings.json
-    // (Key Vault reference in non-dev environments â€” never a plaintext password here).
+    // (Key Vault reference in non-dev environments — never a plaintext password here).
     var connectionString = builder.Configuration.GetConnectionString("HistologyDb")
         ?? throw new InvalidOperationException(
             "ConnectionStrings:HistologyDb is not configured. " +
@@ -67,7 +67,7 @@ try
     builder.Services.AddSingleton<IDbConnectionFactory>(
         new SqlConnectionFactory(connectionString));
 
-    // â”€â”€ Logger adapter (wraps Microsoft.Extensions.Logging for domain services) â”€â”€
+    // -- Logger adapter (wraps Microsoft.Extensions.Logging for domain services) --
     // IAppLogger is a non-generic interface; register via ILoggerFactory so every
     // service injection site gets a logger whose category is the declaring service type.
     // Using a factory delegate ensures the ILoggerFactory is resolved from the
@@ -78,15 +78,15 @@ try
         return new AppLogger<IAppLogger>(factory.CreateLogger<IAppLogger>());
     });
 
-    // â”€â”€ Health checks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- Health checks --------------------------------------------------------
     builder.Services.AddHealthChecks();
     // TODO Phase 1+: add SQL health check:
     //   .AddSqlServer(connectionString, name: "histology-db", tags: ["db"]);
 
-    // â”€â”€ Razor Pages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- Razor Pages ----------------------------------------------------------
     builder.Services.AddRazorPages();
 
-    // â”€â”€ Session â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- Session --------------------------------------------------------------
     builder.Services.AddDistributedMemoryCache();
     builder.Services.AddSession(o =>
     {
@@ -97,26 +97,22 @@ try
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddScoped<ISessionService, SessionService>();
 
-    // â”€â”€ Administration module â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- Administration module -------------------------------------------------
     builder.Services.AddAdministrationModule();
 
-    // â”€â”€ AuditLog module â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- AuditLog module -------------------------------------------------------
     builder.Services.AddAuditLogModule();
 
-    // â”€â”€ Histology module â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- Histology module ------------------------------------------------------
     builder.Services.AddHistologyModule();
 
-    // â”€â”€ QualityControl module â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- QualityControl module -------------------------------------------------
     builder.Services.AddQualityControlModule();
 
-    // â”€â”€ Submissions module â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- Submissions module ----------------------------------------------------
     builder.Services.AddSubmissionsModule();
-    builder.Services.AddScoped<IBatchRepository, BatchRepository>();
-    builder.Services.AddScoped<BatchService>();
-    builder.Services.AddScoped<ISubmissionRepository, SubmissionRepository>();
-    builder.Services.AddScoped<SubmissionService>();
 
-    // â”€â”€ Reporting module â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- Reporting module ------------------------------------------------------
     builder.Services.AddTransient<HistologyReportDataSetBuilder>();
     builder.Services.AddTransient<HistologyReportRenderer>();
     builder.Services.AddTransient<QCNoteDataSetBuilder>();
@@ -124,7 +120,7 @@ try
     builder.Services.AddTransient<SubmissionNotesDataSetBuilder>();
     builder.Services.AddTransient<SubmissionNotesRenderer>();
 
-    // â”€â”€ Application Insights telemetry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- Application Insights telemetry --------------------------------------
     var aiConnString = builder.Configuration["AppSettings:ApplicationInsightsConnectionString"];
     if (!string.IsNullOrWhiteSpace(aiConnString))
         builder.Services.AddApplicationInsightsTelemetry(o =>
@@ -132,7 +128,7 @@ try
 
     var app = builder.Build();
 
-    // â”€â”€ Middleware pipeline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- Middleware pipeline --------------------------------------------------
     if (!app.Environment.IsDevelopment())
         app.UseExceptionHandler("/Error");
 
@@ -143,8 +139,6 @@ try
     app.UseSession();
 
     // Phase 2: app.UseAuthentication(); app.UseAuthorization();
-    
-    app.UseAuthorization();
 
     app.MapHealthChecks("/health");
     app.MapRazorPages();

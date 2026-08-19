@@ -57,7 +57,7 @@ else
                             <input type="hidden" name="noteId" value="@n.QCNoteRef" />
                             <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-page-handler="Edit">Edit</button>
                         </form>
-                        <a href="/Reports/QCNote?qcNoteRef=@n.QCNoteRef" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Print</a>
+                        <a asp-page="/Reports/QCNote" asp-route-qcNoteRef="@n.QCNoteRef" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Print</a>
                     </td>
                 </tr>
             }

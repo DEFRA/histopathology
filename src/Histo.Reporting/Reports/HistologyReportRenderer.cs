@@ -93,7 +93,6 @@ public sealed class HistologyReportRenderer
         var fixation       = batch is not null ? Field(batch, "Fixation")            : string.Empty;
         var postFixOther   = batch is not null ? Field(batch, "PostFixationOther")   : string.Empty;
         var comments       = batch is not null ? Field(batch, "Comments")            : string.Empty;
-        var moreHistology  = batch is not null ? IsChecked(Field(batch, "MoreHistology"))  : false;
         var commentLengthOk = batch is not null ? IsChecked(Field(batch, "CommentLengthOK")) : false;
         var batchId        = batch is not null ? Field(batch, "ID")                  : string.Empty;
 
@@ -504,8 +503,13 @@ public sealed class HistologyReportRenderer
     }
 
     /// <summary>Formats a raw date/time string to dd/MM/yyyy for UK display.</summary>
-    private static string FormatDate(string raw) =>
-        DateTime.TryParse(raw, out var dt) ? dt.ToString("dd/MM/yyyy") : raw;
+    private static string FormatDate(string raw)
+    {
+        var culture = System.Globalization.CultureInfo.GetCultureInfo("en-GB");
+        return DateTime.TryParse(raw, culture, System.Globalization.DateTimeStyles.AllowWhiteSpaces, out var dt)
+            ? dt.ToString("dd/MM/yyyy", culture)
+            : raw;
+    }
 
     /// <summary>
     /// Determines whether a field value represents a "checked" / tick state.
