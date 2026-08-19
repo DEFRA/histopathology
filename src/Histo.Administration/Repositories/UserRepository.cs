@@ -91,15 +91,25 @@ public sealed class UserRepository : IUserRepository
     /// <summary>
     /// Maps a row from the <c>GetUsers</c> / <c>GetUsersByUserArea</c> stored procedures.
     /// <para>
-    /// Uses <see cref="IDictionary{TKey,TValue}"/> + TryGetValue rather than direct dynamic
-    /// property access (<c>row.Property</c>). Uses <see cref="ToIntSafe"/> for numeric columns
-    /// because the SP may return <c>UserGroup</c> and <c>UserArea</c> as string columns;
+    /// Uses a case-insensitive <see cref="Dictionary{TKey,TValue}"/> copy of the Dapper
+    /// <c>ExpandoObject</c> row. Dapper returns column names exactly as the SQL result set
+    /// defines them; the backing <c>IDictionary&lt;string, object&gt;</c> of an ExpandoObject
+    /// is case-sensitive, so a column named <c>groupname</c> would not be found by
+    /// <c>TryGetValue("GroupName")</c>. The case-insensitive copy removes this fragility.
+    /// Uses <see cref="ToIntSafe"/> for numeric columns because the SP may return
+    /// <c>UserGroup</c> and <c>UserArea</c> as string columns;
     /// <c>Convert.ToInt32("")</c> throws <c>FormatException</c> for empty strings.
     /// </para>
     /// </summary>
     private static User MapUser(dynamic row)
     {
-        var d = (IDictionary<string, object>)row;
+        // Build a case-insensitive dictionary so column-name casing differences
+        // between SQL Server SP aliases and TryGetValue key strings do not silently
+        // produce empty strings / zero values.
+        var d = new Dictionary<string, object?>(
+            ((IDictionary<string, object>)row).ToDictionary(p => p.Key, p => (object?)p.Value),
+            StringComparer.OrdinalIgnoreCase);
+
         return new User
         {
             UserID    = d.TryGetValue("ID",        out var id)   ? ToIntSafe(id)                 : 0,
@@ -133,20 +143,21 @@ public sealed class UserRepository : IUserRepository
     }
 
     /// <inheritdoc/>
-    public async Task UpdateUserAsync(User user, CancellationToken ct = default)
+    public async Task UpdateUserAsync(User user, int userId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
         await conn.ExecuteAsync(
             "EditUser",
             new
             {
-                ID        = user.UserID,
+                ID        = user.UserID,   // record being edited
                 NTLogin   = user.NtLogin,
                 Name      = user.Name,
                 Email     = user.Email,
                 UserGroup = user.GroupCode,
                 UserArea  = user.AreaCode,
                 Active    = user.Active,
+                UserID    = userId,        // session editor (audit — matches legacy @UserID param)
             },
             commandType: System.Data.CommandType.StoredProcedure);
     }

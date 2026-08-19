@@ -20,6 +20,12 @@ public interface ISubmissionService
     Task<bool> UpdateAnimalAsync(Animal animal, int userId, CancellationToken ct = default);
     Task<bool> DeleteAnimalAsync(int animalId, int userId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Returns the single animal that exactly matches the given Sender Ref.
+    /// Uses <c>GetAnimalBySender</c> SP (exact match). Returns empty list when not found.
+    /// </summary>
+    Task<IReadOnlyList<SenderSearchResult>> GetAnimalBySenderAsync(string senderRef, CancellationToken ct = default);
+
     /// <summary>Renames the Sender Ref. Throws <see cref="AnimalRefUpdateException"/> on conflict.</summary>
     Task UpdateAnimalSenderRefAsync(string senderRef, string newSenderRef, int userId, CancellationToken ct = default);
 
@@ -39,4 +45,10 @@ public interface ISubmissionService
     Task<IReadOnlyList<SenderSearchResult>> GetAnimalsBySenderRefAsync(string senderRef, CancellationToken ct = default);
     Task<IReadOnlyList<TissueArchiveInfo>> GetTissueArchiveAsync(string? senderRef, string? histologyRef, string? archiveLocation, string? tissueCode, CancellationToken ct = default);
     Task<IReadOnlyList<ImportedDataRow>> GetImportedDataAsync(string? selectedTable, CancellationToken ct = default);
+
+    /// <summary>Standalone ViewSamples search — "Tissue Information" mode. See <see cref="Histo.Submissions.Interfaces.ISubmissionRepository.GetAnimalTissuesAsync"/>.</summary>
+    Task<IReadOnlyList<AnimalTissueSearchResult>> GetAnimalTissuesAsync(string? senderRef, string? histologyRef, string? tissueCode, string? projectDesc, CancellationToken ct = default);
+
+    /// <summary>Standalone ViewSamples search — "Block Information" mode. See <see cref="Histo.Submissions.Interfaces.ISubmissionRepository.GetAnimalBlockTissuesAsync"/>.</summary>
+    Task<IReadOnlyList<AnimalTissueSearchResult>> GetAnimalBlockTissuesAsync(string? senderRef, string? histologyRef, string? tissueCode, string? projectDesc, CancellationToken ct = default);
 }

@@ -41,22 +41,14 @@
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="GroupCode">Group</label>
-        <select class="govuk-select" asp-for="GroupCode">
+        <select class="govuk-select" asp-for="GroupCode" asp-items="Model.GroupSelectList">
             <option value="">-- Select --</option>
-            @foreach (var g in Model.Groups)
-            {
-                <option value="@g.ID" selected="@(g.ID == Model.GroupCode ? "selected" : null)">@g.Name</option>
-            }
         </select>
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="AreaCode">Area</label>
-        <select class="govuk-select" asp-for="AreaCode">
+        <select class="govuk-select" asp-for="AreaCode" asp-items="Model.AreaSelectList">
             <option value="">-- Select --</option>
-            @foreach (var a in Model.Areas)
-            {
-                <option value="@a.ID" selected="@(a.ID == Model.AreaCode ? "selected" : null)">@a.Name</option>
-            }
         </select>
     </div>
     <div class="govuk-form-group">

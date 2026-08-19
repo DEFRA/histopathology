@@ -1,19 +1,25 @@
-using Serilog;
-using Histo.Infrastructure;
-using Histo.Web.Services;
-using Microsoft.Extensions.Options;
-
+using Dapper;
 // Modular monolith — each module registers its own internals via extension method
 using Histo.Administration;
 using Histo.AuditLog;
 using Histo.Histology;
+using Histo.Infrastructure;
 using Histo.QualityControl;
 using Histo.Submissions;
+using Histo.Web.Services;
+using Serilog;
 
 // Bootstrap Serilog before the host is built so startup errors are captured.
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .CreateBootstrapLogger();
+
+// Register Dapper type handler for DateTime? — handles legacy stored procedures that
+// return date columns as CONVERT(VARCHAR, col, 103) strings (dd/MM/yyyy format).
+// Must be called before any Dapper query executes.
+SqlMapper.AddTypeHandler(new NullableDateTimeTypeHandler());
+// Map the audit log SP column "DateTime" → AuditLogEntry.ChangedAt
+AuditLogDapperSetup.RegisterTypeMaps();
 
 try
 {

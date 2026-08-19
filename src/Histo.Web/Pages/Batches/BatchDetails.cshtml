@@ -1,12 +1,14 @@
 @page
 @model Histo.Web.Pages.Batches.BatchDetailsModel
+@using Histo.Core.Domain
 @{
-    ViewData["Title"] = "Batch details";
-    ViewData["PageTitle"] = "Batch details";
+    ViewData["Title"] = "Submission details";
+    ViewData["PageTitle"] = "Submission details";
 }
 
 @section BeforeHeading {
-    <a asp-page="/Batches/BatchesForEditing" class="govuk-back-link">Back</a>
+    @* GAP-3: context-aware back link — ReturnPage is set by the list page before navigating here. *@
+    <a href="@Url.Page(Model.BackLinkPage)" class="govuk-back-link">Back</a>
 }
 
 @if (Model.Batch is null)
@@ -23,51 +25,91 @@ else
 {
     <dl class="govuk-summary-list">
         <div class="govuk-summary-list__row">
-            <dt class="govuk-summary-list__key">Batch ID</dt>
+            <dt class="govuk-summary-list__key">Submission number</dt>
             <dd class="govuk-summary-list__value">@Model.Batch.ID</dd>
         </div>
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Date submitted</dt>
             <dd class="govuk-summary-list__value">@Model.Batch.BatchDate?.ToShortDateString()</dd>
         </div>
+        @*  GAP-6: "Entered By" and "Entered Area" were on BatchDetails.aspx (the VLA staff member who
+            entered the submission) but were absent from the new read-only view.
+            Root cause: the ui-implementation agent captured primary data fields but missed the two
+            user-identity blocks (entering user + external submitter) because they appeared as
+            disabled dropdowns in view mode. *@
         <div class="govuk-summary-list__row">
-            <dt class="govuk-summary-list__key">Customer ref</dt>
-            <dd class="govuk-summary-list__value">@Model.Batch.CustomerRef</dd>
+            <dt class="govuk-summary-list__key">Entered by</dt>
+            <dd class="govuk-summary-list__value">
+                @(string.IsNullOrWhiteSpace(Model.EnteredByName) ? "Not recorded" : Model.EnteredByName)
+            </dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Entered area</dt>
+            <dd class="govuk-summary-list__value">
+                @(string.IsNullOrWhiteSpace(Model.EnteredAreaName) ? "Not recorded" : Model.EnteredAreaName)
+            </dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submitted by</dt>
+            <dd class="govuk-summary-list__value">
+                @(string.IsNullOrWhiteSpace(Model.SubmittedByName) ? "Not recorded" : Model.SubmittedByName)
+            </dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submitted area</dt>
+            <dd class="govuk-summary-list__value">
+                @(string.IsNullOrWhiteSpace(Model.SubmittedAreaName) ? "Not recorded" : Model.SubmittedAreaName)
+            </dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submitted as</dt>
+            <dd class="govuk-summary-list__value">
+                @(string.IsNullOrWhiteSpace(Model.SubmittedAsDescription) ? "Not recorded" : Model.SubmittedAsDescription)
+            </dd>
         </div>
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Project / contract code</dt>
-            <dd class="govuk-summary-list__value">@Model.Batch.ProjectDescription</dd>
+            <dd class="govuk-summary-list__value">@Model.ProjectName</dd>
         </div>
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Pathologist</dt>
-            <dd class="govuk-summary-list__value">@Model.Batch.ContactDescription</dd>
+            <dd class="govuk-summary-list__value">@Model.PathologistName</dd>
         </div>
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Species</dt>
-            <dd class="govuk-summary-list__value">@Model.Batch.Species</dd>
+            <dd class="govuk-summary-list__value">@Model.SpeciesName</dd>
         </div>
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Fixation</dt>
-            <dd class="govuk-summary-list__value">@Model.Batch.FixationDescription</dd>
+            <dd class="govuk-summary-list__value">@Model.FixationName</dd>
+        </div>
+        @* GAP-6: "Is it adequately fixed?" (SafeToHandle) was on BatchDetails.aspx but absent from the new view. *@
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Is it adequately fixed?</dt>
+            <dd class="govuk-summary-list__value">
+                @(Model.Batch.SafeToHandle == true ? "Yes" :
+                  Model.Batch.SafeToHandle == false ? "No" :
+                  "Not specified")
+            </dd>
         </div>
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Status</dt>
-            <dd class="govuk-summary-list__value">@Model.Batch.Status</dd>
+            <dd class="govuk-summary-list__value">@BatchStatus.DisplayName(Model.Batch.Status)</dd>
+        </div>
+        @* GAP-1: CustomerReceivedDate (date returned) was missing from the summary.
+           Label matches legacy lblCustomerReceivedDate ("Customer Received Date") exactly —
+           not a distinct field from the legacy "Date Returned" workflow, just the same
+           tblBatch.CustomerReceivedDate column. *@
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Customer received date</dt>
+            <dd class="govuk-summary-list__value">
+                @(Model.Batch.CustomerReceivedDate.HasValue
+                    ? Model.Batch.CustomerReceivedDate.Value.ToShortDateString()
+                    : "Not yet recorded")
+            </dd>
         </div>
         <div class="govuk-summary-list__row">
-            <dt class="govuk-summary-list__key">Status comments</dt>
-            <dd class="govuk-summary-list__value">@Model.Batch.StatusComments</dd>
-        </div>
-        <div class="govuk-summary-list__row">
-            <dt class="govuk-summary-list__key">Received date</dt>
-            <dd class="govuk-summary-list__value">@Model.Batch.ReceivedDate?.ToShortDateString()</dd>
-        </div>
-        <div class="govuk-summary-list__row">
-            <dt class="govuk-summary-list__key">Completed date</dt>
-            <dd class="govuk-summary-list__value">@Model.Batch.CompletedDate?.ToShortDateString()</dd>
-        </div>
-        <div class="govuk-summary-list__row">
-            <dt class="govuk-summary-list__key">Comments</dt>
+            <dt class="govuk-summary-list__key">Submission comments</dt>
             <dd class="govuk-summary-list__value">@Model.Batch.Comments</dd>
         </div>
         <div class="govuk-summary-list__row">
@@ -79,9 +121,105 @@ else
             <dd class="govuk-summary-list__value">@(Model.Batch.IsPreCassetted ? "Yes" : "No")</dd>
         </div>
     </dl>
-    <a asp-page="/Batches/EditBatch" class="govuk-button" data-module="govuk-button">Edit submission status</a>
-    <a asp-page="/Blocks/BlockDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Assign blocks</a>
-    <a asp-page="/Submissions/ViewSamples" class="govuk-button govuk-button--secondary" data-module="govuk-button">View samples</a>
-    <a asp-page="/Batches/CopyBatch" asp-route-sourceBatchId="@Model.Batch.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy batch</a>
-    <a asp-page="/Index" class="govuk-button govuk-button--secondary" data-module="govuk-button">Home</a>
+
+    @* ── Selected test types — batch-level histology / antibody / special stain selections ──
+       GAP-5: Legacy BatchDetails.aspx had a "Select Histology and required tests" section with
+       three CheckBoxList controls (chkblHistology, chkblAntibodies, chkblSpecialStain).
+       In the new application these are displayed here as a read-only summary and edited via
+       the dedicated EditBatchTests page. *@
+    <h2 class="govuk-heading-m">Selected test types</h2>
+    <dl class="govuk-summary-list">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Histology</dt>
+            <dd class="govuk-summary-list__value">
+                @if (Model.TestSelections.Histology.Count == 0)
+                {
+                    <span class="govuk-hint">None selected</span>
+                }
+                else
+                {
+                    foreach (var row in Model.TestSelections.Histology)
+                    {
+                        var name = Model.HistologyNames.TryGetValue(row.Code, out var h) ? h : row.Code;
+                        <strong class="govuk-tag govuk-tag--blue govuk-!-margin-right-1">@name</strong>
+                    }
+                }
+            </dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Antibodies</dt>
+            <dd class="govuk-summary-list__value">
+                @if (Model.TestSelections.Antibodies.Count == 0)
+                {
+                    <span class="govuk-hint">None selected</span>
+                }
+                else
+                {
+                    foreach (var row in Model.TestSelections.Antibodies)
+                    {
+                        var name = Model.AntibodyNames.TryGetValue(row.Code, out var a) ? a : row.Code;
+                        <strong class="govuk-tag govuk-tag--purple govuk-!-margin-right-1">@name</strong>
+                    }
+                }
+            </dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Special stains</dt>
+            <dd class="govuk-summary-list__value">
+                @if (Model.TestSelections.Stains.Count == 0)
+                {
+                    <span class="govuk-hint">None selected</span>
+                }
+                else
+                {
+                    foreach (var row in Model.TestSelections.Stains)
+                    {
+                        var name = Model.StainNames.TryGetValue(row.Code, out var s) ? s : row.Code;
+                        <strong class="govuk-tag govuk-tag--green govuk-!-margin-right-1">@name</strong>
+                    }
+                }
+            </dd>
+        </div>
+    </dl>
+
+    @* GAP-4: Action buttons — matches legacy BatchDetails.aspx view mode (SV_ViewSubmission=True).
+       In legacy view mode only Samples, Cancel and Finish were present.
+       Editing actions (Edit submission status, Copy batch, Edit test types) are
+       accessed from the list-page action panels (ViewSubmissions / SearchSubmissions),
+       not from this read-only view page.
+
+       Remaining status-gated buttons on this page:
+       ────────────────────────────────────────────────────────
+       Received / InProgress → Assign blocks
+       Completed             → Date returned
+       All statuses          → Samples | Cancel | Finish
+       ────────────────────────────────────────────────────────
+    *@
+    <div class="govuk-button-group">
+
+        @* Samples — always available (replaces legacy btnBatchSummary, Text="Samples").
+           Navigates to BatchBlockSummary.cshtml (renamed from ViewSamples.cshtml \u2014 that name is
+           reserved for the standalone tissue/block search page that replaces legacy ViewSamples.aspx). *@
+        <a asp-page="/Submissions/BatchBlockSummary" class="govuk-button" data-module="govuk-button">Samples</a>
+
+        @* Assign blocks — Received or InProgress only. *@
+        @if (Model.CanAssignBlocks)
+        {
+            <a asp-page="/Blocks/BlockDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Assign blocks</a>
+        }
+
+        @* Date returned — Completed status only.
+           GAP-2: legacy btnReceiveSubmission navigated to BatchDetails in SV_ReceiveBatch mode (new app: dedicated DateReturned page). *@
+        @if (Model.CanDateReturned)
+        {
+            <a asp-page="/Batches/DateReturned" class="govuk-button govuk-button--secondary" data-module="govuk-button">Date returned</a>
+        }
+
+        @* Cancel — matches legacy btnCancel (Response.Redirect(SV_RedirectCancelPage) → BackLinkPage). *@
+        <a href="@Url.Page(Model.BackLinkPage)" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+
+        @* Finish — matches legacy btnSave Text="Finish" in view mode; navigates home. *@
+        <a asp-page="/Index" class="govuk-button govuk-button--secondary" data-module="govuk-button">Finish</a>
+
+    </div>
 }

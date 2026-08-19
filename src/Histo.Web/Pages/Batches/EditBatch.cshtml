@@ -30,7 +30,7 @@
     <div class="govuk-form-group">
         <label class="govuk-label" for="Status">Submission status</label>
         <select class="govuk-select" asp-for="Status">
-            <option value="@BatchStatus.Submitted" selected="@(Model.Status == BatchStatus.Submitted)">Submitted</option>
+            <option value="@BatchStatus.Submitted" selected="@(Model.Status == BatchStatus.Submitted)">Not started</option>
             <option value="@BatchStatus.Received"  selected="@(Model.Status == BatchStatus.Received)">Received</option>
             <option value="@BatchStatus.InProgress" selected="@(Model.Status == BatchStatus.InProgress)">In progress</option>
             <option value="@BatchStatus.OnHold"    selected="@(Model.Status == BatchStatus.OnHold)">On hold</option>

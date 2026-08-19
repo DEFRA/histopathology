@@ -1,0 +1,131 @@
+@page
+@model ViewSamplesModel
+@{
+    ViewData["Title"] = "View samples";
+    ViewData["PageTitle"] = "View samples";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Index" class="govuk-back-link">Back</a>
+}
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.ErrorMessage</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+<form method="post">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="SenderRef">Sender ref</label>
+        <input class="govuk-input" asp-for="SenderRef" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="HistologyRef">Histology ref</label>
+        <input class="govuk-input" asp-for="HistologyRef" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="TissueCode">Tissue</label>
+        <select class="govuk-select" asp-for="TissueCode">
+            <option value="">-- Select --</option>
+            @foreach (var t in Model.Tissues)
+            {
+                var v = !string.IsNullOrWhiteSpace(t.Code) ? t.Code : t.ID.ToString();
+                <option value="@v">@t.Name</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="ProjectDesc">Project</label>
+        <select class="govuk-select" asp-for="ProjectDesc">
+            <option value="">-- Select --</option>
+            @foreach (var p in Model.Projects)
+            {
+                <option value="@p.Name">@p.Name</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-form-group">
+        <fieldset class="govuk-fieldset">
+            <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">
+                Search mode
+            </legend>
+            <div class="govuk-radios" data-module="govuk-radios">
+                <div class="govuk-radios__item">
+                    <input class="govuk-radios__input" type="radio" asp-for="Mode" value="Tissue" id="mode-tissue" />
+                    <label class="govuk-label govuk-radios__label" for="mode-tissue">Tissue Information</label>
+                </div>
+                <div class="govuk-radios__item">
+                    <input class="govuk-radios__input" type="radio" asp-for="Mode" value="Block" id="mode-block" />
+                    <label class="govuk-label govuk-radios__label" for="mode-block">Block Information</label>
+                </div>
+            </div>
+        </fieldset>
+    </div>
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
+        @if (Model.Searched && Model.ErrorMessage is null)
+        {
+            <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to CSV</button>
+        }
+    </div>
+</form>
+
+@if (Model.Searched)
+{
+    @if (Model.Results.Any())
+    {
+        <table class="govuk-table">
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">Sub. number</th>
+                    <th scope="col" class="govuk-table__header">Date submitted</th>
+                    <th scope="col" class="govuk-table__header">Date received</th>
+                    <th scope="col" class="govuk-table__header">Time received</th>
+                    <th scope="col" class="govuk-table__header">Date completed</th>
+                    <th scope="col" class="govuk-table__header">Customer received date</th>
+                    <th scope="col" class="govuk-table__header">Submitted as</th>
+                    @if (Model.Mode == "Block")
+                    {
+                        <th scope="col" class="govuk-table__header">Block ref</th>
+                    }
+                    <th scope="col" class="govuk-table__header">Tissue</th>
+                    <th scope="col" class="govuk-table__header">No pieces</th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @foreach (var r in Model.Results)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@r.ID</td>
+                        <td class="govuk-table__cell">@r.DateSubmitted?.ToShortDateString()</td>
+                        <td class="govuk-table__cell">@r.DateReceived?.ToShortDateString()</td>
+                        <td class="govuk-table__cell">@r.TimeReceived</td>
+                        <td class="govuk-table__cell">@r.DateCompleted?.ToShortDateString()</td>
+                        <td class="govuk-table__cell">@r.CustomerReceivedDate?.ToShortDateString()</td>
+                        <td class="govuk-table__cell">@r.SubmittedAs</td>
+                        @if (Model.Mode == "Block")
+                        {
+                            <td class="govuk-table__cell">@r.BlockRef</td>
+                        }
+                        <td class="govuk-table__cell">@r.TissueDescription</td>
+                        <td class="govuk-table__cell">@r.NoPieces</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <p class="govuk-body govuk-hint">Submitted as: WT = Wet Tissue, WB = Wax Block, SS = Stained Section, US = Unstained Section, PC = Pre Cassetted</p>
+    }
+    else
+    {
+        <p class="govuk-body">No matching samples found.</p>
+    }
+}

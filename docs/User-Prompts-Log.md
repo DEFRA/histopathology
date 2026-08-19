@@ -435,6 +435,55 @@ Build: 0 errors, 0 warnings. Tests: 90 pass, 1 skipped, 0 fail.
 
 ---
 
+## Prompt 40 — BatchDetails.aspx legacy field gap analysis and fix (2026-08-17)
+
+> Field name from BatchDetails.aspx is does not match new batch details pages below are the legacy pages fields, but seems like it's missing in new page and also check if the name has changed in new application during migration, also why this gap, can you please analyse detail analysis and fix it, why it was migrated during migration this was done using agents, ui implementation, implementation etc.
+> Thumb rule is functionality should not be changed, as per GDS if correction needs list out them.
+> Finally this issue has to be captured in run journal agent and user prompt md file has to be updated.
+> Entered By / Submitted By / Submitted As / Customer Received Date / Entered Area / Submitted Area / Submission Date / Is it adequately fixed?
+
+**Field analysis — 8 fields from legacy `BatchDetails.aspx`:**
+
+| Legacy field | DB column | New app status | Action taken |
+|---|---|---|---|
+| Submission Date | `tblBatch.BatchDate` | ✅ Present as "Date submitted" | GDS rename — sentence case + natural English (no fix needed) |
+| Customer Received Date | `tblBatch.CustomerReceivedDate` | ✅ Present as "Date returned to customer" | GDS rename — more descriptive (no fix needed) |
+| Entered By | `tblBatch.SubmittedBy` (int UserID) | ❌ Missing | Added — resolved via `GetAllUsersAsync()` |
+| Entered Area | `tblBatch.SubmittedArea` (int area code) | ❌ Missing | Added — resolved via `GetUserAreasAsync()` |
+| Submitted By | `tblBatch.OtherSubmittedBy` (int UserID) | ❌ Missing | Added — resolved via `GetAllUsersAsync()` |
+| Submitted Area | `tblBatch.OtherSubmittedArea` (int area code) | ❌ Missing | Added — resolved via `GetUserAreasAsync()` |
+| Submitted As | `BATCH_SUBMITTEDAS_TABLE[5].Code` + LOOKUP 11 | ❌ Missing | Added — `GetSubmittedAsCodeAsync` reads result-set 5 of `GetCommonBatchTablesByID` |
+| Is it adequately fixed? | `tblBatch.SafeToHandle` (bool) | ❌ Missing | Added — renders "Yes" / "No" / "Not specified" |
+
+**Root cause of migration gap:** The `ui-implementation` agent in Run #26 built `BatchDetails.cshtml` focusing on primary batch data fields. It missed the 6 secondary fields because: (1) in legacy view mode (`SV_ViewSubmission=True`), the user-identity fields appeared as disabled dropdowns using the same control set as edit mode — not visible as "display data" to the agent; (2) "Submitted As" comes from a separate result set (BATCH_SUBMITTEDAS_TABLE = index 5 of `GetCommonBatchTablesByID`, confirmed from `clsBatch.vb`); (3) `SafeToHandle` was in a secondary position on the legacy form.
+
+**GDS label corrections applied:**
+
+| Legacy label | New GDS label | Rule applied |
+|---|---|---|
+| Entered By | Entered by | Sentence case |
+| Entered Area | Entered area | Sentence case |
+| Submitted By | Submitted by | Sentence case |
+| Submitted Area | Submitted area | Sentence case |
+| Submitted As | Submitted as | Sentence case |
+| Is it adequately fixed? | Is it adequately fixed? | Unchanged — already GDS question form |
+
+**Files changed (7 files, Run #79):**
+
+| File | Change |
+|------|--------|
+| `src/Histo.Submissions/Models/Batch.cs` | 5 new properties: `SubmittedBy int?`, `SubmittedArea int?`, `OtherSubmittedBy int?`, `OtherSubmittedArea int?`, `SafeToHandle bool?` |
+| `src/Histo.Submissions/Interfaces/IBatchRepository.cs` | `GetSubmittedAsCodeAsync` declaration — reads BATCH_SUBMITTEDAS_TABLE (result-set 5) |
+| `src/Histo.Submissions/Repositories/BatchRepository.cs` | Implementation: `QueryMultipleAsync`, discard result-sets 0–4, read set 5, return `Code` string; try-catch returns null for batches without a submitted-as record |
+| `src/Histo.Submissions/Interfaces/IBatchService.cs` | `GetSubmittedAsCodeAsync` declaration |
+| `src/Histo.Submissions/Services/BatchService.cs` | Delegating implementation with `_logger.LogError` on failure |
+| `src/Histo.Web/Pages/Batches/BatchDetails.cshtml.cs` | `IUserService` injected; 5 display properties (`EnteredByName`, `EnteredAreaName`, `SubmittedByName`, `SubmittedAreaName`, `SubmittedAsDescription`); 4 extra parallel tasks in `OnGetAsync`; full `userById`/`areaById` dictionary resolution |
+| `src/Histo.Web/Pages/Batches/BatchDetails.cshtml` | 6 new `govuk-summary-list` rows with GAP-6 comment; GDS sentence-case labels; "Not recorded"/"Not specified" fallbacks |
+
+**Build:** 0 errors, 0 warnings (Release).
+
+---
+
 ## Prompt 31 — Fix ISS-042, ISS-043, ISS-044, ISS-045 and update run journal session metrics (2026-08-06)
 
 > Can you please fix the issues and update the session matrix in the migration runjournal?
@@ -451,3 +500,423 @@ Build: 0 errors, 0 warnings. Tests: 90 pass, 1 skipped, 0 fail.
 | ISS-045 | Medium | `GetAllAsync()` added to interface/repo/service; `QCNotesModel` uses `IsGlobalView` bool to route between global and batch-scoped load | `IQCNoteRepository.cs`, `QCNoteRepository.cs`, `QCNoteService.cs`, `QCNotes.cshtml.cs`, `QCNotes.cshtml` |
 
 **Build:** 0 errors, 0 warnings. **Tests:** 90 pass, 1 skipped (integration), 0 fail.
+
+---
+
+## Prompt 35 — Restore SearchSubmissions row-select action panel (2026-08-07)
+
+> In the Legacy View Submission screen, there is a specific link and button action that becomes enabled only when a row is selected in the View Submission grid. However, in the new application, selecting a row immediately navigates to the Batch Details page. Could you please analyse the discrepancy and fix the new application if required?
+
+**Scope:** Behavioural gap between SearchSubmissions.aspx (row-select enables action buttons) and new SearchSubmissions.cshtml (no row-select, no action buttons).
+
+**Root cause:** The new page had no row-selection mechanism and no action panel. The legacy grdSearchResults_SelectedIndexChanged handler enabled/disabled 6 action buttons based on the selected row's BatchStatus. This logic was not ported when SearchSubmissions.cshtml was first built.
+
+**Changes implemented (Run #72):**
+
+| File | Change |
+|------|--------|
+| src/Histo.Web/Pages/Search/SearchSubmissions.cshtml.cs | Added `[BindProperty] int SelectedBatchId`; added `SelectedBatchStatus` computed property; added 6 `Can*` availability properties mirroring legacy status-gate logic; extracted `BuildCriteria()` helper; added `OnPostSelectAsync()` (stores `Session.BatchID`, re-runs search, returns `Page()`); added `OnPostExportCsvAsync()` (CSV download). |
+| src/Histo.Web/Pages/Search/SearchSubmissions.cshtml | Added a hidden `submission-action-form` with all filter-value hidden inputs; added Select column to results table; each row's Select button uses HTML5 `form` association + `formaction="?handler=Select"`; highlighted selected row; added Export to CSV button; added action panel (inset text + `govuk-button-group`) shown when `SelectedBatchId > 0` with availability gating per legacy status rules. |
+
+**Button availability matrix (from legacy grdSearchResults_SelectedIndexChanged):**
+
+| Status | View | Edit | Print | Receipt | Quality | Archive |
+|--------|------|------|-------|---------|---------|---------|
+| Submitted ("1") | ✗ | ✗ | ✓* | ✗ | ✗ | ✗ |
+| Completed ("4") | ✓ | ✗ | ✓* | ✓ | ✓ | ✓ |
+| Rejected ("3") | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ |
+| Received/On Hold/In Progress | ✓ | ✓ | ✓* | ✓ | ✓ | ✓ |
+
+*Print submission is rendered disabled in the new app — FinalPrintBatch.aspx is blocked on Phase 2 (report engine replacement).
+
+**Build:** 0 errors, 0 warnings (CoreCompile; copy step skipped — dev server running).
+---
+
+## Prompt 38 — BatchDetails legacy vs new gap analysis, alignment and docs update (2026-08-14)
+
+> Please verify the BatchDetails.aspx screen logic between the legacy and new application, identify any behaviour, implementation, or migration gaps across New, View, Edit, and Returned submission states, and align the new application's functionality with the legacy behaviour while following GDS, Razor Pages, .NET 10, and C# standards. Also update the migration-run-journal, User-Prompts-Log, and session metrics with duration to fix and the findings, analysis, and changes implemented.
+
+**Four gaps found and fixed (Run #75):**
+
+| # | Gap | Legacy behaviour | New app (before fix) | Fix |
+|---|-----|-----------------|---------------------|-----|
+| GAP-1 | `CustomerReceivedDate` missing | `ctlReceivedDate` (CustomerReceivedDate) shown in all modes on `BatchDetails.aspx` | `Batch` model had no `CustomerReceivedDate`; summary list didn't show it | Added `CustomerReceivedDate DateTime?` to `Batch.cs`; added "Date returned to customer" summary row to `BatchDetails.cshtml` |
+| GAP-2 | "Date Returned" workflow broken | Legacy `btnReceiveSubmission_Click` sets `SV_ReceiveBatch=True` → `BatchDetails.aspx` with only `ctlReceivedDate` editable; status NOT changed | `ViewSubmissions` "Date returned" linked to `ReceiveBatch.cshtml` which calls `UpdateStatusAsync(..., Received)` — would change a Completed batch back to Received | Created `DateReturned.cshtml(.cs)` (sets `CustomerReceivedDate` only, no status change); added `SetCustomerReceivedDateAsync` full-stack (IBatchRepository → BatchRepository → IBatchService → BatchService); updated link in `ViewSubmissions.cshtml` |
+| GAP-3 | Back link context-unaware | Legacy uses `SV_RedirectCancelPage` to know where Cancel goes | Back link hardcoded to `/Batches/BatchesForEditing` regardless of entry point | Added `ReturnPage` to `ISessionService`/`SessionService`; `ViewSubmissions` and `SearchSubmissions` `OnPostSelectAsync` set it; `BatchDetails.BackLinkPage` reads it (falls back to `/Index`) |
+| GAP-4 | Action buttons never gated | Legacy `EnableDisableControls()` shows/hides buttons per mode | All buttons always shown regardless of status | `BatchDetailsModel` exposes `CanEdit` (Submitted/Rejected), `CanAssignBlocks` (Received/InProgress), `CanDateReturned` (Completed); `BatchDetails.cshtml` renders `disabled aria-disabled` for unavailable actions |
+
+**Files changed:**
+- `src/Histo.Submissions/Models/Batch.cs` — +`CustomerReceivedDate`
+- `src/Histo.Submissions/Interfaces/IBatchRepository.cs` — +`SetCustomerReceivedDateAsync`
+- `src/Histo.Submissions/Repositories/BatchRepository.cs` — +implementation
+- `src/Histo.Submissions/Interfaces/IBatchService.cs` — +`SetCustomerReceivedDateAsync`
+- `src/Histo.Submissions/Services/BatchService.cs` — +passthrough
+- `src/Histo.Web/Services/ISessionService.cs` — +`ReturnPage`
+- `src/Histo.Web/Services/SessionService.cs` — +`ReturnPage` impl
+- `src/Histo.Web/Pages/Batches/BatchDetails.cshtml.cs` — rewritten with status properties + back link
+- `src/Histo.Web/Pages/Batches/BatchDetails.cshtml` — rewritten with CustomerReceivedDate row, context back link, status-gated buttons
+- `src/Histo.Web/Pages/Batches/DateReturned.cshtml.cs` — new page
+- `src/Histo.Web/Pages/Batches/DateReturned.cshtml` — new page
+- `src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml` — "Date returned" link → `DateReturned`
+- `src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs` — `Session.ReturnPage` set in `OnPostSelectAsync`
+- `src/Histo.Web/Pages/Search/SearchSubmissions.cshtml.cs` — `Session.ReturnPage` set in `OnPostSelectAsync`
+
+**GDS alignment:** `DateReturned.cshtml` uses `govuk-error-summary`, `govuk-form-group--error`, `govuk-error-message`, `govuk-input--error`, `govuk-label--s`, `govuk-hint`, `govuk-button-group`, sentence case labels, back link — GDS-compliant. `BatchDetails.cshtml` `disabled aria-disabled="true" title="..."` pattern on locked buttons — GDS-compliant.
+
+**DB note:** `EditBatch` SP must accept a `CustomerReceivedDate` named parameter for `SetCustomerReceivedDateAsync` to persist the date. Verify SP definition before testing the Date Returned workflow against the database.
+
+**Build:** 0 errors, 0 warnings. **Duration:** ~40 minutes.
+
+---
+
+## Prompt 37 — Fix Select button not working in ViewSubmissions; check routing navigation; GDS alignment and journal update (2026-08-14)
+
+> No action is happening on the click of select button in view submission screen
+>
+> check the routing navigation on these button links properly
+
+**Follow-up (same session):**
+> update journal and prompts logs with session duration to fix
+>
+> Also check these issue fix is aligned GDS and finally add them into journal and prompts logs with session duration to fix
+
+**Root causes found and fixed (Run #74):**
+
+| # | Bug | Root cause | Fix |
+|---|-----|-----------|-----|
+| 1 | Select does nothing (`ViewSubmissions` + `SearchSubmissions`) | Hidden carrier form has no `asp-*` attribute → `FormTagHelper` never runs → no `__RequestVerificationToken` injected → ASP.NET Core rejects every POST with 400 Bad Request | Added `asp-page` to both hidden forms |
+| 2 | `OnPostSelectAsync` always receives `SelectedBatchId = 0` | Hidden form contained `<input name="SelectedBatchId" value="0">` duplicating the per-row button's submission; ASP.NET Core model binding picks the hidden input's value (0) | Removed the duplicate hidden `SelectedBatchId` from both forms |
+| 3 | Copy submission → "submission not found" | `CopyBatchModel.OnGetAsync(int sourceBatchId)` requires a route/query parameter; anchor link had none → `sourceBatchId = 0` | Added `asp-route-sourceBatchId="@Model.SelectedBatchId"` to the Copy submission link |
+
+**Files changed:** [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml), [src/Histo.Web/Pages/Search/SearchSubmissions.cshtml](../src/Histo.Web/Pages/Search/SearchSubmissions.cshtml)
+
+**GDS alignment check:** Fixes are functional/security corrections only — no GDS components added or removed. The action panel (from Run #73) uses `govuk-inset-text`, `govuk-button-group`, `govuk-button--secondary`, `disabled aria-disabled="true"` on Phase-2-blocked and status-locked buttons, sentence-case labels, and a `govuk-table` with correct `th scope="col"` headers — all GDS-compliant. One pre-existing minor deviation (not introduced in this run): selected row uses inline `style=background-color:#bbd4ea` rather than a CSS class; addressable as a future CSS housekeeping task.
+
+**Build:** 0 errors, 0 warnings. **Duration:** ~15 minutes.
+
+---
+
+## Prompt 36 — Restore ViewSubmissions row-select action panel (2026-08-14)
+
+> In the Legacy View Submission screen, there is a specific link and button action that becomes enabled only when a row is selected in the View Submission grid. However, in the new application, selecting a row immediately navigates to the Batch Details page of but seeing different button and actions.
+>
+> Buttons: Print Submission, Edit Submission, View Submission, Date Returned, Print Submission Notes, Copy Submission
+> Link: Export to Excel
+
+**Clarification confirmed:** `ViewSubmissions.aspx` (`Submissions/ViewSubmissions.cshtml`) and `SearchSubmissions.aspx` (`Search/SearchSubmissions.cshtml`) are **two distinct pages** with different purposes and different button sets.
+
+| Page | Purpose | Button set |
+|------|---------|-----------|
+| `Search/SearchSubmissions` | Histopath staff search (admin/QC context) | View Quality Data, View Archive, View Receipt |
+| `Submissions/ViewSubmissions` | Lab's main submission browsing page | **Print Submission, Print Submission Notes, Copy Submission, Edit Submission, View Submission, Date Returned** |
+
+**Root cause:** `ViewSubmissions.cshtml` had a Select button per row but `OnPostSelect(int batchId)` immediately redirected to BatchDetails — it never stored a `SelectedBatchId`, re-ran the search, or rendered an action panel. The legacy `grdviewResults_SelectedIndexChanged` status-gate logic was never ported.
+
+**Changes implemented (Run #73):**
+
+| File | Change |
+|------|--------|
+| `src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs` | Added `[BindProperty] int SelectedBatchId`; added `SelectedBatchStatus` computed property; added 4 `Can*` availability properties mirroring legacy status-gate logic; extracted `BuildCriteria()` helper; replaced `OnPostSelect(int batchId)` → `OnPostSelectAsync()` (stores `Session.BatchID`, re-runs search, returns `Page()`); added `OnPostExportCsvAsync()` (CSV download replacing `lbExportExcel`). |
+| `src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml` | Added hidden `view-action-form` with all filter hidden inputs outside the table; removed inline `<form>` from each `<tr>`; per-row Select button now uses HTML5 `form` association + `formaction="?handler=Select"` + `name="SelectedBatchId" value="@r.ID"`; highlighted selected row; added Export to CSV button; added action panel (`govuk-inset-text` + `govuk-button-group`) shown when `SelectedBatchId > 0` with status-gated buttons. |
+
+**Button availability matrix (from legacy `grdviewResults_SelectedIndexChanged`):**
+
+| Status | View | Edit | Copy | Date Returned | Print | Print Notes |
+|--------|------|------|------|---------------|-------|-------------|
+| Submitted ("1") | ✓ | ✓ | ✓ | ✗ | Phase 2 | Phase 2 |
+| Rejected ("3") | ✓ | ✓ | ✓ | ✗ | Phase 2 | Phase 2 |
+| Completed ("4") | ✓ | ✗ | ✓ | ✓ | Phase 2 | Phase 2 |
+| Received/On Hold/In Progress | ✓ | ✗ | ✓ | ✗ | Phase 2 | Phase 2 |
+
+Print Submission → `SubmissionForm.aspx` (Crystal Reports popup) — Phase 2 blocked.
+Print Submission Notes → `SubmissionNotes.aspx` (Crystal Reports popup) — Phase 2 blocked.
+
+**Build:** 0 errors, 0 warnings (CoreCompile).
+
+---
+
+## Prompt 39 — Fix BatchDetails duplicate code, page title, and legacy button alignment (2026-08-17)
+
+> Can you go thorugh BatchDetails.cshtml why i have below dublicate code as per legacy if i clicke view submission button in viewsubmission page, it will nagivate to batchdetail. page and will show page non editable fields and name as Submission Details with sample, cancel and finish button, if i clicek edit submission page it will editable page, but right now its show dublicate code as below , can you analysis legacy and fix the it. wire the functionaligy from legacy and also finally this has be captured in run journal mode md file with duration of exuectinon time use the journal update agetn aand  update prompt in user promt md file
+
+**Root cause (3 separate issues):**
+
+1. **Duplicate block:** A stale pre-Run-#75 copy of `BatchDetails.cshtml` (with old field labels `"Batch ID"`, `"Received date"`, `"Completed date"` and unguarded direct `<a>` links without status gating) remained appended below the correct updated implementation. The file had two `@if (Model.Batch is null)` guard blocks — the valid one at line 14 and a stale copy at line 227 — rendering duplicate page output.
+
+2. **Page title:** `ViewData["Title"]`/`ViewData["PageTitle"]` were set to `"Batch details"` in both `BatchDetails.cshtml` and `BatchDetails.cshtml.cs`. The legacy `BatchDetails.aspx.vb` always set `VLAHeader1.PageTitle = "Submission Details"` (line 28).
+
+3. **Button mismatch:** The three legacy buttons in `BatchDetails.aspx` were `btnBatchSummary` (Text=`"Samples"`), `btnCancel` (Text=`"Cancel"`, navigates to `SV_RedirectCancelPage` = `BackLinkPage` in new app), and `btnSave` (Text=`"Finish"`, navigates to `Home.aspx` in view mode). The new app had `"View samples"` (different label), no explicit Cancel button, and `"Home"` instead of `"Finish"`.
+
+**Changes implemented (Run #77):**
+
+| File | Change |
+|------|--------|
+| `src/Histo.Web/Pages/Batches/BatchDetails.cshtml` | Removed entire duplicate `@if/else` block (74 stale lines, lines 227–302 pre-fix); title → `"Submission details"`; `"View samples"` → `"Samples"`; added `"Cancel"` button linking to `Model.BackLinkPage`; `"Home"` → `"Finish"`. |
+| `src/Histo.Web/Pages/Batches/BatchDetails.cshtml.cs` | `ViewData["Title"]`/`ViewData["PageTitle"]` → `"Submission details"`. |
+
+**Legacy button mapping (from `BatchDetails.aspx`):**
+
+| Legacy button | Text | Navigation | New app button |
+|---|---|---|---|
+| `btnBatchSummary` | "Samples" | `BatchSummary.aspx` / `BatchBlockSummary.aspx` | "Samples" → `/Submissions/ViewSamples` |
+| `btnCancel` | "Cancel" | `Response.Redirect(SV_RedirectCancelPage)` | "Cancel" → `Model.BackLinkPage` |
+| `btnSave` | "Finish" | `Home.aspx` (view mode) | "Finish" → `/Index` |
+
+**Build:** 0 errors, 0 warnings (Release).
+---
+
+## Prompt 41 � ViewSubmissions edit button not visible + BatchBlockSummary page gap (2026-08-17)
+
+> Issue one: View submissioned why edit submission button is not visible? what is cause? and fix it check the other button enable logic as well in this page.
+> Issue two: in Batchdetails page when I click on sample button it takes me into ViewSamples, as per legacy it supposed to take to BatchBlockSummary page, why this discrepency, is the reusable migration done, why this issue occurring, check all the content and fields name buttons on this BatchBlockSummary it should align with legacy. if something consider modular monolithic approach for optimise the screen list out existing functionality should not break the flows. also consider the GDS standard
+
+---
+
+### Issue 1 � Edit submission button (and all action-panel buttons) always disabled after row Select
+
+**Root cause:** BuildCriteria() in ViewSubmissions.cshtml.cs (and SearchSubmissions.cshtml.cs) did not normalise empty strings to null. When the user searches with no Status filter (Status = null), Razor renders the hidden form Status input as value="". On the next POST (row Select), ASP.NET Core model-binds Status = "" (empty string). BuildCriteria() passes "" to GetSearchBatchDetails SP as the Status parameter. The SP treats "" as a real filter and returns 0 rows. Results is empty; SelectedBatchStatus is null; all Can* properties are false; every action-panel button renders disabled for every selected row. Same bug affected SearchSubmissions.
+
+**Fix applied (Run #80):**
+
+| File | Change |
+|------|--------|
+| ViewSubmissions.cshtml.cs | Added NullIfEmpty() helper; applied to Status, ProjectContractCode, ContactName, Species, Fixation, HistologyRef, SenderRef in BuildCriteria() |
+| SearchSubmissions.cshtml.cs | Same NullIfEmpty helper and same criteria fields |
+| ViewSubmissions.cshtml | Status column: @r.Status (raw "1") to @BatchStatus.DisplayName(r.Status ?? "") |
+| ViewSubmissions.cshtml.cs | CSV export Status column also changed to display name |
+
+**Button logic vs legacy (all correct after fix):** Edit submission = Submitted OR Rejected; View submission = any row; Copy submission = any row; Date returned = Completed; Edit test types = Submitted OR Received OR InProgress.
+
+---
+
+### Issue 2 � BatchBlockSummary page gap; Samples button navigates to ViewSamples
+
+**Root cause:** Legacy btnBatchSummary_Click navigates to BatchBlockSummary.aspx (cassetted) or BatchSummary.aspx (non-cassetted). New app ViewSamples.cshtml consolidates both pages (documented in class comment) but served at /Submissions/ViewSamples with wrong title, button labels, and missing Done button.
+
+**Modular monolith decision:** ViewSamples.cshtml correctly consolidates both legacy pages into one GDS flat-list page. Not split. Tissues button (edit animal details) is retained as additional value.
+
+**Fix applied (Run #80):**
+
+| File | Change |
+|------|--------|
+| ViewSamples.cshtml | @page "/Submissions/BatchBlockSummary" route override; title "Sample summary"; "Add sample" / "Edit sample" / "Delete sample"; "Done" button -> BatchDetails; empty message updated |
+| ViewSamples.cshtml.cs | ViewData title strings -> "Sample summary" |
+| BatchDetails.cshtml | Samples button comment updated |
+
+**GDS labels:** "Add sample" / "Edit sample" / "Delete sample" / "Done" / "Sample summary" — all sentence case. Build: 0 errors, 0 warnings (Release). 6 files changed.
+
+---
+
+## Prompt 42 — ViewSamples.aspx vs BatchBlockSummary.aspx: root-cause correction of Run #80 (2026-08-18)
+
+> In legacy it has two pages BatchBlockSummary.aspx and viewsample.aspx file why not in new application, because view samples differenty screen and functionality is there in legacy, why these discrpency why it was not during migration agent execution ? can you go through deep analaysis and fix it.
+>
+> In viewsubmission page the follwoing button enabled disabled based on submisstion selected, its not happening in new applicaiton **Print Submission, Print Submission Notes, Copy Submission, Edit Submission, View Submission, Date Returned**
+
+---
+
+### Issue 1 — `ViewSamples.aspx` and `BatchBlockSummary.aspx` are two distinct legacy pages; Run #80's fix was wrong
+
+**Correction of prior turn:** Run #80 (Prompt 41, Issue 2) incorrectly assumed `ViewSamples.cshtml` was already the consolidated replacement for both `BatchSummary.aspx`/`BatchBlockSummary.aspx` and added a route alias. The user correctly pointed out that legacy has **both** files as separate, independent pages.
+
+**Deep analysis performed:** Read the full legacy `HistopathologySystem/ViewSamples.aspx`/`.aspx.vb` and confirmed it is a standalone, non-batch-scoped global search page — not related to the batch-scoped in-progress sample list at all:
+
+- Search by Sender Ref **or** Histology Ref (mutually exclusive — validation error if both or neither filled)
+- Tissue dropdown (LOOKUP_TISSUE_CODE = 9) and Project dropdown (LOOKUP_PROJECTS = 19) filters
+- Radio toggle: "Tissue Information" (calls `clsAnimal.GetAnimalTissues` → SP `GetAnimalBatchTissues`) vs "Block Information" (calls `GetAnimalBlockTissues` → SP `GetAnimalBlockTissues`)
+- Two separate result grids with an "Export to Excel" link on each
+- Linked only from `Home.aspx`'s `hlViewSamples` hyperlink ("View Samples") — never from the Search menu
+
+**Root cause of the migration gap:** The original migration agent built the batch-scoped in-progress sample list (the true replacement for `BatchSummary.aspx`/`BatchBlockSummary.aspx`) and named the Razor Page `ViewSamples.cshtml`. This name collision meant the real `ViewSamples.aspx` feature was never built under any name — it was silently dropped from migration scope entirely, and no gap was ever logged for it because the name match made it look "already covered."
+
+**Fix applied (Run #81):**
+
+| File | Change |
+|------|--------|
+| `Submissions/ViewSamples.cshtml` → `Submissions/BatchBlockSummary.cshtml` | `git mv` rename; removed the Run #80 `@page` route-alias workaround (default routing now matches the filename) |
+| `Submissions/ViewSamples.cshtml.cs` → `Submissions/BatchBlockSummary.cshtml.cs` | `git mv` rename; class `ViewSamplesModel` → `BatchBlockSummaryModel`; doc comment rewritten to distinguish it from the real `ViewSamples` |
+| `Batches/BatchDetails.cshtml` | "Samples" button route updated to `/Submissions/BatchBlockSummary` |
+| 11 files (`SubmissionDetailsBlock`, `SubmissionDetails`, `AddSubmission`, `AddSample`, `BookHistologyRef`, `BlockDetails` — `.cshtml`/`.cshtml.cs`) | Bulk PowerShell `-replace` of `/Submissions/ViewSamples` → `/Submissions/BatchBlockSummary` (all `RedirectToPage`/`asp-page` references); verified 0 remaining matches via grep |
+| `Histo.Submissions/Models/SearchModels.cs` | New `AnimalTissueSearchResult` model (ID, DateSubmitted, DateReceived, TimeReceived, DateCompleted, CustomerReceivedDate, SubmittedAs, BlockRef, TissueDescription, NoPieces) |
+| `Histo.Submissions/Interfaces/ISubmissionRepository.cs` + `SubmissionRepository.cs` | `GetAnimalTissuesAsync`/`GetAnimalBlockTissuesAsync` — Dapper `QueryAsync` against SPs `GetAnimalBatchTissues`/`GetAnimalBlockTissues` |
+| `Histo.Submissions/Interfaces/ISubmissionService.cs` + `SubmissionService.cs` | Passthrough with `_logger.LogError` on failure |
+| `Search/ViewSamples.cshtml` + `.cshtml.cs` (new) | Genuine replacement for legacy `ViewSamples.aspx`: Sender Ref/Histology Ref exactly-one-required validation, Tissue (table 9)/Project (table 19) `govuk-select` dropdowns, `govuk-radios` Tissue Information/Block Information mode toggle, mode-conditional results table (Block Ref column shown only in Block mode), CSV export via `CsvExportHelper.BuildCsv` (replacing the legacy Excel export links) |
+| `Index.cshtml` | Added "View samples" link to the Search and reports panel (matches legacy Home-page-only placement — not added to `SearchMenu.cshtml`, since legacy never listed it there either) |
+
+**Build:** 0 errors, 0 warnings (Release). **Tests:** 90 pass, 1 skipped, 0 fail.
+
+---
+
+### Issue 2 — ViewSubmissions button enable/disable (repeat of Prompt 41, Issue 1)
+
+**Status:** Already resolved in Run #80 via the `NullIfEmpty()` helper added to `ViewSubmissions.cshtml.cs` and `SearchSubmissions.cshtml.cs` — no regression found and no further code change was required in this turn. Re-verified by the full build and test run above (90 pass, 1 skipped, 0 fail) alongside the Issue 1 changes.
+
+---
+
+## Prompt 43 — BatchBlockSummary action-button business rules + ViewSubmissions status label (2026-08-18)
+
+> Analyze the BatchBlockSummary screen and determine the exact conditions for displaying the following actions: Add Sample button, Delete Sample button, Edit Sample button, Copy Sample button. Review the logic thoroughly and ensure the behavior matches the legacy application. Identify all dependencies, business rules, user permissions, status validations, and workflow conditions that control the visibility and availability of these buttons.
+>
+> Additionally, when fixing an issue, perform a complete impact analysis before making changes. Several new issues are being introduced because related legacy functionality is not being considered. Compare the current implementation with the legacy application, understand the end-to-end behavior, and implement the fix in a way that does not create regressions or introduce new defects. Ensure all related scenarios are validated and existing functionality remains intact.
+>
+> Please check view submissioned page, status drop down values, in legacy it says, Not started, but in new application when selected submitted the data returned for Not started status.
+
+**Deep legacy analysis performed before any change:** Read `BatchSummary.aspx.vb`/`BatchBlockSummary.aspx.vb::EnableDisableButtons` (both session-mode branches and markup `Enabled` defaults) and `BatchDetails.aspx.vb::EnableDisableControls` (all 4 branches — `SV_ViewSubmission`/`SV_ReceiveBatch`/`SV_EditingBatch`/else) in full, plus the session-flag origin points across `Cassetted.aspx.vb`, `EditBatch.aspx.vb`, `Home.aspx.vb`, `ReceiveBatch.aspx.vb`, `ViewSubmissions.aspx.vb`. Confirmed: Add/Delete/Copy Sample are force-disabled only in legacy "View Submission" mode, enabled in "Editing"/"Creating New" modes (which produce identical availability); Edit Sample (block details) stays enabled even in View mode for the Block variant. Confirmed via `Program.cs`/route grep that the new `BatchBlockSummary.cshtml` is shared by 3 entry points (`BatchDetails` "Samples" — documented as legacy View-mode only; `AddSubmission`/`AddSample` batch-creation wizard; `BookHistologyRef`), so no single session-mode flag could be reintroduced without contradicting the existing `Batch.Status`-driven architecture already used for `CanEditSubmission`/`CanAssignBlocks`/`CanDateReturned` elsewhere in the app.
+
+**Clarifying questions asked before implementing** (per user's explicit "impact analysis before changes" instruction): (1) confirm the `CanModifySamples` (Submitted/Rejected) gating design; (2) confirm renaming "Submitted" → "Not started" across all status displays; (3) confirm implementing Copy Sample now vs. deferring. User approved all three.
+
+**Fixes applied:**
+1. **Button gating:** Added `CanModifySamples => Batch?.Status is BatchStatus.Submitted or BatchStatus.Rejected` to `BatchBlockSummaryModel` (new `IBatchService` dependency to load `Batch`); gated "Add sample" and "Delete sample" behind it; "Edit sample" (blocks) intentionally left ungated.
+2. **Copy Sample (previously entirely missing):** Added a "Copy sample" link per row → `/Submissions/AddSample?senderRef=...`, reusing `AddSampleModel`'s existing `OnGet(string? senderRef)` pre-fill parameter (the migrated Add Sample page only carries `SenderRef` forward, matching its already-reduced legacy feature scope) — gated by `CanModifySamples`.
+3. **Status label:** Confirmed via `LookupData.vb::GetStatusLookupData` that all 4 legacy status dropdowns bind to the same DB-driven `GetluStatus` lookup, not a hardcoded string, supporting the user's observation that legacy shows "Not started" for the same code the new app labels "Submitted" — a labelling error, not a query bug. Renamed the label to "Not started" in `BatchStatus.DisplayName` (single source of truth) plus 3 dropdown `<option>` labels and 3 disabled-button tooltips referencing "Submitted" as a status name. The `BatchStatus.Submitted` constant and all comparison/filter logic are unchanged — zero behaviour change.
+
+**Build:** 0 errors, 0 warnings. **Tests:** 90 pass, 1 skipped, 0 fail.
+
+**Files changed:** `Submissions/BatchBlockSummary.cshtml.cs`, `Submissions/BatchBlockSummary.cshtml`, `Histo.Core/Domain/BatchStatus.cs`, `Submissions/ViewSubmissions.cshtml`, `Search/SearchSubmissions.cshtml`, `Batches/EditBatch.cshtml`.
+
+---
+
+## Prompt 44 — Multi-bug fix: BatchBlockSummary data binding, User Maintenance group/area names, EditUser dropdowns, PicklistMaintenance add/edit, Audit Log date range and column mapping, EditAnimalRef Sender Ref search (2026-08-18)
+
+> Fix the following issues:
+>
+> BatchBlockSummary (BatchBlockSummary.cshtml)
+> - Data not loading. Verify and fix data binding.
+>
+> User Maintenance
+> - Edit user not working (EditUser.cshtml).
+> - User maintenance group name and area is not displaying
+>
+> Picklist Maintenance
+> - Add item not working.
+> - Edit item not working.
+> - Compare with Project Picklist implementation and apply the same approach where applicable.
+>
+> Audit Log
+> - No records returned for selected date range.
+> - Incorrect dates displayed in results.
+>
+> Edit Sender / Histology Ref
+> - Sender Ref search is not working. Investigate and fix search functionality.
+>
+> Ensure all fixes match legacy application behavior and do not introduce regressions.
+>
+> run journal agent to update session metric duration of issue fix and update prompt to user prompt md file
+
+**Six root causes diagnosed and fixed (Run #83):**
+
+| # | Module | Root Cause | Fix |
+|---|--------|-----------|-----|
+| 1 | Audit Log — no records | `GetAuditLogByDate` SP uses `@LogDate` (one call per day), not `@StartDate`/`@EndDate` | `GetByDateAsync` iterates date range, calling SP with `LogDate` per day |
+| 2 | Audit Log — wrong dates | SP returns column `DateTime`; `AuditLogEntry.ChangedAt` never populated by Dapper auto-mapping | All 3 audit methods → `QueryAsync<dynamic>` + `MapAuditLogEntry` with case-insensitive dict mapping `DateTime` → `ChangedAt` |
+| 3 | UserMaintenance blank Group/Area | `IDictionary<string,object>` cast of `ExpandoObject` is case-sensitive; SP column casing can differ | `MapUser` uses `StringComparer.OrdinalIgnoreCase` via `ToDictionary`; page model adds `ILookupService` `ResolveGroupName`/`ResolveAreaName` helpers as fallback chain |
+| 4 | EditUser dropdowns | Manual `@foreach` option loops fragile for ASP.NET Core tag-helper pre-selection | `GroupSelectList`/`AreaSelectList` `SelectList` properties + `asp-items` on both `<select>` elements |
+| 5 | PicklistMaintenance Add/Edit | Area-scoped tables (18=Contacts, 19=Projects) need `@Area` on INSERT SP; was not passed | `Area = Session.UserArea` passed on create (LookupRepository adds the param only when non-empty — safe for non-area-scoped tables) |
+| 6 | EditAnimalRef Sender Ref search | Used `GetAnimalsBySenderRef` (wildcard/partial SP), filtered by exact match — filter always failed due to wrong column mapping | Added `GetAnimalBySenderAsync` full-stack calling `GetAnimalBySender` SP (exact-match, per legacy `clsAnimal.vb`) |
+| 7 | BatchBlockSummary data not loading | `GetBatchSubmissionDetailsByBatchID` is multi-result-set; `BATCH_SUBMISSION_TABLE = 6` (confirmed from `clsBatch.vb`) — submissions at index 6, but code read index 0 → wrong `BatchSubmissionID` → `AddAnimal` called with wrong parent | `QueryMultipleAsync` skipping 6 result sets to reach index 6; `BatchBlockSummary.OnGetAsync` two-tier strategy: primary derives `BatchSubmissionID` from loaded animals; secondary falls back to the fixed `GetSubmissionsByBatchAsync` |
+
+**Build:** 0 errors, 0 warnings. **Tests:** 90 pass, 1 skipped, 0 fail.
+
+**Files changed:** `AuditLog/Repositories/AuditLogRepository.cs`, `Administration/Repositories/UserRepository.cs`, `Web/Pages/Admin/UserMaintenance.cshtml.cs`, `Web/Pages/Admin/UserMaintenance.cshtml`, `Web/Pages/Admin/EditUser.cshtml.cs`, `Web/Pages/Admin/EditUser.cshtml`, `Web/Pages/Admin/EditLookupItem.cshtml.cs`, `Submissions/Interfaces/ISubmissionRepository.cs`, `Submissions/Repositories/SubmissionRepository.cs`, `Submissions/Interfaces/ISubmissionService.cs`, `Submissions/Services/SubmissionService.cs`, `Web/Pages/Admin/EditAnimalRef.cshtml.cs`, `Web/Pages/Submissions/BatchBlockSummary.cshtml.cs`.
+
+---
+
+## Prompt 45 — Picklist Management duplicate code validation check (2026-08-18)
+
+> Can you verify the error validation for Picklist Management when adding or editing an item?
+>
+> In the legacy system, there is a validation that prevents duplicate codes. When editing an item and selecting a code that is already in use, the following error message is displayed:
+>
+> "The code you have selected is already in use."
+>
+> Please check whether this validation is implemented and working correctly in the current version for both Add and Edit scenarios.
+
+Validation was completely absent. Four compounding issues were found and fixed: (1) no duplicate-code check existed; (2) the "Code" form input bound to `ItemId` (int) rather than a string `Code` property — users could not enter a code string; (3) the table displayed `@i.ID` under the Code column instead of `@i.Code`; (4) `CreateLookupItemAsync` never passed `@Code` to Code-keyed table INSERT SPs. Added `[BindProperty] string Code`, `bool TableHasCodes`, GDS inline error display, and the duplicate check mirroring `PickListMaintenance.aspx Pager_RowSave`.
+
+**Build:** Succeeded. 0 warnings, 0 errors.
+
+**Files changed:** `Web/Pages/Admin/EditLookupItem.cshtml.cs`, `Web/Pages/Admin/EditLookupItem.cshtml`, `Administration/Repositories/LookupRepository.cs`.
+
+---
+
+## Prompt 46 — Fix EditluArchiveLocation expects parameter @Original_Code (2026-08-18)
+
+> Fix this issue
+> {"Procedure or function 'EditluArchiveLocation' expects parameter '@Original_Code', which was not supplied."}
+
+Four root causes fixed together: (1) `UpdateLookupItemAsync` passed `@ID` for all tables — Code-keyed SPs expect `@Original_Code` + `@Code`, not `@ID`; (2) Edit links for Code-keyed tables used `asp-route-itemId="@i.ID"` but Code-keyed items have no integer ID (all map to 0); (3) `OnPostAsync` identified Edit vs Add by `ItemId is int` — always false for Code-keyed tables, so edits fell into the Create path; (4) duplicate-check exclusion used integer `i.ID != editId` which incorrectly excluded all rows (all ID = 0). Added `ItemCode` route parameter, `OriginalCode` hidden round-trip field, branched `UpdateLookupItemAsync` signature with optional `string? originalCode`, and fixed duplicate-check exclusion to use `OriginalCode` string comparison.
+
+**Build:** Succeeded. 0 warnings, 0 errors.
+
+**Files changed:** `Administration/Interfaces/ILookupRepository.cs`, `Administration/Interfaces/ILookupService.cs`, `Administration/Repositories/LookupRepository.cs`, `Administration/Services/LookupService.cs`, `Web/Pages/Admin/EditLookupItem.cshtml.cs`, `Web/Pages/Admin/EditLookupItem.cshtml`.
+
+---
+
+## Prompt 47 — Fix AddluArchiveLocation has too many arguments (2026-08-18)
+
+> Fix this issue
+> {"Procedure or function AddluArchiveLocation has too many arguments specified."}
+
+Legacy `BuildParamListCommon` (Code-keyed tables) inserts exactly `Code`, `Description`, `IsActive` — no `Area`. The page model was passing `Area = Session.UserArea` unconditionally on the Add path, giving Archive Location (and all other Code-keyed tables) a 4th parameter their INSERT SPs do not declare. Fix: changed the Add path to `Area = TableHasCodes ? null : Session.UserArea` — Code-keyed tables receive no Area; ID-keyed area-scoped tables (Contacts 18, Projects 19) still receive the session area as required.
+
+**Build:** Succeeded. 0 warnings, 0 errors.
+
+**Files changed:** `Web/Pages/Admin/EditLookupItem.cshtml.cs`.
+
+---
+
+## Prompt 48 — Journal update for this session (2026-08-18)
+
+> @file:journal-updater.agent.md run this agent update the below prompt in user prompt file
+>
+> Update the issue that has fixed from this session and add the prompt in User-Prompts-Log
+
+Journal-updater agent invoked in Mode B (uncommitted Copilot Chat session). Three fix prompts (45, 46, 47) appended to `docs/User-Prompts-Log.md`. `docs/migration-run-journal.md` updated with Run Log entry for this session.
+
+**Files changed:** `docs/User-Prompts-Log.md`, `docs/migration-run-journal.md`.
+
+
+## Prompt 49 -  Multiple bug fix 
+
+AuditLogByDate.cshtml
+
+The page currently loads a default date automatically.
+Legacy behavior should not pre-populate the date fields.
+Remove default date initialization and align with legacy behavior.
+User Maintenance (EditUser)
+
+Fix Edit User functionality.
+Current error:
+"Procedure or function 'EditUser' expects parameter '@UserID', which was not supplied."
+Compare legacy implementation and ensure all required parameters, especially UserID, are correctly passed through UI, controller/service, repository, and stored procedure layers.
+Picklist Maintenance (Edit Pick List)
+
+Fix Edit Pick List functionality.
+Current error:
+"Procedure or function AddluArchiveLocation has too many arguments specified."
+Compare with legacy implementation and Project Picklist pattern.
+Verify stored procedure signatures and parameter mappings.
+Remove any unsupported parameters and ensure parameter count/order matches the stored procedure definition.
+Edit Sender / Histology Ref
+
+Original Histology Ref field is not editable.
+Verify whether this field should be editable based on legacy behavior.
+Correct control configuration, data binding, and permissions if required.
+Review page layout and column alignment.
+Edit Sender / Histology Ref
+
+Fix alignment and positioning of the "Get Histology Ref" button to match legacy UI standards and surrounding controls.
+Audit Log Data Access
+
+Continue using strongly typed models (AuditLogEntry) wherever a model already exists.
+Do not replace:
+QueryAsync<AuditLogEntry>()
+with:
+QueryAsync<dynamic>()
+Use model-to-column mapping through aliases or model updates as required.
+Only use dynamic when the result set is genuinely variable.
+Ensure date fields and result mappings remain strongly typed and consistent with legacy behavior.
+---
+
+
+

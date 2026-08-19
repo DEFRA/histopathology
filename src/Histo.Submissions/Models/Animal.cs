@@ -4,7 +4,7 @@ namespace Histo.Submissions.Models;
 /// Represents an animal/sample record within a batch submission.
 ///
 /// Legacy source: HistopathologyLib/clsAnimal.vb — DataTable columns produced by
-/// <c>GetBatchSubmissionDetailsByBatchID</c> (BATCH_ANIMAL_TABLE, index 8).
+/// <c>GetBatchAnimal</c> (via <c>GetAnimalsForBatch</c>).
 ///
 /// PG-number auto-reversal logic is in <see cref="Histo.Core.Domain.AnimalHelpers"/>.
 /// </summary>

@@ -9,12 +9,29 @@
     <a asp-page="/AuditLog/AuditLogMenu" class="govuk-back-link">Back</a>
 }
 
+@if (Model.Errors.Any())
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    @foreach (var e in Model.Errors)
+                    {
+                        <li>@e</li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
 <form method="post">
-    <div class="govuk-form-group">
+    <div class="govuk-form-group @(Model.Errors.Any(e => e.Contains("start")) ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="StartDate">From</label>
         <input class="govuk-input govuk-input--width-10" type="date" asp-for="StartDate" />
     </div>
-    <div class="govuk-form-group">
+    <div class="govuk-form-group @(Model.Errors.Any(e => e.Contains("end")) ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="EndDate">To</label>
         <input class="govuk-input govuk-input--width-10" type="date" asp-for="EndDate" />
     </div>
@@ -46,7 +63,7 @@
                 <tr class="govuk-table__row">
                     <td class="govuk-table__cell">@e.TableName</td>
                     <td class="govuk-table__cell">@e.FieldName</td>
-                    <td class="govuk-table__cell">@e.ChangedAt.ToString("G")</td>
+                    <td class="govuk-table__cell">@e.ChangedAt.ToString("dd/MM/yyyy HH:mm:ss")</td>
                     <td class="govuk-table__cell">@e.UserName</td>
                     <td class="govuk-table__cell">@e.BeforeValue</td>
                     <td class="govuk-table__cell">@e.AfterValue</td>

@@ -105,6 +105,17 @@ public sealed class BatchService : IBatchService
     }
 
     /// <summary>
+    /// Sets the customer received date ("date returned") on a batch without changing status.
+    /// Returns <see langword="false"/> and logs on failure.
+    /// Legacy source: <c>BatchDetails.aspx::btnSave_Click</c> when <c>SV_ReceiveBatch = True</c>.
+    /// </summary>
+    public async Task<bool> SetCustomerReceivedDateAsync(int batchId, DateTime? date, byte[] rowStamp, int userId, CancellationToken ct = default)
+    {
+        try { await _batches.SetCustomerReceivedDateAsync(batchId, date, rowStamp, userId, ct); return true; }
+        catch (Exception ex) { _logger.LogError("Failed to set customer received date for batch {BatchId}.", ex, batchId); return false; }
+    }
+
+    /// <summary>
     /// Creates a new batch header copied from an existing one — the starting point
     /// for the "Copy batch" workflow. The new batch always starts in Submitted
     /// status regardless of the source batch's current status.
@@ -226,5 +237,55 @@ public sealed class BatchService : IBatchService
                 latest = d;
         }
         return true;
+    }
+
+    // -----------------------------------------------------------------------
+    // Batch-level test type selections
+    // -----------------------------------------------------------------------
+
+    /// <inheritdoc/>
+    public async Task<BatchTestSelections> GetBatchTestSelectionsAsync(int batchId, CancellationToken ct = default)
+    {
+        try { return await _batches.GetBatchTestSelectionsAsync(batchId, ct); }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get batch test selections for batch {BatchId}.", ex, batchId);
+            return new BatchTestSelections();
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> SaveBatchTestSelectionsAsync(
+        int batchId,
+        IReadOnlyList<string> histologyCodes,
+        IReadOnlyList<string> antibodyCodes,
+        IReadOnlyList<string> stainCodes,
+        int userId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await _batches.SaveBatchTestSelectionsAsync(batchId, histologyCodes, antibodyCodes, stainCodes, userId, ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to save batch test selections for batch {BatchId}.", ex, batchId);
+            return false;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<string?> GetSubmittedAsCodeAsync(int batchId, CancellationToken ct = default)
+    {
+        try
+        {
+            return await _batches.GetSubmittedAsCodeAsync(batchId, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to read submitted-as code for batch {BatchId}.", ex, batchId);
+            return null;
+        }
     }
 }

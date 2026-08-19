@@ -246,6 +246,17 @@ public sealed class SubmissionService : ISubmissionService
         catch (Exception ex) { _logger.LogError("Failed to search animals by sender ref {SenderRef}.", ex, senderRef); return []; }
     }
 
+    /// <summary>
+    /// Returns the single animal record that exactly matches the given Sender Ref.
+    /// Uses the <c>GetAnimalBySender</c> SP (exact match), mirroring the legacy
+    /// <c>EditHistologyRef.aspx::getHistologyRef</c> lookup behaviour.
+    /// </summary>
+    public async Task<IReadOnlyList<SenderSearchResult>> GetAnimalBySenderAsync(string senderRef, CancellationToken ct = default)
+    {
+        try { return await _repo.GetAnimalBySenderAsync(senderRef, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to look up animal by exact sender ref {SenderRef}.", ex, senderRef); return []; }
+    }
+
     /// <summary>Returns archived tissue records matching the given (optional) filters.</summary>
     public async Task<IReadOnlyList<TissueArchiveInfo>> GetTissueArchiveAsync(
         string? senderRef, string? histologyRef, string? archiveLocation, string? tissueCode, CancellationToken ct = default)
@@ -259,5 +270,21 @@ public sealed class SubmissionService : ISubmissionService
     {
         try { return await _repo.GetImportedDataAsync(selectedTable, ct); }
         catch (Exception ex) { _logger.LogError("Failed to get imported data for table {SelectedTable}.", ex, selectedTable ?? "(none)"); return []; }
+    }
+
+    /// <summary>Standalone ViewSamples search — "Tissue Information" mode.</summary>
+    public async Task<IReadOnlyList<AnimalTissueSearchResult>> GetAnimalTissuesAsync(
+        string? senderRef, string? histologyRef, string? tissueCode, string? projectDesc, CancellationToken ct = default)
+    {
+        try { return await _repo.GetAnimalTissuesAsync(senderRef, histologyRef, tissueCode, projectDesc, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to search animal tissues.", ex); return []; }
+    }
+
+    /// <summary>Standalone ViewSamples search — "Block Information" mode.</summary>
+    public async Task<IReadOnlyList<AnimalTissueSearchResult>> GetAnimalBlockTissuesAsync(
+        string? senderRef, string? histologyRef, string? tissueCode, string? projectDesc, CancellationToken ct = default)
+    {
+        try { return await _repo.GetAnimalBlockTissuesAsync(senderRef, histologyRef, tissueCode, projectDesc, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to search animal block tissues.", ex); return []; }
     }
 }

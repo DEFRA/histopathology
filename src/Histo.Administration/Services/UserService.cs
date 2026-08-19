@@ -86,11 +86,11 @@ public sealed class UserService : IUserService
     /// Returns <see langword="false"/> and logs the error if the update fails —
     /// callers should surface a generic save error to the user.
     /// </summary>
-    public async Task<bool> UpdateUserAsync(User user, CancellationToken ct = default)
+    public async Task<bool> UpdateUserAsync(User user, int userId, CancellationToken ct = default)
     {
         try
         {
-            await _users.UpdateUserAsync(user, ct);
+            await _users.UpdateUserAsync(user, userId, ct);
             return true;
         }
         catch (Exception ex)
