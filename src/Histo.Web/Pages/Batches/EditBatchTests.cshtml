@@ -1,0 +1,180 @@
+@page
+@model Histo.Web.Pages.Batches.EditBatchTestsModel
+@using Histo.Submissions.Models
+@{
+    ViewData["Title"]     = "Edit test types";
+    ViewData["PageTitle"] = "Edit test types";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Batches/BatchDetails" class="govuk-back-link">Back</a>
+}
+
+@if (!string.IsNullOrEmpty(Model.SaveError))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.SaveError</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+@if (Model.Batch is not null)
+{
+    <p class="govuk-body">
+        Submission <strong>@Model.Batch.ID</strong> &mdash;
+        @BatchTypeConstants.DisplayName(Model.Batch.BatchType) submission
+    </p>
+
+    <form method="post">
+        @Html.AntiForgeryToken()
+
+        @* ── Histology types (required) ──────────────────────────────────── *@
+        <div class="govuk-form-group @(Model.SaveError != null && Model.SelectedHistologyCodes.Count == 0 ? "govuk-form-group--error" : "")">
+            <fieldset class="govuk-fieldset">
+                <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">
+                    <h2 class="govuk-fieldset__heading">Histology</h2>
+                </legend>
+                <div class="govuk-hint">Select at least one histology type.</div>
+                <div class="govuk-checkboxes" data-module="govuk-checkboxes" id="histology-checkboxes">
+                    @foreach (var item in Model.HistologyOptions)
+                    {
+                        var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
+                        var checkboxId = $"histology-{code}";
+                        var isChecked = Model.SelectedHistologyCodes.Contains(code);
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input"
+                                   id="@checkboxId"
+                                   name="SelectedHistologyCodes"
+                                   type="checkbox"
+                                   value="@code"
+                                   @(isChecked ? "checked" : "")
+                                   data-histology-code="@code" />
+                            <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+                        </div>
+                    }
+                </div>
+            </fieldset>
+        </div>
+
+        @* ── Antibodies (conditional — only when IHC-PrP or IHC-Other is selected) ──
+           Legacy: chkblAntibodies.Enabled = True when IHC-PrP or IHC-Other is checked.
+           TSE submissions load table 4 (LOOKUP_TSE_ANTIBODIES).
+           NonTSE submissions load table 5 (LOOKUP_NONTSE_ANTIBODIES). *@
+        <div class="govuk-form-group"
+             id="antibodies-section"
+             style="@(Model.ShowAntibodies ? "" : "display:none")">
+            <fieldset class="govuk-fieldset">
+                <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">
+                    <h2 class="govuk-fieldset__heading">Antibodies</h2>
+                </legend>
+                <div class="govuk-hint">Required when IHC is selected above.</div>
+                <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                    @foreach (var item in Model.AntibodyOptions)
+                    {
+                        var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
+                        var checkboxId = $"antibody-{code}";
+                        var isChecked = Model.SelectedAntibodyCodes.Contains(code);
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input"
+                                   id="@checkboxId"
+                                   name="SelectedAntibodyCodes"
+                                   type="checkbox"
+                                   value="@code"
+                                   @(isChecked ? "checked" : "") />
+                            <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+                        </div>
+                    }
+                </div>
+            </fieldset>
+        </div>
+
+        @* ── Special stains (conditional — only when "Special Stain" histology is selected) ──
+           Legacy: chkblSpecialStain.Enabled = True when "Special Stain" is checked in histology list. *@
+        <div class="govuk-form-group"
+             id="stains-section"
+             style="@(Model.ShowStains ? "" : "display:none")">
+            <fieldset class="govuk-fieldset">
+                <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">
+                    <h2 class="govuk-fieldset__heading">Special stains</h2>
+                </legend>
+                <div class="govuk-hint">Required when Special Stain is selected above.</div>
+                <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                    @foreach (var item in Model.StainOptions)
+                    {
+                        var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
+                        var checkboxId = $"stain-{code}";
+                        var isChecked = Model.SelectedStainCodes.Contains(code);
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input"
+                                   id="@checkboxId"
+                                   name="SelectedStainCodes"
+                                   type="checkbox"
+                                   value="@code"
+                                   @(isChecked ? "checked" : "") />
+                            <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+                        </div>
+                    }
+                </div>
+            </fieldset>
+        </div>
+
+        <div class="govuk-button-group">
+            <button type="submit" class="govuk-button" data-module="govuk-button">Save test types</button>
+            <a asp-page="/Batches/BatchDetails" class="govuk-link">Cancel</a>
+        </div>
+    </form>
+}
+else
+{
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <strong class="govuk-warning-text__text">
+            <span class="govuk-visually-hidden">Warning</span>
+            Submission not found.
+        </strong>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        // Conditional reveal: show/hide Antibodies section when IHC histology codes are checked.
+        // Show/hide Special Stains section when Special Stain histology code is checked.
+        // Legacy equivalent: chkblHistology_SelectedIndexChanged in BatchDetails.aspx.vb.
+        (function () {
+            var IHC_CODES      = ['@HistologyCode.IhcPrp', '@HistologyCode.IhcOther'];
+            var STAIN_CODE     = '@HistologyCode.SpecialStain';
+            var antibodiesDiv  = document.getElementById('antibodies-section');
+            var stainsDiv      = document.getElementById('stains-section');
+
+            function updateConditionalSections() {
+                var checked = Array.from(
+                    document.querySelectorAll('#histology-checkboxes input[type=checkbox]:checked')
+                ).map(function (cb) { return cb.value; });
+
+                var showAntibodies = IHC_CODES.some(function (c) { return checked.indexOf(c) !== -1; });
+                var showStains     = checked.indexOf(STAIN_CODE) !== -1;
+
+                antibodiesDiv.style.display = showAntibodies ? '' : 'none';
+                stainsDiv.style.display     = showStains     ? '' : 'none';
+
+                // Clear selections when section is hidden to avoid submitting stale values.
+                if (!showAntibodies) {
+                    antibodiesDiv.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
+                }
+                if (!showStains) {
+                    stainsDiv.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
+                }
+            }
+
+            document.querySelectorAll('#histology-checkboxes input[type=checkbox]').forEach(function (cb) {
+                cb.addEventListener('change', updateConditionalSections);
+            });
+        }());
+    </script>
+}

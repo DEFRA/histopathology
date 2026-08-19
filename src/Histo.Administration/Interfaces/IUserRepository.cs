@@ -37,6 +37,10 @@ public interface IUserRepository
     /// <summary>
     /// Updates an existing user record. Maps to the <c>EditUser</c> stored procedure
     /// (legacy source: <c>clsUser.SaveUserData</c> update parameter set).
+    /// <para>
+    /// <paramref name="userId"/> is the session user's ID passed as <c>@UserID</c> to the
+    /// SP for audit logging — distinct from <c>user.UserID</c> (the record being edited).
+    /// </para>
     /// </summary>
-    Task UpdateUserAsync(User user, CancellationToken ct = default);
+    Task UpdateUserAsync(User user, int userId, CancellationToken ct = default);
 }

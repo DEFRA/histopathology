@@ -29,9 +29,20 @@ public interface ILookupService
     /// <summary>Returns all species from the dedicated species lookup stored procedure.</summary>
     Task<IReadOnlyList<LookupItem>> GetSpeciesLookupAsync(CancellationToken ct = default);
 
+    /// <summary>
+    /// Returns all histology types from <c>GetluHistology</c>.
+    /// Each item's <see cref="LookupItem.Code"/> holds the string code used when storing
+    /// batch-level test-type selections (e.g. "3" = Special Stain, "4" = IHC-PrP,
+    /// "5" = H&amp;E BSE, "6" = IHC-Other).
+    /// Callers should filter by <see cref="Histo.Submissions.Models.BatchTypeConstants"/>:
+    /// hide code "6" (IHC-Other) for TSE; hide codes "4" and "5" for NonTSE.
+    /// </summary>
+    Task<IReadOnlyList<LookupItem>> GetHistologyTypesAsync(CancellationToken ct = default);
+
     /// <summary>Creates a new pick-list row. Returns <see langword="false"/> on failure.</summary>
     Task<bool> CreateLookupItemAsync(int tableId, LookupItem item, int userId, CancellationToken ct = default);
 
     /// <summary>Updates an existing pick-list row. Returns <see langword="false"/> on failure.</summary>
-    Task<bool> UpdateLookupItemAsync(int tableId, LookupItem item, int userId, CancellationToken ct = default);
+    /// <param name="originalCode">For Code-keyed tables: the original code identifying the row. Null for ID-keyed tables.</param>
+    Task<bool> UpdateLookupItemAsync(int tableId, LookupItem item, int userId, string? originalCode = null, CancellationToken ct = default);
 }

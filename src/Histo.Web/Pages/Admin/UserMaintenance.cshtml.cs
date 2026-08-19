@@ -9,23 +9,41 @@ namespace Histo.Web.Pages.Admin;
 public class UserMaintenanceModel : HistoPageModel
 {
     private readonly IUserService _users;
+    private readonly ILookupService _lookups;
 
-    public UserMaintenanceModel(ISessionService session, IUserService users)
-        : base(session) => _users = users;
+    public UserMaintenanceModel(ISessionService session, IUserService users, ILookupService lookups)
+        : base(session)
+    {
+        _users   = users;
+        _lookups = lookups;
+    }
 
     /// <summary>
-    /// When true, only active users are shown.
-    /// Legacy <c>cbActive</c> defaulted to <c>Checked="True"</c> ("Show deactivated items")
-    /// which meant ALL users were visible by default.
-    /// This property therefore defaults to <c>false</c> (= show all) to match that behaviour.
+    /// When true, deactivated (inactive) users are included in the list alongside active users.
+    /// Matches the legacy <c>cbActive</c> ("Show deactivated items") checkbox behaviour:
+    /// default unchecked = show active users only; checked = show all users.
     /// </summary>
     [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
-    public bool ShowActiveOnly { get; set; }
+    public bool ShowDeactivated { get; set; }
 
     public IReadOnlyList<User> Users { get; private set; } = [];
     public string? StatusMessage { get; private set; }
     public string? ErrorMessage { get; private set; }
     public int TotalFromDb { get; private set; }
+
+    /// <summary>
+    /// Group code → display name fallback map. Populated from <c>GetluUserGroup</c>
+    /// when the <c>GetUsers</c> SP does not return <c>GroupName</c> inline.
+    /// </summary>
+    public IReadOnlyDictionary<int, string> GroupNames { get; private set; }
+        = new Dictionary<int, string>();
+
+    /// <summary>
+    /// Area code → display name fallback map. Populated from <c>GetluUserArea</c>
+    /// when the <c>GetUsers</c> SP does not return <c>AreaName</c> inline.
+    /// </summary>
+    public IReadOnlyDictionary<int, string> AreaNames { get; private set; }
+        = new Dictionary<int, string>();
 
     public async Task OnGetAsync()
     {
@@ -36,11 +54,40 @@ public class UserMaintenanceModel : HistoPageModel
         {
             var all = await _users.GetAllUsersAsync();
             TotalFromDb = all.Count;
-            Users = ShowActiveOnly ? all.Where(u => u.Active).ToList() : all.ToList();
+            Users = ShowDeactivated ? all.ToList() : all.Where(u => u.Active).ToList();
+
+            // Load lookup names as a fallback in case the GetUsers SP does not return
+            // GroupName / AreaName columns (older SP versions return only integer codes).
+            var groupsTask = _lookups.GetUserGroupsAsync();
+            var areasTask  = _lookups.GetUserAreasAsync();
+            await Task.WhenAll(groupsTask, areasTask);
+
+            GroupNames = groupsTask.Result.ToDictionary(g => g.ID, g => g.Name);
+            AreaNames  = areasTask.Result.ToDictionary(a => a.ID, a => a.Name);
         }
         catch (Exception ex)
         {
             ErrorMessage = $"{ex.GetType().Name}: {ex.Message}";
         }
     }
+
+    /// <summary>
+    /// Returns the display name for a user group code.
+    /// Uses the value returned by <c>GetUsers</c> SP when available;
+    /// falls back to the lookup dictionary when that column is empty.
+    /// </summary>
+    public string ResolveGroupName(User u)
+        => !string.IsNullOrWhiteSpace(u.GroupName) ? u.GroupName
+           : GroupNames.TryGetValue(u.GroupCode, out var n) ? n
+           : u.GroupCode.ToString();
+
+    /// <summary>
+    /// Returns the display name for a user area code.
+    /// Uses the value returned by <c>GetUsers</c> SP when available;
+    /// falls back to the lookup dictionary when that column is empty.
+    /// </summary>
+    public string ResolveAreaName(User u)
+        => !string.IsNullOrWhiteSpace(u.AreaName) ? u.AreaName
+           : AreaNames.TryGetValue(u.AreaCode, out var n) ? n
+           : u.AreaCode.ToString();
 }

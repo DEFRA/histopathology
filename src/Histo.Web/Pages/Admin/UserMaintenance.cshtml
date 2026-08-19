@@ -37,8 +37,8 @@
 <form method="get" class="govuk-form-group">
     <div class="govuk-checkboxes govuk-checkboxes--small">
         <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" type="checkbox" id="ShowActiveOnly" name="ShowActiveOnly" value="true" @(Model.ShowActiveOnly ? "checked" : "") onchange="this.form.submit()" />
-            <label class="govuk-label govuk-checkboxes__label" for="ShowActiveOnly">Show active users only</label>
+            <input class="govuk-checkboxes__input" type="checkbox" id="ShowDeactivated" name="ShowDeactivated" value="true" @(Model.ShowDeactivated ? "checked" : "") onchange="this.form.submit()" />
+            <label class="govuk-label govuk-checkboxes__label" for="ShowDeactivated">Show deactivated items</label>
         </div>
     </div>
 </form>
@@ -65,8 +65,8 @@
             <tr class="govuk-table__row">
                 <td class="govuk-table__cell">@u.Name</td>
                 <td class="govuk-table__cell">@u.NtLogin</td>
-                <td class="govuk-table__cell">@u.GroupName</td>
-                <td class="govuk-table__cell">@u.AreaName</td>
+                <td class="govuk-table__cell">@Model.ResolveGroupName(u)</td>
+                <td class="govuk-table__cell">@Model.ResolveAreaName(u)</td>
                 <td class="govuk-table__cell">@u.Email</td>
                 <td class="govuk-table__cell">@(u.Active ? "Yes" : "No")</td>
                 <td class="govuk-table__cell">

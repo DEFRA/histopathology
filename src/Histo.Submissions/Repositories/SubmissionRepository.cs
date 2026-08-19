@@ -23,10 +23,22 @@ public sealed class SubmissionRepository : ISubmissionRepository
     public async Task<IReadOnlyList<BatchSubmission>> GetSubmissionsByBatchAsync(int batchId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<BatchSubmission>(
+
+        // GetBatchSubmissionDetailsByBatchID is a multi-result-set SP that populates the
+        // full batch DataSet.  Legacy constant BATCH_SUBMISSION_TABLE = 6 (clsBatch.vb)
+        // means the batch-submission rows are in the 7th result set (0-indexed).
+        // Use QueryMultiple and skip the first 6 result sets to reach submissions.
+        using var multi = await conn.QueryMultipleAsync(
             "GetBatchSubmissionDetailsByBatchID",
             new { ID = batchId },
             commandType: System.Data.CommandType.StoredProcedure);
+
+        // Skip result sets 0–5 (batch header, tests, tissues, animals, etc.)
+        const int batchSubmissionTableIndex = 6;
+        for (var i = 0; i < batchSubmissionTableIndex; i++)
+            await multi.ReadAsync<dynamic>();
+
+        var rows = await multi.ReadAsync<BatchSubmission>();
         return rows.ToList();
     }
 
@@ -72,8 +84,15 @@ public sealed class SubmissionRepository : ISubmissionRepository
     public async Task<IReadOnlyList<Animal>> GetAnimalsByBatchAsync(int batchId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
+        // BUG FIX: was calling "GetAnimalsByBatchID", a stored procedure name that does not exist anywhere
+        // in the legacy codebase. The correct legacy source is clsAnimal.vb::GetAnimalsForBatch, which calls
+        // "GetBatchAnimal" with the same { ID = batchId } parameter shape and returns exactly the columns
+        // this model expects (SenderRef, NextBlockRef, HistologyRef, OnHold, PMDate, IsPGNumber) — used by
+        // AddSubmission.aspx.vb, BatchBlocks.aspx.vb, CopyBlocks.aspx.vb, and CopySamples.aspx.vb for this
+        // same "list current animals in a batch" purpose. The wrong SP name was the root cause of
+        // Histology Ref / On Hold not populating correctly on BatchBlockSummary.
         var rows = await conn.QueryAsync<Animal>(
-            "GetAnimalsByBatchID",
+            "GetBatchAnimal",
             new { ID = batchId },
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
@@ -288,6 +307,19 @@ public sealed class SubmissionRepository : ISubmissionRepository
     }
 
     /// <inheritdoc/>
+    public async Task<IReadOnlyList<SenderSearchResult>> GetAnimalBySenderAsync(string senderRef, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        // GetAnimalBySender performs an exact match on SenderRef — legacy source:
+        // clsAnimal.vb::GetAnimalBySender, used by EditHistologyRef.aspx::getHistologyRef.
+        var rows = await conn.QueryAsync<SenderSearchResult>(
+            "GetAnimalBySender",
+            new { SenderRef = senderRef },
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<TissueArchiveInfo>> GetTissueArchiveAsync(
         string? senderRef, string? histologyRef, string? archiveLocation, string? tissueCode, CancellationToken ct = default)
     {
@@ -335,6 +367,30 @@ public sealed class SubmissionRepository : ISubmissionRepository
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<ImportedDataRow>(
             procName,
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<AnimalTissueSearchResult>> GetAnimalTissuesAsync(
+        string? senderRef, string? histologyRef, string? tissueCode, string? projectDesc, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<AnimalTissueSearchResult>(
+            "GetAnimalBatchTissues",
+            new { SenderRef = senderRef, HistologyRef = histologyRef, TissueCode = tissueCode, ProjectDesc = projectDesc },
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<AnimalTissueSearchResult>> GetAnimalBlockTissuesAsync(
+        string? senderRef, string? histologyRef, string? tissueCode, string? projectDesc, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<AnimalTissueSearchResult>(
+            "GetAnimalBlockTissues",
+            new { SenderRef = senderRef, HistologyRef = histologyRef, TissueCode = tissueCode, ProjectDesc = projectDesc },
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }

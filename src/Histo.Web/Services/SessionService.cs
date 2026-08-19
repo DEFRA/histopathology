@@ -28,7 +28,8 @@ public sealed class SessionService : ISessionService
     private const string KeySubmID    = "BatchSubmissionID";
     private const string KeyAnimalID  = "AnimalID";
     private const string KeyBlockID   = "BlockID";
-    private const string KeyBatchType = "BatchType";
+    private const string KeyBatchType  = "BatchType";
+    private const string KeyReturnPage = "ReturnPage";
 
     private readonly ISession _session;
 
@@ -78,6 +79,12 @@ public sealed class SessionService : ISessionService
     {
         get => GetInt(KeyBatchType);
         set => _session.Set(KeyBatchType, BitConverter.GetBytes(value));
+    }
+
+    public string ReturnPage
+    {
+        get => GetStr(KeyReturnPage);
+        set => _session.SetString(KeyReturnPage, value);
     }
 
     // ── Role helpers ─────────────────────────────────────────────────────────

@@ -24,11 +24,11 @@ public class AddSubmissionModel : HistoPageModel
     public async Task<IActionResult> OnPostAsync()
     {
         ViewData["Title"] = "Add Submission";
-        if (Session.BatchSubmissionID <= 0) return RedirectToPage("/Index");
+        if (Session.BatchSubmissionID is null or <= 0) return RedirectToPage("/Index");
 
         await _submissions.AddAnimalAsync(
-            Session.BatchSubmissionID ?? 0, SenderRef, IsNeuropath, Session.UserID);
+            Session.BatchSubmissionID.Value, SenderRef, IsNeuropath, Session.UserID);
 
-        return RedirectToPage("/Submissions/ViewSamples");
+        return RedirectToPage("/Submissions/BatchBlockSummary");
     }
 }

@@ -102,7 +102,13 @@ public sealed class BatchSearchResult
     public DateTime? DateCompleted { get; init; }
     public DateTime? CustomerReceivedDate { get; init; }
     public string? Status { get; init; }
-    public int? SubmittedBy { get; init; }
+    /// <summary>
+    /// The display name of the user who submitted the batch.
+    /// The <c>GetSearchBatchDetails</c> SP returns this as a VARCHAR display name
+    /// (e.g. "Gunjan Arya"), not the integer UserID. Hidden column — not rendered
+    /// in the results grid but preserved for completeness.
+    /// </summary>
+    public string? SubmittedBy { get; init; }
 }
 
 /// <summary>
@@ -133,4 +139,30 @@ public sealed class TissueArchiveInfo
     public DateTime? ArchivedDate { get; init; }
     public short? NoPieces { get; init; }
 }
+
+/// <summary>
+/// One result row for the legacy <c>ViewSamples.aspx</c> tissue/block search — a standalone
+/// (non-batch-scoped) search reached from the Home page, distinct from the in-progress-batch
+/// sample list now served by <c>BatchBlockSummary.cshtml</c>.
+///
+/// Legacy source: HistopathologyLib/clsAnimal.vb — <c>GetAnimalTissues</c> (SP <c>GetAnimalBatchTissues</c>,
+/// "Tissue Information" mode) and <c>GetAnimalBlockTissues</c> (SP <c>GetAnimalBlockTissues</c>,
+/// "Block Information" mode). Column shape from ViewSamples.aspx grdTissuesGrid / grdResults BoundColumns.
+/// <see cref="BlockRef"/> is populated only in Block Information mode (grdResults); it is
+/// <c>null</c> for Tissue Information mode rows (grdTissuesGrid, which has no Block Ref column).
+/// </summary>
+public sealed class AnimalTissueSearchResult
+{
+    public int ID { get; init; }
+    public DateTime? DateSubmitted { get; init; }
+    public DateTime? DateReceived { get; init; }
+    public string? TimeReceived { get; init; }
+    public DateTime? DateCompleted { get; init; }
+    public DateTime? CustomerReceivedDate { get; init; }
+    public string? SubmittedAs { get; init; }
+    public string? BlockRef { get; init; }
+    public string? TissueDescription { get; init; }
+    public int? NoPieces { get; init; }
+}
+
 
