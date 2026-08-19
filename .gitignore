@@ -59,7 +59,6 @@ appsettings.*.json
 secrets.json
 local.settings.json
 
-
 # -----------------------------------------------------------------------
 # Crystal Reports runtime outputs (legacy)
 # -----------------------------------------------------------------------
