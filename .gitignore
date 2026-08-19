@@ -59,10 +59,6 @@ appsettings.*.json
 secrets.json
 local.settings.json
 
-# -----------------------------------------------------------------------
-# Legacy codebase — not pushed to remote
-# -----------------------------------------------------------------------
-HistopathologySystem/
 
 # -----------------------------------------------------------------------
 # Crystal Reports runtime outputs (legacy)
