@@ -393,7 +393,8 @@ public sealed class BatchRepository : IBatchRepository
             }
         }
 
-        foreach (var code in newCodes)
+        //foreach (var code in newCodes)
+        foreach (var code in newCodes.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (!currentSet.ContainsKey(code))
             {

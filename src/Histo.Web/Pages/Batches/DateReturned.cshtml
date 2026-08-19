@@ -55,7 +55,7 @@ else if (Model.Batch is not null)
         </div>
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Status</dt>
-            <dd class="govuk-summary-list__value">@Model.Batch.Status</dd>
+            <dd class="govuk-summary-list__value">@Histo.Core.Domain.BatchStatus.DisplayName(Model.Batch.Status)</dd>
         </div>
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Date submitted</dt>

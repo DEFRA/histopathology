@@ -36,12 +36,13 @@ public sealed class NullableDateTimeTypeHandler : SqlMapper.TypeHandler<DateTime
     public override DateTime? Parse(object value)
     {
         if (value is null or DBNull) return null;
-
         // Native SQL datetime — returned as-is (no string conversion needed).
         if (value is DateTime dt) return dt;
 
+        var s = value.ToString();
+        if (string.IsNullOrWhiteSpace(s)) return null;
         return DateTime.ParseExact(
-            value.ToString()!,
+            s,
             Formats,
             CultureInfo.InvariantCulture,
             DateTimeStyles.None);

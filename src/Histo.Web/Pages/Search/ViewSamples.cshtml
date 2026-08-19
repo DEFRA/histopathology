@@ -38,7 +38,8 @@
             <option value="">-- Select --</option>
             @foreach (var t in Model.Tissues)
             {
-                <option value="@t.Name">@t.Name</option>
+                var v = !string.IsNullOrWhiteSpace(t.Code) ? t.Code : t.ID.ToString();
+                <option value="@v">@t.Name</option>
             }
         </select>
     </div>

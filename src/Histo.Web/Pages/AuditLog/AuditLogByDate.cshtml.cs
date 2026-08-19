@@ -34,6 +34,8 @@ public class AuditLogByDateModel : HistoPageModel
 
         if (!StartDate.HasValue) Errors.Add("Enter a start date.");
         if (!EndDate.HasValue)   Errors.Add("Enter an end date.");
+        if (StartDate.HasValue && EndDate.HasValue && StartDate.Value.Date > EndDate.Value.Date)
+            Errors.Add("The end date must be the same as or after the start date.");
         if (Errors.Count > 0) return Page();
 
         Searched = true;
