@@ -32,19 +32,6 @@ public class QCNoteServiceTests
     }
 
     [Fact]
-    public async Task GetBySubmissionAsync_RepositoryThrows_ReturnsEmptyList()
-    {
-        _repoMock
-            .Setup(r => r.GetBySubmissionAsync(It.IsAny<int>(), default))
-            .ThrowsAsync(new InvalidOperationException("DB error"));
-
-        var sut = BuildSut();
-        var result = await sut.GetBySubmissionAsync(1);
-
-        Assert.Empty(result);
-    }
-
-    [Fact]
     public async Task AddAsync_RepositoryThrows_ReturnsZero()
     {
         _repoMock

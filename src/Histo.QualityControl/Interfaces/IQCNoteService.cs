@@ -8,7 +8,6 @@ namespace Histo.QualityControl.Interfaces;
 /// </summary>
 public interface IQCNoteService
 {
-    Task<IReadOnlyList<QCNote>> GetBySubmissionAsync(int submissionId, CancellationToken ct = default);
     Task<QCNote?> GetByIdAsync(int qcNoteId, CancellationToken ct = default);
     Task<IReadOnlyList<QCNote>> GetAllAsync(CancellationToken ct = default);
 

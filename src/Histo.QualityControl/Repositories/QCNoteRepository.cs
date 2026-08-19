@@ -20,19 +20,6 @@ public sealed class QCNoteRepository : IQCNoteRepository
     public QCNoteRepository(IDbConnectionFactory db) => _db = db;
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<QCNote>> GetBySubmissionAsync(int submissionId, CancellationToken ct = default)
-    {
-        // Legacy QCNotes.aspx always called GetBatchQCNotes with no filter (showed all notes).
-        // Filtering by batch is not supported by this SP; return all notes to match legacy behaviour.
-        using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<QCNote>(
-            "GetBatchQCNotes",
-            new { QCNoteRef = (int?)null },
-            commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
-    }
-
-    /// <inheritdoc/>
     public async Task<QCNote?> GetByIdAsync(int qcNoteId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
