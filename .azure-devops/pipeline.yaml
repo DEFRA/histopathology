@@ -68,33 +68,29 @@ stages:
       artifact: drop
       displayName: 'Publish artifact'
 
-# ---------------------------------------------------------------
-# Once the ARM service connection exists,:
-#
-# - stage: Deploy
-#   displayName: Deploy to Dev
-#   dependsOn: Build
-#   condition: >-
-#     and(succeeded(),
-#         eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
-#         ne(variables['Build.Reason'], 'PullRequest'))
-#   jobs:
-#   - deployment: deploy_dev
-#     environment: 'dev'
-#     pool:
-#       vmImage: 'ubuntu-24.04'
-#     strategy:
-#       runOnce:
-#         deploy:
-#           steps:
-#           - download: current
-#             artifact: drop
-#           - task: AzureWebApp@1
-#             inputs:
-#               azureSubscription: '<service connection name>'
-#               appType: 'webAppLinux'
-#               appName: 'DEVCDEWEBAW1401'
-#               resourceGroupName: 'DEVCDEINFRG1401'
-#               package: '$(Pipeline.Workspace)/drop/**/*.zip'
-#               deploymentMethod: 'zipDeploy'
-# ---------------------------------------------------------------
+- stage: Deploy
+  displayName: Deploy to Dev
+  dependsOn: Build
+  condition: >-
+    and(succeeded(),
+        eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
+        ne(variables['Build.Reason'], 'PullRequest'))
+  jobs:
+  - deployment: deploy_dev
+    environment: 'dev'
+    pool:
+      vmImage: 'ubuntu-24.04'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: 'AZR-CDE-DEV1'
+              appType: 'webAppLinux'
+              appName: 'DEVCDEWEBAW1401'
+              package: '$(Pipeline.Workspace)/drop/*.zip'
+              runtimeStack: 'DOTNETCORE|10.0'
+              deploymentMethod: 'zipDeploy'
