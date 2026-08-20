@@ -75,6 +75,12 @@ public interface IBatchRepository
     /// </summary>
     Task UpdateStatusAsync(int batchId, string newStatus, byte[] rowStamp, int userId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Persists the ByPassSort flag. Reloads current batch to supply the full EditBatch parameter set.
+    /// Legacy source: <c>BatchBlockSummary.aspx.vb</c>::<c>chkByPassSort_CheckedChanged</c>.
+    /// </summary>
+    Task SetByPassSortAsync(int batchId, bool byPassSort, int userId, CancellationToken ct = default);
+
     /// <summary>Returns comment rows for a batch. Maps to <c>GetAllBatchComments</c>.</summary>
     Task<IReadOnlyList<string>> GetCommentsAsync(int batchId, CancellationToken ct = default);
 

@@ -59,7 +59,13 @@ public class BatchBlockSummaryModel : HistoPageModel
         if (Session.BatchID is null or <= 0) return RedirectToPage("/Index");
         var batchId = Session.BatchID.Value;
         Batch = await _batches.GetByIdAsync(batchId);
-        Animals = await _submissions.GetAnimalsByBatchAsync(batchId);
+        var animals = await _submissions.GetBlockAnimalsByBatchAsync(batchId);
+
+        // Default sort: SenderRef ASC then HistologyRef ASC, matching legacy ByPassSort=false behaviour.
+        // When ByPassSort=true the user has explicitly requested block-insertion order — preserve SP order.
+        Animals = Batch?.ByPassSort == true
+            ? animals
+            : [.. animals.OrderBy(a => a.SenderRef).ThenBy(a => a.HistologyRef)];
 
         // Ensure BatchSubmissionID is populated in session so that AddSubmission / AddSample
         // have a valid parent record when adding a new animal.
@@ -115,6 +121,20 @@ public class BatchBlockSummaryModel : HistoPageModel
     public async Task<IActionResult> OnPostDeleteAsync(int animalId)
     {
         await _submissions.DeleteAnimalAsync(animalId, Session.UserID);
+        return RedirectToPage();
+    }
+
+    /// <summary>
+    /// Toggles the ByPassSort flag on the batch and reloads.
+    /// Legacy source: <c>BatchBlockSummary.aspx.vb</c>::<c>chkByPassSort_CheckedChanged</c>.
+    /// </summary>
+    public async Task<IActionResult> OnPostToggleByPassSortAsync()
+    {
+        if (Session.BatchID is null or <= 0) return RedirectToPage();
+        var batchId = Session.BatchID.Value;
+        var current = await _batches.GetByIdAsync(batchId);
+        if (current is not null)
+            await _batches.SetByPassSortAsync(batchId, !current.ByPassSort, Session.UserID);
         return RedirectToPage();
     }
 }

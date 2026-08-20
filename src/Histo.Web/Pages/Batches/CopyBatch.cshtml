@@ -27,17 +27,20 @@
 {
     <form method="post">
         <input type="hidden" asp-for="SourceBatchId" />
-        <div class="govuk-form-group">
-            <label class="govuk-label" for="NewCustomerRef">Customer reference for new submission</label>
-            <input class="govuk-input" asp-for="NewCustomerRef" />
-        </div>
+        <input type="hidden" asp-for="IsCassetted" />
+
+        <p class="govuk-body">The following table shows the samples in this submission.
+        To change a sender reference, edit the value in the <strong>New sender ref</strong> column before clicking Finish.
+        Expand a row to view its tissue details where available.</p>
 
         <h2 class="govuk-heading-m">Samples to copy</h2>
         <table class="govuk-table">
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
                     <th scope="col" class="govuk-table__header">Sender ref</th>
+                    <th scope="col" class="govuk-table__header">Tissue details</th>
                     <th scope="col" class="govuk-table__header">New sender ref</th>
+                    <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Change</span></th>
                 </tr>
             </thead>
             <tbody class="govuk-table__body">
@@ -46,21 +49,45 @@
                     <tr class="govuk-table__row">
                         <td class="govuk-table__cell">@Model.Animals[i].SenderRef</td>
                         <td class="govuk-table__cell">
+                            @if (Model.Animals[i].TissueDetails.Any())
+                            {
+                                <details class="govuk-details">
+                                    <summary class="govuk-details__summary">
+                                        <span class="govuk-details__summary-text">@Model.Animals[i].TissueDetails.Count tissue(s)</span>
+                                    </summary>
+                                    <div class="govuk-details__text">
+                                        <ul class="govuk-list govuk-list--bullet">
+                                            @foreach (var td in Model.Animals[i].TissueDetails)
+                                            {
+                                                <li>@td</li>
+                                            }
+                                        </ul>
+                                    </div>
+                                </details>
+                            }
+                        </td>
+                        <td class="govuk-table__cell">
                             <input type="hidden" asp-for="Animals[i].AnimalId" />
                             <input type="hidden" asp-for="Animals[i].SubmissionId" />
                             <input type="hidden" asp-for="Animals[i].SenderRef" />
-                            <input class="govuk-input" asp-for="Animals[i].NewSenderRef" />
+                            <input class="govuk-input" id="Animals_@(i)__NewSenderRef" asp-for="Animals[i].NewSenderRef" />
+                        </td>
+                        <td class="govuk-table__cell">
+                            <a href="#Animals_@(i)__NewSenderRef" class="govuk-link">Change</a>
                         </td>
                     </tr>
                 }
                 @if (!Model.Animals.Any())
                 {
-                    <tr class="govuk-table__row"><td colspan="2" class="govuk-table__cell">No samples found for this submission.</td></tr>
+                    <tr class="govuk-table__row"><td colspan="4" class="govuk-table__cell">No samples found for this submission.</td></tr>
                 }
             </tbody>
         </table>
 
-        <button type="submit" class="govuk-button" data-module="govuk-button">Copy submission</button>
-        <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        <div class="govuk-button-group">
+            <button type="submit" class="govuk-button" data-module="govuk-button">Finish</button>
+            <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Summary</a>
+            <a asp-page="/Submissions/ViewSubmissions" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        </div>
     </form>
 }

@@ -8,9 +8,9 @@ namespace Histo.Submissions.Models;
 /// </summary>
 public sealed class BatchSubmission
 {
-    public int ID { get; init; }
-    public int BatchID { get; init; }
-    public string SubmissionName { get; init; } = string.Empty;
-    public int Order { get; init; }
-    public byte[]? RowStamp { get; init; }
+    public int ID { get; set; }
+    public int BatchID { get; set; }
+    public string SubmissionName { get; set; } = string.Empty;
+    public int Order { get; set; }
+    public byte[]? RowStamp { get; set; }
 }

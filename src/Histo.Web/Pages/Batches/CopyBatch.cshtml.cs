@@ -1,3 +1,4 @@
+using Histo.Administration.Interfaces;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -7,41 +8,35 @@ namespace Histo.Web.Pages.Batches;
 
 /// <summary>
 /// Replaces <c>CopyBatch.aspx</c> / <c>CopyBatchBlocks.aspx</c> — duplicates an
-/// existing submission (batch header, batch submissions, animals and tissues)
-/// as the starting point for a new submission.
+/// existing submission as the starting point for a new submission.
 ///
-/// Legacy source: entry point was <c>ViewSubmissions.aspx</c> (select a row,
-/// click Copy). The migrated entry point is <see cref="BatchDetailsModel"/>,
-/// which already has the source batch loaded via <c>Session.BatchID</c>.
+/// Scenario 1 (<c>CopyBatchBlocks.aspx</c>): cassetted batch — shows SenderRef + New Sender Ref.
+/// Scenario 2 (<c>CopyBatch.aspx</c>): non-cassetted batch — shows SenderRef + expandable
+/// Tissue Details + New Sender Ref.
 ///
-/// SIMPLIFIED: the legacy pages forked behaviour on <c>IsPreCassetted</c> —
-/// pre-cassette batches copied BATCH_SUBMISSION/BATCH_ANIMAL/BATCH_TISSUES rows,
-/// already-cassetted batches copied BATCH_BLOCK/BATCH_BLOCK_ANIMAL rows instead.
-/// This page always copies at the submission level (batch submissions, animals,
-/// tissues) regardless of cassette status. Duplicating an already-cassetted
-/// batch's blocks is not reproduced here — the "Copy blocks" and "Copy samples"
-/// workflows (see <c>Pages/Blocks/CopyBlocks.cshtml</c> and
-/// <c>Pages/Blocks/CopySamples.cshtml</c>) already cover block-level duplication.
-/// The per-sample "change sender ref" sub-flow (legacy: <c>AddSubmission.aspx</c>
-/// round-trip) is simplified to an inline editable field per row.
+/// Legacy branching: <c>ViewSubmissions.aspx.vb</c> redirects to <c>CopyBatch.aspx</c> when
+/// <c>SV_Cassetted = False</c>, otherwise to <c>CopyBatchBlocks.aspx</c>.
 /// </summary>
 public class CopyBatchModel : HistoPageModel
 {
     private readonly IBatchService _batches;
     private readonly ISubmissionService _submissions;
+    private readonly ILookupService _lookups;
 
-    public CopyBatchModel(ISessionService session, IBatchService batches, ISubmissionService submissions)
+    public CopyBatchModel(ISessionService session, IBatchService batches, ISubmissionService submissions, ILookupService lookups)
         : base(session)
     {
         _batches = batches;
         _submissions = submissions;
+        _lookups = lookups;
     }
 
     [BindProperty] public int SourceBatchId { get; set; }
-    [BindProperty] public string NewCustomerRef { get; set; } = string.Empty;
     [BindProperty] public List<AnimalRow> Animals { get; set; } = [];
 
     public Batch? SourceBatch { get; private set; }
+    // Persisted as hidden field so the view branches correctly on POST re-render.
+    [BindProperty] public bool IsCassetted { get; set; }
     public string? Error { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(int sourceBatchId)
@@ -57,22 +52,61 @@ public class CopyBatchModel : HistoPageModel
             return Page();
         }
 
-        NewCustomerRef = SourceBatch.CustomerRef;
         var submissions = await _submissions.GetSubmissionsByBatchAsync(sourceBatchId);
-        var animals = await _submissions.GetAnimalsByBatchAsync(sourceBatchId);
+        var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(sourceBatchId);
+        IsCassetted = blockAnimals.Count > 0;
 
-        Animals = animals
-            .OrderBy(a => a.SenderRef)
-            .Select(a => new AnimalRow
+        // Load submission-level tissues for ALL scenarios — the column is always shown.
+        var tissueTypes = await _lookups.GetLookupDataAsync(9); // 9 = LOOKUP_TISSUE_CODE
+        var tissueNames = tissueTypes
+            .Where(t => t.Code != null)
+            .ToDictionary(t => t.Code!, t => t.Name, StringComparer.OrdinalIgnoreCase);
+        var allTissues  = await _submissions.GetBatchSubmissionTissuesAsync(sourceBatchId);
+        var tissuesBySubmId = allTissues
+            .GroupBy(t => t.OwnerID)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(t => $"{t.NoPieces} x {tissueNames.GetValueOrDefault(t.TissueCode, t.TissueCode)}").ToList());
+        // Fallback: if all OwnerID = 0 (column name mismatch), all tissues land under key 0.
+        var allTissueStrings = tissuesBySubmId.TryGetValue(0, out var zeroTd) ? zeroTd : [];
+        var firstSubmId   = submissions.Count > 0 ? submissions[0].ID : 0;
+        var submissionIds = submissions.Select(s => s.ID).ToHashSet();
+
+        List<string> ResolveTissues(int batchSubmissionId)
+        {
+            var submId = batchSubmissionId > 0 && submissionIds.Contains(batchSubmissionId)
+                ? batchSubmissionId : firstSubmId;
+            if (submId > 0 && tissuesBySubmId.TryGetValue(submId, out var td)) return td;
+            // All tissues keyed under 0 when BatchSubmissionID column wasn't mapped.
+            return allTissueStrings.Count > 0 ? allTissueStrings : [];
+        }
+
+        if (IsCassetted)
+        {
+            Animals = blockAnimals.OrderBy(a => a.SenderRef).Select(a => new AnimalRow
             {
-                AnimalId = a.ID,
-                SubmissionId = a.BatchSubmissionID,
-                SenderRef = a.SenderRef,
-                NewSenderRef = a.SenderRef,
-            })
-            .ToList();
+                AnimalId      = a.ID,
+                SubmissionId  = a.BatchSubmissionID > 0 ? a.BatchSubmissionID : firstSubmId,
+                SenderRef     = a.SenderRef,
+                NewSenderRef  = a.SenderRef,
+                TissueDetails = ResolveTissues(a.BatchSubmissionID),
+            }).ToList();
+        }
+        else
+        {
+            var animals = await _submissions.GetAnimalsByBatchAsync(sourceBatchId);
+            Animals = animals.OrderBy(a => a.SenderRef).Select(a => new AnimalRow
+            {
+                AnimalId      = a.ID,
+                SubmissionId  = a.BatchSubmissionID > 0 && submissionIds.Contains(a.BatchSubmissionID)
+                    ? a.BatchSubmissionID : firstSubmId,
+                SenderRef     = a.SenderRef,
+                NewSenderRef  = a.SenderRef,
+                TissueDetails = ResolveTissues(a.BatchSubmissionID),
+            }).ToList();
+        }
 
-        _ = submissions; // loaded to confirm the batch has submission data; rows are driven by animals
+        _ = submissions;
         return Page();
     }
 
@@ -88,21 +122,15 @@ public class CopyBatchModel : HistoPageModel
             return Page();
         }
 
-        if (string.IsNullOrWhiteSpace(NewCustomerRef))
-        {
-            Error = "Enter a customer reference for the new submission.";
-            return Page();
-        }
-
         var userId = Session.UserID;
         var batchToCopy = new Batch
         {
-            Status = SourceBatch.Status,
-            CustomerRef = NewCustomerRef,
-            Comments = SourceBatch.Comments,
-            SubmittedByUserID = SourceBatch.SubmittedByUserID,
-            UserAreaCode = SourceBatch.UserAreaCode,
-            IsPreCassetted = SourceBatch.IsPreCassetted,
+            Status             = SourceBatch.Status,
+            CustomerRef        = SourceBatch.CustomerRef,
+            Comments           = SourceBatch.Comments,
+            SubmittedByUserID  = SourceBatch.SubmittedByUserID,
+            UserAreaCode       = SourceBatch.UserAreaCode,
+            IsPreCassetted     = SourceBatch.IsPreCassetted,
         };
         var newBatchId = await _batches.CopyBatchHeaderAsync(batchToCopy, userId);
         if (newBatchId <= 0)
@@ -111,9 +139,12 @@ public class CopyBatchModel : HistoPageModel
             return Page();
         }
 
-        var submissions = await _submissions.GetSubmissionsByBatchAsync(SourceBatchId);
-        var animals = await _submissions.GetAnimalsByBatchAsync(SourceBatchId);
-        var newSenderRefsByAnimalId = Animals.ToDictionary(a => a.AnimalId, a => a.NewSenderRef);
+        var submissions   = await _submissions.GetSubmissionsByBatchAsync(SourceBatchId);
+        var blockAnimals  = await _submissions.GetBlockAnimalsByBatchAsync(SourceBatchId);
+        var animals       = blockAnimals.Count > 0 ? blockAnimals : await _submissions.GetAnimalsByBatchAsync(SourceBatchId);
+        var newSenderRefs = Animals.ToDictionary(a => a.AnimalId, a => a.NewSenderRef);
+        // When BatchSubmissionID is absent on the animal, assign to the first submission.
+        var firstSubmId   = submissions.Count > 0 ? submissions[0].ID : 0;
 
         foreach (var submission in submissions)
         {
@@ -124,9 +155,11 @@ public class CopyBatchModel : HistoPageModel
             foreach (var tissue in tissues)
                 await _submissions.CopyTissueAsync(tissue, newSubmissionId, userId);
 
-            foreach (var animal in animals.Where(a => a.BatchSubmissionID == submission.ID))
+            foreach (var animal in animals.Where(a =>
+                a.BatchSubmissionID == submission.ID ||
+                (a.BatchSubmissionID == 0 && submission.ID == firstSubmId)))
             {
-                var newSenderRef = newSenderRefsByAnimalId.GetValueOrDefault(animal.ID, animal.SenderRef);
+                var newSenderRef = newSenderRefs.GetValueOrDefault(animal.ID, animal.SenderRef);
                 await _submissions.CopyAnimalAsync(animal, newSubmissionId, newSenderRef, userId);
             }
         }
@@ -141,5 +174,7 @@ public class CopyBatchModel : HistoPageModel
         public int SubmissionId { get; set; }
         public string SenderRef { get; set; } = string.Empty;
         public string NewSenderRef { get; set; } = string.Empty;
+        /// <summary>Tissue detail strings for Scenario 2 (non-cassetted). Empty for Scenario 1.</summary>
+        public List<string> TissueDetails { get; set; } = [];
     }
 }
