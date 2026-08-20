@@ -918,5 +918,44 @@ Only use dynamic when the result set is genuinely variable.
 Ensure date fields and result mappings remain strongly typed and consistent with legacy behavior.
 ---
 
+## Prompt 50 — AuditLog validation + BatchBlockSummary SenderRef/HistologyRef fix (2026-08-20)
 
+> Please add validation messages for the following pages, using the implementation in `AuditLogByDate.cshtml` and `AuditLogByDate.cs` as a reference.
+>
+> 1. **AuditLogBySubmission.cshtml** and **AuditLogBySubmission.cs**
+> - `SubmissionID` is a mandatory field.
+> - Display an appropriate validation message when it is not provided.
+>
+> 2. **AuditLogByUser.cshtml** and **AuditLogByUser.cs**
+> - The following fields are mandatory: `StartDate`, `EndDate`, `UserID`
+> - Display validation messages when any required field is missing.
+> - Validate that `EndDate` is the same as or later than `StartDate`.
 
+Validation was missing from both AuditLog pages. Added `Errors` list, GDS `govuk-error-summary`, and inline `govuk-form-group--error` / `govuk-error-message` / `govuk-input--error` states to `AuditLogBySubmission` (SubmissionID mandatory) and `AuditLogByUser` (StartDate/EndDate/UserID mandatory, EndDate ≥ StartDate). Matches the reference pattern from `AuditLogByDate`.
+
+**Build:** Succeeded. 0 warnings, 0 errors.
+
+**Files changed:** `AuditLog/AuditLogBySubmission.cshtml.cs`, `AuditLog/AuditLogBySubmission.cshtml`, `AuditLog/AuditLogByUser.cshtml.cs`, `AuditLog/AuditLogByUser.cshtml`.
+
+---
+
+## Prompt 51 — BatchBlockSummary SenderRef/HistologyRef + ByPassSort + CopyBatch multi-fix (2026-08-20)
+
+> Investigate and fix the issue in **`BatchBlockSummary.cshtml`** and **`BatchBlockSummary.cs`** where data is not being loaded/displayed for `SenderRef` and `HistologyRef`.
+>
+> Also: the **Bypass Sort** checkbox exists in `BatchBlockSummary.aspx` but is missing from the new application.
+>
+> And: clicking **Copy Submission** navigates to `CopyBatch.cshtml` but the data is not loading. The page displays a "Customer Reference for New Submission" textbox (not in legacy). The button is labelled "Copy Submission" instead of "Finish". Legacy buttons: Change, Summary, Cancel, Finish. Please investigate whether these match the legacy functionality and UI behaviour.
+
+Multi-fix session (Run #85) with ~17 sub-prompts including follow-ups on tissue details, data loading, and Change button:
+
+1. **BatchBlockSummary SenderRef/HistologyRef** — root cause: `GetAnimalsByBatchAsync` (GetBatchAnimal SP) queries wrong table for cassetted batches. Added `GetBlockAnimalsByBatchAsync` reading `BATCH_BLOCK_ANIMAL` (result-set 5 of `GetBatchBlocksByID`); `Animal` model `init`→`set` for reliable Dapper string-property mapping.
+2. **ByPassSort** — added `ByPassSort` to `Batch` model; `SetByPassSortAsync` full stack (IBatchRepository/BatchRepository/IBatchService/BatchService); GDS checkbox + `OnPostToggleByPassSortAsync` on `BatchBlockSummary`; default sort applied (SenderRef ASC, HistologyRef ASC) when ByPassSort=false.
+3. **CopyBatch** — removed erroneous `NewCustomerRef` textbox; always uses `GetBlockAnimalsByBatchAsync` (matches legacy forced `SV_Cassetted=True` path); `IsCassetted` changed from `IsPreCassetted`-derived computed property to data-driven flag; Finish/Summary/Cancel/Change buttons added matching legacy button set.
+4. **CopyBatch Scenario 2** — non-cassetted path implemented: `GetAnimalsByBatchAsync` + `GetBatchSubmissionTissuesAsync` (reads `BATCH_TISSUES_TABLE` result-set 1 of `GetBatchSubmissionDetailsByBatchID`) + GDS `<details>/<summary>` expandable tissue details column.
+5. **Root-cause SP fix** — `GetBatchSubmissionDetailsByBatchID` has 3 result sets (0=submissions, 1=tissues, 2=animals). Corrected `GetSubmissionsByBatchAsync` skip from 6→0 and `GetBatchSubmissionTissuesAsync` skip from 7→1. `BatchSubmission` model `init`→`set`.
+6. **CopyBatch Change button** — per-row `Change` anchor focusing the `NewSenderRef` input, replacing the legacy navigate-away `AddSubmission.aspx` round-trip.
+
+**Build:** Succeeded. 0 warnings, 0 errors (all fixes).
+
+**Files changed:** `Submissions/BatchBlockSummary.cshtml.cs`, `Submissions/BatchBlockSummary.cshtml`, `Submissions/Models/Animal.cs`, `Submissions/Models/BatchSubmission.cs`, `Submissions/Interfaces/ISubmissionRepository.cs`, `Submissions/Repositories/SubmissionRepository.cs`, `Submissions/Interfaces/ISubmissionService.cs`, `Submissions/Services/SubmissionService.cs`, `Submissions/Models/Batch.cs`, `Submissions/Interfaces/IBatchRepository.cs`, `Submissions/Repositories/BatchRepository.cs`, `Submissions/Interfaces/IBatchService.cs`, `Submissions/Services/BatchService.cs`, `Batches/CopyBatch.cshtml.cs`, `Batches/CopyBatch.cshtml`.
