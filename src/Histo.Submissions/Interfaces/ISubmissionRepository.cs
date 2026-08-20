@@ -39,6 +39,15 @@ public interface ISubmissionRepository
     Task<IReadOnlyList<Animal>> GetAnimalsByBatchAsync(int batchId, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns the animal rows from the block-context animal table (<c>BATCH_BLOCK_ANIMAL</c>,
+    /// result-set index 5 of <c>GetBatchBlocksByID</c>, = index 11 in the assembled batch DataSet).
+    /// This is the exact data source used by legacy <c>BatchBlockSummary.aspx</c> via
+    /// <c>clsBatchSummary.CreateSenderHistoRefData</c> — use this on the BatchBlockSummary page
+    /// to ensure <c>SenderRef</c> and <c>HistologyRef</c> are populated from the block workflow tables.
+    /// </summary>
+    Task<IReadOnlyList<Animal>> GetBlockAnimalsByBatchAsync(int batchId, CancellationToken ct = default);
+
+    /// <summary>
     /// Adds a new animal record. Maps to <c>AddAnimal</c>.
     /// Returns new animal ID.
     /// </summary>
@@ -97,6 +106,14 @@ public interface ISubmissionRepository
     /// Maps to BATCH_TISSUES_TABLE (index 7) in <c>GetBatchSubmissionDetailsByBatchID</c>.
     /// </summary>
     Task<IReadOnlyList<Tissue>> GetTissuesBySubmissionAsync(int submissionId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns all submission-level tissues for a batch by reading BATCH_TISSUES_TABLE
+    /// (result-set 7 of <c>GetBatchSubmissionDetailsByBatchID</c>).
+    /// Each returned <see cref="Tissue"/> has <c>OwnerID = BatchSubmissionID</c>.
+    /// Use for CopyBatch tissue display instead of per-submission SP calls.
+    /// </summary>
+    Task<IReadOnlyList<Tissue>> GetBatchSubmissionTissuesAsync(int batchId, CancellationToken ct = default);
 
     /// <summary>Adds a tissue record. Maps to <c>AddTissue</c>. Returns new ID.</summary>
     Task<int> AddTissueAsync(Tissue tissue, int userId, CancellationToken ct = default);

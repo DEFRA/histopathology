@@ -74,3 +74,16 @@
 
 @* "Done" — replaces legacy BatchBlockSummary.aspx btnCancel Text="Done" → BatchDetails.aspx. *@
 <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
+
+@* "Bypass sort" — legacy chkByPassSort: when checked, animals display in block-insertion order
+   instead of the default SenderRef / HistologyRef ascending order. *@
+<form method="post" asp-page-handler="ToggleByPassSort" class="govuk-!-margin-top-4">
+    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" id="byPassSort" type="checkbox"
+                   name="byPassSort" @(Model.Batch?.ByPassSort == true ? "checked" : "")
+                   onchange="this.form.submit()" />
+            <label class="govuk-label govuk-checkboxes__label" for="byPassSort">Bypass sort</label>
+        </div>
+    </div>
+</form>

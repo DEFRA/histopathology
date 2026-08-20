@@ -70,6 +70,13 @@ public sealed class SubmissionService : ISubmissionService
         catch (Exception ex) { _logger.LogError("Failed to get animals for batch {BatchId}.", ex, batchId); return []; }
     }
 
+    /// <summary>Returns animals from the block-workflow animal table (BATCH_BLOCK_ANIMAL).</summary>
+    public async Task<IReadOnlyList<Animal>> GetBlockAnimalsByBatchAsync(int batchId, CancellationToken ct = default)
+    {
+        try { return await _repo.GetBlockAnimalsByBatchAsync(batchId, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to get block animals for batch {BatchId}.", ex, batchId); return []; }
+    }
+
     /// <summary>
     /// Adds a new animal record.
     ///
@@ -178,6 +185,12 @@ public sealed class SubmissionService : ISubmissionService
     {
         try { return await _repo.GetTissuesBySubmissionAsync(submissionId, ct); }
         catch (Exception ex) { _logger.LogError("Failed to get tissues for submission {SubmissionId}.", ex, submissionId); return []; }
+    }
+
+    public async Task<IReadOnlyList<Tissue>> GetBatchSubmissionTissuesAsync(int batchId, CancellationToken ct = default)
+    {
+        try { return await _repo.GetBatchSubmissionTissuesAsync(batchId, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to get submission tissues for batch {BatchId}.", ex, batchId); return []; }
     }
 
     /// <summary>Returns tissues for a block.</summary>

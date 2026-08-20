@@ -26,6 +26,7 @@ public class AuditLogByUserModel : HistoPageModel
 
     public IReadOnlyList<User> Users { get; private set; } = [];
     public IReadOnlyList<AuditLogEntry> Results { get; private set; } = [];
+    public List<string> Errors { get; } = [];
 
     public async Task OnGetAsync()
     {
@@ -39,6 +40,14 @@ public class AuditLogByUserModel : HistoPageModel
         ViewData["Title"] = "Audit log by user";
         ViewData["PageTitle"] = "Audit log — by user";
         Users = await _users.GetAllUsersAsync();
+
+        if (UserID <= 0)          Errors.Add("Select a user.");
+        if (!StartDate.HasValue)  Errors.Add("Enter a start date.");
+        if (!EndDate.HasValue)    Errors.Add("Enter an end date.");
+        if (StartDate.HasValue && EndDate.HasValue && StartDate.Value.Date > EndDate.Value.Date)
+            Errors.Add("The end date must be the same as or after the start date.");
+        if (Errors.Count > 0) return Page();
+
         Results = await _auditLog.GetByUserAsync(UserID, StartDate, EndDate);
         return Page();
     }

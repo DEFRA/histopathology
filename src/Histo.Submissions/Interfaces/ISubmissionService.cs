@@ -15,6 +15,8 @@ public interface ISubmissionService
 
     // Animals
     Task<IReadOnlyList<Animal>> GetAnimalsByBatchAsync(int batchId, CancellationToken ct = default);
+    /// <summary>Returns animals from the block-workflow animal table (BATCH_BLOCK_ANIMAL = result-set 5 of GetBatchBlocksByID). Use on BatchBlockSummary.</summary>
+    Task<IReadOnlyList<Animal>> GetBlockAnimalsByBatchAsync(int batchId, CancellationToken ct = default);
     Task<int> AddAnimalAsync(int batchSubmissionId, string senderRef, bool isNeuropath, int userId, string? pmDate = null, bool pmDateSet = false, CancellationToken ct = default);
     Task<int> CopyAnimalAsync(Animal source, int newBatchSubmissionId, string newSenderRef, int userId, CancellationToken ct = default);
     Task<bool> UpdateAnimalAsync(Animal animal, int userId, CancellationToken ct = default);
@@ -34,6 +36,8 @@ public interface ISubmissionService
 
     // Tissues
     Task<IReadOnlyList<Tissue>> GetTissuesBySubmissionAsync(int submissionId, CancellationToken ct = default);
+    /// <summary>Returns all submission-level tissues for a batch. Each tissue's OwnerID = BatchSubmissionID.</summary>
+    Task<IReadOnlyList<Tissue>> GetBatchSubmissionTissuesAsync(int batchId, CancellationToken ct = default);
     Task<IReadOnlyList<Tissue>> GetTissuesByBlockAsync(int blockId, CancellationToken ct = default);
     Task<int> AddTissueAsync(Tissue tissue, int userId, CancellationToken ct = default);
     Task<int> CopyTissueAsync(Tissue source, int newOwnerId, int userId, CancellationToken ct = default);

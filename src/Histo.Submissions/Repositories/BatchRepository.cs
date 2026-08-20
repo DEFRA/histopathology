@@ -162,6 +162,30 @@ public sealed class BatchRepository : IBatchRepository
     }
 
     /// <inheritdoc/>
+    public async Task SetByPassSortAsync(int batchId, bool byPassSort, int userId, CancellationToken ct = default)
+    {
+        var existing = await GetByIdAsync(batchId, ct);
+        if (existing is null) return;
+        using var conn = _db.CreateConnection();
+        await conn.ExecuteAsync(
+            "EditBatch",
+            new
+            {
+                existing.ID,
+                existing.Status,
+                existing.CustomerRef,
+                existing.Comments,
+                existing.StatusComments,
+                existing.ReceivedDate,
+                existing.CompletedDate,
+                ByPassSort = byPassSort,
+                RowStamp = existing.RowStamp,
+                UserID = userId,
+            },
+            commandType: System.Data.CommandType.StoredProcedure);
+    }
+
+    /// <inheritdoc/>
     public async Task UpdateStatusAsync(int batchId, string newStatus, byte[] rowStamp, int userId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
