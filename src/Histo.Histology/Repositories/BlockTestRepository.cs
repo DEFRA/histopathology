@@ -8,6 +8,17 @@ namespace Histo.Histology.Repositories;
 /// <summary>
 /// Dapper implementation of <see cref="IBlockTestRepository"/>.
 ///
+/// <see cref="GetByBatchAsync"/> uses the legacy <c>GetBatchBlocksByID</c> SP which
+/// returns 10 result sets in one roundtrip (same SP the legacy app used to populate
+/// the block-level DataSet in session). Result sets read:
+///   0 = GetBatchBlockDetails  → BlockID, BlockRef, AnimalID, Status
+///   1 = GetBatchBlockTissues  → (skipped)
+///   2 = GetBatchBlockHistology → full histology test rows
+///   3 = GetBatchBlockAntibodies → full antibodies test rows
+///   4 = GetBatchBlockStain → full stain test rows
+///   5 = GetBatchBlockAnimal → AnimalID, HistologyRef
+///   6–9 = refs/TC codes → (skipped)
+///
 /// Update is dispatched to the insert/update/delete stored-procedure family that
 /// matches <see cref="BlockTest.TestType"/>, mirroring the legacy
 /// <c>clsCheckBoxData.UpdateBlockTablesDetails</c> table-ID switch.
@@ -22,11 +33,76 @@ public sealed class BlockTestRepository : IBlockTestRepository
     public async Task<IReadOnlyList<BlockTest>> GetByBatchAsync(int batchId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<BlockTest>(
-            "GetTestsByBatchID",
-            new { BatchID = batchId },
+        using var multi = await conn.QueryMultipleAsync(
+            "GetBatchBlocksByID",
+            new { ID = batchId },
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+
+        // Result set 0: block details — BlockID→BlockRef, AnimalID, Status
+        var blockDetails = (await multi.ReadAsync<dynamic>()).ToList();
+        // Result set 1: tissues — skip
+        await multi.ReadAsync<dynamic>();
+        // Result set 2: histology test rows
+        var histology = (await multi.ReadAsync<dynamic>()).ToList();
+        // Result set 3: antibody test rows
+        var antibodies = (await multi.ReadAsync<dynamic>()).ToList();
+        // Result set 4: stain test rows
+        var stains = (await multi.ReadAsync<dynamic>()).ToList();
+        // Result set 5: animals — AnimalID→HistologyRef
+        var animals = (await multi.ReadAsync<dynamic>()).ToList();
+
+        // Build lookup dictionaries from block details and animal data
+        var blockRefMap       = blockDetails.ToDictionary(b => (int)b.ID,   b => (string?)b.BlockRef);
+        var blockAnimalMap    = blockDetails.ToDictionary(b => (int)b.ID,   b => (int?)b.AnimalID);
+        var blockStatusMap    = blockDetails.ToDictionary(b => (int)b.ID,   b => (int?)b.Status);
+        var animalHistoRefMap = animals.ToDictionary(a => (int)a.ID, a => (string?)a.HistologyRef);
+
+        var results = new List<BlockTest>();
+
+        BlockTest Map(dynamic row, string testType)
+        {
+            int blockId       = (int)row.BlockID;
+            int? animalId     = blockAnimalMap.GetValueOrDefault(blockId);
+            int? blockStatus  = blockStatusMap.GetValueOrDefault(blockId);
+            string? histoRef  = animalId.HasValue ? animalHistoRefMap.GetValueOrDefault(animalId.Value) : null;
+            bool onHold       = blockStatus == 2;
+            bool archived     = row.ArchiveLocation is not null && row.ArchivedDate is not null;
+
+            return new BlockTest
+            {
+                ID              = (int)row.ID,
+                BlockID         = blockId,
+                BlockRef        = blockRefMap.GetValueOrDefault(blockId) ?? string.Empty,
+                HistologyRef    = histoRef,
+                TestType        = testType,
+                Code            = (string?)row.Code ?? string.Empty,
+                TestDetails     = null,  // not available from legacy block SPs; page falls back to Code
+                Result          = (string?)row.Result,
+                QCCode          = (string?)row.QCCode,
+                QCNote          = row.QCNote is bool b ? b : row.QCNote is not null && (int)row.QCNote != 0,
+                QCNoteRef       = (int?)row.QCNoteRef,
+                StainRef        = (string?)row.StainRef,
+                Dispatched      = row.Dispatched is bool d ? d : row.Dispatched is not null && (int)row.Dispatched != 0,
+                DispatchedDate  = (DateTime?)row.DispatchedDate,
+                DispatchedBy    = (string?)row.DispatchedBy,
+                DispatchedTo    = (string?)row.DispatchedTo,
+                Comment         = (string?)row.Comment,
+                RemedialAction  = (string?)row.RemedialAction,
+                ArchiveLocation = (string?)row.ArchiveLocation,
+                ArchivedDate    = (DateTime?)row.ArchivedDate,
+                ArchiveComment  = (string?)row.ArchiveComment,
+                NumberOfSlides  = (int?)row.NumberOfSlides,
+                OnHold          = onHold,
+                Archived        = archived,
+                RowStamp        = (byte[]?)row.RowStamp,
+            };
+        }
+
+        foreach (var row in histology)  results.Add(Map(row, BlockTestType.Histology));
+        foreach (var row in antibodies) results.Add(Map(row, BlockTestType.Antibodies));
+        foreach (var row in stains)     results.Add(Map(row, BlockTestType.Stain));
+
+        return results;
     }
 
     /// <inheritdoc/>

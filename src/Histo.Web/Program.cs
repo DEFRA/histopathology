@@ -1,4 +1,4 @@
-using Dapper;
+﻿using Dapper;
 // Modular monolith — each module registers its own internals via extension method
 using Histo.Administration;
 using Histo.AuditLog;
@@ -8,6 +8,24 @@ using Histo.QualityControl;
 using Histo.Submissions;
 using Histo.Web.Services;
 using Serilog;
+
+using Histo.Administration.Interfaces;
+using Histo.Administration.Repositories;
+using Histo.Administration.Services;
+using Histo.AuditLog.Interfaces;
+using Histo.AuditLog.Repositories;
+using Histo.AuditLog.Services;
+using Histo.Histology.Interfaces;
+using Histo.Histology.Repositories;
+using Histo.Histology.Services;
+using Histo.QualityControl.Interfaces;
+using Histo.QualityControl.Repositories;
+using Histo.QualityControl.Services;
+using Histo.Submissions.Interfaces;
+using Histo.Submissions.Repositories;
+using Histo.Submissions.Services;
+using Histo.Reporting.Reports;
+using Histo.Reporting.Services;
 
 // Bootstrap Serilog before the host is built so startup errors are captured.
 Log.Logger = new LoggerConfiguration()
@@ -27,18 +45,18 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
-    // ── Serilog ─────────────────────────────────────────────────────────────
+    // -- Serilog -------------------------------------------------------------
     builder.Host.UseSerilog((ctx, services, cfg) =>
         cfg.ReadFrom.Configuration(ctx.Configuration)
            .ReadFrom.Services(services)
            .Enrich.FromLogContext()
            .WriteTo.Console());
 
-    // ── Strongly-typed options ───────────────────────────────────────────────
+    // -- Strongly-typed options -----------------------------------------------
     builder.Services.Configure<AppOptions>(
         builder.Configuration.GetSection(AppOptions.SectionName));
 
-    // ── DB connection factory ────────────────────────────────────────────────
+    // -- DB connection factory ------------------------------------------------
     // Connection string comes from ConnectionStrings:HistologyDb in appsettings.json
     // (Key Vault reference in non-dev environments — never a plaintext password here).
     var connectionString = builder.Configuration.GetConnectionString("HistologyDb")
@@ -49,7 +67,7 @@ try
     builder.Services.AddSingleton<IDbConnectionFactory>(
         new SqlConnectionFactory(connectionString));
 
-    // ── Logger adapter (wraps Microsoft.Extensions.Logging for domain services) ──
+    // -- Logger adapter (wraps Microsoft.Extensions.Logging for domain services) --
     // IAppLogger is a non-generic interface; register via ILoggerFactory so every
     // service injection site gets a logger whose category is the declaring service type.
     // Using a factory delegate ensures the ILoggerFactory is resolved from the
@@ -60,15 +78,15 @@ try
         return new AppLogger<IAppLogger>(factory.CreateLogger<IAppLogger>());
     });
 
-    // ── Health checks ────────────────────────────────────────────────────────
+    // -- Health checks --------------------------------------------------------
     builder.Services.AddHealthChecks();
     // TODO Phase 1+: add SQL health check:
     //   .AddSqlServer(connectionString, name: "histology-db", tags: ["db"]);
 
-    // ── Razor Pages ──────────────────────────────────────────────────────────
+    // -- Razor Pages ----------------------------------------------------------
     builder.Services.AddRazorPages();
 
-    // ── Session ──────────────────────────────────────────────────────────────
+    // -- Session --------------------------------------------------------------
     builder.Services.AddDistributedMemoryCache();
     builder.Services.AddSession(o =>
     {
@@ -79,22 +97,30 @@ try
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddScoped<ISessionService, SessionService>();
 
-    // ── Administration module ─────────────────────────────────────────────────
+    // -- Administration module -------------------------------------------------
     builder.Services.AddAdministrationModule();
 
-    // ── AuditLog module ───────────────────────────────────────────────────────
+    // -- AuditLog module -------------------------------------------------------
     builder.Services.AddAuditLogModule();
 
-    // ── Histology module ──────────────────────────────────────────────────────
+    // -- Histology module ------------------------------------------------------
     builder.Services.AddHistologyModule();
 
-    // ── QualityControl module ─────────────────────────────────────────────────
+    // -- QualityControl module -------------------------------------------------
     builder.Services.AddQualityControlModule();
 
-    // ── Submissions module ────────────────────────────────────────────────────
+    // -- Submissions module ----------------------------------------------------
     builder.Services.AddSubmissionsModule();
 
-    // ── Application Insights telemetry ──────────────────────────────────────
+    // -- Reporting module ------------------------------------------------------
+    builder.Services.AddTransient<HistologyReportDataSetBuilder>();
+    builder.Services.AddTransient<HistologyReportRenderer>();
+    builder.Services.AddTransient<QCNoteDataSetBuilder>();
+    builder.Services.AddTransient<QCNoteRenderer>();
+    builder.Services.AddTransient<SubmissionNotesDataSetBuilder>();
+    builder.Services.AddTransient<SubmissionNotesRenderer>();
+
+    // -- Application Insights telemetry --------------------------------------
     var aiConnString = builder.Configuration["AppSettings:ApplicationInsightsConnectionString"];
     if (!string.IsNullOrWhiteSpace(aiConnString))
         builder.Services.AddApplicationInsightsTelemetry(o =>
@@ -102,7 +128,7 @@ try
 
     var app = builder.Build();
 
-    // ── Middleware pipeline ──────────────────────────────────────────────────
+    // -- Middleware pipeline --------------------------------------------------
     if (!app.Environment.IsDevelopment())
         app.UseExceptionHandler("/Error");
 

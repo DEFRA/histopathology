@@ -21,6 +21,7 @@
     <ProjectReference Include="..\Histo.QualityControl\Histo.QualityControl.csproj" />
     <ProjectReference Include="..\Histo.Histology\Histo.Histology.csproj" />
     <ProjectReference Include="..\Histo.Submissions\Histo.Submissions.csproj" />
+    <ProjectReference Include="..\Histo.Reporting\Histo.Reporting.csproj" />
   </ItemGroup>
 
 </Project>

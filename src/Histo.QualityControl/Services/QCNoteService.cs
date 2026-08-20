@@ -22,20 +22,6 @@ public sealed class QCNoteService : IQCNoteService
         _logger = logger;
     }
 
-    /// <summary>Returns all QC notes for a submission.</summary>
-    public async Task<IReadOnlyList<QCNote>> GetBySubmissionAsync(int submissionId, CancellationToken ct = default)
-    {
-        try
-        {
-            return await _repo.GetBySubmissionAsync(submissionId, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Failed to retrieve QC notes for submission {SubmissionId}.", ex, submissionId);
-            return [];
-        }
-    }
-
     /// <summary>Returns a single QC note, or <see langword="null"/> if not found.</summary>
     public async Task<QCNote?> GetByIdAsync(int qcNoteId, CancellationToken ct = default)
     {

@@ -1,4 +1,4 @@
-@page
+﻿@page
 @model Histo.Web.Pages.Batches.BatchDetailsModel
 @using Histo.Core.Domain
 @{
@@ -7,7 +7,7 @@
 }
 
 @section BeforeHeading {
-    @* GAP-3: context-aware back link — ReturnPage is set by the list page before navigating here. *@
+    @* GAP-3: context-aware back link â€” ReturnPage is set by the list page before navigating here. *@
     <a href="@Url.Page(Model.BackLinkPage)" class="govuk-back-link">Back</a>
 }
 
@@ -97,7 +97,7 @@ else
             <dd class="govuk-summary-list__value">@BatchStatus.DisplayName(Model.Batch.Status)</dd>
         </div>
         @* GAP-1: CustomerReceivedDate (date returned) was missing from the summary.
-           Label matches legacy lblCustomerReceivedDate ("Customer Received Date") exactly —
+           Label matches legacy lblCustomerReceivedDate ("Customer Received Date") exactly â€”
            not a distinct field from the legacy "Date Returned" workflow, just the same
            tblBatch.CustomerReceivedDate column. *@
         <div class="govuk-summary-list__row">
@@ -121,7 +121,6 @@ else
             <dd class="govuk-summary-list__value">@(Model.Batch.IsPreCassetted ? "Yes" : "No")</dd>
         </div>
     </dl>
-
     @* ── Selected test types — batch-level histology / antibody / special stain selections ──
        GAP-5: Legacy BatchDetails.aspx had a "Select Histology and required tests" section with
        three CheckBoxList controls (chkblHistology, chkblAntibodies, chkblSpecialStain).
@@ -183,23 +182,10 @@ else
     </dl>
 
     @* GAP-4: Action buttons — matches legacy BatchDetails.aspx view mode (SV_ViewSubmission=True).
-       In legacy view mode only Samples, Cancel and Finish were present.
-       Editing actions (Edit submission status, Copy batch, Edit test types) are
-       accessed from the list-page action panels (ViewSubmissions / SearchSubmissions),
-       not from this read-only view page.
-
-       Remaining status-gated buttons on this page:
-       ────────────────────────────────────────────────────────
-       Received / InProgress → Assign blocks
-       Completed             → Date returned
-       All statuses          → Samples | Cancel | Finish
-       ────────────────────────────────────────────────────────
-    *@
+       Editing actions (Edit submission status, Copy batch, Edit test types) are accessed from
+       list-page action panels, not from this read-only view page. *@
     <div class="govuk-button-group">
 
-        @* Samples — always available (replaces legacy btnBatchSummary, Text="Samples").
-           Navigates to BatchBlockSummary.cshtml (renamed from ViewSamples.cshtml \u2014 that name is
-           reserved for the standalone tissue/block search page that replaces legacy ViewSamples.aspx). *@
         <a asp-page="/Submissions/BatchBlockSummary" class="govuk-button" data-module="govuk-button">Samples</a>
 
         @* Assign blocks — Received or InProgress only. *@
@@ -208,17 +194,17 @@ else
             <a asp-page="/Blocks/BlockDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Assign blocks</a>
         }
 
-        @* Date returned — Completed status only.
-           GAP-2: legacy btnReceiveSubmission navigated to BatchDetails in SV_ReceiveBatch mode (new app: dedicated DateReturned page). *@
+        @* Date returned — Completed status only. *@
         @if (Model.CanDateReturned)
         {
             <a asp-page="/Batches/DateReturned" class="govuk-button govuk-button--secondary" data-module="govuk-button">Date returned</a>
         }
 
-        @* Cancel — matches legacy btnCancel (Response.Redirect(SV_RedirectCancelPage) → BackLinkPage). *@
-        <a href="@Url.Page(Model.BackLinkPage)" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        <a asp-page="/QC/QCNotes" class="govuk-button govuk-button--secondary" data-module="govuk-button">QC notes</a>
+        <a asp-page="/Reports/HistologyReport" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission form</a>
+        <a asp-page="/Reports/SubmissionNotes" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission notes</a>
 
-        @* Finish — matches legacy btnSave Text="Finish" in view mode; navigates home. *@
+        <a href="@Url.Page(Model.BackLinkPage)" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
         <a asp-page="/Index" class="govuk-button govuk-button--secondary" data-module="govuk-button">Finish</a>
 
     </div>

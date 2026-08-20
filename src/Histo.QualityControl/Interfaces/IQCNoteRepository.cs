@@ -11,12 +11,6 @@ namespace Histo.QualityControl.Interfaces;
 public interface IQCNoteRepository
 {
     /// <summary>
-    /// Returns the QC notes for a given batch submission.
-    /// Maps to <c>GetQCNotes</c> stored procedure.
-    /// </summary>
-    Task<IReadOnlyList<QCNote>> GetBySubmissionAsync(int submissionId, CancellationToken ct = default);
-
-    /// <summary>
     /// Returns a single QC note by ID.
     /// Maps to <c>GetQCNote</c> stored procedure.
     /// </summary>

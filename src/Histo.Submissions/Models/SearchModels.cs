@@ -72,9 +72,14 @@ public sealed class BatchListResult
     public string? ContactDescription { get; init; }
     public string? Species { get; init; }
     public DateTime? BatchDate { get; init; }
+    /// <summary>Submission date as a formatted string — returned by GetBatchesWithStatus for non-zero status branches.</summary>
+    public string? SubmissionDate { get; init; }
     public DateTime? ReceivedDate { get; init; }
+    /// <summary>Received date as a formatted string — returned by GetBatchesWithStatus.</summary>
+    public string? DateReceived { get; init; }
     public DateTime? CompletedDate { get; init; }
-    public string? CustomerRef { get; init; }
+    /// <summary>Customer/submitter reference — maps to OtherSubmittedBy column in legacy SPs.</summary>
+    public string? OtherSubmittedBy { get; init; }
     public string Status { get; init; } = string.Empty;
     /// <summary>Used by Batches Received only — checkbox column from the SP result set.</summary>
     public bool AllTissuesAssigned { get; init; }

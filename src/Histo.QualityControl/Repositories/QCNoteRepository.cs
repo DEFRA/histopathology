@@ -8,9 +8,10 @@ namespace Histo.QualityControl.Repositories;
 /// <summary>
 /// Dapper implementation of <see cref="IQCNoteRepository"/>.
 ///
-/// The <see cref="UpdateAsync"/> method checks the SP RETURN_VALUE to detect
-/// concurrent modification — mirroring the legacy <c>clsQCNote.UpdateQCNote</c>
-/// pattern where SP return value 1 signals a stale rowstamp.
+/// Uses legacy SPs exclusively:
+/// - <c>GetBatchQCNotes</c> (no param = all notes, @QCNoteRef = filtered) for list and edit header
+/// - <c>GetQCNoteHistStainTestInformation</c> for note text and rowstamp on edit
+/// - <c>EditQCNote</c> / <c>AddQCNote</c> for mutations
 /// </summary>
 public sealed class QCNoteRepository : IQCNoteRepository
 {
@@ -19,24 +20,34 @@ public sealed class QCNoteRepository : IQCNoteRepository
     public QCNoteRepository(IDbConnectionFactory db) => _db = db;
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<QCNote>> GetBySubmissionAsync(int submissionId, CancellationToken ct = default)
-    {
-        using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<QCNote>(
-            "GetQCNotes",
-            new { ID = submissionId },
-            commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
-    }
-
-    /// <inheritdoc/>
     public async Task<QCNote?> GetByIdAsync(int qcNoteId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        return await conn.QuerySingleOrDefaultAsync<QCNote>(
-            "GetQCNote",
-            new { ID = qcNoteId },
-            commandType: System.Data.CommandType.StoredProcedure);
+
+        // First call: get batch/submission header columns for the note
+        var header = (await conn.QueryAsync<QCNote>(
+            "GetBatchQCNotes",
+            new { QCNoteRef = qcNoteId },
+            commandType: System.Data.CommandType.StoredProcedure)).FirstOrDefault();
+
+        if (header is null) return null;
+
+        // Second call: get note text and rowstamp from the test information SP
+        var detail = (await conn.QueryAsync<dynamic>(
+            "GetQCNoteHistStainTestInformation",
+            new { QCNoteRef = qcNoteId },
+            commandType: System.Data.CommandType.StoredProcedure)).FirstOrDefault();
+
+        return new QCNote
+        {
+            ID                 = header.ID,
+            QCNoteRef          = header.QCNoteRef,
+            StainRef           = header.StainRef,
+            ProjectDescription = header.ProjectDescription,
+            Species            = header.Species,
+            Text               = (string?)detail?.QCText ?? string.Empty,
+            RowStamp           = (byte[]?)detail?.RowStamp,
+        };
     }
 
     /// <inheritdoc/>
@@ -67,16 +78,16 @@ public sealed class QCNoteRepository : IQCNoteRepository
         using var conn = _db.CreateConnection();
 
         var parameters = new DynamicParameters();
-        parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
-        parameters.Add("BatchSubmissionID", submissionId);
-        parameters.Add("CreatedBy",         createdByUserId);
+        parameters.Add("CreatedBy",   createdByUserId);
+        parameters.Add("DateCreated", DateTime.Now);
+        parameters.Add("NewID",       dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync(
             "AddQCNote",
             parameters,
             commandType: System.Data.CommandType.StoredProcedure);
 
-        return parameters.Get<int>("RETURN_VALUE");
+        return parameters.Get<int>("NewID");
     }
 
     /// <inheritdoc/>
@@ -85,6 +96,7 @@ public sealed class QCNoteRepository : IQCNoteRepository
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<QCNote>(
             "GetBatchQCNotes",
+            new { QCNoteRef = (int?)null },
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
