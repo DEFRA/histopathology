@@ -36,6 +36,7 @@ Log.Logger = new LoggerConfiguration()
 // return date columns as CONVERT(VARCHAR, col, 103) strings (dd/MM/yyyy format).
 // Must be called before any Dapper query executes.
 SqlMapper.AddTypeHandler(new NullableDateTimeTypeHandler());
+SqlMapper.AddTypeHandler(new DateTimeTypeHandler());
 // Map the audit log SP column "DateTime" → AuditLogEntry.ChangedAt
 AuditLogDapperSetup.RegisterTypeMaps();
 
@@ -90,7 +91,7 @@ try
     builder.Services.AddDistributedMemoryCache();
     builder.Services.AddSession(o =>
     {
-        o.IdleTimeout     = TimeSpan.FromMinutes(30);
+        o.IdleTimeout = TimeSpan.FromMinutes(30);
         o.Cookie.HttpOnly = true;
         o.Cookie.IsEssential = true;
     });

@@ -17,7 +17,7 @@
         </tr>
     </thead>
     <tbody class="govuk-table__body">
-        @foreach (var l in Model.Lookups)
+        @foreach (var l in Model.Lookups.Where(l => l.TableName != "User Area"))
         {
             <tr class="govuk-table__row">
                 <td class="govuk-table__cell">@l.TableName</td>

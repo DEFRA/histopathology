@@ -24,6 +24,31 @@ namespace Histo.Infrastructure;
 /// are returned directly without string conversion.
 /// </para>
 /// </summary>
+/// <summary>
+/// Handles non-nullable <see cref="DateTime"/> columns returned as <c>VARCHAR</c> strings
+/// (same dd/MM/yyyy format as <see cref="NullableDateTimeTypeHandler"/>).
+/// Required for <see cref="Histo.AuditLog.Models.AuditLogEntry.ChangedAt"/> which is
+/// <c>DateTime</c> (not <c>DateTime?</c>) and mapped from a SQL <c>DateTime</c> column alias.
+/// </summary>
+public sealed class DateTimeTypeHandler : SqlMapper.TypeHandler<DateTime>
+{
+    private static readonly string[] Formats = ["dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss"];
+
+    /// <inheritdoc/>
+    public override void SetValue(IDbDataParameter parameter, DateTime value)
+        => parameter.Value = value;
+
+    /// <inheritdoc/>
+    public override DateTime Parse(object value)
+    {
+        if (value is null or DBNull) return DateTime.MinValue;
+        if (value is DateTime dt) return dt;
+        var s = value.ToString();
+        if (string.IsNullOrWhiteSpace(s)) return DateTime.MinValue;
+        return DateTime.ParseExact(s, Formats, CultureInfo.InvariantCulture, DateTimeStyles.None);
+    }
+}
+
 public sealed class NullableDateTimeTypeHandler : SqlMapper.TypeHandler<DateTime?>
 {
     private static readonly string[] Formats = ["dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss"];

@@ -105,14 +105,14 @@ public sealed class BatchRepository : IBatchRepository
         using var conn = _db.CreateConnection();
         var parameters = new DynamicParameters();
         parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
-        parameters.Add("Status",              batch.Status);
-        parameters.Add("CustomerRef",         batch.CustomerRef);
-        parameters.Add("Comments",            batch.Comments);
-        parameters.Add("SubmittedByUserID",   batch.SubmittedByUserID);
-        parameters.Add("UserAreaCode",        batch.UserAreaCode);
-        parameters.Add("IsPreCassetted",      batch.IsPreCassetted);
-        parameters.Add("BatchType",           batch.BatchType);
-        parameters.Add("UserID",              userId);
+        parameters.Add("Status", batch.Status);
+        parameters.Add("CustomerRef", batch.CustomerRef);
+        parameters.Add("Comments", batch.Comments);
+        parameters.Add("SubmittedByUserID", batch.SubmittedByUserID);
+        parameters.Add("UserAreaCode", batch.UserAreaCode);
+        parameters.Add("IsPreCassetted", batch.IsPreCassetted);
+        parameters.Add("BatchType", batch.BatchType);
+        parameters.Add("UserID", userId);
 
         await conn.ExecuteAsync("AddBatch", parameters,
             commandType: System.Data.CommandType.StoredProcedure);
@@ -196,10 +196,10 @@ public sealed class BatchRepository : IBatchRepository
         using var conn = _db.CreateConnection();
         var parameters = new DynamicParameters();
         parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
-        parameters.Add("ID",       batchId);
-        parameters.Add("Status",   newStatus);
+        parameters.Add("ID", batchId);
+        parameters.Add("Status", newStatus);
         parameters.Add("RowStamp", rowStamp, dbType: System.Data.DbType.Binary);
-        parameters.Add("UserID",   userId);
+        parameters.Add("UserID", userId);
 
         await conn.ExecuteAsync("EditBatchStatus", parameters,
             commandType: System.Data.CommandType.StoredProcedure);
@@ -232,22 +232,22 @@ public sealed class BatchRepository : IBatchRepository
             "GetSearchBatchDetails",
             new
             {
-                SubmittedBy       = (object?)criteria.SubmittedBy ?? DBNull.Value,
-                ProjectContract   = (object?)criteria.ProjectContractCode ?? DBNull.Value,
-                ContactName       = (object?)criteria.ContactName ?? DBNull.Value,
-                Species           = (object?)criteria.Species ?? DBNull.Value,
-                SubmittedArea     = (object?)criteria.SubmittedArea ?? DBNull.Value,
+                SubmittedBy = (object?)criteria.SubmittedBy ?? DBNull.Value,
+                ProjectContract = (object?)criteria.ProjectContractCode ?? DBNull.Value,
+                ContactName = (object?)criteria.ContactName ?? DBNull.Value,
+                Species = (object?)criteria.Species ?? DBNull.Value,
+                SubmittedArea = (object?)criteria.SubmittedArea ?? DBNull.Value,
                 SubmittedDateFrom = (object?)criteria.SubmittedDateFrom ?? DBNull.Value,
-                SubmittedDateTo   = (object?)criteria.SubmittedDateTo ?? DBNull.Value,
-                ReceivedDateFrom  = (object?)criteria.ReceivedDateFrom ?? DBNull.Value,
-                ReceivedDateTo    = (object?)criteria.ReceivedDateTo ?? DBNull.Value,
-                Fixation          = (object?)criteria.Fixation ?? DBNull.Value,
-                HistologyRef      = (object?)criteria.HistologyRef ?? DBNull.Value,
-                SenderRef         = (object?)criteria.SenderRef ?? DBNull.Value,
-                Number            = (object?)criteria.SubmissionNumber ?? DBNull.Value,
-                Status            = (object?)criteria.Status ?? DBNull.Value,
-                EnteredBy         = (object?)criteria.EnteredBy ?? DBNull.Value,
-                All               = 0,
+                SubmittedDateTo = (object?)criteria.SubmittedDateTo ?? DBNull.Value,
+                ReceivedDateFrom = (object?)criteria.ReceivedDateFrom ?? DBNull.Value,
+                ReceivedDateTo = (object?)criteria.ReceivedDateTo ?? DBNull.Value,
+                Fixation = (object?)criteria.Fixation ?? DBNull.Value,
+                HistologyRef = (object?)criteria.HistologyRef ?? DBNull.Value,
+                SenderRef = (object?)criteria.SenderRef ?? DBNull.Value,
+                Number = (object?)criteria.SubmissionNumber ?? DBNull.Value,
+                Status = (object?)criteria.Status ?? DBNull.Value,
+                EnteredBy = (object?)criteria.EnteredBy ?? DBNull.Value,
+                All = 0,
             },
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
@@ -337,15 +337,15 @@ public sealed class BatchRepository : IBatchRepository
         // Result set 0 = BATCH_TABLE (batch header) — read and discard; we only need 1-3.
         await multi.ReadAsync<dynamic>();
 
-        var histology  = (await multi.ReadAsync<BatchTestSelectionRow>()).ToList(); // index 1
+        var histology = (await multi.ReadAsync<BatchTestSelectionRow>()).ToList(); // index 1
         var antibodies = (await multi.ReadAsync<BatchTestSelectionRow>()).ToList(); // index 2
-        var stains     = (await multi.ReadAsync<BatchTestSelectionRow>()).ToList(); // index 3
+        var stains = (await multi.ReadAsync<BatchTestSelectionRow>()).ToList(); // index 3
 
         return new BatchTestSelections
         {
-            Histology  = histology,
+            Histology = histology,
             Antibodies = antibodies,
-            Stains     = stains,
+            Stains = stains,
         };
     }
 
@@ -388,11 +388,11 @@ public sealed class BatchRepository : IBatchRepository
 
         using var conn = _db.CreateConnection();
         await ApplyTestSelectionDeltaAsync(conn, batchId, userId,
-            current.Histology,  histologyCodes,  "AddHistology",   "DeleteHistology");
+            current.Histology, histologyCodes, "AddHistology", "DeleteHistology");
         await ApplyTestSelectionDeltaAsync(conn, batchId, userId,
-            current.Antibodies, antibodyCodes,   "AddAntibodies",  "DeleteAntibodies");
+            current.Antibodies, antibodyCodes, "AddAntibodies", "DeleteAntibodies");
         await ApplyTestSelectionDeltaAsync(conn, batchId, userId,
-            current.Stains,     stainCodes,      "AddSpecialStain","DeleteSpecialStain");
+            current.Stains, stainCodes, "AddSpecialStain", "DeleteSpecialStain");
     }
 
     /// <summary>
@@ -410,7 +410,7 @@ public sealed class BatchRepository : IBatchRepository
         string deleteSp)
     {
         var currentSet = current.ToDictionary(r => r.Code, r => r.ID, StringComparer.OrdinalIgnoreCase);
-        var newSet     = newCodes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var newSet = newCodes.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         foreach (var row in current)
         {

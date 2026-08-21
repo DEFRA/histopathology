@@ -244,6 +244,7 @@ public sealed class LookupRepository : ILookupRepository
             Name   = d.TryGetValue("Description", out var desc)   ? Convert.ToString(desc) ?? "" : "",
             Active = d.TryGetValue("IsActive",     out var active) ? Convert.ToBoolean(active)    : true,
             Code   = d.TryGetValue("Code",         out var code)   ? Convert.ToString(code)       : null,
+            Area   = d.TryGetValue("Area",         out var area)   ? Convert.ToString(area)       : null,
         };
     }
 
