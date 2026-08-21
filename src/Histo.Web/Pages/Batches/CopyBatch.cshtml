@@ -56,7 +56,7 @@
                                         <span class="govuk-details__summary-text">@Model.Animals[i].TissueDetails.Count tissue(s)</span>
                                     </summary>
                                     <div class="govuk-details__text">
-                                        <ul class="govuk-list govuk-list--bullet">
+                                        <ul class="govuk-list">
                                             @foreach (var td in Model.Animals[i].TissueDetails)
                                             {
                                                 <li>@td</li>
@@ -73,7 +73,10 @@
                             <input class="govuk-input" id="Animals_@(i)__NewSenderRef" asp-for="Animals[i].NewSenderRef" />
                         </td>
                         <td class="govuk-table__cell">
-                            <a href="#Animals_@(i)__NewSenderRef" class="govuk-link">Change</a>
+                            <button type="submit"
+                                    formaction="?handler=Pick"
+                                    name="rowIndex" value="@i"
+                                    class="govuk-link govuk-!-font-size-19">Change</button>
                         </td>
                     </tr>
                 }

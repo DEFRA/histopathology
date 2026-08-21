@@ -3,6 +3,7 @@ using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace Histo.Web.Pages.Batches;
 
@@ -45,6 +46,21 @@ public class CopyBatchModel : HistoPageModel
         ViewData["PageTitle"] = "Copy Submission";
 
         SourceBatchId = sourceBatchId;
+
+        // ── Picker return: Animals were serialised to TempData before navigating to SearchSender. ──
+        if (TempData["CopyBatch_Animals"] is string savedJson)
+        {
+            Animals     = JsonSerializer.Deserialize<List<AnimalRow>>(savedJson) ?? [];
+            IsCassetted = bool.TryParse(TempData["CopyBatch_IsCassetted"] as string, out var ic) && ic;
+            if (TempData["SenderRefPicker_Selected"] is string chosen &&
+                int.TryParse(TempData["CopyBatch_RowIndex"] as string, out var ri) &&
+                ri >= 0 && ri < Animals.Count)
+            {
+                Animals[ri].NewSenderRef = chosen;
+            }
+            SourceBatch = await _batches.GetByIdAsync(sourceBatchId);
+            return Page();
+        }
         SourceBatch = await _batches.GetByIdAsync(sourceBatchId);
         if (SourceBatch is null)
         {
@@ -61,7 +77,7 @@ public class CopyBatchModel : HistoPageModel
         var tissueNames = tissueTypes
             .Where(t => t.Code != null)
             .ToDictionary(t => t.Code!, t => t.Name, StringComparer.OrdinalIgnoreCase);
-        var allTissues  = await _submissions.GetBatchSubmissionTissuesAsync(sourceBatchId);
+        var allTissues = await _submissions.GetBatchSubmissionTissuesAsync(sourceBatchId);
         var tissuesBySubmId = allTissues
             .GroupBy(t => t.OwnerID)
             .ToDictionary(
@@ -69,7 +85,7 @@ public class CopyBatchModel : HistoPageModel
                 g => g.Select(t => $"{t.NoPieces} x {tissueNames.GetValueOrDefault(t.TissueCode, t.TissueCode)}").ToList());
         // Fallback: if all OwnerID = 0 (column name mismatch), all tissues land under key 0.
         var allTissueStrings = tissuesBySubmId.TryGetValue(0, out var zeroTd) ? zeroTd : [];
-        var firstSubmId   = submissions.Count > 0 ? submissions[0].ID : 0;
+        var firstSubmId = submissions.Count > 0 ? submissions[0].ID : 0;
         var submissionIds = submissions.Select(s => s.ID).ToHashSet();
 
         List<string> ResolveTissues(int batchSubmissionId)
@@ -85,10 +101,10 @@ public class CopyBatchModel : HistoPageModel
         {
             Animals = blockAnimals.OrderBy(a => a.SenderRef).Select(a => new AnimalRow
             {
-                AnimalId      = a.ID,
-                SubmissionId  = a.BatchSubmissionID > 0 ? a.BatchSubmissionID : firstSubmId,
-                SenderRef     = a.SenderRef,
-                NewSenderRef  = a.SenderRef,
+                AnimalId = a.ID,
+                SubmissionId = a.BatchSubmissionID > 0 ? a.BatchSubmissionID : firstSubmId,
+                SenderRef = a.SenderRef,
+                NewSenderRef = string.Empty,
                 TissueDetails = ResolveTissues(a.BatchSubmissionID),
             }).ToList();
         }
@@ -97,11 +113,11 @@ public class CopyBatchModel : HistoPageModel
             var animals = await _submissions.GetAnimalsByBatchAsync(sourceBatchId);
             Animals = animals.OrderBy(a => a.SenderRef).Select(a => new AnimalRow
             {
-                AnimalId      = a.ID,
-                SubmissionId  = a.BatchSubmissionID > 0 && submissionIds.Contains(a.BatchSubmissionID)
+                AnimalId = a.ID,
+                SubmissionId = a.BatchSubmissionID > 0 && submissionIds.Contains(a.BatchSubmissionID)
                     ? a.BatchSubmissionID : firstSubmId,
-                SenderRef     = a.SenderRef,
-                NewSenderRef  = a.SenderRef,
+                SenderRef = a.SenderRef,
+                NewSenderRef = string.Empty,
                 TissueDetails = ResolveTissues(a.BatchSubmissionID),
             }).ToList();
         }
@@ -125,12 +141,12 @@ public class CopyBatchModel : HistoPageModel
         var userId = Session.UserID;
         var batchToCopy = new Batch
         {
-            Status             = SourceBatch.Status,
-            CustomerRef        = SourceBatch.CustomerRef,
-            Comments           = SourceBatch.Comments,
-            SubmittedByUserID  = SourceBatch.SubmittedByUserID,
-            UserAreaCode       = SourceBatch.UserAreaCode,
-            IsPreCassetted     = SourceBatch.IsPreCassetted,
+            Status = SourceBatch.Status,
+            CustomerRef = SourceBatch.CustomerRef,
+            Comments = SourceBatch.Comments,
+            SubmittedByUserID = SourceBatch.SubmittedByUserID,
+            UserAreaCode = SourceBatch.UserAreaCode,
+            IsPreCassetted = SourceBatch.IsPreCassetted,
         };
         var newBatchId = await _batches.CopyBatchHeaderAsync(batchToCopy, userId);
         if (newBatchId <= 0)
@@ -139,12 +155,12 @@ public class CopyBatchModel : HistoPageModel
             return Page();
         }
 
-        var submissions   = await _submissions.GetSubmissionsByBatchAsync(SourceBatchId);
-        var blockAnimals  = await _submissions.GetBlockAnimalsByBatchAsync(SourceBatchId);
-        var animals       = blockAnimals.Count > 0 ? blockAnimals : await _submissions.GetAnimalsByBatchAsync(SourceBatchId);
+        var submissions = await _submissions.GetSubmissionsByBatchAsync(SourceBatchId);
+        var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(SourceBatchId);
+        var animals = blockAnimals.Count > 0 ? blockAnimals : await _submissions.GetAnimalsByBatchAsync(SourceBatchId);
         var newSenderRefs = Animals.ToDictionary(a => a.AnimalId, a => a.NewSenderRef);
         // When BatchSubmissionID is absent on the animal, assign to the first submission.
-        var firstSubmId   = submissions.Count > 0 ? submissions[0].ID : 0;
+        var firstSubmId = submissions.Count > 0 ? submissions[0].ID : 0;
 
         foreach (var submission in submissions)
         {
@@ -160,11 +176,29 @@ public class CopyBatchModel : HistoPageModel
                 (a.BatchSubmissionID == 0 && submission.ID == firstSubmId)))
             {
                 var newSenderRef = newSenderRefs.GetValueOrDefault(animal.ID, animal.SenderRef);
+                if (string.IsNullOrWhiteSpace(newSenderRef)) newSenderRef = animal.SenderRef;
                 await _submissions.CopyAnimalAsync(animal, newSubmissionId, newSenderRef, userId);
             }
         }
 
         return RedirectToPage("/Batches/CopyBatchSummary", new { newBatchId });
+    }
+
+    /// <summary>
+    /// Saves current Animals to TempData and navigates to SearchSender in picker mode.
+    /// Called when the user clicks Change on a row.
+    /// </summary>
+    public IActionResult OnPostPick(int rowIndex)
+    {
+        TempData["CopyBatch_Animals"]     = JsonSerializer.Serialize(Animals);
+        TempData["CopyBatch_IsCassetted"] = IsCassetted.ToString();
+        TempData["CopyBatch_RowIndex"]    = rowIndex.ToString();
+        return RedirectToPage("/Search/SearchSender", new
+        {
+            returnPage = "/Batches/CopyBatch",
+            returnId   = SourceBatchId,
+            rowIndex,
+        });
     }
 
     /// <summary>One editable row of the source submission's samples.</summary>

@@ -959,3 +959,59 @@ Multi-fix session (Run #85) with ~17 sub-prompts including follow-ups on tissue 
 **Build:** Succeeded. 0 warnings, 0 errors (all fixes).
 
 **Files changed:** `Submissions/BatchBlockSummary.cshtml.cs`, `Submissions/BatchBlockSummary.cshtml`, `Submissions/Models/Animal.cs`, `Submissions/Models/BatchSubmission.cs`, `Submissions/Interfaces/ISubmissionRepository.cs`, `Submissions/Repositories/SubmissionRepository.cs`, `Submissions/Interfaces/ISubmissionService.cs`, `Submissions/Services/SubmissionService.cs`, `Submissions/Models/Batch.cs`, `Submissions/Interfaces/IBatchRepository.cs`, `Submissions/Repositories/BatchRepository.cs`, `Submissions/Interfaces/IBatchService.cs`, `Submissions/Services/BatchService.cs`, `Batches/CopyBatch.cshtml.cs`, `Batches/CopyBatch.cshtml`.
+
+---
+
+## Prompt 52 — BatchBlockSummary Tissue Details column not displaying + UI fixes (2026-08-21)
+
+> can you make the following UI updates:
+> 1. **BatchBlockSummary.cshtml** — Fix the Tissue Details column so that it displays tissue details correctly, matching the behavior in CopyBatch.cshtml.
+> 2. **Pathologists - EditLookupItem.cshtml** — Remove the Code column from the Pathologist lookup. Add the Area column.
+> 3. **Projects - EditLookupItem.cshtml** — Remove the Code column from the Project lookup. Add the Area column.
+> 4. **PickListMaintenance.cshtml** — Do not display the User Area in the Pick List name. Match the legacy system behavior.
+
+Root cause of tissue details not showing: `GetBlockAnimalsByBatchAsync` (BATCH_BLOCK_ANIMAL SP) does not return `BatchSubmissionID`, so all animals had `BatchSubmissionID = 0`. The tissue lookup was keyed by `BatchSubmissionID`, so no match was ever found. Fix: load `submissions` before tissue resolution and use `firstSubmId` as fallback — exact mirror of `CopyBatch.ResolveTissues`. Also fixed Razor `@foreach` → `@for` index loop to avoid `IReadOnlyList<string> tissues = []` parse ambiguity. Bullet points removed from tissue list. Area column added for tables 18/19 via `ShowAreaColumn` property. User Area filtered from PickListMaintenance.
+
+**Build:** Succeeded. 0 warnings, 0 errors.
+
+**Files changed:** `Submissions/BatchBlockSummary.cshtml.cs`, `Submissions/BatchBlockSummary.cshtml`, `Admin/EditLookupItem.cshtml.cs`, `Admin/EditLookupItem.cshtml`, `Admin/PickListMaintenance.cshtml`, `Administration/Repositories/LookupRepository.cs`.
+
+---
+
+## Prompt 53 — Help link opens new tab (GDS standard) + AuditLogDapperSetup warnings (2026-08-21)
+
+> Help page should open new tab — is it GDS standard? Can you fix it.
+
+Yes — GDS standard requires help/guidance links to open in a new tab so users don't lose their place. Added `target="_blank" rel="noreferrer noopener"` to the Help nav link. Also fixed two CS8603 nullable warnings in `AuditLogDapperSetup.cs` by adding null-forgiving `!` operators to both `GetProperty` calls.
+
+**Build:** Succeeded. 0 warnings, 0 errors.
+
+**Files changed:** `Shared/_NavPartial.cshtml`, `Histo.AuditLog/AuditLogDapperSetup.cs`.
+
+---
+
+## Prompt 54 — CopyBatch Sender Ref search-and-select flow (Option B) (2026-08-21)
+
+> Implement a simple and reusable Sender Reference change flow from CopyBatch.cshtml. When a user clicks "Change Sender Reference", navigate to the Sender Reference search page. Preserve the current Copy Batch data during navigation. On the Search Sender page, display the Sender Reference and History Log Reference grid. When the user selects a row, return to the originating page. If the user came from CopyBatch, restore the Copy Batch data and update the selected row with the new Sender Reference. The solution should be reusable so the same Search Sender page can also be used from AddSubmission/CreateSubmission in the future. Use a return URL/origin page parameter and avoid hardcoded navigation logic.
+
+Implemented Option B (per-row navigate + TempData return). `OnPostPick` in CopyBatch serialises the full Animals list to `TempData` and redirects to `SearchSender` with `returnPage`/`returnId`/`rowIndex` query params. `SearchSender` extended with picker mode: `IsPickerMode` computed property, hidden fields to persist params across search POST, Select button per result row, `OnPostSelect` handler that stores chosen ref in TempData and redirects back. `CopyBatch.OnGetAsync` checks TempData at entry — if Animals JSON present, restores state and injects selected ref into the correct row. No hardcoded caller logic in SearchSender: any future page can use the same picker by setting `returnPage`.
+
+**Build:** Succeeded. 0 warnings, 0 errors.
+
+**Files changed:** `Batches/CopyBatch.cshtml.cs`, `Batches/CopyBatch.cshtml`, `Search/SearchSender.cshtml.cs`, `Search/SearchSender.cshtml`.
+
+---
+
+## Prompt 55 — BatchBlockSummary view-mode read-only (IsViewMode) (2026-08-21)
+
+> In BatchBlockSummary.cshtml, disable the following buttons when the user navigates from the View Submission journey: Add Sample, Edit Sample, Copy Sample, Delete Sample.
+>
+> Flow: View Submission → Batch Details → Samples → BatchBlockSummary
+>
+> If the user reaches BatchBlockSummary.cshtml from View Submission, all sample maintenance actions should be read-only. Users should still be able to view sample details, but not add, edit, copy, or delete samples.
+
+Added `IsViewMode` computed property to `BatchBlockSummaryModel` that checks `Session.ReturnPage` — the same session key set by `ViewSubmissions.cshtml.cs` and `SearchSubmissions.cshtml.cs` when selecting a batch, equivalent to legacy `SV_ViewSubmission`. When `true`, all four sample action buttons (Add, Edit, Copy, Delete) are hidden. Tissue details and page content remain fully visible.
+
+**Build:** Succeeded. 0 warnings, 0 errors.
+
+**Files changed:** `Submissions/BatchBlockSummary.cshtml.cs`, `Submissions/BatchBlockSummary.cshtml`.

@@ -34,7 +34,8 @@ public static class AuditLogDapperSetup
                     if (string.Equals(columnName, "DateTime", StringComparison.OrdinalIgnoreCase))
                         return type.GetProperty(nameof(AuditLogEntry.ChangedAt))!;
 
-                    // All other columns map by name, case-insensitively.
+                    // Return null for unrecognised columns so Dapper skips them rather than
+                    // throwing NullReferenceException when the SP returns extra columns.
                     return type.GetProperty(
                         columnName,
                         BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)!;

@@ -6,13 +6,27 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Search/SearchMenu" class="govuk-back-link">Back</a>
+    @if (Model.IsPickerMode && Model.ReturnId.HasValue)
+    {
+        <a asp-page="/Batches/CopyBatch" asp-route-sourceBatchId="@Model.ReturnId" class="govuk-back-link">Back</a>
+    }
+    else
+    {
+        <a asp-page="/Search/SearchMenu" class="govuk-back-link">Back</a>
+    }
 }
 
 <form method="post">
+    @* Preserve picker params across the search POST so Select buttons and back link render correctly. *@
+    @if (Model.IsPickerMode)
+    {
+        <input type="hidden" name="ReturnPage" value="@Model.ReturnPage" />
+        <input type="hidden" name="ReturnId"   value="@Model.ReturnId" />
+        <input type="hidden" name="RowIndex"   value="@Model.RowIndex" />
+    }
     <div class="govuk-form-group">
         <label class="govuk-label" for="SenderRef">Sender ref</label>
-        <input class="govuk-input" asp-for="SenderRef" />
+        <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" />
     </div>
     <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
 </form>
@@ -24,6 +38,10 @@
             <tr class="govuk-table__row">
                 <th scope="col" class="govuk-table__header">Sender ref</th>
                 <th scope="col" class="govuk-table__header">Histology ref</th>
+                @if (Model.IsPickerMode)
+                {
+                    <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Select</span></th>
+                }
             </tr>
         </thead>
         <tbody class="govuk-table__body">
@@ -32,6 +50,17 @@
                 <tr class="govuk-table__row">
                     <td class="govuk-table__cell">@r.SenderRef</td>
                     <td class="govuk-table__cell">@r.HistologyRef</td>
+                    @if (Model.IsPickerMode)
+                    {
+                        <td class="govuk-table__cell">
+                            <form method="post" asp-page-handler="Select">
+                                <input type="hidden" name="selectedSenderRef" value="@r.SenderRef" />
+                                <input type="hidden" name="returnPage" value="@Model.ReturnPage" />
+                                <input type="hidden" name="returnId"   value="@Model.ReturnId" />
+                                <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Select</button>
+                            </form>
+                        </td>
+                    }
                 </tr>
             }
         </tbody>
