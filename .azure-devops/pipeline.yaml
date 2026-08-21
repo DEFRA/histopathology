@@ -1,52 +1,96 @@
-name: $(BuildID)
- 
-parameters:
-  - name: apiName
-    displayName: 'API Name to Deploy'
-    type: string
-    default: '__ALL__'
- 
-  - name: forceDeploy
-    displayName: 'Force full slice deployment (no ApiNames required)'
-    type: boolean
-    default: false
- 
- 
-resources:
-  repositories:
-    - repository: DefraApiInfra
-      type: git
-      name: DEFRA-Common-Platform-Improvements/DEFRA-API-INFRA
-      ref: main
- 
 trigger:
   branches:
     include:
       - develop
-      - master
-  paths:
-    include:
-      - internal/**
-pr:
-  branches:
-    include:
-      - master
-      - develop
-  paths:
-      include:
-        - internal/**
- 
+
 variables:
-- group: apim-api-keys
-- name: TraceTag
-  value: "API=$(parameters.apiName)-Env=01-RunID=$(Build.BuildId)"
- 
- 
-extends:
-  template: /.azure-devops/api-ops-publisher.yaml@DefraApiInfra
- 
-  parameters:
-    internalOrExternalApimService: internal
-    environmentId: '01'
-    apiName: ${{ parameters.apiName }}        
-    forceDeploy: ${{ parameters.forceDeploy }}
+  - name: buildConfiguration
+    value: 'Release'
+
+  - name: solution
+    value: 'HistopathologySystem.slnx'
+
+  - name: webProject
+    value: 'src/Histo.Web/Histo.Web.csproj'
+
+stages:
+
+- stage: Build
+  displayName: Build and test
+  jobs:
+  - job: build
+    pool:
+      vmImage: 'ubuntu-24.04'
+    steps:
+
+    - checkout: self
+      fetchDepth: 1
+      persistCredentials: false
+
+    - task: UseDotNet@2
+      displayName: 'Install .NET 10 SDK'
+      inputs:
+        version: '10.0.x'
+        includePreviewVersions: true
+
+    - script: |
+        dotnet --info
+        echo "--- files in working directory ---"
+        ls -la
+      displayName: 'Diagnostics'
+
+    - script: dotnet restore $(solution)
+      displayName: 'Restore dependencies'
+
+    - script: dotnet build $(solution) --configuration $(buildConfiguration) --no-restore
+      displayName: 'Build'
+
+    - script: dotnet test $(solution) --configuration $(buildConfiguration) --no-build --logger trx
+      displayName: 'Run tests'
+
+    - task: PublishTestResults@2
+      displayName: 'Publish test results'
+      condition: succeededOrFailed()
+      inputs:
+        testResultsFormat: VSTest
+        testResultsFiles: '**/*.trx'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Publish Histo.Web'
+      inputs:
+        command: publish
+        publishWebProjects: false
+        projects: '$(webProject)'
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+        zipAfterPublish: true
+
+    - publish: '$(Build.ArtifactStagingDirectory)'
+      artifact: drop
+      displayName: 'Publish artifact'
+
+- stage: Deploy
+  displayName: Deploy to Dev
+  dependsOn: Build
+  condition: >-
+    and(succeeded(),
+        eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
+        ne(variables['Build.Reason'], 'PullRequest'))
+  jobs:
+  - deployment: deploy_dev
+    environment: 'dev'
+    pool:
+      vmImage: 'ubuntu-24.04'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: 'AZR-CDE-DEV1'
+              appType: 'webAppLinux'
+              appName: 'DEVCDEWEBAW1401'
+              package: '$(Pipeline.Workspace)/drop/*.zip'
+              runtimeStack: 'DOTNETCORE|10.0'
+              deploymentMethod: 'zipDeploy'
