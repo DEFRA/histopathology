@@ -38,7 +38,7 @@ public static class AuditLogDapperSetup
                     // throwing NullReferenceException when the SP returns extra columns.
                     return type.GetProperty(
                         columnName,
-                        BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)!;
+                        BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
                 }));
     }
 }
