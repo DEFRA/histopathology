@@ -1,3 +1,4 @@
+using Histo.Administration.Interfaces;
 using Histo.Core.Domain;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
@@ -25,17 +26,23 @@ public class BatchBlockSummaryModel : HistoPageModel
 {
     private readonly ISubmissionService _submissions;
     private readonly IBatchService _batches;
+    private readonly ILookupService _lookups;
 
-    public BatchBlockSummaryModel(ISessionService session, ISubmissionService submissions, IBatchService batches)
+    public BatchBlockSummaryModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups)
         : base(session)
     {
         _submissions = submissions;
         _batches = batches;
+        _lookups = lookups;
     }
 
     public IReadOnlyList<Animal> Animals { get; private set; } = [];
 
     public Batch? Batch { get; private set; }
+
+    /// <summary>Tissue detail strings keyed by AnimalID for the Tissue Details column.</summary>
+    public IReadOnlyDictionary<int, IReadOnlyList<string>> TissuesByAnimalId { get; private set; } =
+        new Dictionary<int, IReadOnlyList<string>>();
 
     /// <summary>
     /// Gates Add sample / Delete sample / Copy sample.
@@ -52,6 +59,14 @@ public class BatchBlockSummaryModel : HistoPageModel
     /// </summary>
     public bool CanModifySamples => Batch?.Status is BatchStatus.Submitted or BatchStatus.Rejected;
 
+    /// <summary>
+    /// Mirrors legacy <c>SV_ViewSubmission</c>: true when reached via the View Submission journey
+    /// (ViewSubmissions or SearchSubmissions → BatchDetails → Samples). All sample actions are
+    /// read-only in this mode.
+    /// </summary>
+    public bool IsViewMode =>
+        Session.ReturnPage is "/Submissions/ViewSubmissions" or "/Search/SearchSubmissions";
+
     public async Task<IActionResult> OnGetAsync()
     {
         ViewData["Title"] = "Sample summary";
@@ -59,33 +74,67 @@ public class BatchBlockSummaryModel : HistoPageModel
         if (Session.BatchID is null or <= 0) return RedirectToPage("/Index");
         var batchId = Session.BatchID.Value;
         Batch = await _batches.GetByIdAsync(batchId);
-        Animals = await _submissions.GetAnimalsByBatchAsync(batchId);
+        var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(batchId);
+        // Fall back to submission-level animals for non-cassetted batches where the
+        // block SP returns no rows (mirrors CopyBatch's IsCassetted detection).
+        var animals = blockAnimals.Count > 0
+            ? blockAnimals
+            : await _submissions.GetAnimalsByBatchAsync(batchId);
 
-        // Ensure BatchSubmissionID is populated in session so that AddSubmission / AddSample
-        // have a valid parent record when adding a new animal.
+        // Default sort: SenderRef ASC then HistologyRef ASC, matching legacy ByPassSort=false behaviour.
+        // When ByPassSort=true the user has explicitly requested block-insertion order — preserve SP order.
+        Animals = Batch?.ByPassSort == true
+            ? animals
+            : [.. animals.OrderBy(a => a.SenderRef).ThenBy(a => a.HistologyRef)];
 
-        // Primary strategy: if animals were loaded and carry a valid BatchSubmissionID,
-        // use the first animal's submission ID directly (avoids the QueryMultiple overhead).
+        // Load submissions upfront — needed for tissue resolution fallback (mirrors CopyBatch which uses
+        // firstSubmId when BatchSubmissionID is 0 or the column wasn't returned by the block-animal SP).
+        var submissions  = await _submissions.GetSubmissionsByBatchAsync(batchId);
+        var firstSubmId  = submissions.Count > 0 ? submissions[0].ID : 0;
+        var submissionIds = submissions.Select(s => s.ID).ToHashSet();
+
+        // Load tissue details for the Tissue Details column, mirroring CopyBatch tissue resolution.
+        var tissueTypes = await _lookups.GetLookupDataAsync(9); // 9 = LOOKUP_TISSUE_CODE
+        var tissueNames = tissueTypes
+            .Where(t => t.Code != null)
+            .ToDictionary(t => t.Code!, t => t.Name, StringComparer.OrdinalIgnoreCase);
+        var allTissues = await _submissions.GetBatchSubmissionTissuesAsync(batchId);
+        var tissuesBySubmId = allTissues
+            .GroupBy(t => t.OwnerID)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyList<string>)g
+                    .Select(t => $"{t.NoPieces} x {tissueNames.GetValueOrDefault(t.TissueCode, t.TissueCode)}")
+                    .ToList());
+        var allTissueStrings = tissuesBySubmId.TryGetValue(0, out var zeroGroup) ? zeroGroup : (IReadOnlyList<string>)[];
+
+        // Exact same fallback chain as CopyBatch.ResolveTissues: BatchSubmissionID → firstSubmId → key-0.
+        IReadOnlyList<string> ResolveTissues(int batchSubmissionId)
+        {
+            var submId = batchSubmissionId > 0 && submissionIds.Contains(batchSubmissionId)
+                ? batchSubmissionId : firstSubmId;
+            if (submId > 0 && tissuesBySubmId.TryGetValue(submId, out var td)) return td;
+            return allTissueStrings.Count > 0 ? allTissueStrings : [];
+        }
+
+        TissuesByAnimalId = Animals.ToDictionary(a => a.ID, a => ResolveTissues(a.BatchSubmissionID));
+
+        // Populate session BatchSubmissionID using already-loaded submissions (no second query needed).
         var firstAnimalSubId = Animals.FirstOrDefault(a => a.BatchSubmissionID > 0)?.BatchSubmissionID;
         if (firstAnimalSubId is > 0)
         {
             Session.BatchSubmissionID = firstAnimalSubId.Value;
         }
+        else if (firstSubmId > 0)
+        {
+            Session.BatchSubmissionID = firstSubmId;
+        }
         else
         {
-            // Secondary: query the batch submissions directly.
-            var submissions = await _submissions.GetSubmissionsByBatchAsync(batchId);
-            if (submissions.Count > 0)
-            {
-                Session.BatchSubmissionID = submissions[0].ID;
-            }
-            else
-            {
-                // First visit for this batch: create the default batch submission record.
-                var sub = new BatchSubmission { BatchID = batchId, SubmissionName = "Default", Order = 1 };
-                var subId = await _submissions.AddSubmissionAsync(sub, Session.UserID);
-                if (subId > 0) Session.BatchSubmissionID = subId;
-            }
+            // First visit for this batch: create the default batch submission record.
+            var sub = new BatchSubmission { BatchID = batchId, SubmissionName = "Default", Order = 1 };
+            var subId = await _submissions.AddSubmissionAsync(sub, Session.UserID);
+            if (subId > 0) Session.BatchSubmissionID = subId;
         }
 
         return Page();
@@ -98,16 +147,6 @@ public class BatchBlockSummaryModel : HistoPageModel
     }
 
     /// <summary>
-    /// Replaces the legacy "Edit submission" action (<c>BatchSummary.aspx.vb</c>::<c>btnEditSubmission_Click</c>),
-    /// which stored the selected animal in session and redirected to <c>SubmissionDetails.aspx</c>.
-    /// </summary>
-    public IActionResult OnPostEditAsync(int animalId)
-    {
-        Session.AnimalID = animalId;
-        return RedirectToPage("/Submissions/SubmissionDetails");
-    }
-
-    /// <summary>
     /// Replaces the legacy "Delete submission" action (<c>BatchSummary.aspx.vb</c>::<c>btnDeleteSubmission_Click</c>
     /// / <c>BatchBlockSummary.aspx.vb</c>::<c>btnDeleteSubmission_Click</c>), both of which removed the animal
     /// record from the in-progress batch.
@@ -115,6 +154,20 @@ public class BatchBlockSummaryModel : HistoPageModel
     public async Task<IActionResult> OnPostDeleteAsync(int animalId)
     {
         await _submissions.DeleteAnimalAsync(animalId, Session.UserID);
+        return RedirectToPage();
+    }
+
+    /// <summary>
+    /// Toggles the ByPassSort flag on the batch and reloads.
+    /// Legacy source: <c>BatchBlockSummary.aspx.vb</c>::<c>chkByPassSort_CheckedChanged</c>.
+    /// </summary>
+    public async Task<IActionResult> OnPostToggleByPassSortAsync()
+    {
+        if (Session.BatchID is null or <= 0) return RedirectToPage();
+        var batchId = Session.BatchID.Value;
+        var current = await _batches.GetByIdAsync(batchId);
+        if (current is not null)
+            await _batches.SetByPassSortAsync(batchId, !current.ByPassSort, Session.UserID);
         return RedirectToPage();
     }
 }

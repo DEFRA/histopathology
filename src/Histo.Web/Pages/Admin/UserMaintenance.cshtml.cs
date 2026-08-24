@@ -14,17 +14,18 @@ public class UserMaintenanceModel : HistoPageModel
     public UserMaintenanceModel(ISessionService session, IUserService users, ILookupService lookups)
         : base(session)
     {
-        _users   = users;
+        _users = users;
         _lookups = lookups;
     }
 
     /// <summary>
     /// When true, deactivated (inactive) users are included in the list alongside active users.
     /// Matches the legacy <c>cbActive</c> ("Show deactivated items") checkbox behaviour:
-    /// default unchecked = show active users only; checked = show all users.
+    /// legacy default = all users shown (checked); unchecked = active users only.
+    /// Default <c>true</c> so first visit matches legacy (no filtering applied).
     /// </summary>
     [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
-    public bool ShowDeactivated { get; set; }
+    public bool ShowDeactivated { get; set; } = true;
 
     public IReadOnlyList<User> Users { get; private set; } = [];
     public string? StatusMessage { get; private set; }
@@ -59,11 +60,11 @@ public class UserMaintenanceModel : HistoPageModel
             // Load lookup names as a fallback in case the GetUsers SP does not return
             // GroupName / AreaName columns (older SP versions return only integer codes).
             var groupsTask = _lookups.GetUserGroupsAsync();
-            var areasTask  = _lookups.GetUserAreasAsync();
+            var areasTask = _lookups.GetUserAreasAsync();
             await Task.WhenAll(groupsTask, areasTask);
 
             GroupNames = groupsTask.Result.ToDictionary(g => g.ID, g => g.Name);
-            AreaNames  = areasTask.Result.ToDictionary(a => a.ID, a => a.Name);
+            AreaNames = areasTask.Result.ToDictionary(a => a.ID, a => a.Name);
         }
         catch (Exception ex)
         {

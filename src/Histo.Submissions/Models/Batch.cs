@@ -24,6 +24,12 @@ public sealed class Batch
     public int SubmittedByUserID { get; init; }
     public int UserAreaCode { get; init; }
     public bool IsPreCassetted { get; init; }
+    /// <summary>
+    /// When <see langword="true"/> the sample list is displayed in block-insertion order instead of
+    /// the default SenderRef / HistologyRef ascending sort. Persisted in <c>tblBatch.ByPassSort</c>.
+    /// Legacy source: <c>BatchBlockSummary.aspx.vb</c>::<c>chkByPassSort_CheckedChanged</c>.
+    /// </summary>
+    public bool ByPassSort { get; set; }
     public byte[]? RowStamp { get; init; }
 
     /// <summary>

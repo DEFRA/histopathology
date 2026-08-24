@@ -9,10 +9,31 @@
     <a asp-page="/AuditLog/AuditLogMenu" class="govuk-back-link">Back</a>
 }
 
+@if (Model.Errors.Any())
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    @foreach (var e in Model.Errors)
+                    {
+                        <li>@e</li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
 <form method="post">
-    <div class="govuk-form-group">
+    <div class="govuk-form-group @(Model.Errors.Any(e => e.Contains("user")) ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="UserID">User</label>
-        <select class="govuk-select" asp-for="UserID">
+        @if (Model.Errors.Any(e => e.Contains("user")))
+        {
+            <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> Select a user.</p>
+        }
+        <select class="govuk-select @(Model.Errors.Any(e => e.Contains("user")) ? "govuk-select--error" : "")" asp-for="UserID">
             <option value="0">-- Select user --</option>
             @foreach (var u in Model.Users)
             {
@@ -20,13 +41,21 @@
             }
         </select>
     </div>
-    <div class="govuk-form-group">
+    <div class="govuk-form-group @(Model.Errors.Any(e => e.Contains("start")) ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="StartDate">From</label>
-        <input class="govuk-input govuk-input--width-10" type="date" asp-for="StartDate" />
+        @if (Model.Errors.Any(e => e.Contains("start")))
+        {
+            <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> Enter a start date.</p>
+        }
+        <input class="govuk-input govuk-input--width-10 @(Model.Errors.Any(e => e.Contains("start")) ? "govuk-input--error" : "")" type="date" asp-for="StartDate" />
     </div>
-    <div class="govuk-form-group">
+    <div class="govuk-form-group @(Model.Errors.Any(e => e.Contains("end")) ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="EndDate">To</label>
-        <input class="govuk-input govuk-input--width-10" type="date" asp-for="EndDate" />
+        @if (Model.Errors.Any(e => e.Contains("end")))
+        {
+            <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @Model.Errors.First(e => e.Contains("end"))</p>
+        }
+        <input class="govuk-input govuk-input--width-10 @(Model.Errors.Any(e => e.Contains("end")) ? "govuk-input--error" : "")" type="date" asp-for="EndDate" />
     </div>
     <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
     @if (Model.Results.Any())

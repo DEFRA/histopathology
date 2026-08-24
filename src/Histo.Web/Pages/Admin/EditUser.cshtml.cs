@@ -57,12 +57,12 @@ public class EditUserModel : HistoPageModel
         var user = (await _users.GetAllUsersAsync()).FirstOrDefault(u => u.UserID == UserId);
         if (user is null) return RedirectToPage("/Admin/UserMaintenance");
 
-        NtLogin   = user.NtLogin;
-        Name      = user.Name;
-        Email     = user.Email;
+        NtLogin = user.NtLogin;
+        Name = user.Name;
+        Email = user.Email;
         GroupCode = user.GroupCode;
-        AreaCode  = user.AreaCode;
-        Active    = user.Active;
+        AreaCode = user.AreaCode;
+        Active = user.Active;
         return Page();
     }
 
@@ -77,13 +77,13 @@ public class EditUserModel : HistoPageModel
 
         var user = new User
         {
-            UserID    = UserId,
-            NtLogin   = NtLogin.Trim(),
-            Name      = Name.Trim(),
-            Email     = Email.Trim(),
+            UserID = UserId,
+            NtLogin = NtLogin.Trim(),
+            Name = Name.Trim(),
+            Email = Email.Trim(),
             GroupCode = GroupCode,
-            AreaCode  = AreaCode,
-            Active    = Active,
+            AreaCode = AreaCode,
+            Active = Active,
         };
 
         var ok = await _users.UpdateUserAsync(user, Session.UserID);
@@ -108,6 +108,6 @@ public class EditUserModel : HistoPageModel
     private async Task LoadLookupsAsync()
     {
         Groups = await _lookups.GetUserGroupsAsync();
-        Areas  = await _lookups.GetUserAreasAsync();
+        Areas = await _lookups.GetUserAreasAsync();
     }
 }

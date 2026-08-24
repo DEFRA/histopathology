@@ -90,3 +90,15 @@ TestResults/
 [Tt]est[Rr]esult*/
 *.trx
 
+# -----------------------------------------------------------------------
+# GOV.UK Frontend — built assets (restored by CI/CD via npm ci)
+# -----------------------------------------------------------------------
+# wwwroot/govuk/ is populated by the pipeline 'npm ci' + copy step.
+# Never commit these files — the pipeline restores them on every build.
+# The version pin is in src/Histo.Web/package.json.
+src/Histo.Web/wwwroot/govuk/
+
+# Node / npm
+node_modules/
+npm-debug.log*
+.npm

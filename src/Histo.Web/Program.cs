@@ -5,27 +5,11 @@ using Histo.AuditLog;
 using Histo.Histology;
 using Histo.Infrastructure;
 using Histo.QualityControl;
+using Histo.Reporting.Reports;
+using Histo.Reporting.Services;
 using Histo.Submissions;
 using Histo.Web.Services;
 using Serilog;
-
-using Histo.Administration.Interfaces;
-using Histo.Administration.Repositories;
-using Histo.Administration.Services;
-using Histo.AuditLog.Interfaces;
-using Histo.AuditLog.Repositories;
-using Histo.AuditLog.Services;
-using Histo.Histology.Interfaces;
-using Histo.Histology.Repositories;
-using Histo.Histology.Services;
-using Histo.QualityControl.Interfaces;
-using Histo.QualityControl.Repositories;
-using Histo.QualityControl.Services;
-using Histo.Submissions.Interfaces;
-using Histo.Submissions.Repositories;
-using Histo.Submissions.Services;
-using Histo.Reporting.Reports;
-using Histo.Reporting.Services;
 
 // Bootstrap Serilog before the host is built so startup errors are captured.
 Log.Logger = new LoggerConfiguration()
@@ -36,6 +20,7 @@ Log.Logger = new LoggerConfiguration()
 // return date columns as CONVERT(VARCHAR, col, 103) strings (dd/MM/yyyy format).
 // Must be called before any Dapper query executes.
 SqlMapper.AddTypeHandler(new NullableDateTimeTypeHandler());
+SqlMapper.AddTypeHandler(new DateTimeTypeHandler());
 // Map the audit log SP column "DateTime" → AuditLogEntry.ChangedAt
 AuditLogDapperSetup.RegisterTypeMaps();
 
@@ -90,7 +75,7 @@ try
     builder.Services.AddDistributedMemoryCache();
     builder.Services.AddSession(o =>
     {
-        o.IdleTimeout     = TimeSpan.FromMinutes(30);
+        o.IdleTimeout = TimeSpan.FromMinutes(30);
         o.Cookie.HttpOnly = true;
         o.Cookie.IsEssential = true;
     });

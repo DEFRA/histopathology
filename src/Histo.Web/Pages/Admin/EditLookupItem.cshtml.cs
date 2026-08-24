@@ -19,6 +19,7 @@ public class EditLookupItemModel : HistoPageModel
         : base(session) => _lookups = lookups;
 
     [BindProperty(SupportsGet = true)] public int TableId { get; set; }
+    [BindProperty(SupportsGet = true)] public bool ShowDeactivated { get; set; }
     // ID-keyed tables (Contacts 18, Projects 19): identify the row being edited.
     [BindProperty(SupportsGet = true)] public int? ItemId { get; set; }
     // Code-keyed tables (Archive Location 16, QC Code 14, etc.): identify the row by its
@@ -36,6 +37,8 @@ public class EditLookupItemModel : HistoPageModel
     /// <summary>True when the loaded table's items carry a distinct string Code column (tables 14, 15, 16, etc.).
     /// False for ID-keyed tables (Contacts 18, Projects 19) which have no Code field.</summary>
     public bool TableHasCodes { get; private set; }
+    /// <summary>Area-scoped tables (Contacts/Pathologists = 18, Projects = 19) show the Area column instead of Code.</summary>
+    public bool ShowAreaColumn => TableId is 18 or 19;
     public List<string> Errors { get; } = [];
     public string? StatusMessage { get; private set; }
 
@@ -53,10 +56,10 @@ public class EditLookupItemModel : HistoPageModel
             var item = Items.FirstOrDefault(i => string.Equals(i.Code, ItemCode, StringComparison.OrdinalIgnoreCase));
             if (item is not null)
             {
-                Description   = item.Name;
-                Active        = item.Active;
-                Code          = item.Code ?? string.Empty;
-                OriginalCode  = item.Code ?? string.Empty;  // round-tripped for POST @Original_Code
+                Description = item.Name;
+                Active = item.Active;
+                Code = item.Code ?? string.Empty;
+                OriginalCode = item.Code ?? string.Empty;  // round-tripped for POST @Original_Code
             }
         }
         else if (ItemId is int id)
@@ -65,7 +68,7 @@ public class EditLookupItemModel : HistoPageModel
             if (item is not null)
             {
                 Description = item.Name;
-                Active      = item.Active;
+                Active = item.Active;
             }
         }
         else
@@ -157,6 +160,9 @@ public class EditLookupItemModel : HistoPageModel
 
     private async Task LoadItemsAsync()
     {
+        // Always load ALL items (active and inactive) so that TableHasCodes is derived
+        // from the full table shape and the duplicate-code check is exhaustive.
+        // The view filters displayed rows based on ShowDeactivated.
         Items = await _lookups.GetLookupDataAsync(TableId, includeInactive: true);
         TableHasCodes = Items.Any(i => i.Code is not null);
     }
