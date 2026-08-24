@@ -79,7 +79,7 @@ stages:
   - deployment: deploy_dev
     environment: 'dev'
     pool:
-      vmImage: 'ubuntu-24.04'
+      name: 'DEFRA-COMMON-UBUNTU-SSV3'
     strategy:
       runOnce:
         deploy:
