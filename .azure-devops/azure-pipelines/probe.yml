@@ -1,0 +1,15 @@
+trigger: none
+pr: none
+
+jobs:
+- job: probe
+  pool:
+    name: 'DEFRA-COMMON-UBUNTU-SSV3'
+  steps:
+  - checkout: none
+  - script: |
+      echo "Agent: $(Agent.Name)"
+      getent hosts devcdewebaw1401.scm.azurewebsites.net || echo "DNS FAILED"
+      curl -s -o /dev/null -w "HTTP %{http_code}\n" --max-time 10 \
+        https://devcdewebaw1401.scm.azurewebsites.net || echo "CONNECT FAILED"
+    displayName: 'Network check'
