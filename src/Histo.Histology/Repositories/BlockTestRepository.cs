@@ -50,6 +50,23 @@ public sealed class BlockTestRepository : IBlockTestRepository
         var stains = (await multi.ReadAsync<dynamic>()).ToList();
         // Result set 5: animals — AnimalID→HistologyRef
         var animals = (await multi.ReadAsync<dynamic>()).ToList();
+        // Result set 6: histology refs — skip
+        await multi.ReadAsync<dynamic>();
+        // Result set 7: stain TC codes (BLOCK_SPECIALSTAIN_TCCODES)
+        var stainTcRows = (await multi.ReadAsync<dynamic>()).ToList();
+        // Result set 8: antibodies TC codes (BLOCK_ANTIBODIES_TCCODES)
+        var antibodiesTcRows = (await multi.ReadAsync<dynamic>()).ToList();
+        // Result set 9: histology TC codes (BLOCK_HISTOLOGY_TCCODES)
+        var histologyTcRows = (await multi.ReadAsync<dynamic>()).ToList();
+
+        // Build TC code lookups keyed by TestID for each test type
+        static Dictionary<int, List<TcCode>> BuildTcLookup(List<dynamic> rows) =>
+            rows.GroupBy(r => (int)r.TestID)
+                .ToDictionary(g => g.Key, g => g.Select(r => new TcCode((int)r.ID, (string)r.Code)).ToList());
+
+        var histologyTcByTestId  = BuildTcLookup(histologyTcRows);
+        var antibodiesTcByTestId = BuildTcLookup(antibodiesTcRows);
+        var stainTcByTestId      = BuildTcLookup(stainTcRows);
 
         // Build lookup dictionaries from block details and animal data
         var blockRefMap       = blockDetails.ToDictionary(b => (int)b.ID,   b => (string?)b.BlockRef);
@@ -67,6 +84,14 @@ public sealed class BlockTestRepository : IBlockTestRepository
             string? histoRef  = animalId.HasValue ? animalHistoRefMap.GetValueOrDefault(animalId.Value) : null;
             bool onHold       = blockStatus == 2;
             bool archived     = row.ArchiveLocation is not null && row.ArchivedDate is not null;
+
+            var tcLookup = testType switch
+            {
+                BlockTestType.Histology  => histologyTcByTestId,
+                BlockTestType.Antibodies => antibodiesTcByTestId,
+                BlockTestType.Stain      => stainTcByTestId,
+                _ => new Dictionary<int, List<TcCode>>()
+            };
 
             return new BlockTest
             {
@@ -95,6 +120,7 @@ public sealed class BlockTestRepository : IBlockTestRepository
                 OnHold          = onHold,
                 Archived        = archived,
                 RowStamp        = (byte[]?)row.RowStamp,
+                TCCodes         = tcLookup.TryGetValue((int)row.ID, out var codes) ? codes : [],
             };
         }
 
@@ -145,5 +171,34 @@ public sealed class BlockTestRepository : IBlockTestRepository
         var returnValue = parameters.Get<int>("RETURN_VALUE");
         if (returnValue == 1)
             throw new BlockTestConcurrencyException();
+    }
+
+    /// <inheritdoc/>
+    public async Task SaveTCCodesAsync(
+        int batchId, int testId, string testType,
+        IReadOnlyList<TcCode> existing, IReadOnlyList<string> selected,
+        int userId, CancellationToken ct = default)
+    {
+        var (insertSp, deleteSp) = testType switch
+        {
+            BlockTestType.Histology  => ("AddHistologyTCCode",    "DeleteHistologyTCCode"),
+            BlockTestType.Antibodies => ("AddAntibodiesTCCode",   "DeleteAntibodiesTCCode"),
+            BlockTestType.Stain      => ("AddSpecialStainTCCode", "DeleteSpecialStainTCCode"),
+            _ => throw new ArgumentOutOfRangeException(nameof(testType), testType, "Unknown test type.")
+        };
+
+        var toDelete = existing.Where(e => !selected.Contains(e.Code)).ToList();
+        var toInsert = selected.Where(s => !existing.Any(e => e.Code == s)).ToList();
+
+        using var conn = _db.CreateConnection();
+
+        foreach (var tc in toDelete)
+            await conn.ExecuteAsync(deleteSp, new { ID = tc.Id },
+                commandType: System.Data.CommandType.StoredProcedure);
+
+        foreach (var code in toInsert)
+            await conn.ExecuteAsync(insertSp,
+                new { TestID = testId, Code = code, UserID = userId, BatchID = batchId },
+                commandType: System.Data.CommandType.StoredProcedure);
     }
 }

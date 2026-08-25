@@ -6,15 +6,110 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Batches/BatchDetails" class="govuk-back-link">Back</a>
+    <a asp-page="/Batches/BatchesForDispatch" class="govuk-back-link">Back</a>
 }
 
-<p class="govuk-body"><strong>Batch No:</strong> @Model.BatchID</p>
+@* Batch summary — mirrors legacy Batch.ascx header *@
+<dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-4">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Submission number</dt>
+        <dd class="govuk-summary-list__value">@Model.BatchID</dd>
+    </div>
+    @if (Model.BatchSummary is not null)
+    {
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Species</dt>
+            <dd class="govuk-summary-list__value">@Model.BatchSummary.Species</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Project/Contract Code</dt>
+            <dd class="govuk-summary-list__value">@Model.ProjectName</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Pathologist</dt>
+            <dd class="govuk-summary-list__value">@Model.PathologistName</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submission date</dt>
+            <dd class="govuk-summary-list__value">@Model.BatchSummary.BatchDate?.ToShortDateString()</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Received date</dt>
+            <dd class="govuk-summary-list__value">@Model.BatchSummary.ReceivedDate?.ToShortDateString()</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Entered by</dt>
+            <dd class="govuk-summary-list__value">@(Model.EnteredByName ?? "—")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Entered area</dt>
+            <dd class="govuk-summary-list__value">@(Model.EnteredAreaName ?? "—")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submitted by</dt>
+            <dd class="govuk-summary-list__value">@(Model.SubmittedByName ?? "—")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submitted area</dt>
+            <dd class="govuk-summary-list__value">@(Model.SubmittedAreaName ?? "—")</dd>
+        </div>
+    }
+</dl>
 
-<p class="govuk-hint">To raise a QC note against a test, click <strong>Edit</strong> on that row and tick "Raise a QC note".</p>
+@* Filters *@
+<form method="get" class="govuk-!-margin-bottom-6">
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-quarter">
+            <div class="govuk-form-group govuk-!-margin-bottom-0">
+                <label class="govuk-label" for="FilterHistologyRef">Histology ref</label>
+                <select class="govuk-select govuk-!-width-full" id="FilterHistologyRef" name="FilterHistologyRef">
+                    <option value="">All</option>
+                    @foreach (var r in Model.HistologyRefs)
+                    {
+                        if (Model.FilterHistologyRef == r)
+                        {
+                            <option value="@r" selected>@r</option>
+                        }
+                        else
+                        {
+                            <option value="@r">@r</option>
+                        }
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-quarter">
+            <div class="govuk-form-group govuk-!-margin-bottom-0">
+                <label class="govuk-label" for="FilterTest">Test</label>
+                <select class="govuk-select govuk-!-width-full" id="FilterTest" name="FilterTest">
+                    <option value="">All</option>
+                    @foreach (var t in Model.TestNames)
+                    {
+                        if (Model.FilterTest == t)
+                        {
+                            <option value="@t" selected>@t</option>
+                        }
+                        else
+                        {
+                            <option value="@t">@t</option>
+                        }
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-quarter" style="padding-top: 2rem;">
+            <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Apply filters</button>
+            @if (!string.IsNullOrEmpty(Model.FilterHistologyRef) || !string.IsNullOrEmpty(Model.FilterTest))
+            {
+                <a asp-page="/QC/QualityData" class="govuk-link govuk-!-margin-left-3">Clear</a>
+            }
+        </div>
+    </div>
+</form>
 
 @if (Model.Tests.Any())
 {
+    <p class="govuk-hint">To raise a QC note against a test, click <strong>Edit</strong> on that row and tick "Raise a QC note".</p>
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
@@ -22,9 +117,12 @@
                 <th scope="col" class="govuk-table__header">Block ref</th>
                 <th scope="col" class="govuk-table__header">Test</th>
                 <th scope="col" class="govuk-table__header">Result</th>
+                <th scope="col" class="govuk-table__header">Failed</th>
+                <th scope="col" class="govuk-table__header">Passed</th>
                 <th scope="col" class="govuk-table__header">QC note</th>
                 <th scope="col" class="govuk-table__header">Dispatched</th>
                 <th scope="col" class="govuk-table__header">Archived</th>
+                <th scope="col" class="govuk-table__header">On hold</th>
                 <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
             </tr>
         </thead>
@@ -39,6 +137,8 @@
                         @(t.Result == Histo.Histology.Models.BlockTestResult.Passed ? "Passed"
                             : t.Result == Histo.Histology.Models.BlockTestResult.Failed ? "Failed" : "Not tested")
                     </td>
+                    <td class="govuk-table__cell">@(t.Result == Histo.Histology.Models.BlockTestResult.Failed ? "Yes" : "No")</td>
+                    <td class="govuk-table__cell">@(t.Result == Histo.Histology.Models.BlockTestResult.Passed ? "Yes" : "No")</td>
                     <td class="govuk-table__cell">
                         @if (t.QCNoteRef is > 0)
                         {
@@ -46,15 +146,16 @@
                         }
                         else
                         {
-                            <span class="govuk-body govuk-!-colour-secondary">—</span>
+                            <span>—</span>
                         }
                     </td>
                     <td class="govuk-table__cell">@(t.Dispatched ? "Yes" : "No")</td>
                     <td class="govuk-table__cell">@(t.Archived ? "Yes" : "No")</td>
+                    <td class="govuk-table__cell">@(t.OnHold ? "Yes" : "No")</td>
                     <td class="govuk-table__cell">
                         @if (t.OnHold)
                         {
-                            <span class="govuk-tag govuk-tag--grey">On hold</span>
+                            <strong class="govuk-tag govuk-tag--grey">On hold</strong>
                         }
                         else
                         {
@@ -73,3 +174,9 @@ else
 {
     <p class="govuk-body">No tests found for this batch.</p>
 }
+
+<div class="govuk-button-group">
+    <a asp-page="/Batches/BatchesForDispatch" class="govuk-button">Done</a>
+    <a asp-page="/Batches/BatchesForDispatch" class="govuk-button govuk-button--secondary">Cancel</a>
+</div>
+

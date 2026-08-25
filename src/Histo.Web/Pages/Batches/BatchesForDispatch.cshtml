@@ -17,7 +17,7 @@
                 <h2 class="govuk-error-summary__title">There is a problem</h2>
                 <div class="govuk-error-summary__body">
                     <ul class="govuk-list govuk-error-summary__list">
-                        <li>@Model.GoError</li>
+                        <li><a href="#QuickGoId">@Model.GoError</a></li>
                     </ul>
                 </div>
             </div>
@@ -39,13 +39,11 @@ else
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <th scope="col" class="govuk-table__header">Batch No</th>
-                <th scope="col" class="govuk-table__header">Project</th>
+                <th scope="col" class="govuk-table__header">Submission Number</th>
+                <th scope="col" class="govuk-table__header">Project Code</th>
                 <th scope="col" class="govuk-table__header">Pathologist</th>
                 <th scope="col" class="govuk-table__header">Species</th>
-                <th scope="col" class="govuk-table__header">Batch date</th>
-                <th scope="col" class="govuk-table__header">Completed date</th>
-                <th scope="col" class="govuk-table__header">Customer ref</th>
+                <th scope="col" class="govuk-table__header">Submitted Date</th>
                 <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
             </tr>
         </thead>
@@ -58,8 +56,6 @@ else
                     <td class="govuk-table__cell">@b.ContactDescription</td>
                     <td class="govuk-table__cell">@b.Species</td>
                     <td class="govuk-table__cell">@b.BatchDate?.ToShortDateString()</td>
-                    <td class="govuk-table__cell">@b.CompletedDate?.ToShortDateString()</td>
-                    <td class="govuk-table__cell">@b.OtherSubmittedBy</td>
                     <td class="govuk-table__cell">
                         <form method="post">
                             <input type="hidden" name="batchId" value="@b.ID" />
@@ -71,3 +67,7 @@ else
         </tbody>
     </table>
 }
+
+<div class="govuk-button-group">
+    <a asp-page="/Index" class="govuk-button govuk-button--secondary">Done</a>
+</div>

@@ -29,13 +29,13 @@
     <strong>Test:</strong> @(Model.Test?.TestDetails ?? Model.Test?.Code)
 </p>
 
-<form method="post">
+<form method="post" asp-page="/QC/EditQualityDataTest">
     <input type="hidden" asp-for="TestId" />
 
     <div class="govuk-form-group">
         <fieldset class="govuk-fieldset">
             <legend class="govuk-fieldset__legend">Test result</legend>
-            <div class="govuk-radios" data-module="govuk-radios">
+            <div class="govuk-radios" data-module="govuk-radios" id="ResultRadios">
                 <div class="govuk-radios__item">
                     <input class="govuk-radios__input" type="radio" asp-for="Result" id="ResultPassed" value="@Histo.Histology.Models.BlockTestResult.Passed">
                     <label class="govuk-label govuk-radios__label" for="ResultPassed">Passed</label>
@@ -43,6 +43,10 @@
                 <div class="govuk-radios__item">
                     <input class="govuk-radios__input" type="radio" asp-for="Result" id="ResultFailed" value="@Histo.Histology.Models.BlockTestResult.Failed">
                     <label class="govuk-label govuk-radios__label" for="ResultFailed">Failed</label>
+                </div>
+                <div class="govuk-radios__item">
+                    <input class="govuk-radios__input" type="radio" asp-for="Result" id="ResultNotTested" value="">
+                    <label class="govuk-label govuk-radios__label" for="ResultNotTested">Not tested</label>
                 </div>
             </div>
         </fieldset>
@@ -64,10 +68,24 @@
         </select>
     </div>
 
-    <div class="govuk-checkboxes__item">
-        <input class="govuk-checkboxes__input" type="checkbox" asp-for="QCNote" id="QCNote">
-        <label class="govuk-label govuk-checkboxes__label" for="QCNote">Raise a QC note</label>
+    <div class="govuk-form-group" id="QCNoteRow">
+        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" type="checkbox" asp-for="QCNote" id="QCNote">
+                <label class="govuk-label govuk-checkboxes__label" for="QCNote">Raise a QC note</label>
+            </div>
+        </div>
     </div>
+
+    @if (Model.Test?.QCNoteRef is > 0)
+    {
+        <div class="govuk-form-group">
+            <label class="govuk-label">QC note ref</label>
+            <p class="govuk-body">
+                <a asp-page="/Reports/QCNote" asp-route-qcNoteRef="@Model.Test.QCNoteRef" class="govuk-link">@Model.Test.QCNoteRef</a>
+            </p>
+        </div>
+    }
 
     <div class="govuk-form-group govuk-!-margin-top-4">
         <label class="govuk-label" for="RemedialAction">Remedial action</label>
@@ -80,30 +98,36 @@
         </select>
     </div>
 
-    <div class="govuk-checkboxes__item">
-        <input class="govuk-checkboxes__input" type="checkbox" asp-for="Dispatched" id="Dispatched">
-        <label class="govuk-label govuk-checkboxes__label" for="Dispatched">Dispatched</label>
-    </div>
-
-    <div class="govuk-form-group govuk-!-margin-top-4">
-        <label class="govuk-label" for="DispatchedDate">Dispatched date</label>
-        <input class="govuk-input govuk-input--width-10" type="date" asp-for="DispatchedDate" />
-    </div>
-
     <div class="govuk-form-group">
-        <label class="govuk-label" for="DispatchedBy">Dispatched by</label>
-        <select class="govuk-select" asp-for="DispatchedBy">
-            <option value="">Select</option>
-            @foreach (var u in Model.Users)
-            {
-                <option value="@u.UserID">@u.Name</option>
-            }
-        </select>
+        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" type="checkbox" asp-for="Dispatched" id="Dispatched">
+                <label class="govuk-label govuk-checkboxes__label" for="Dispatched">Dispatched</label>
+            </div>
+        </div>
     </div>
 
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="DispatchedTo">Dispatched to</label>
-        <input class="govuk-input" asp-for="DispatchedTo" maxlength="30" />
+    <div id="DispatchedFields">
+        <div class="govuk-form-group govuk-!-margin-top-4">
+            <label class="govuk-label" for="DispatchedDate">Dispatched date</label>
+            <input class="govuk-input govuk-input--width-10" type="date" asp-for="DispatchedDate" />
+        </div>
+
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="DispatchedBy">Dispatched by</label>
+            <select class="govuk-select" asp-for="DispatchedBy">
+                <option value="">Select</option>
+                @foreach (var u in Model.Users)
+                {
+                    <option value="@u.UserID">@u.Name</option>
+                }
+            </select>
+        </div>
+
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="DispatchedTo">Dispatched to</label>
+            <input class="govuk-input" asp-for="DispatchedTo" maxlength="30" />
+        </div>
     </div>
 
     <div class="govuk-form-group">
@@ -127,9 +151,33 @@
         <textarea class="govuk-textarea" asp-for="ArchiveComment" rows="2" maxlength="200"></textarea>
     </div>
 
+    @if (Model.PremiumCharges.Any())
+    {
+        <div class="govuk-form-group">
+            <fieldset class="govuk-fieldset">
+                <legend class="govuk-fieldset__legend">Charges</legend>
+                <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                    @foreach (var charge in Model.PremiumCharges)
+                    {
+                        var chargeCode = charge.Code ?? charge.Name;
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input"
+                                   type="checkbox"
+                                   name="SelectedCharges"
+                                   value="@chargeCode"
+                                   id="charge-@chargeCode"
+                                   @(Model.SelectedCharges.Contains(chargeCode) ? "checked" : "")>
+                            <label class="govuk-label govuk-checkboxes__label" for="charge-@chargeCode">@charge.Name</label>
+                        </div>
+                    }
+                </div>
+            </fieldset>
+        </div>
+    }
+
     <div class="govuk-form-group">
         <label class="govuk-label" for="NumberOfSlides">Number of blocks/slides</label>
-        <input class="govuk-input govuk-input--width-5" asp-for="NumberOfSlides" />
+        <input class="govuk-input govuk-input--width-5" type="number" min="1" max="9999" asp-for="NumberOfSlides" />
     </div>
 
     <div class="govuk-form-group">
@@ -137,6 +185,40 @@
         <textarea class="govuk-textarea" asp-for="Comment" rows="4" maxlength="2000"></textarea>
     </div>
 
-    <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
-    <a asp-page="/QC/QualityData" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
+        <a asp-page="/QC/QualityData" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    </div>
 </form>
+
+@section Scripts {
+<script>
+    (function () {
+        // Show/hide dispatch fields based on Dispatched checkbox
+        var dispatchedCb = document.getElementById('Dispatched');
+        var dispatchedFields = document.getElementById('DispatchedFields');
+        function toggleDispatched() {
+            dispatchedFields.style.display = dispatchedCb.checked ? '' : 'none';
+        }
+        if (dispatchedCb && dispatchedFields) {
+            toggleDispatched();
+            dispatchedCb.addEventListener('change', toggleDispatched);
+        }
+
+        // Show/hide "Raise a QC note" based on result: only enabled when Passed
+        var radios = document.querySelectorAll('input[name="Result"]');
+        var qcNoteRow = document.getElementById('QCNoteRow');
+        var qcNoteCb = document.getElementById('QCNote');
+        function toggleQCNote() {
+            var passed = document.getElementById('ResultPassed');
+            var isPassed = passed && passed.checked;
+            if (qcNoteRow) qcNoteRow.style.display = isPassed ? '' : 'none';
+            if (!isPassed && qcNoteCb) qcNoteCb.checked = false;
+        }
+        if (radios.length && qcNoteRow) {
+            toggleQCNote();
+            radios.forEach(function(r) { r.addEventListener('change', toggleQCNote); });
+        }
+    })();
+</script>
+}
