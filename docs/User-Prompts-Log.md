@@ -1015,3 +1015,7 @@ Added `IsViewMode` computed property to `BatchBlockSummaryModel` that checks `Se
 **Build:** Succeeded. 0 warnings, 0 errors.
 
 **Files changed:** `Submissions/BatchBlockSummary.cshtml.cs`, `Submissions/BatchBlockSummary.cshtml`.
+
+
+## Prompt 56 -  Entrat Id integration 
+

@@ -2,33 +2,32 @@
 @model Histo.Web.Pages.AccessDeniedModel
 @{
     ViewData["Title"] = "Access denied";
-    ViewData["PageTitle"] = "Access denied";
-    Layout = null;
 }
-<!DOCTYPE html>
-<html lang="en" class="govuk-template">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Access denied — Histopathology System</title>
-    <link rel="stylesheet" href="/govuk/govuk-frontend.min.css">
-</head>
-<body class="govuk-template__body">
-<div class="govuk-width-container">
-    <main class="govuk-main-wrapper" id="main-content">
-        <div class="govuk-grid-row">
-            <div class="govuk-grid-column-two-thirds">
-                <h1 class="govuk-heading-xl">Access denied</h1>
-                <p class="govuk-body">
-                    Your Windows login (@Model.Login) was not found in the
-                    Histopathology System database, or your account is inactive.
-                </p>
-                <p class="govuk-body">
-                    Contact your system administrator to request access.
-                </p>
-            </div>
-        </div>
-    </main>
+
+<div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+
+        <h1 class="govuk-heading-xl">Access denied</h1>
+
+        @if (Model.Email is not null)
+        {
+            <p class="govuk-body">
+                You signed in as <strong>@Model.Email</strong>, but that account is not set up
+                in the Histopathology System.
+            </p>
+        }
+        else
+        {
+            <p class="govuk-body">
+                Your account is not set up in the Histopathology System.
+            </p>
+        }
+
+        <p class="govuk-body">Your account may not have been created yet, or it may have been deactivated.</p>
+
+        <p class="govuk-body">
+            Contact your system administrator to request access or reactivate your account.
+        </p>
+
+    </div>
 </div>
-</body>
-</html>

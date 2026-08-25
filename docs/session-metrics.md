@@ -80,7 +80,9 @@
 | 68 | 2026-08-03 | `gds-ui` | — | — | **~10 min** | Run #50 — Search menu label reverted to "Search outputs"; FixCompletedDates legacy provenance confirmed (URL-only). |
 | 69 | 2026-08-03 | `gds-ui` | — | — | **~5 min** | Run #51 — Remove FixCompletedDates from Index.cshtml Administration panel (preserves legacy URL-only behaviour). |
 | 70 | 2026-08-03 | `gds-ui` | — | — | **~5 min** | Run #52 — Remove "Batches received" from Index.cshtml Laboratory panel and _NavPartial.cshtml. |
-
+| 71 | 2026-08-24 | `Identity-migration` | — | — | **40 min** | Run Entra id integration agents |
+| 72 | 2026-08-24 | `Identity-migration` | — | — | **10 min** | SAML config validation |
+| 73 | 2026-08-24 | `gds-ui` | — | — | **15 min** | Access denied and There is a problem with the service pages implmentation - An unhandled exception occurred while processing the request. |
 ---
 
 ## Run #85 Sub-task Breakdown (2026-08-19)
@@ -104,6 +106,7 @@
 | 85-15 | 16:43 | 16:50 | **~6 min** | CopyBatch `IsPreCassetted` → data-driven `IsCassetted` flag fix |
 | 85-16 | 16:50 | 16:55 | **~5 min** | Change button visible (per-row anchor focusing NewSenderRef input) |
 | 85-17 | 16:55 | 17:00 | **~5 min** | SearchSender complexity discussion (advisory only — no code) |
+
 
 ---
 
