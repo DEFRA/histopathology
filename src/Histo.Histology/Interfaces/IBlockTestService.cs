@@ -13,4 +13,9 @@ public interface IBlockTestService
 
     /// <summary>Updates a test record. Throws <see cref="BlockTestConcurrencyException"/> on concurrent modification.</summary>
     Task UpdateAsync(BlockTest test, int userId, CancellationToken ct = default);
+
+    /// <summary>Delta-saves premium-charge (TC code) selections for a single test.</summary>
+    Task SaveTCCodesAsync(int batchId, int testId, string testType,
+        IReadOnlyList<TcCode> existing, IReadOnlyList<string> selected,
+        int userId, CancellationToken ct = default);
 }
