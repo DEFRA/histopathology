@@ -18,6 +18,17 @@ public interface IUserRepository
     Task<User?> GetUserByNtLoginAsync(string ntLogin, CancellationToken ct = default);
 
     /// <summary>
+    /// Resolves a user record from an Entra ID email/UPN claim.
+    /// Maps to the <c>GetUserByEmail</c> stored procedure.
+    ///
+    /// Returns <see langword="null"/> when the email is not found or the account is inactive.
+    /// ISS-009: replaces <see cref="GetUserByNtLoginAsync"/> as the primary lookup after
+    /// Phase 1 auth migration. Requires <c>tblUser.Email</c> to be populated with the UPN.
+    /// See: docs/EntraID-Implementation-plan.md — existing user migration steps.
+    /// </summary>
+    Task<User?> GetUserByEmailAsync(string email, CancellationToken ct = default);
+
+    /// <summary>
     /// Returns all users. Maps to <c>GetUsers</c> stored procedure.
     /// </summary>
     Task<IReadOnlyList<User>> GetUsersAsync(CancellationToken ct = default);

@@ -11,6 +11,13 @@ public interface IUserService
     /// <summary>Resolves the application user for the given NT login. Returns <see langword="null"/> if not found.</summary>
     Task<User?> ResolveUserAsync(string ntLogin, CancellationToken ct = default);
 
+    /// <summary>
+    /// Resolves the application user by Entra ID email/UPN claim.
+    /// Returns <see langword="null"/> if the email is not found in <c>tblUser</c> or the account is inactive.
+    /// ISS-009: this replaces <see cref="ResolveUserAsync"/> as the primary lookup after Phase 1 auth migration.
+    /// </summary>
+    Task<User?> ResolveUserByEmailAsync(string email, CancellationToken ct = default);
+
     /// <summary>Returns all users (active and inactive).</summary>
     Task<IReadOnlyList<User>> GetAllUsersAsync(CancellationToken ct = default);
 

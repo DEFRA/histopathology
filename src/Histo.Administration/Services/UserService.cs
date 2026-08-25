@@ -46,6 +46,20 @@ public sealed class UserService : IUserService
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<User?> ResolveUserByEmailAsync(string email, CancellationToken ct = default)
+    {
+        try
+        {
+            return await _users.GetUserByEmailAsync(email, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to resolve user for email claim.", ex);
+            return null;
+        }
+    }
+
     /// <summary>Returns all active and inactive users.</summary>
     public async Task<IReadOnlyList<User>> GetAllUsersAsync(CancellationToken ct = default)
     {

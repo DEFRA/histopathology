@@ -1016,6 +1016,10 @@ Added `IsViewMode` computed property to `BatchBlockSummaryModel` that checks `Se
 
 **Files changed:** `Submissions/BatchBlockSummary.cshtml.cs`, `Submissions/BatchBlockSummary.cshtml`.
 
+
+## Prompt 56 -  Entrat Id integration 
+
+
 ## Prompt - Enter Quality Data
 
 In the navigation menu, there is a link labeled "Enter Quality Data" that points to the BatchesForDispatch workflow. Please confirm whether "Quality Data" refers to QC Notes or if it represents a different business process/entity.
