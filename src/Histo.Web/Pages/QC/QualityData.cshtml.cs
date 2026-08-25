@@ -25,8 +25,13 @@ public class QualityDataModel : HistoPageModel
     private readonly ILookupService _lookups;
     private readonly IUserService _users;
 
-    private const int LookupProjects  = 19;
-    private const int LookupContacts  = 18;
+    private const int LookupProjects          = 19;
+    private const int LookupContacts          = 18;
+    private const int LookupAntibodiesTse    = 4;
+    private const int LookupAntibodiesNonTse = 5;
+    private const int LookupSpecialStain     = 6;
+    private const int LookupHistologyTse     = 7;
+    private const int LookupHistologyNonTse  = 8;
 
     public QualityDataModel(
         ISessionService session,
@@ -60,6 +65,12 @@ public class QualityDataModel : HistoPageModel
     public IReadOnlyList<string> HistologyRefs { get; private set; } = [];
     public IReadOnlyList<string> TestNames { get; private set; } = [];
 
+    // Resolved code→name map keyed as "TestType|Code"
+    private IReadOnlyDictionary<string, string> _testNameMap = new Dictionary<string, string>();
+
+    public string GetTestName(BlockTest t) =>
+        _testNameMap.TryGetValue($"{t.TestType}|{t.Code}", out var n) ? n : t.Code;
+
     public async Task<IActionResult> OnGetAsync()
     {
         ViewData["Title"] = "Quality data";
@@ -71,6 +82,8 @@ public class QualityDataModel : HistoPageModel
 
         if (BatchSummary is not null)
             await ResolveBatchSummaryAsync(BatchSummary);
+
+        await ResolveTestNamesAsync(BatchSummary?.BatchType ?? Histo.Submissions.Models.BatchTypeConstants.Tse);
 
         HistologyRefs = allTests
             .Select(t => t.HistologyRef)
@@ -99,6 +112,22 @@ public class QualityDataModel : HistoPageModel
     public IActionResult OnPostEdit(int testId)
     {
         return RedirectToPage("/QC/EditQualityDataTest", new { testId });
+    }
+
+    private async Task ResolveTestNamesAsync(int batchType)
+    {
+        var antibodyId = batchType == Histo.Submissions.Models.BatchTypeConstants.Tse ? LookupAntibodiesTse : LookupAntibodiesNonTse;
+
+        var histTask     = _lookups.GetHistologyTypesAsync();
+        var antibodyTask = _lookups.GetLookupDataAsync(antibodyId);
+        var stainTask    = _lookups.GetLookupDataAsync(LookupSpecialStain);
+        await Task.WhenAll(histTask, antibodyTask, stainTask);
+
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var i in histTask.Result)     map[$"Histology|{i.Code ?? i.ID.ToString()}"]  = i.Name;
+        foreach (var i in antibodyTask.Result) map[$"Antibodies|{i.Code ?? i.ID.ToString()}"] = i.Name;
+        foreach (var i in stainTask.Result)    map[$"Stain|{i.Code ?? i.ID.ToString()}"]      = i.Name;
+        _testNameMap = map;
     }
 
     private async Task ResolveBatchSummaryAsync(Batch batch)

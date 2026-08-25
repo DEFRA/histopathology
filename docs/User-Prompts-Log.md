@@ -1015,3 +1015,95 @@ Added `IsViewMode` computed property to `BatchBlockSummaryModel` that checks `Se
 **Build:** Succeeded. 0 warnings, 0 errors.
 
 **Files changed:** `Submissions/BatchBlockSummary.cshtml.cs`, `Submissions/BatchBlockSummary.cshtml`.
+
+## Prompt - Enter Quality Data
+
+In the navigation menu, there is a link labeled "Enter Quality Data" that points to the BatchesForDispatch workflow. Please confirm whether "Quality Data" refers to QC Notes or if it represents a different business process/entity.
+
+Perform a detailed analysis and validation of the "Enter Quality Data" functionality by comparing the legacy application with the new application implementation.
+
+Legacy Pages:
+
+BatchesForDispatch.aspx
+QualityData.aspx
+New Application Pages:
+
+BatchesForDispatch.cshtml
+
+QualityData.cshtml
+
+Validate the following:
+
+All fields are present and correctly mapped from the legacy application.
+
+All filters function as expected and match legacy behavior.
+
+Labels, headings, and field names are consistent with the legacy application and business requirements.
+
+Page layout, alignment, spacing, and overall UI comply with GDS standards and design components.
+
+Colors, typography, and styling are aligned with the approved design system.
+
+Validation messages, help text, and user guidance are correctly implemented.
+
+Navigation flow and user interactions match the intended functionality.
+
+Any missing, incorrect, or newly introduced functionality is identified and documented.
+
+Provide a gap analysis highlighting:
+
+Functional differences between the legacy and new applications.
+
+UI/UX inconsistencies.
+
+Missing fields, filters, validations, or business rules.
+
+Recommendations and required changes to achieve full parity and GDS compliance.
+
+2026-08-25 Session prompts
+
+1. An unhandled exception occurred while processing the request. InvalidOperationException: No authentication handler is registered for the scheme Cookies. The registered schemes are: saml2.
+
+2. Here is Dev environment config details. Can you make the config changes and give me steps which i can test this entra id integration from local code base. Identifier (Entity ID) https://dev-cde.azure.defra.cloud. Reply URL https://dev-cde.azure.defra.cloud/Saml2/Acs. Sign-on URL https://dev-cde.azure.defra.cloud/. Logout URL https://dev-cde.azure.defra.cloud/Saml2/Logout.
+
+3. is there any accessdenied page in this application, else create one using as per GDS UI
+
+4. Can you implement the There is a problem with the service pages as per GDS. Source design-system.service.gov.uk/patterns/problem-with-the-service-pages. Mandatory content rules for title, h1, body copy, breadcrumbs, error codes, red warning text.
+
+5. Review the codebase to verify whether an Entra ID security group is being created and properly associated with the relevant resources. If a security group is not currently implemented, identify the changes required to create an Entra ID security group and attach it appropriately.
+
+6. security groupw would be used to for authentication, db groups customer, maintenace, etch will be used for authorisaiton, for authenticaiton will there be any issue or any code changes requried ?
+
+7. How to this group will be attache to the respective application ? SG-HistopathologySystem-Users
+
+8. In the navigation menu, there is a link labeled Enter Quality Data that points to the BatchesForDispatch workflow. Please confirm whether Quality Data refers to QC Notes or if it represents a different business process/entity. Perform a detailed analysis and validation of the Enter Quality Data functionality by comparing the legacy application with the new application implementation.
+
+9. Can you implement the suggestion, except the pagination and sortable column because this has to added for all the pages, i will implement later. Fix other issue and gab
+
+10. Thoroughly review the following documents: session-metrics.md and migration-run-journal.md. Review recent issue fixes and incorporate any relevant learnings or patterns to prevent regressions. Previously identified issues from migration and session review documents do not reoccur. On the below functionality: QualityData.cshtml, EditQualityDataTest.cshtml, BatchesForDispatch.cshtml
+
+11. In BatchesForDispatch.cshtml update column names to match legacy. In QualityData.cshtml review and validate the grid - why is QC Notes displayed, why is On Hold missing, missing fields Entered By, Submitted By, Project/Contract Code, Pathologist, Entered Area, Submitted Area, Submission Date, Species. In EditQualityDataTest.cshtml add missing fields Remedial Action, QC Note Ref, Charges with multiple checkboxes.
+
+12. How legacy is making saving these details for TC Codes?
+
+13. is there any implementation is pending now for TC Codes?
+
+14. Please document all fixes, gaps, issues, findings, and recommendations identified during this session from 11:00 AM until now in run-log-v2.md.
+
+15. I'm getting below message, actually in the grid has this data - Submission 29395 could not be found or is not ready for quality data entry.
+
+16. check the EditQualityDataTest.cshtml there is issue in rendering
+
+17. In legacy Quality Data page shows submission summary and a colour-coded results grid. in new page QualityData.cshtml is that achievable using GDS standard? Green = awaiting result, Grey = Passed, Purple = Failed, White = dispatched.
+
+18. Is it as per GDS?
+
+19. align with GDS and remove the row CSS and keep only the tags with respective colour?
+
+20. In legacy this QualityData.aspx has Failed and Passed column, how this has changed QualityData.cshtml it's show column Results.
+
+21. Please review the following observations in EditQualityDataTest.cshtml: 1. Why is the Raise a QC Note checkbox displayed? When the Passed radio button is selected, the QC Note checkbox is automatically checked. 2. The QC Note Reference field is not available on the Edit Quality Data Test screen. 3. When the Dispatched checkbox is selected, the related dispatched fields become visible. 4. The Test column is currently displaying numeric values instead of text.
+
+22. Remove QC note column from QualityData.cshtml. Still can't see QC Note Ref in EditQualityDataTest.cshtml. Still Test column shows numeric codes in QualityData.cshtml.
+
+23. update issue and fix in run-log-v2.md file duration time session-metrics.md file. update the prompt in User-Prompts-Log.md file.

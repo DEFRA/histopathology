@@ -34,10 +34,6 @@
             <dd class="govuk-summary-list__value">@Model.BatchSummary.BatchDate?.ToShortDateString()</dd>
         </div>
         <div class="govuk-summary-list__row">
-            <dt class="govuk-summary-list__key">Received date</dt>
-            <dd class="govuk-summary-list__value">@Model.BatchSummary.ReceivedDate?.ToShortDateString()</dd>
-        </div>
-        <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Entered by</dt>
             <dd class="govuk-summary-list__value">@(Model.EnteredByName ?? "—")</dd>
         </div>
@@ -117,9 +113,6 @@
                 <th scope="col" class="govuk-table__header">Block ref</th>
                 <th scope="col" class="govuk-table__header">Test</th>
                 <th scope="col" class="govuk-table__header">Result</th>
-                <th scope="col" class="govuk-table__header">Failed</th>
-                <th scope="col" class="govuk-table__header">Passed</th>
-                <th scope="col" class="govuk-table__header">QC note</th>
                 <th scope="col" class="govuk-table__header">Dispatched</th>
                 <th scope="col" class="govuk-table__header">Archived</th>
                 <th scope="col" class="govuk-table__header">On hold</th>
@@ -132,21 +125,23 @@
                 <tr class="govuk-table__row">
                     <td class="govuk-table__cell">@t.HistologyRef</td>
                     <td class="govuk-table__cell">@t.BlockRef</td>
-                    <td class="govuk-table__cell">@(t.TestDetails ?? t.Code)</td>
+                    <td class="govuk-table__cell">@Model.GetTestName(t)</td>
                     <td class="govuk-table__cell">
-                        @(t.Result == Histo.Histology.Models.BlockTestResult.Passed ? "Passed"
-                            : t.Result == Histo.Histology.Models.BlockTestResult.Failed ? "Failed" : "Not tested")
-                    </td>
-                    <td class="govuk-table__cell">@(t.Result == Histo.Histology.Models.BlockTestResult.Failed ? "Yes" : "No")</td>
-                    <td class="govuk-table__cell">@(t.Result == Histo.Histology.Models.BlockTestResult.Passed ? "Yes" : "No")</td>
-                    <td class="govuk-table__cell">
-                        @if (t.QCNoteRef is > 0)
+                        @if (t.Dispatched)
                         {
-                            <a asp-page="/Reports/QCNote" asp-route-qcNoteRef="@t.QCNoteRef" class="govuk-link">@t.QCNoteRef</a>
+                            <strong class="govuk-tag govuk-tag--blue">Dispatched</strong>
+                        }
+                        else if (t.Result == Histo.Histology.Models.BlockTestResult.Passed)
+                        {
+                            <strong class="govuk-tag govuk-tag--green">Passed</strong>
+                        }
+                        else if (t.Result == Histo.Histology.Models.BlockTestResult.Failed)
+                        {
+                            <strong class="govuk-tag govuk-tag--red">Failed</strong>
                         }
                         else
                         {
-                            <span>—</span>
+                            <strong class="govuk-tag govuk-tag--yellow">Not tested</strong>
                         }
                     </td>
                     <td class="govuk-table__cell">@(t.Dispatched ? "Yes" : "No")</td>
