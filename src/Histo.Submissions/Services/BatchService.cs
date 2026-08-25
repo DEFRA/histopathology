@@ -110,7 +110,11 @@ public sealed class BatchService : IBatchService
     public async Task<bool> UpdateAsync(Batch batch, int userId, CancellationToken ct = default)
     {
         try { await _batches.UpdateAsync(batch, userId, ct); return true; }
-        catch (Exception ex) { _logger.LogError("Failed to update batch {BatchId}.", ex, batch.ID); return false; }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to update batch {BatchId}: {Message}", ex, batch.ID, ex.Message);
+            throw;
+        }
     }
 
     /// <summary>

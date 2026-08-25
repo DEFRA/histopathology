@@ -70,7 +70,8 @@ public class EditBatchModel : HistoPageModel
         ViewData["PageTitle"] = "Edit submission";
         if (Session.BatchID <= 0) return RedirectToPage("/Index");
 
-        Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0);
+        try { Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0); }
+        catch (Exception ex) { SaveError = $"Error loading submission: {ex.Message}"; await LoadLookupsAsync(); return Page(); }
         if (Batch is null) return RedirectToPage("/Index");
 
         // Pre-populate editable fields from loaded batch
@@ -99,7 +100,8 @@ public class EditBatchModel : HistoPageModel
         ViewData["Title"]     = "Edit submission";
         ViewData["PageTitle"] = "Edit submission";
 
-        Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0);
+        try { Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0); }
+        catch (Exception ex) { SaveError = $"Error loading submission: {ex.Message}"; await LoadLookupsAsync(); return Page(); }
         if (Batch?.RowStamp is null) return RedirectToPage("/Index");
 
         await LoadLookupsAsync();
@@ -166,9 +168,13 @@ public class EditBatchModel : HistoPageModel
             PostFixationOther   = Batch.PostFixationOther,
         };
 
-        if (!await _batches.UpdateAsync(updated, Session.UserID))
+        try
         {
-            SaveError = "Failed to save submission details. Please try again.";
+            await _batches.UpdateAsync(updated, Session.UserID);
+        }
+        catch (Exception ex)
+        {
+            SaveError = $"Error saving submission: {ex.Message}";
             return Page();
         }
 
