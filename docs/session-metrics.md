@@ -138,3 +138,43 @@ Write-Host "Elapsed duration  : $elapsed minutes"
 ```
 
 > **Tip:** Keep a PowerShell terminal open for the duration of each agent run. `$agentStart` persists in the session until the terminal is closed.
+
+---
+
+## Session 2026-08-25 � Entra ID Auth + Quality Data Parity
+
+| Item | Value |
+|---|---|
+| Date | 2026-08-25 |
+| Start time | 10:59 |
+| End time | 17:45 |
+| Duration | **4h 00m** (240 min — measured from session log timestamps) |
+| Agent | GitHub Copilot (Chat) |
+| Build result | 0 errors, 0 warnings |
+
+### Work completed
+
+| Area | Change |
+|---|---|
+| Auth � SAML scheme | Fixed ChallengeResult("Cookies") ? ChallengeResult("saml2") in HistoPageModel.cs |
+| Auth � dev config | Populated ppsettings.Development.json with real Entra ID tenant/app IDs |
+| Auth � AccessDenied | Replaced inline HTML + Windows messaging with GDS layout + Entra ID email claim |
+| Auth � ServiceProblem | Created GDS service-problem page; fixed Program.cs error middleware |
+| Auth � Security groups | Analysis: Option A (Enterprise App assignment) recommended; portal steps provided |
+| QC � BatchesForDispatch | Column names corrected to legacy labels; Completed Date + Customer Ref removed |
+| QC � QualityData batch summary | 10 legacy fields added (Project, Pathologist, Entered/Submitted By/Area, dates) |
+| QC � QualityData grid | On Hold column added; Failed/Passed columns separated; filters wired |
+| QC � EditQualityDataTest | Not Tested radio; QC Note Ref link; JS conditionals; missing validations; Charges UI |
+| QC � TC Codes full stack | TcCode model + BlockTestRepository reads result sets 7-9 + SaveTCCodesAsync delta || QC — Quick-Go bug | BatchesForDispatch Quick-Go rejected valid batches; fixed validation against dispatch list |
+| QC — GDS JS cleanup | EditQualityDataTest custom JS replaced with govuk-radios/checkboxes conditional reveal |
+| QC — Div structure fix | EditQualityDataTest stray div + misaligned dispatched conditional nesting fixed |
+| QC — Test name display | QualityData grid Test column resolved from lookup codes to display names |
+| QC — QC Note Ref | EditQualityDataTest always shows QC Note Ref (None/link) regardless of state |
+| QC — GDS row colours | Row CSS tinting removed; govuk-tag in Result column is sole status indicator |
+### Outstanding items
+
+- Entra admin: add localhost Reply URL + create security group + set Assignment required
+- Verify TC code SPs exist in DB (sys.procedures query)
+- Fix EditUser.cshtml antiforgery form attribute (ISS-R05)
+- Add dedicated 404 page (ISS-R03)
+- Pagination for QualityData and EditQualityDataTest (deferred)
