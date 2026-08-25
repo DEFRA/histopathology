@@ -85,4 +85,11 @@ public interface IBatchService
     /// Legacy: <c>LOOKUP_SUBMITTEDAS = 11</c> is used by the caller to resolve the code to a display name.
     /// </summary>
     Task<string?> GetSubmittedAsCodeAsync(int batchId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Saves (replaces) the SubmittedAs code for a batch in <c>BatchSubmittedAs</c>.
+    /// Clears any existing entry for the batch before inserting the new one.
+    /// Legacy source: <c>Cassetted.aspx.vb::UpdateSessionWithBatchDetails</c> — UpdateCheckBoxData on BATCH_SUBMITTEDAS_TABLE.
+    /// </summary>
+    Task SaveSubmittedAsAsync(int batchId, string code, int userId, CancellationToken ct = default);
 }

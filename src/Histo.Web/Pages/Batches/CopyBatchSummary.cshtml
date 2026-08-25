@@ -16,8 +16,8 @@
 
     <dl class="govuk-summary-list">
         <div class="govuk-summary-list__row">
-            <dt class="govuk-summary-list__key">Customer ref</dt>
-            <dd class="govuk-summary-list__value">@Model.NewBatch.CustomerRef</dd>
+            <dt class="govuk-summary-list__key">Project / contract</dt>
+            <dd class="govuk-summary-list__value">@(Model.NewBatch.ProjectContractCode ?? "Not specified")</dd>
         </div>
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Samples copied</dt>

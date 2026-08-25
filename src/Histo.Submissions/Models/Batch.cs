@@ -92,11 +92,11 @@ public sealed class Batch
     public int? SubmittedBy { get; init; }
 
     /// <summary>
-    /// User area ID of the entering VLA staff member.
-    /// Legacy source: <c>tblBatch.SubmittedArea</c>, label "Entered Area" on BatchDetails.aspx.
+    /// User area code (varchar) of the entering VLA staff member.
+    /// Legacy source: <c>tblBatch.SubmittedArea varchar(10)</c>, label "Entered Area" on BatchDetails.aspx.
     /// Resolved to a description via <c>GetUserAreasAsync</c> in the view layer.
     /// </summary>
-    public int? SubmittedArea { get; init; }
+    public string? SubmittedArea { get; init; }
 
     /// <summary>
     /// ID of the external user who submitted this batch (the customer).
@@ -107,11 +107,11 @@ public sealed class Batch
     public int? OtherSubmittedBy { get; init; }
 
     /// <summary>
-    /// User area ID of the external submitter.
-    /// Legacy source: <c>tblBatch.OtherSubmittedArea</c>, label "Submitted Area" on BatchDetails.aspx.
+    /// User area code (varchar) of the external submitter.
+    /// Legacy source: <c>tblBatch.OtherSubmittedArea varchar(10)</c>, label "Submitted Area" on BatchDetails.aspx.
     /// Resolved to a description via <c>GetUserAreasAsync</c> in the view layer.
     /// </summary>
-    public int? OtherSubmittedArea { get; init; }
+    public string? OtherSubmittedArea { get; init; }
 
     /// <summary>
     /// Whether the samples are adequately fixed (formalin fixation).
@@ -120,6 +120,26 @@ public sealed class Batch
     /// Rendered as "Yes", "No", or "Not specified" in the view.
     /// </summary>
     public bool? SafeToHandle { get; init; }
+
+    // ---- Additional fields mapped from GetBatchDetails SP ----
+
+    /// <summary>Flag set when all tissues have been assigned to blocks.</summary>
+    public bool AllTissuesAssigned { get; init; }
+
+    /// <summary>Flag set when all samples share the same project code.</summary>
+    public bool SampleSameProjects { get; init; }
+
+    /// <summary>Whether the batch is blocked (all blocks assigned).</summary>
+    public bool IsBlocked { get; init; }
+
+    /// <summary>Additional post-fixation information. Legacy source: <c>tblBatch.PostFixationOther</c>.</summary>
+    public string? PostFixationOther { get; init; }
+
+    /// <summary>Time the batch was received (stored as int in legacy). Legacy source: <c>tblBatch.TimeReceived</c>.</summary>
+    public string? TimeReceived { get; init; }
+
+    /// <summary>User ID who received this batch. Legacy source: <c>tblBatch.ReceivedBy</c>.</summary>
+    public int? ReceivedBy { get; init; }
 }
 
 /// <summary>

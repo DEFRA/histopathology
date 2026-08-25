@@ -73,7 +73,7 @@ public interface IBatchRepository
     /// Updates batch status. Maps to <c>EditBatchStatus</c>.
     /// Throws <see cref="BatchConcurrencyException"/> on rowstamp mismatch.
     /// </summary>
-    Task UpdateStatusAsync(int batchId, string newStatus, byte[] rowStamp, int userId, CancellationToken ct = default);
+    Task<bool> UpdateStatusAsync(int batchId, string newStatus, byte[] rowStamp, int userId, CancellationToken ct = default);
 
     /// <summary>
     /// Persists the ByPassSort flag. Reloads current batch to supply the full EditBatch parameter set.
@@ -193,4 +193,7 @@ public interface IBatchRepository
     /// reads <c>foundRows(0)("Code")</c> then resolves via <c>GetListType(code, LOOKUP_SUBMITTEDAS)</c>.
     /// </summary>
     Task<string?> GetSubmittedAsCodeAsync(int batchId, CancellationToken ct = default);
+
+    /// <summary>Saves (replaces) the SubmittedAs code. Calls <c>AddSubmittedAs</c> SP.</summary>
+    Task SaveSubmittedAsAsync(int batchId, string code, int userId, CancellationToken ct = default);
 }
