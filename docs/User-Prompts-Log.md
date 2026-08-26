@@ -1118,3 +1118,9 @@ Recommendations and required changes to achieve full parity and GDS compliance.
 
 4. Please update the details run-log-v2.md (what fix applied) and session-metrics.md (duration), User-Prompts-Log.md (prompt) files to contain the relevant data pertaining to this session.
 
+5. When comparing the legacy and current version of the Edit QC note page. The current system doesn't always present all the data that is presented on the Legacy system. (Notes are loaded into the legacy system but they do not appear in the current system, The created date appears in legacy but not in current). Please review the current system to ensure that all the correct data is loaded into the form.
+
+6. The correct notes have started to appear, however the dates next to the username all missing, while they are present in the legacy system. Please resolve this issue.
+
+7. Please update the details run-log-v2.md (what fix applied) and session-metrics.md (duration), User-Prompts-Log.md (prompt) files to contain the relevent data pertaining to this session.
+

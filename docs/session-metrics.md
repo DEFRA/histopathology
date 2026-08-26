@@ -188,9 +188,9 @@ Write-Host "Elapsed duration  : $elapsed minutes"
 | Date | 2026-08-26 |
 | Start time | — |
 | End time | — |
-| Duration | **~50 min** (complexity-based estimate — sum of 3 sub-tasks below) |
+| Duration | **~90 min** (complexity-based estimate — sum of 5 sub-tasks below) |
 | Agent | GitHub Copilot (Chat) |
-| Build result | 0 CS errors (file-lock copy errors only, from a running dev process) |
+| Build result | 0 errors (Histo.QualityControl); solution build had only pre-existing file-lock copy errors from a running dev process |
 
 ### Work completed
 
@@ -199,7 +199,9 @@ Write-Host "Elapsed duration  : $elapsed minutes"
 | 1 | **~25 min** | Nav / BatchesForEditing / EditBatch (ISS-R13) | Removed duplicate `Quality data` nav link (replaced with `Edit QC notes` → `/QC/QCNotes`); fixed `BatchesForEditingModel.OnPostSelect` to redirect to `/Batches/EditBatch` (was `/Batches/BatchDetails`, matching legacy `grdBatchesForEditing_SelectedIndexChanged`); corrected `BatchesForEditing.cshtml` grid headers/columns to match legacy `BatchesForEditing.aspx` exactly (removed `Received date`/`Customer ref`, renamed headers) |
 | 2 | **~15 min** | QC — EditQCNote (ISS-R14) | Restored legacy QC Note Ref summary box (QC note ref, Submission number, Project, Species, Stain ref) and Created by/Date created footer, missing entirely from the migrated page; added `CreatedBy`/`DateCreated` to `QCNote` model and repository mapping |
 | 3 | **~10 min** | QC — QCNoteRepository (ISS-R15) | Fixed regression from Sub-task 2 — `RuntimeBinderException` on dynamic access to possibly-absent SP columns silently swallowed by service catch, making the QCNotes Edit button appear non-functional; replaced with safe `IDictionary<string, object>` + `TryGetValue` mapping |
+| 4 | **~25 min** | QC — QCNoteRepository (ISS-R16) | Notes missing entirely for antibody-test QC notes — added the missing `GetQCNoteAntibodiesInformation` SP call (legacy calls both SPs and combines result sets); added `BuildDefaultNoteText` to reproduce legacy's padded Sender Ref/Histo Ref/Block Ref/Test table shown when a note has no saved text yet |
+| 5 | **~15 min** | QC — QCNoteRepository (ISS-R17) | Created-by date missing next to username — `DateCreated` arrives as a `dd/MM/yyyy` string but dynamic/IDictionary reads bypass Dapper's `NullableDateTimeTypeHandler`; added a `ParseDate` helper mirroring that handler's logic |
 
 ### Outstanding items
 
-- None raised this session — all 3 issues found were resolved in-session.
+- None raised this session — all 5 issues found were resolved in-session.
