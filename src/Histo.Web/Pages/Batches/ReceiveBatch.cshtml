@@ -25,7 +25,11 @@
 
 @if (Model.Batch is not null)
 {
-    <p class="govuk-body">Confirm receipt of batch <strong>@Model.Batch.CustomerRef</strong> (ID: @Model.Batch.ID)?</p>
+    <p class="govuk-body">Confirm receipt of submission <strong>@Model.Batch.ID</strong>
+        @if (!string.IsNullOrWhiteSpace(Model.Batch.ProjectContractCode))
+        {
+            <span> — project @Model.Batch.ProjectContractCode</span>
+        }?</p>
     <form method="post">
         <button type="submit" class="govuk-button" data-module="govuk-button">Confirm receipt</button>
         <a asp-page="/Batches/BatchesNotReceived" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>

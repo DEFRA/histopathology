@@ -141,12 +141,20 @@ public class CopyBatchModel : HistoPageModel
         var userId = Session.UserID;
         var batchToCopy = new Batch
         {
-            Status = SourceBatch.Status,
-            CustomerRef = SourceBatch.CustomerRef,
-            Comments = SourceBatch.Comments,
-            SubmittedByUserID = SourceBatch.SubmittedByUserID,
-            UserAreaCode = SourceBatch.UserAreaCode,
-            IsPreCassetted = SourceBatch.IsPreCassetted,
+            Status              = SourceBatch.Status,
+            Comments            = SourceBatch.Comments,
+            SubmittedByUserID   = SourceBatch.SubmittedByUserID,
+            UserAreaCode        = SourceBatch.UserAreaCode,
+            IsPreCassetted      = SourceBatch.IsPreCassetted,
+            BatchType           = SourceBatch.BatchType,
+            ProjectContractCode = SourceBatch.ProjectContractCode,
+            ContactName         = SourceBatch.ContactName,
+            Species             = SourceBatch.Species,
+            BatchDate           = SourceBatch.BatchDate,
+            Fixation            = SourceBatch.Fixation,
+            SafeToHandle        = SourceBatch.SafeToHandle,
+            OtherSubmittedBy    = SourceBatch.OtherSubmittedBy,
+            OtherSubmittedArea  = SourceBatch.OtherSubmittedArea ?? "",
         };
         var newBatchId = await _batches.CopyBatchHeaderAsync(batchToCopy, userId);
         if (newBatchId <= 0)

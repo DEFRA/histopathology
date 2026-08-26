@@ -142,12 +142,22 @@ public class BatchDetailsModel : HistoPageModel
         ? "/Index"
         : Session.ReturnPage;
 
+    public string? LoadError { get; private set; }
+
     public async Task<IActionResult> OnGetAsync()
     {
         ViewData["Title"] = "Submission details";
         ViewData["PageTitle"] = "Submission details";
         if (Session.BatchID <= 0) return RedirectToPage("/Index");
-        Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0);
+        try
+        {
+            Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0);
+        }
+        catch (Exception ex)
+        {
+            LoadError = "Failed to load the submission details. Please go back and try again.";
+            return Page();
+        }
         if (Batch is not null)
         {
             Session.BatchType = Batch.BatchType;  // ISS-023: restore from DB for downstream lookup selection
@@ -193,9 +203,10 @@ public class BatchDetailsModel : HistoPageModel
 
             // Resolve Entered Area / Submitted Area codes → descriptions.
             // GetUserAreasAsync uses MapCodeDescription: Code column → LookupItem.ID (int), Description → Name.
-            var areaById = userAreasTask.Result.ToDictionary(a => a.ID, a => a.Name);
-            EnteredAreaName   = Batch.SubmittedArea.HasValue     && areaById.TryGetValue(Batch.SubmittedArea.Value,     out var ea) ? ea : null;
-            SubmittedAreaName = Batch.OtherSubmittedArea.HasValue && areaById.TryGetValue(Batch.OtherSubmittedArea.Value, out var sa) ? sa : null;
+            // SubmittedArea/OtherSubmittedArea are varchar codes in DB; match them as strings.
+            var areaByCode = userAreasTask.Result.ToDictionary(a => a.ID.ToString(), a => a.Name, StringComparer.OrdinalIgnoreCase);
+            EnteredAreaName   = !string.IsNullOrEmpty(Batch.SubmittedArea)     && areaByCode.TryGetValue(Batch.SubmittedArea,      out var ea) ? ea : null;
+            SubmittedAreaName = !string.IsNullOrEmpty(Batch.OtherSubmittedArea) && areaByCode.TryGetValue(Batch.OtherSubmittedArea, out var sa) ? sa : null;
 
             // Resolve Submitted As code → description via LOOKUP_SUBMITTEDAS (table 11).
             var code = submittedAsTask.Result;

@@ -34,12 +34,53 @@ public class ReceiveBatchModel : HistoPageModel
             return Page();
         }
 
-        var ok = await _batches.UpdateStatusAsync(
-            Session.BatchID ?? 0, Received, Batch.RowStamp, Session.UserID);
+        // Mirrors legacy ReceiveBatch.aspx → UpdateBatchDetails → EditBatch SP.
+        // Uses the full UpdateAsync path so RowStamp concurrency (WHERE ID=@ID AND RowStamp=@RowStamp)
+        // is checked exactly as legacy; EditBatchStatus has no rowstamp check.
+        var updated = new Batch
+        {
+            ID = Batch.ID, Status = Received,
+            ReceivedDate      = DateTime.Now,
+            ReceivedBy        = Session.UserID,
+            Comments          = Batch.Comments,
+            StatusComments    = Batch.StatusComments,
+            BatchDate         = Batch.BatchDate,
+            CompletedDate     = Batch.CompletedDate,
+            SubmittedByUserID = Batch.SubmittedByUserID,
+            UserAreaCode      = Batch.UserAreaCode,
+            IsPreCassetted    = Batch.IsPreCassetted,
+            ByPassSort        = Batch.ByPassSort,
+            RowStamp          = Batch.RowStamp,
+            BatchType         = Batch.BatchType,
+            ProjectContractCode = Batch.ProjectContractCode,
+            ContactName       = Batch.ContactName,
+            Species           = Batch.Species,
+            Fixation          = Batch.Fixation,
+            CustomerReceivedDate = Batch.CustomerReceivedDate,
+            SubmittedBy       = Batch.SubmittedBy,
+            SubmittedArea     = Batch.SubmittedArea,
+            OtherSubmittedBy  = Batch.OtherSubmittedBy,
+            OtherSubmittedArea = Batch.OtherSubmittedArea ?? "",
+            SafeToHandle      = Batch.SafeToHandle,
+            IsBlocked         = Batch.IsBlocked,
+            SampleSameProjects = Batch.SampleSameProjects,
+            AllTissuesAssigned = Batch.AllTissuesAssigned,
+            TimeReceived      = Batch.TimeReceived,
+            PostFixationOther = Batch.PostFixationOther,
+        };
 
-        if (!ok)
+        try
+        {
+            await _batches.UpdateAsync(updated, Session.UserID);
+        }
+        catch (BatchConcurrencyException)
         {
             Error = "Could not update batch status. It may have been modified by another user.";
+            return Page();
+        }
+        catch (Exception)
+        {
+            Error = "Failed to update batch status. Please try again.";
             return Page();
         }
 
