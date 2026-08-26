@@ -53,3 +53,23 @@
 - TC code result sets in `GetBatchBlocksByID`: set 7 = Stain TC, set 8 = Antibodies TC, set 9 = Histology TC (derived from `clsBatch.vb` BLOCK_*_TCCODES constants offset by 6).
 - Security group option A (Enterprise Application assignment gate) is the correct approach for authentication; `tblUser` remains the authorisation gate.
 
+---
+
+## Session 2026-08-26 (15:23–16:53) — Submission creation flow + Edit Submission + Pick List fixes
+
+| # | Fix area | Issue | Fix applied |
+|---|---|---|---|
+| 1 | `Cassetted.cshtml` / `BatchDetails.cshtml` | Submission creation fields all on Cassetted — does not match legacy two-step flow | Stripped Cassetted to type-selection only (BatchType + SubmittedAs); moved full creation form (Project, Pathologist, Species, Date, Histology/Antibody/Stain checkboxes) to `BatchDetails.cshtml?mode=create` |
+| 2 | `BatchDetails.cshtml.cs` | Histology/Antibody/Stain checkboxes missing from create mode | Added `Create_Selected*Codes` bind properties, lookup loading, validation (mirrors `CheckHistology()`), and `SaveBatchTestSelectionsAsync` call after batch creation |
+| 3 | `BatchDetails.cshtml` | "Batch not found. }" rendered as page text | `@if (!Model.IsCreateMode)` was only wrapping the LoadError section; `else if (Batch is null)` and main `else` were at top level — fixed to use inner `if/else if/else` inside outer `@if` block |
+| 4 | `Cassetted.cshtml.cs` | Selections lost when user navigates back from BatchDetails | Added `OnGetAsync` pre-population: `BatchType` from `Session.BatchType`, `SubmittedAs` from `TempData["CreateSubmittedAsId"]` with `.Keep()` |
+| 5 | `Cassetted.cshtml` | SubmittedAs defaulting to "Pre Cassetted Tissue" instead of blank | `asp-for="SubmittedAs"` on `<select>` caused SelectTagHelper to bypass blank placeholder for `int?` null; replaced with `name="SubmittedAs"` |
+| 6 | `SearchSubmissions.cshtml.cs` | `CanEditSubmission` conditions inverted vs legacy — enabled for Received/OnHold/InProgress, disabled for Submitted/Rejected | Fixed to `Submitted \|\| Rejected` matching `ViewSubmissions` and legacy `ViewSubmissions.aspx.vb` |
+| 7 | `BatchesForEditing.cshtml.cs` | `Session.ReturnPage` not set on select — EditBatch had no return context | Added `Session.ReturnPage = "/Batches/BatchesForEditing"` in `OnPostSelect` |
+| 8 | `EditBatch.cshtml.cs` | Back link hardcoded to BatchDetails; Cancel/save always to BatchesForEditing | Added `ReturnPage` property using `Session.ReturnPage`; wired to back link, Cancel, and post-save redirect |
+| 9 | `EditBatch.cshtml` | Back link and Cancel hardcoded to wrong pages | Changed to `Model.ReturnPage` |
+| 10 | `EditLookupItem.cshtml.cs` | Area column shows numeric code instead of name for Contacts/Projects (tables 18/19) | Loaded `GetUserAreasAsync()` when `ShowAreaColumn`, built `AreaNameById` dictionary, table now displays name |
+| 11 | `EditLookupItem.cshtml` | Area dropdown missing in Add/Edit form for tables 18/19 | Added Area `<select>` bound to `Model.UserAreas`; pre-populated on edit from `item.Area`; used in `OnPostAsync` for new items |
+| 12 | `LookupRepository.cs` | `AddluContacts` error: "@ID was not supplied" on insert for ID-keyed tables | Added `else parameters.Add("ID", item.ID)` branch in `CreateLookupItemAsync` — mirrors legacy `BuildParamListID` which always passed `@ID` |
+| 13 | `QualityData.cshtml.cs` | Test name resolution used `GetLookupDataAsync(histId)` which returns integer IDs not string codes; histology codes like "3","4" never matched | Switched to `GetHistologyTypesAsync()` which returns the string codes used in `tblBatchBlockHistology.Code` |
+

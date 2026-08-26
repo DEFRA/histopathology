@@ -77,9 +77,8 @@ public class SearchSubmissionsModel : HistoPageModel
     // Received/OnHold/InProgress: all six buttons enabled.
 
     public bool CanPrintSubmission => SelectedBatchStatus is not null && SelectedBatchStatus != BatchStatus.Rejected;
-    public bool CanEditSubmission  => SelectedBatchStatus == BatchStatus.Received
-                                   || SelectedBatchStatus == BatchStatus.OnHold
-                                   || SelectedBatchStatus == BatchStatus.InProgress;
+    public bool CanEditSubmission  => SelectedBatchStatus == BatchStatus.Submitted
+                                   || SelectedBatchStatus == BatchStatus.Rejected;
     public bool CanViewSubmission  => SelectedBatchStatus is not null && SelectedBatchStatus != BatchStatus.Submitted;
     public bool CanViewQualityData => SelectedBatchStatus == BatchStatus.Completed
                                    || SelectedBatchStatus == BatchStatus.Received

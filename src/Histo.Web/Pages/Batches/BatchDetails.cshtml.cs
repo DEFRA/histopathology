@@ -29,9 +29,14 @@ namespace Histo.Web.Pages.Batches;
 /// </summary>
 public class BatchDetailsModel : HistoPageModel
 {
-    private const int LookupContacts = 18;  // Legacy source: HistopathologySystem/Common.vb — LOOKUP_CONTACTS
-    private const int LookupProjects = 19;  // Legacy source: HistopathologySystem/Common.vb — LOOKUP_PROJECTS
-    private const int LookupFixation = 10;  // Legacy source: HistopathologySystem/Common.vb — LOOKUP_FIXATION
+    private const int LookupContacts    = 18;
+    private const int LookupProjects    = 19;
+    private const int LookupFixation    = 10;
+    private const int LookupSubmittedAs      = 11;
+    private const int LookupUserArea          = 13;
+    private const int LookupTseAntibodies     = 4;
+    private const int LookupNonTseAntibodies  = 5;
+    private const int LookupSpecialStain      = 6;
 
     private readonly IBatchService _batches;
     private readonly ILookupService _lookups;
@@ -44,6 +49,47 @@ public class BatchDetailsModel : HistoPageModel
         _lookups = lookups;
         _users   = users;
     }
+
+    // ── Query param — "create" activates the new-batch form ──
+    [BindProperty(SupportsGet = true)] public string? Mode { get; set; }
+    public bool IsCreateMode => string.Equals(Mode, "create", StringComparison.OrdinalIgnoreCase);
+
+    // ── Create-mode form fields (map to AddBatch SP params) ──
+    [BindProperty] public string? Create_ProjectContractCode { get; set; }
+    [BindProperty] public string? Create_ContactName         { get; set; }
+    [BindProperty] public string? Create_SpeciesId           { get; set; }
+    [BindProperty] public string? Create_BatchDateStr        { get; set; }
+    [BindProperty] public string? Create_Fixation            { get; set; }
+    [BindProperty] public bool    Create_SafeToHandle        { get; set; }
+    [BindProperty] public int?    Create_OtherSubmittedBy    { get; set; }
+    [BindProperty] public string? Create_OtherSubmittedArea  { get; set; }
+    [BindProperty] public string? Create_Comments            { get; set; }
+
+    // ── Test type selections (checkbox groups) ──
+    [BindProperty] public List<string> Create_SelectedHistologyCodes { get; set; } = [];
+    [BindProperty] public List<string> Create_SelectedAntibodyCodes  { get; set; } = [];
+    [BindProperty] public List<string> Create_SelectedStainCodes     { get; set; } = [];
+
+    // Computed flags mirror EditBatchTests show/hide logic
+    public bool Create_ShowAntibodies => Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcPrp)
+                                      || Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcOther);
+    public bool Create_ShowStains     => Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.SpecialStain);
+
+    // ── Create-mode dropdown lists ──
+    public IReadOnlyList<LookupItem> Create_Projects   { get; private set; } = [];
+    public IReadOnlyList<LookupItem> Create_Contacts   { get; private set; } = [];
+    public IReadOnlyList<LookupItem> Create_SpeciesList { get; private set; } = [];
+    public IReadOnlyList<LookupItem> Create_Fixations  { get; private set; } = [];
+    public IReadOnlyList<LookupItem> Create_UserAreas  { get; private set; } = [];
+    public IReadOnlyList<User>       Create_AllUsers   { get; private set; } = [];
+    public string? Create_SubmittedAsName { get; private set; }
+
+    // ── Test type lookup lists ──
+    public IReadOnlyList<LookupItem> Create_HistologyOptions { get; private set; } = [];
+    public IReadOnlyList<LookupItem> Create_AntibodyOptions  { get; private set; } = [];
+    public IReadOnlyList<LookupItem> Create_StainOptions     { get; private set; } = [];
+
+    public IDictionary<string, string> Errors { get; private set; } = new Dictionary<string, string>();
 
     public Batch? Batch { get; private set; }
 
@@ -146,9 +192,26 @@ public class BatchDetailsModel : HistoPageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
-        ViewData["Title"] = "Submission details";
-        ViewData["PageTitle"] = "Submission details";
-        if (Session.BatchID <= 0) return RedirectToPage("/Index");
+        ViewData["Title"]     = IsCreateMode ? "New submission" : "Submission details";
+        ViewData["PageTitle"] = IsCreateMode ? "New submission" : "Submission details";
+
+        if (IsCreateMode)
+        {
+            await LoadCreateLookupsAsync();
+            Create_BatchDateStr = DateTime.Today.ToString("dd/MM/yyyy");
+            // Resolve SubmittedAs name from TempData for display
+            if (TempData.TryGetValue("CreateSubmittedAsId", out var saId))
+            {
+                var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs);
+                Create_SubmittedAsName = saLookup.FirstOrDefault(x => x.ID.ToString() == saId?.ToString())?.Name;
+                TempData.Keep("CreateSubmittedAsId");
+                TempData.Keep("CreateSubmittedAsCode");
+                TempData.Keep("CreateIsPreCassetted");
+            }
+            return Page();
+        }
+
+        if (Session.BatchID is null or <= 0) return RedirectToPage("/Index");
         try
         {
             Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0);
@@ -261,5 +324,152 @@ public class BatchDetailsModel : HistoPageModel
             dict.TryAdd(key, item.Name);
         }
         return dict;
+    }
+
+    public async Task<IActionResult> OnPostCreateAsync()
+    {
+        ViewData["Title"]     = "New submission";
+        ViewData["PageTitle"] = "New submission";
+        await LoadCreateLookupsAsync();
+
+        // Read type-selection values from TempData (set by Cassetted step)
+        var submittedAsCode = TempData["CreateSubmittedAsCode"]?.ToString() ?? "";
+        var isPreCassetted  = bool.TryParse(TempData["CreateIsPreCassetted"]?.ToString(), out var ipc) && ipc;
+
+        TempData.Keep("CreateSubmittedAsId");
+        TempData.Keep("CreateSubmittedAsCode");
+        TempData.Keep("CreateIsPreCassetted");
+
+        // Resolve SubmittedAs name for redisplay
+        if (TempData.TryGetValue("CreateSubmittedAsId", out var saId))
+        {
+            var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs);
+            Create_SubmittedAsName = saLookup.FirstOrDefault(x => x.ID.ToString() == saId?.ToString())?.Name;
+        }
+
+        var errors = new Dictionary<string, string>();
+
+        // Required fields — mirrors legacy ValidateMandatoryFields()
+        if (string.IsNullOrWhiteSpace(Create_ProjectContractCode))
+            errors["Create_ProjectContractCode"] = "Select a project or contract code.";
+        if (string.IsNullOrWhiteSpace(Create_ContactName))
+            errors["Create_ContactName"] = "Select a pathologist.";
+        if (string.IsNullOrWhiteSpace(Create_SpeciesId))
+            errors["Create_SpeciesId"] = "Select a species.";
+        if (string.IsNullOrWhiteSpace(Create_BatchDateStr))
+            errors["Create_BatchDateStr"] = "Enter the submission date.";
+        if (Create_OtherSubmittedBy is null or 0)
+            errors["Create_OtherSubmittedBy"] = "Select the submitted by person.";
+        if (string.IsNullOrWhiteSpace(Create_OtherSubmittedArea))
+            errors["Create_OtherSubmittedArea"] = "Select the submitted area.";
+
+        DateTime? batchDate = null;
+        if (!string.IsNullOrWhiteSpace(Create_BatchDateStr))
+        {
+            if (!DateTime.TryParseExact(Create_BatchDateStr, new[] { "dd/MM/yyyy", "d/M/yyyy" },
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var parsed))
+                errors["Create_BatchDateStr"] = "Enter a valid date in DD/MM/YYYY format.";
+            else
+                batchDate = parsed;
+        }
+
+        if (Create_SelectedHistologyCodes.Count == 0)
+            errors["Create_Histology"] = "Select at least one histology type.";
+
+        // Antibody required when IHC-PrP or IHC-Other is selected
+        var needsAntibodies = Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcPrp)
+                           || Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcOther);
+        if (needsAntibodies && Create_SelectedAntibodyCodes.Count == 0)
+            errors["Create_Antibodies"] = "Select at least one antibody (required when IHC is selected).";
+
+        // Stain required when Special Stain is selected
+        var needsStains = Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.SpecialStain);
+        if (needsStains && Create_SelectedStainCodes.Count == 0)
+            errors["Create_Stains"] = "Select at least one special stain.";
+
+        if (errors.Count > 0)
+        {
+            Errors = errors;
+            Mode = "create";
+            return Page();
+        }
+
+        var batch = new Batch
+        {
+            SubmittedByUserID   = Session.UserID,
+            UserAreaCode        = Session.UserAreaID,
+            IsPreCassetted      = isPreCassetted,
+            BatchType           = Session.BatchType,
+            ProjectContractCode = Create_ProjectContractCode,
+            ContactName         = Create_ContactName,
+            Species             = Create_SpeciesId,
+            BatchDate           = batchDate ?? DateTime.Today,
+            Fixation            = Create_Fixation,
+            SafeToHandle        = Create_SafeToHandle,
+            OtherSubmittedBy    = Create_OtherSubmittedBy,
+            OtherSubmittedArea  = Create_OtherSubmittedArea ?? string.Empty,
+            Comments            = Create_Comments,
+        };
+
+        int batchId;
+        try { batchId = await _batches.AddAsync(batch, Session.UserID); }
+        catch
+        {
+            Errors = new Dictionary<string, string> { ["Create_Save"] = "Failed to create the submission. Please try again." };
+            Mode = "create";
+            return Page();
+        }
+
+        if (batchId <= 0)
+        {
+            Errors = new Dictionary<string, string> { ["Create_Save"] = "Failed to create the submission. Please try again." };
+            Mode = "create";
+            return Page();
+        }
+
+        Session.BatchID   = batchId;
+
+        if (!string.IsNullOrWhiteSpace(submittedAsCode))
+            await _batches.SaveSubmittedAsAsync(batchId, submittedAsCode, Session.UserID);
+
+        // Save test type selections — mirrors clsCheckBoxData.UpdateTable for BATCH_HISTOLOGY/ANTIBODIES/STAIN
+        await _batches.SaveBatchTestSelectionsAsync(
+            batchId,
+            Create_SelectedHistologyCodes,
+            needsAntibodies ? Create_SelectedAntibodyCodes : new List<string>(),
+            needsStains     ? Create_SelectedStainCodes    : new List<string>(),
+            Session.UserID);
+
+        return RedirectToPage("/Batches/BatchDetails");
+    }
+
+    private async Task LoadCreateLookupsAsync()
+    {
+        var projectsTask  = _lookups.GetLookupDataAsync(LookupProjects);
+        var contactsTask  = _lookups.GetLookupDataAsync(LookupContacts);
+        var speciesTask   = _lookups.GetSpeciesLookupAsync();
+        var fixationTask  = _lookups.GetLookupDataAsync(LookupFixation);
+        var areaTask      = _lookups.GetLookupDataAsync(LookupUserArea);
+        var usersTask     = _users.GetAllUsersAsync();
+        var antibodyId    = Session.BatchType == BatchTypeConstants.NonTse ? LookupNonTseAntibodies : LookupTseAntibodies;
+        var histologyTask = _lookups.GetHistologyTypesAsync();
+        var antibodyTask  = _lookups.GetLookupDataAsync(antibodyId);
+        var stainTask     = _lookups.GetLookupDataAsync(LookupSpecialStain);
+        await Task.WhenAll(projectsTask, contactsTask, speciesTask, fixationTask, areaTask, usersTask,
+                           histologyTask, antibodyTask, stainTask);
+        Create_Projects    = projectsTask.Result;
+        Create_Contacts    = contactsTask.Result;
+        Create_SpeciesList = speciesTask.Result;
+        Create_Fixations   = fixationTask.Result;
+        Create_UserAreas   = areaTask.Result;
+        Create_AllUsers    = [.. usersTask.Result];
+
+        // Filter histology options by batch type — mirrors EditBatchTests.LoadLookupOptionsAsync / BatchDetails.aspx HideOptions()
+        Create_HistologyOptions = Session.BatchType == BatchTypeConstants.NonTse
+            ? histologyTask.Result.Where(i => i.Code != HistologyCode.IhcPrp && i.Code != HistologyCode.HeBse).ToList()
+            : histologyTask.Result.Where(i => i.Code != HistologyCode.IhcOther).ToList();
+        Create_AntibodyOptions = antibodyTask.Result;
+        Create_StainOptions    = stainTask.Result;
     }
 }

@@ -36,7 +36,8 @@ public class BatchesForEditingModel : HistoPageModel
     public IActionResult OnPostSelect(int batchId)
     {
         // Matches legacy grdBatchesForEditing_SelectedIndexChanged, which always redirects to EditBatch.aspx.
-        Session.BatchID = batchId;
+        Session.BatchID    = batchId;
+        Session.ReturnPage = "/Batches/BatchesForEditing";
         return RedirectToPage("/Batches/EditBatch");
     }
 

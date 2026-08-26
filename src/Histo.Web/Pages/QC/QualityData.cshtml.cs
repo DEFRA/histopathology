@@ -152,8 +152,10 @@ public class QualityDataModel : HistoPageModel
         SubmittedByName = batch.OtherSubmittedBy.HasValue && userById.TryGetValue(batch.OtherSubmittedBy.Value, out var sb) ? sb : null;
 
         var areaById = userAreasTask.Result.ToDictionary(a => a.ID, a => a.Name);
-        EnteredAreaName   = batch.SubmittedArea.HasValue      && areaById.TryGetValue(batch.SubmittedArea.Value,      out var ea) ? ea : null;
-        SubmittedAreaName = batch.OtherSubmittedArea.HasValue && areaById.TryGetValue(batch.OtherSubmittedArea.Value, out var sa) ? sa : null;
+        EnteredAreaName = int.TryParse(batch.SubmittedArea, out var enteredAreaId)
+            && areaById.TryGetValue(enteredAreaId, out var ea) ? ea : batch.SubmittedArea;
+        SubmittedAreaName = int.TryParse(batch.OtherSubmittedArea, out var submittedAreaId)
+            && areaById.TryGetValue(submittedAreaId, out var sa) ? sa : batch.OtherSubmittedArea;
     }
 }
 

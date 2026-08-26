@@ -205,3 +205,37 @@ Write-Host "Elapsed duration  : $elapsed minutes"
 ### Outstanding items
 
 - None raised this session â€” all 5 issues found were resolved in-session.
+---
+
+## Session 2026-08-26 (afternoon) — Submission creation flow + Edit Submission + Pick List fixes
+
+| Item | Value |
+|---|---|
+| Date | 2026-08-26 |
+| Start time | 15:23 |
+| End time | 16:53 |
+| Duration | **90 min** (measured from session log timestamps) |
+| Agent | GitHub Copilot (Chat) |
+| Build result | 0 errors, 0 warnings |
+| Turns | 198 |
+
+### Work completed (13 fixes)
+
+| Area | Fix |
+|---|---|
+| Cassetted / BatchDetails | Submission creation flow restored to two-step legacy pattern |
+| BatchDetails create mode | Histology/Antibody/Stain checkboxes added to create form |
+| BatchDetails view | "Batch not found. }" text rendering bug fixed (unbalanced @if blocks) |
+| Cassetted state | Previous selections restored on back-navigation via Session + TempData |
+| Cassetted SubmittedAs | Default to blank fixed (replaced asp-for with name on select) |
+| SearchSubmissions | CanEditSubmission conditions were inverted — fixed to Submitted/Rejected |
+| BatchesForEditing | Session.ReturnPage set in OnPostSelect |
+| EditBatch | Back link / Cancel / save now context-aware via ReturnPage |
+| EditLookupItem | Area column shows name not numeric code for tables 18/19 |
+| EditLookupItem | Area dropdown added to Add/Edit form for tables 18/19 |
+| LookupRepository | AddluContacts @ID parameter now supplied on insert |
+| QualityData | Test name resolution fixed to use GetHistologyTypesAsync() |
+
+### Outstanding items
+
+- None raised this session — all 13 issues resolved in-session.

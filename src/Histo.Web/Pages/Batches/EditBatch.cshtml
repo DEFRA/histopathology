@@ -8,7 +8,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Batches/BatchDetails" class="govuk-back-link">Back</a>
+    <a href="@Url.Page(Model.ReturnPage)" class="govuk-back-link">Back</a>
 }
 
 @if (!string.IsNullOrEmpty(Model.SaveError))
@@ -173,6 +173,6 @@
 
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
-        <a asp-page="/Batches/BatchesForEditing" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        <a href="@Url.Page(Model.ReturnPage)" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
     </div>
 </form>

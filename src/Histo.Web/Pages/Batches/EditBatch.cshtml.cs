@@ -56,6 +56,11 @@ public class EditBatchModel : HistoPageModel
     public Batch?  Batch     { get; private set; }
     public string? SaveError { get; private set; }
 
+    // Falls back to BatchesForEditing when no context is available (legacy SV_RedirectCancelPage)
+    public string ReturnPage => string.IsNullOrWhiteSpace(Session.ReturnPage)
+        ? "/Batches/BatchesForEditing"
+        : Session.ReturnPage;
+
     // ---- Lookup data for dropdowns ----
     public IReadOnlyList<LookupItem> Projects    { get; private set; } = [];
     public IReadOnlyList<LookupItem> Contacts    { get; private set; } = [];
@@ -182,7 +187,7 @@ public class EditBatchModel : HistoPageModel
             return Page();
         }
 
-        return RedirectToPage("/Batches/BatchDetails");
+        return RedirectToPage(ReturnPage);
     }
 
     private async Task LoadLookupsAsync()

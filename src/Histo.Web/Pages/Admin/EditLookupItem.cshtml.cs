@@ -39,6 +39,9 @@ public class EditLookupItemModel : HistoPageModel
     public bool TableHasCodes { get; private set; }
     /// <summary>Area-scoped tables (Contacts/Pathologists = 18, Projects = 19) show the Area column instead of Code.</summary>
     public bool ShowAreaColumn => TableId is 18 or 19;
+    public IReadOnlyList<LookupItem> UserAreas   { get; private set; } = [];
+    public IReadOnlyDictionary<string, string> AreaNameById { get; private set; } = new Dictionary<string, string>();
+    [BindProperty] public string? Area { get; set; }
     public List<string> Errors { get; } = [];
     public string? StatusMessage { get; private set; }
 
@@ -69,6 +72,7 @@ public class EditLookupItemModel : HistoPageModel
             {
                 Description = item.Name;
                 Active = item.Active;
+                Area = item.Area; // pre-populate area for area-scoped tables (18/19)
             }
         }
         else
@@ -108,7 +112,7 @@ public class EditLookupItemModel : HistoPageModel
             // (Contacts/Projects — table IDs 18/19). Code-keyed tables (Archive Location 16,
             // QC Code 14, etc.) use BuildParamListCommon which expects Code/Description/IsActive
             // only — passing Area to those SPs causes "too many arguments".
-            var item = new LookupItem { Name = Description.Trim(), Active = Active, Area = TableHasCodes ? null : Session.UserArea, Code = TableHasCodes ? Code.Trim() : null };
+            var item = new LookupItem { Name = Description.Trim(), Active = Active, Area = TableHasCodes ? null : (Area ?? Session.UserArea), Code = TableHasCodes ? Code.Trim() : null };
             ok = await _lookups.CreateLookupItemAsync(TableId, item, Session.UserID);
         }
 
@@ -165,5 +169,11 @@ public class EditLookupItemModel : HistoPageModel
         // The view filters displayed rows based on ShowDeactivated.
         Items = await _lookups.GetLookupDataAsync(TableId, includeInactive: true);
         TableHasCodes = Items.Any(i => i.Code is not null);
+
+        if (ShowAreaColumn)
+        {
+            UserAreas  = await _lookups.GetUserAreasAsync();
+            AreaNameById = UserAreas.ToDictionary(a => a.ID.ToString(), a => a.Name, StringComparer.OrdinalIgnoreCase);
+        }
     }
 }

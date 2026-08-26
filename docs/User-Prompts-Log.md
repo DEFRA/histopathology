@@ -1124,3 +1124,23 @@ Recommendations and required changes to achieve full parity and GDS compliance.
 
 7. Please update the details run-log-v2.md (what fix applied) and session-metrics.md (duration), User-Prompts-Log.md (prompt) files to contain the relevent data pertaining to this session.
 
+
+2026-08-26 afternoon session prompts (15:23 onwards)
+
+1. Please update the submission creation flow to match the legacy application. Legacy: Cassetted.aspx is used only for submission type selection, and BatchDetails.aspx handles submission creation and editing. New Application: Cassetted.cshtml currently contains the submission creation fields and logic. Required Changes: Analyse the legacy and make the changes like when the user clicks New Submission, navigate to BatchDetails.cshtml instead of Cassetted.cshtml. Use BatchDetails.cshtml as the primary screen for creating and editing submissions. Recreate the legacy submission creation flow where possible.
+
+2. Can we do something for create option to achieve it, is there any GDS issue one thing per page pattern is blocking? Histology/Antibody/Stain checkboxes - Accessible via Edit test types button on read-mode view - deferred.
+
+3. Unknown text is showing now in BatchDetails.cshtml file: Batch not found. }
+
+4. Where are these files BatchDetails being called from - edit submission or view submission?
+
+5. Suggestion: Before moving the Submission Category and Submission Type fields from Cassetted.cshtml to BatchDetails.cshtml, please assess the impact on the overall workflow and navigation.
+
+6. Then how to keep value if I selected something from either submission category and submission type if navigate to next pages if I come back to this page should I have keep track of selected values?
+
+7. EditLookupItem.cshtml - When editing Pick List Maintenance and selecting Pathologists, the Area field should display Area Name but currently displays numeric values. When adding a new Pick List Maintenance record selecting Pathologists the Area field should be displayed as a dropdown but it is not appearing. In Edit Pick List when Pathologists is selected the Area field should show Area Name instead of numeric identifier. Cassetted.cshtml - Submission Type field currently defaulting to Pre Cassetted Tissue. It should not have a default value selected and should require the user to explicitly choose a Submission Type.
+
+8. Procedure or function AddluContacts expects parameter @ID which was not supplied.
+
+9. Run journal-updater to document all the issue and fixes to update the details run-log-v2.md and session-metrics.md and User-Prompts-Log.md file from time after 3 PM today.
