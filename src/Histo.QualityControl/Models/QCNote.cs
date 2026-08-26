@@ -23,6 +23,10 @@ public sealed class QCNote
     public string? Species { get; init; }
     /// <summary>QC note text — populated only by <see cref="IQCNoteRepository.GetByIdAsync"/>.</summary>
     public string Text { get; init; } = string.Empty;
+    /// <summary>Name of the user who created the note — from GetQCNoteHistStainTestInformation "Name" column.</summary>
+    public string? CreatedBy { get; init; }
+    /// <summary>Date the note was created — from GetQCNoteHistStainTestInformation "DateCreated" column.</summary>
+    public DateTime? DateCreated { get; init; }
     /// <summary>
     /// SQL Server rowversion (timestamp) — used for optimistic concurrency
     /// in the <c>EditQCNote</c> stored procedure.

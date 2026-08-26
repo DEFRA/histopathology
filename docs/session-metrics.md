@@ -178,3 +178,28 @@ Write-Host "Elapsed duration  : $elapsed minutes"
 - Fix EditUser.cshtml antiforgery form attribute (ISS-R05)
 - Add dedicated 404 page (ISS-R03)
 - Pagination for QualityData and EditQualityDataTest (deferred)
+
+---
+
+## Session 2026-08-26 — Navigation, BatchesForEditing, and QC Note Parity
+
+| Item | Value |
+|---|---|
+| Date | 2026-08-26 |
+| Start time | — |
+| End time | — |
+| Duration | **~50 min** (complexity-based estimate — sum of 3 sub-tasks below) |
+| Agent | GitHub Copilot (Chat) |
+| Build result | 0 CS errors (file-lock copy errors only, from a running dev process) |
+
+### Work completed
+
+| Sub | Duration | Area | Change |
+|---|---|---|---|
+| 1 | **~25 min** | Nav / BatchesForEditing / EditBatch (ISS-R13) | Removed duplicate `Quality data` nav link (replaced with `Edit QC notes` → `/QC/QCNotes`); fixed `BatchesForEditingModel.OnPostSelect` to redirect to `/Batches/EditBatch` (was `/Batches/BatchDetails`, matching legacy `grdBatchesForEditing_SelectedIndexChanged`); corrected `BatchesForEditing.cshtml` grid headers/columns to match legacy `BatchesForEditing.aspx` exactly (removed `Received date`/`Customer ref`, renamed headers) |
+| 2 | **~15 min** | QC — EditQCNote (ISS-R14) | Restored legacy QC Note Ref summary box (QC note ref, Submission number, Project, Species, Stain ref) and Created by/Date created footer, missing entirely from the migrated page; added `CreatedBy`/`DateCreated` to `QCNote` model and repository mapping |
+| 3 | **~10 min** | QC — QCNoteRepository (ISS-R15) | Fixed regression from Sub-task 2 — `RuntimeBinderException` on dynamic access to possibly-absent SP columns silently swallowed by service catch, making the QCNotes Edit button appear non-functional; replaced with safe `IDictionary<string, object>` + `TryGetValue` mapping |
+
+### Outstanding items
+
+- None raised this session — all 3 issues found were resolved in-session.
