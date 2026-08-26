@@ -17,9 +17,9 @@
             <h2 class="govuk-error-summary__title">There is a problem</h2>
             <div class="govuk-error-summary__body">
                 <ul class="govuk-list govuk-error-summary__list">
-                    @foreach (var e in Model.Errors.Values)
+                    @foreach (var e in Model.Errors)
                     {
-                        <li>@e</li>
+                        <li><a href="#@e.Key" class="govuk-link">@e.Value</a></li>
                     }
                 </ul>
             </div>
@@ -58,7 +58,7 @@
             <option value="">-- Select --</option>
             @foreach (var o in Model.SubmittedAsOptions)
             {
-                <option value="@o.ID">@o.Name</option>
+                <option value="@o.ID" selected="@(Model.SubmittedAs == o.ID)">@o.Name</option>
             }
         </select>
     </div>
@@ -74,7 +74,7 @@
             <option value="">-- Select --</option>
             @foreach (var p in Model.Projects)
             {
-                <option value="@p.ID">@p.Name</option>
+                <option value="@p.ID" selected="@(Model.ProjectContractCode == p.ID.ToString())">@p.Name</option>
             }
         </select>
     </div>
@@ -90,7 +90,7 @@
             <option value="">-- Select --</option>
             @foreach (var c in Model.Contacts)
             {
-                <option value="@c.ID">@c.Name</option>
+                <option value="@c.ID" selected="@(Model.ContactName == c.ID.ToString())">@c.Name</option>
             }
         </select>
     </div>
@@ -106,7 +106,7 @@
             <option value="">-- Select --</option>
             @foreach (var s in Model.SpeciesList)
             {
-                <option value="@s.ID">@s.Name</option>
+                <option value="@s.ID" selected="@(Model.SpeciesId == s.ID.ToString())">@s.Name</option>
             }
         </select>
     </div>
@@ -130,7 +130,7 @@
             <option value="">-- Not specified --</option>
             @foreach (var f in Model.Fixations)
             {
-                <option value="@(f.Code ?? f.ID.ToString())">@f.Name</option>
+                <option value="@(f.Code ?? f.ID.ToString())" selected="@(Model.Fixation == (f.Code ?? f.ID.ToString()))">@f.Name</option>
             }
         </select>
     </div>
@@ -156,7 +156,7 @@
             <option value="">-- None --</option>
             @foreach (var u in Model.AllUsers)
             {
-                <option value="@u.UserID">@u.Name</option>
+                <option value="@u.UserID" selected="@(Model.OtherSubmittedBy == u.UserID)">@u.Name</option>
             }
         </select>
     </div>
@@ -167,7 +167,7 @@
             <option value="">-- None --</option>
             @foreach (var a in Model.UserAreas)
             {
-                <option value="@a.ID">@a.Name</option>
+                <option value="@a.ID" selected="@(Model.OtherSubmittedArea == a.ID.ToString())">@a.Name</option>
             }
         </select>
     </div>

@@ -132,7 +132,7 @@ public class CassettedModel : HistoPageModel
         }
         catch (Exception ex)
         {
-            Errors = new Dictionary<string, string> { [""] = $"Database error creating submission: {ex.Message}" };
+            Errors = new Dictionary<string, string> { [""] = "Failed to create the submission. Please try again." };
             return Page();
         }
 

@@ -171,10 +171,10 @@ public sealed class BatchService : IBatchService
     /// Updates batch status. Throws <see cref="BatchConcurrencyException"/> on
     /// concurrent modification.
     /// </summary>
-    public async Task<bool> UpdateStatusAsync(int batchId, string newStatus, byte[] rowStamp, int userId, CancellationToken ct = default)
+    public async Task<bool> UpdateStatusAsync(int batchId, string newStatus, int userId, CancellationToken ct = default)
     {
         // BatchConcurrencyException propagates — the UI must handle it
-        return await _batches.UpdateStatusAsync(batchId, newStatus, rowStamp, userId, ct);
+        return await _batches.UpdateStatusAsync(batchId, newStatus, userId, ct);
     }
 
     // -----------------------------------------------------------------------

@@ -155,7 +155,7 @@ public class BatchDetailsModel : HistoPageModel
         }
         catch (Exception ex)
         {
-            LoadError = $"Error loading submission: {ex.Message}";
+            LoadError = "Failed to load the submission details. Please go back and try again.";
             return Page();
         }
         if (Batch is not null)

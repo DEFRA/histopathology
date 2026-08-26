@@ -101,7 +101,7 @@ public class EditBatchModel : HistoPageModel
         ViewData["PageTitle"] = "Edit submission";
 
         try { Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0); }
-        catch (Exception ex) { SaveError = $"Error loading submission: {ex.Message}"; await LoadLookupsAsync(); return Page(); }
+        catch (Exception ex) { SaveError = "Failed to load the submission. Please go back and try again."; _ = ex; await LoadLookupsAsync(); return Page(); }
         if (Batch?.RowStamp is null) return RedirectToPage("/Index");
 
         await LoadLookupsAsync();
@@ -122,10 +122,14 @@ public class EditBatchModel : HistoPageModel
         DateTime? batchDate = Batch.BatchDate;
         if (!string.IsNullOrWhiteSpace(BatchDateStr))
         {
-            if (DateTime.TryParseExact(BatchDateStr, ["dd/MM/yyyy", "d/M/yyyy"],
+            if (!DateTime.TryParseExact(BatchDateStr, ["dd/MM/yyyy", "d/M/yyyy"],
                     System.Globalization.CultureInfo.InvariantCulture,
                     System.Globalization.DateTimeStyles.None, out var parsedDate))
-                batchDate = parsedDate;
+            {
+                SaveError = "Enter a valid date of submission in DD/MM/YYYY format.";
+                return Page();
+            }
+            batchDate = parsedDate;
         }
 
         // ---- Set DateCompleted when status changes to Completed ----
@@ -174,7 +178,7 @@ public class EditBatchModel : HistoPageModel
         }
         catch (Exception ex)
         {
-            SaveError = $"Error saving submission: {ex.Message}";
+            SaveError = "Failed to save the submission. Please try again.";
             return Page();
         }
 

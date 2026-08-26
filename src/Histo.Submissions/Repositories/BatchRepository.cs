@@ -342,7 +342,7 @@ public sealed class BatchRepository : IBatchRepository
     }
 
     /// <inheritdoc/>
-    public async Task<bool> UpdateStatusAsync(int batchId, string newStatus, byte[] rowStamp, int userId, CancellationToken ct = default)
+    public async Task<bool> UpdateStatusAsync(int batchId, string newStatus, int userId, CancellationToken ct = default)
     {
         if (!int.TryParse(newStatus, out var batchStatusInt)) batchStatusInt = 1;
 
