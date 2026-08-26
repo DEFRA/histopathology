@@ -23,11 +23,43 @@
     </div>
 }
 
+@if (Model.Note is not null)
+{
+    <dl class="govuk-summary-list">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">QC note ref</dt>
+            <dd class="govuk-summary-list__value">@Model.Note.QCNoteRef</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submission number</dt>
+            <dd class="govuk-summary-list__value">@Model.Note.ID</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Project</dt>
+            <dd class="govuk-summary-list__value">@Model.Note.ProjectDescription</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Species</dt>
+            <dd class="govuk-summary-list__value">@Model.Note.Species</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Stain ref</dt>
+            <dd class="govuk-summary-list__value">@Model.Note.StainRef</dd>
+        </div>
+    </dl>
+}
+
 <form method="post">
     <div class="govuk-form-group">
         <label class="govuk-label" for="Text">Note text</label>
         <textarea name="Text" id="Text" class="govuk-textarea" rows="6">@Model.Text</textarea>
     </div>
+    @if (Model.Note is not null)
+    {
+        <p class="govuk-body govuk-!-margin-bottom-6">
+            Created by @Model.Note.CreatedBy on @Model.Note.DateCreated?.ToLongDateString()
+        </p>
+    }
     <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
     <a asp-page="/QC/QCNotes" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
 </form>

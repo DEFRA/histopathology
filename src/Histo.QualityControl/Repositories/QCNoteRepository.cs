@@ -33,10 +33,14 @@ public sealed class QCNoteRepository : IQCNoteRepository
         if (header is null) return null;
 
         // Second call: get note text and rowstamp from the test information SP
-        var detail = (await conn.QueryAsync<dynamic>(
+        var detailRow = (await conn.QueryAsync(
             "GetQCNoteHistStainTestInformation",
             new { QCNoteRef = qcNoteId },
             commandType: System.Data.CommandType.StoredProcedure)).FirstOrDefault();
+
+        // Read via IDictionary rather than dynamic member access — a column absent from
+        // the SP result set throws RuntimeBinderException, not just a null (see ISS-034).
+        IDictionary<string, object>? detail = detailRow is null ? null : (IDictionary<string, object>)detailRow;
 
         return new QCNote
         {
@@ -45,8 +49,10 @@ public sealed class QCNoteRepository : IQCNoteRepository
             StainRef           = header.StainRef,
             ProjectDescription = header.ProjectDescription,
             Species            = header.Species,
-            Text               = (string?)detail?.QCText ?? string.Empty,
-            RowStamp           = (byte[]?)detail?.RowStamp,
+            Text               = detail is not null && detail.TryGetValue("QCText", out var text) ? Convert.ToString(text) ?? "" : "",
+            CreatedBy          = detail is not null && detail.TryGetValue("Name", out var name) ? Convert.ToString(name) : null,
+            DateCreated        = detail is not null && detail.TryGetValue("DateCreated", out var created) && created is DateTime dt ? dt : null,
+            RowStamp           = detail is not null && detail.TryGetValue("RowStamp", out var rowStamp) ? rowStamp as byte[] : null,
         };
     }
 

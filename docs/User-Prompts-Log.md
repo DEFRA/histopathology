@@ -1107,3 +1107,14 @@ Recommendations and required changes to achieve full parity and GDS compliance.
 22. Remove QC note column from QualityData.cshtml. Still can't see QC Note Ref in EditQualityDataTest.cshtml. Still Test column shows numeric codes in QualityData.cshtml.
 
 23. update issue and fix in run-log-v2.md file duration time session-metrics.md file. update the prompt in User-Prompts-Log.md file.
+
+2026-08-26 Session prompts
+
+1. Review and Update Navigation, Batch Editing, and Legacy Functionality Alignment — Review the current implementation of Quality Data navigation (BatchesForEditing.cshtml) and compare it with the EditSubmissionStatus functionality. Currently, clicking Quality Data redirects users to BatchesForEditing.cshtml — if it is same as EditSubmissionStatus then evaluate whether the existing Quality Data navigation link should be replaced with Edit QC Notes functionality link, routing to QC/QCNotes. Compare BatchesForEditing.cshtml with the legacy BatchesForEditing.aspx — review the grid implementation, add any missing columns, validate column names/ordering/formatting. Verify row selection redirects to EditBatch.cshtml mirroring legacy EditBatch.aspx. Review validations and business rules against legacy. Perform a detailed gap analysis and review session-metrics.md/migration-run-journal.md for known migration issues to ensure they are resolved and do not reoccur.
+
+2. Compare the QCNote edit form in the current system against the original legacy version, present in the HistopathologySystem folder. On the current version, the QC Note Ref section is missing and the username and date section below the note is missing. Please restore these sections.
+
+3. The edit button on the Edit QC Note page no longer works, please resolve this.
+
+4. Please update the details run-log-v2.md (what fix applied) and session-metrics.md (duration), User-Prompts-Log.md (prompt) files to contain the relevant data pertaining to this session.
+
