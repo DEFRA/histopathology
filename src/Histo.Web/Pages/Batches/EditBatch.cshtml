@@ -176,3 +176,8 @@
         <a href="@Url.Page(Model.ReturnPage)" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
     </div>
 </form>
+
+@* "Samples" — this page only edits submission header fields; sample/animal/block details
+   (Add sample, Edit sample, Copy sample, Delete sample) are on BatchBlockSummary, matching
+   the same "Samples" entry point already used from BatchDetails.cshtml. *@
+<a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples</a>

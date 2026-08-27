@@ -66,6 +66,9 @@ public class BatchBlockSummaryModel : HistoPageModel
     /// <c>BatchBlockSummary.aspx.vb</c> keeps Edit selectable in View mode (unlike <c>BatchSummary.aspx.vb</c>,
     /// which force-disables it too), since block assignment/viewing continues after a batch has been received.
     /// </summary>
+    /// <summary>Exposes the session-resolved submission ID so the Copy sample link can pass it explicitly to AddSample.</summary>
+    public int? BatchSubmissionId => Session.BatchSubmissionID;
+
     public bool CanModifySamples => Batch?.Status is BatchStatus.Submitted or BatchStatus.Rejected;
 
     /// <summary>
@@ -73,8 +76,7 @@ public class BatchBlockSummaryModel : HistoPageModel
     /// (ViewSubmissions or SearchSubmissions → BatchDetails → Samples). All sample actions are
     /// read-only in this mode.
     /// </summary>
-    public bool IsViewMode =>
-        Session.ReturnPage is "/Submissions/ViewSubmissions" or "/Search/SearchSubmissions";
+    public bool IsViewMode => Session.IsViewSubmissionMode;
 
     public async Task<IActionResult> OnGetAsync()
     {

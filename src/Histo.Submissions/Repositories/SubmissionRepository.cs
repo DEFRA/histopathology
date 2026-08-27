@@ -42,15 +42,20 @@ public sealed class SubmissionRepository : ISubmissionRepository
     {
         using var conn = _db.CreateConnection();
         var parameters = new DynamicParameters();
-        parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
-        parameters.Add("BatchID", submission.BatchID);
-        parameters.Add("SubmissionName", submission.SubmissionName);
-        parameters.Add("Order", submission.Order);
-        parameters.Add("UserID", userId);
+        // Legacy SP signature: ID (0 = new), BatchID, AnimalID, Order, OldID (out), NewID (out).
+        // AnimalID is NOT NULL on the table; legacy's typed DataSet defaulted new rows to 0
+        // when no animal is known yet (the "default empty submission" case) — passing DBNull
+        // violates the NOT NULL constraint, so 0 is sent instead to match legacy behaviour.
+        parameters.Add("ID",        0,                      dbType: System.Data.DbType.Int32);
+        parameters.Add("BatchID",   submission.BatchID,     dbType: System.Data.DbType.Int32);
+        parameters.Add("AnimalID",  0,                      dbType: System.Data.DbType.Int32);
+        parameters.Add("Order",     submission.Order,       dbType: System.Data.DbType.Int32);
+        parameters.Add("OldID",     dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+        parameters.Add("NewID",     dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync("AddBatchSubmission", parameters,
             commandType: System.Data.CommandType.StoredProcedure);
-        return parameters.Get<int>("RETURN_VALUE");
+        return parameters.Get<int>("NewID");
     }
 
     /// <inheritdoc/>
@@ -119,7 +124,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         parameters.Add("BatchSubmissionID", animal.BatchSubmissionID);
         parameters.Add("SenderRef", animal.SenderRef);
         parameters.Add("NextBlockRef", animal.NextBlockRef);
-        parameters.Add("HistologyRef", (object?)animal.HistologyRef ?? DBNull.Value);
+        parameters.Add("HistologyRef", animal.HistologyRef, dbType: System.Data.DbType.String);
         parameters.Add("OnHold", animal.OnHold);
         parameters.Add("PMDate", (object?)animal.PMDate ?? DBNull.Value);
         parameters.Add("PMDateSet", animal.PMDateSet);

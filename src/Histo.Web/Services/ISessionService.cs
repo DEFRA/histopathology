@@ -68,4 +68,19 @@ public interface ISessionService
     /// Replaces the legacy <c>SessionVars.SV_RedirectCancelPage</c> pattern.
     /// </summary>
     string ReturnPage { get; set; }
+
+    /// <summary>
+    /// True when the user is in the read-only "View Submission" journey (legacy
+    /// <c>SessionVars.SV_ViewSubmission</c>). Gates Add/Edit/Copy/Delete sample on
+    /// <c>BatchBlockSummary</c>/<c>BatchDetails</c>.
+    ///
+    /// Distinct from <see cref="ReturnPage"/> (a navigation breadcrumb) — legacy sets/clears
+    /// this flag independently per action button (e.g. "View submission" sets it true,
+    /// "Edit submission"/"Copy submission" set it false), not merely on row selection.
+    /// Set true by <c>ViewSubmissionsModel</c>/<c>SearchSubmissionsModel.OnPostSelectAsync</c>;
+    /// cleared false by any journey that enters an editable context (<c>EditBatchModel</c>,
+    /// <c>CassettedModel</c>, <c>BatchesForEditing</c>/<c>BatchesReceived</c>/<c>BatchesForDispatch</c>/
+    /// <c>SubmissionsOnHold.OnPostSelect</c>, <c>CopyBatchSummaryModel</c>).
+    /// </summary>
+    bool IsViewSubmissionMode { get; set; }
 }

@@ -125,6 +125,7 @@ public class SearchSubmissionsModel : HistoPageModel
         {
             Session.BatchID    = SelectedBatchId;
             Session.ReturnPage = "/Search/SearchSubmissions";  // GAP-3: context-aware back link on BatchDetails
+            Session.IsViewSubmissionMode = true;
         }
 
         Results = await _batches.SearchAsync(BuildCriteria());

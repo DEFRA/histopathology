@@ -79,6 +79,12 @@ public class EditBatchModel : HistoPageModel
         catch (Exception ex) { SaveError = $"Error loading submission: {ex.Message}"; await LoadLookupsAsync(); return Page(); }
         if (Batch is null) return RedirectToPage("/Index");
 
+        // Entering the Edit submission journey unambiguously means "not read-only" — clears a stale
+        // IsViewSubmissionMode flag left over from a prior ViewSubmissions/SearchSubmissions visit,
+        // which otherwise kept Add/Edit/Copy sample hidden on BatchBlockSummary. Mirrors legacy
+        // btnEditSubmission_Click: Session(SV_ViewSubmission) = False.
+        Session.IsViewSubmissionMode = false;
+
         // Pre-populate editable fields from loaded batch
         ProjectContractCode = Batch.ProjectContractCode;
         ContactName         = Batch.ContactName;

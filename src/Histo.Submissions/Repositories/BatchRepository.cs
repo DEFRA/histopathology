@@ -387,7 +387,7 @@ public sealed class BatchRepository : IBatchRepository
     public async Task<IReadOnlyList<BatchSearchResult>> SearchAsync(BatchSearchCriteria criteria, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<BatchSearchResult>(
+        var rows = await conn.QueryAsync<dynamic>(
             "GetSearchBatchDetails",
             new
             {
@@ -409,8 +409,54 @@ public sealed class BatchRepository : IBatchRepository
                 All = 0,
             },
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+        return rows.Select(MapSearchResult).ToList();
     }
+
+    /// <summary>
+    /// Maps a dynamic row from <c>GetSearchBatchDetails</c> to a <see cref="BatchSearchResult"/>.
+    /// The SP returns the status column as <c>BatchStatus</c> (int) — not <c>Status</c> — matching
+    /// <see cref="MapBatch"/>'s handling of the same column on <c>GetCommonBatchTablesByID</c>.
+    /// Using naive <c>QueryAsync&lt;BatchSearchResult&gt;</c> left <c>Status</c> always null, since
+    /// no column is literally named "Status", breaking every status-gated action button downstream.
+    /// </summary>
+    private static BatchSearchResult MapSearchResult(dynamic row)
+    {
+        var dict = new Dictionary<string, object>((IDictionary<string, object>)row, StringComparer.OrdinalIgnoreCase);
+
+        static string? Str(Dictionary<string, object> d, string k)
+            => d.TryGetValue(k, out var v) && v is not DBNull && v is not null ? Convert.ToString(v) : null;
+
+        static int Int(Dictionary<string, object> d, string k)
+            => d.TryGetValue(k, out var v) && v is not DBNull && v is not null ? Convert.ToInt32(v) : 0;
+
+        static DateTime? ParseDate(Dictionary<string, object> d, string k)
+        {
+            if (!d.TryGetValue(k, out var v) || v is DBNull || v is null) return null;
+            if (v is DateTime dt) return dt;
+            var s = Convert.ToString(v);
+            if (string.IsNullOrEmpty(s)) return null;
+            return DateTime.TryParseExact(s, ["dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss"],
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var parsed) ? parsed : null;
+        }
+
+        var batchStatusInt = Int(dict, "BatchStatus");
+
+        return new BatchSearchResult
+        {
+            ID                    = Int(dict, "ID"),
+            ProjectDescription    = Str(dict, "ProjectDescription"),
+            ContactDescription    = Str(dict, "ContactDescription"),
+            Species               = Str(dict, "Species"),
+            BatchDate             = ParseDate(dict, "BatchDate"),
+            DateReceived          = ParseDate(dict, "DateReceived"),
+            DateCompleted         = ParseDate(dict, "DateCompleted"),
+            CustomerReceivedDate  = ParseDate(dict, "CustomerReceivedDate"),
+            Status                = batchStatusInt > 0 ? batchStatusInt.ToString() : Str(dict, "Status"),
+            SubmittedBy           = Str(dict, "SubmittedBy"),
+        };
+    }
+
 
     /// <inheritdoc/>
     public async Task<IReadOnlyList<TestItemRow>> GetTestItemRowsAsync(string? projectDesc, int batchType, CancellationToken ct = default)

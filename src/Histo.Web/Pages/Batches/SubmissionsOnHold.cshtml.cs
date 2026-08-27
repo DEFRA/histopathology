@@ -28,6 +28,7 @@ public class SubmissionsOnHoldModel : HistoPageModel
     public IActionResult OnPostSelect(int batchId)
     {
         Session.BatchID = batchId;
+        Session.IsViewSubmissionMode = false;
         return RedirectToPage("/Batches/BatchDetails");
     }
 }

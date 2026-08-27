@@ -1,8 +1,8 @@
 @page
 @model Histo.Web.Pages.Submissions.AddSubmissionModel
 @{
-    ViewData["Title"] = "Add submission";
-    ViewData["PageTitle"] = "Add submission";
+    ViewData["Title"] = "Add sample";
+    ViewData["PageTitle"] = "Add sample";
 }
 
 @section BeforeHeading {
@@ -23,6 +23,7 @@
 
 <form method="post">
     <input type="hidden" asp-for="BatchId" />
+    <input type="hidden" asp-for="BatchSubmissionId" />
     <div class="govuk-form-group">
         <label class="govuk-label" for="SenderRef">Sender reference</label>
         <input class="govuk-input" asp-for="SenderRef" required />
@@ -40,6 +41,6 @@
             </div>
         </div>
     </div>
-    <button type="submit" class="govuk-button" data-module="govuk-button">Add animal</button>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Add sample</button>
     <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
 </form>

@@ -60,8 +60,10 @@ public class CassettedModel : HistoPageModel
 
         // Store type selection in session � BatchDetails create mode reads these.
         Session.BatchType = BatchType;
-        Session.BatchID   = null; // clear any previous batch
-
+        Session.BatchID   = null; // clear any previous batch        // Clear a stale "reached via View/Search Submissions" flag from an earlier, unrelated visit
+        // in the same session — otherwise BatchBlockSummary.IsViewMode/BatchDetails.IsViewMode stay
+        // stuck true for this brand-new batch, hiding Add sample and other edit actions.
+        Session.ReturnPage = string.Empty;
         // Pass SubmittedAs code and pre-cassetted flag via TempData so BatchDetails can read them once.
         TempData["CreateSubmittedAsId"]   = selected!.ID.ToString();
         TempData["CreateSubmittedAsCode"] = selected.Code ?? selected.ID.ToString();

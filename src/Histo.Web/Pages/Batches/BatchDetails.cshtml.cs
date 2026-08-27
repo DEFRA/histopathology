@@ -198,7 +198,7 @@ public class BatchDetailsModel : HistoPageModel
     /// Mirrors <c>BatchBlockSummaryModel.IsViewMode</c>: true when reached via the View Submission
     /// journey (ViewSubmissions or SearchSubmissions), as opposed to the Create Submission journey.
     /// </summary>
-    public bool IsViewMode => Session.ReturnPage is "/Submissions/ViewSubmissions" or "/Search/SearchSubmissions";
+    public bool IsViewMode => Session.IsViewSubmissionMode;
 
     /// <summary>
     /// Gates the print buttons — a submission has nothing meaningful to print until it has left
