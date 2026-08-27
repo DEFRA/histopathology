@@ -101,7 +101,7 @@ public class BatchDetailsModel : HistoPageModel
 
     public Batch? Batch { get; private set; }
 
-    /// <summary>Number of samples added so far — drives the "Samples" progress row in the task-list summary.</summary>
+    /// <summary>Number of samples added so far — shown as a hint on the "Samples" button.</summary>
     public int SampleCount { get; private set; }
 
     /// <summary>Batch-level test type selections (histology, antibodies, special stains).</summary>
@@ -195,6 +195,19 @@ public class BatchDetailsModel : HistoPageModel
     public bool CanDateReturned => Batch?.Status == BatchStatus.Completed;
 
     /// <summary>
+    /// Mirrors <c>BatchBlockSummaryModel.IsViewMode</c>: true when reached via the View Submission
+    /// journey (ViewSubmissions or SearchSubmissions), as opposed to the Create Submission journey.
+    /// </summary>
+    public bool IsViewMode => Session.ReturnPage is "/Submissions/ViewSubmissions" or "/Search/SearchSubmissions";
+
+    /// <summary>
+    /// Gates the print buttons — a submission has nothing meaningful to print until it has left
+    /// the in-progress Create Submission journey (per legacy, printing happens via the "Finish"
+    /// step, not mid-build) or is being looked at via the View Submission journey.
+    /// </summary>
+    public bool CanPrint => IsViewMode || !CanModifySamples;
+
+    /// <summary>
     /// Page path for the back link, populated from <see cref="ISessionService.ReturnPage"/>.
     /// Falls back to <c>/Index</c> if the session value is absent (e.g. direct URL access).
     /// </summary>
@@ -212,7 +225,7 @@ public class BatchDetailsModel : HistoPageModel
         if (IsCreateMode)
         {
             await LoadCreateLookupsAsync();
-            Create_BatchDateStr = DateTime.Today.ToString("dd/MM/yyyy");
+            Create_BatchDateStr = DateTime.Today.ToString("yyyy-MM-dd");
             // Resolve SubmittedAs name from TempData for display
             if (TempData.TryGetValue("CreateSubmittedAsId", out var saId))
             {
@@ -391,10 +404,10 @@ public class BatchDetailsModel : HistoPageModel
         DateTime? batchDate = null;
         if (!string.IsNullOrWhiteSpace(Create_BatchDateStr))
         {
-            if (!DateTime.TryParseExact(Create_BatchDateStr, new[] { "dd/MM/yyyy", "d/M/yyyy" },
+            if (!DateTime.TryParseExact(Create_BatchDateStr, new[] { "yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy" },
                     System.Globalization.CultureInfo.InvariantCulture,
                     System.Globalization.DateTimeStyles.None, out var parsed))
-                errors["Create_BatchDateStr"] = "Enter a valid date in DD/MM/YYYY format.";
+                errors["Create_BatchDateStr"] = "Enter a valid submission date.";
             else
                 batchDate = parsed;
         }

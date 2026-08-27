@@ -30,7 +30,7 @@
    Completed/OnHold batches, where the animal list is locked. *@
 @if (Model.CanModifySamples && !Model.IsViewMode)
 {
-    <a asp-page="/Submissions/AddSubmission" class="govuk-button govuk-!-margin-bottom-4" data-module="govuk-button">Add sample</a>
+    <a asp-page="/Submissions/AddSubmission" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-!-margin-bottom-4" data-module="govuk-button">Add sample</a>
 }
 
 @* Inline GOV.UK confirmation panel — replaces the browser confirm() dialog for Delete sample. *@

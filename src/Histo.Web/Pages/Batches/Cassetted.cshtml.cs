@@ -34,15 +34,10 @@ public class CassettedModel : HistoPageModel
         ViewData["PageTitle"] = "Submission type";
         await LoadLookupsAsync();
 
-        // Restore previous selections when the user navigates back from BatchDetails
+        // Every fresh visit starts with nothing selected — do not restore a previous choice from
+        // TempData here, since it can leak from an abandoned/completed earlier submission attempt
+        // and wrongly pre-select a submission type (e.g. always showing "Pre Cassetted Tissue").
         BatchType = Session.BatchType;
-        if (TempData.TryGetValue("CreateSubmittedAsId", out var saId) && int.TryParse(saId?.ToString(), out var id))
-        {
-            SubmittedAs = id;
-            TempData.Keep("CreateSubmittedAsId");
-            TempData.Keep("CreateSubmittedAsCode");
-            TempData.Keep("CreateIsPreCassetted");
-        }
     }
 
     public async Task<IActionResult> OnPostAsync()

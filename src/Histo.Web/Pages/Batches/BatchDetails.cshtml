@@ -136,13 +136,12 @@
         @* Submission date � required, legacy ctlBatchDate *@
         <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_BatchDateStr") ? "govuk-form-group--error" : "")">
             <label class="govuk-label" for="Create_BatchDateStr">Submission date</label>
-            <div class="govuk-hint">For example, 27/03/2025</div>
             @if (Model.Errors.TryGetValue("Create_BatchDateStr", out var bdErr))
             {
                 <p id="Create_BatchDateStr-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @bdErr</p>
             }
             <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("Create_BatchDateStr") ? "govuk-input--error" : "")"
-                   asp-for="Create_BatchDateStr" id="Create_BatchDateStr" autocomplete="off" />
+                   asp-for="Create_BatchDateStr" id="Create_BatchDateStr" type="date" max="@DateTime.Today.ToString("yyyy-MM-dd")" />
         </div>
 
         @* Species � required, legacy ddlSpecies rvfSpecies *@
@@ -318,33 +317,8 @@
     }
     else
     {
-    @* Task-list-style progress summary for a submission still being built (Submitted/Rejected).
-       Reuses this existing hub page rather than a separate overview page, since it already
-       lists every subsequent action for the batch. Uses govuk-summary-list + govuk-tag, matching
-       the status-tag pattern already used elsewhere on this page (selected test types, below). *@
-    @if (Model.CanModifySamples)
-    {
-        <dl class="govuk-summary-list govuk-!-margin-bottom-6">
-            <div class="govuk-summary-list__row">
-                <dt class="govuk-summary-list__key">Submission details</dt>
-                <dd class="govuk-summary-list__value"><strong class="govuk-tag govuk-tag--green">Completed</strong></dd>
-            </div>
-            <div class="govuk-summary-list__row">
-                <dt class="govuk-summary-list__key"><a class="govuk-link" asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId">Samples</a></dt>
-                <dd class="govuk-summary-list__value">
-                    @if (Model.SampleCount > 0)
-                    {
-                        <strong class="govuk-tag govuk-tag--green">@Model.SampleCount added</strong>
-                    }
-                    else
-                    {
-                        <strong class="govuk-tag govuk-tag--grey">Not started</strong>
-                    }
-                </dd>
-            </div>
-        </dl>
-    }
-
+    @* Sample count shown as a hint next to the "Samples" button below, rather than a separate
+       summary-list link to the same destination — avoids two navigation points to one page. *@
     <dl class="govuk-summary-list">
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Submission number</dt>
@@ -508,7 +482,13 @@
        list-page action panels, not from this read-only view page. *@
     <div class="govuk-button-group">
 
-        <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button" data-module="govuk-button">Samples</a>
+        <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button" data-module="govuk-button">
+            Samples
+            @if (Model.CanModifySamples)
+            {
+                <span class="govuk-visually-hidden">, @Model.SampleCount added so far</span>
+            }
+        </a>
 
         @* Assign blocks — Received or InProgress only. *@
         @if (Model.CanAssignBlocks)
@@ -522,9 +502,15 @@
             <a asp-page="/Batches/DateReturned" class="govuk-button govuk-button--secondary" data-module="govuk-button">Date returned</a>
         }
 
-        <a asp-page="/QC/QCNotes" class="govuk-button govuk-button--secondary" data-module="govuk-button">QC notes</a>
-        <a asp-page="/Reports/HistologyReport" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission form</a>
-        <a asp-page="/Reports/SubmissionNotes" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission notes</a>
+        @* Print actions -- nothing meaningful to print while the submission is still being built in
+           the Create Submission journey; legacy only printed via the final "Finish" step. QC notes
+           is not shown here at all -- it is already reachable from the main navigation and the Home
+           page, so a duplicate entry point here was redundant. *@
+        @if (Model.CanPrint)
+        {
+            <a asp-page="/Reports/HistologyReport" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission form</a>
+            <a asp-page="/Reports/SubmissionNotes" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission notes</a>
+        }
 
         <a href="@Url.Page(Model.BackLinkPage)" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
         <a asp-page="/Index" class="govuk-button govuk-button--secondary" data-module="govuk-button">Finish</a>
