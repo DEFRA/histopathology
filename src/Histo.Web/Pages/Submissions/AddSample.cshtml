@@ -25,3 +25,11 @@
     <button type="submit" class="govuk-button" data-module="govuk-button">Add sample</button>
     <a asp-page="/Submissions/BatchBlockSummary" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
 </form>
+
+@* Contextual lookup, pre-filled with the sender ref entered above, replacing the need to leave
+   this task and navigate to the standalone Search menu. *@
+<form method="get" asp-page="/Search/ViewImportedData"
+      onsubmit="document.getElementById('icc-filter').value = document.getElementById('SenderRef').value;">
+    <input type="hidden" id="icc-filter" name="Filter" value="" />
+    <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Check historical data for this sender ref</button>
+</form>

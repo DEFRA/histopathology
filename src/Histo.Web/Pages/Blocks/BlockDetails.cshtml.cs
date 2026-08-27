@@ -13,6 +13,9 @@ public class BlockDetailsModel : HistoPageModel
     public BlockDetailsModel(ISessionService session, IBlockService blocks)
         : base(session) => _blocks = blocks;
 
+    /// <summary>Block awaiting delete confirmation \u2014 drives the inline GOV.UK confirmation panel (replaces browser confirm()).</summary>
+    [BindProperty(SupportsGet = true)] public int? ConfirmDeleteBlockId { get; set; }
+
     public IReadOnlyList<Block> Blocks { get; private set; } = [];
 
     public async Task<IActionResult> OnGetAsync()

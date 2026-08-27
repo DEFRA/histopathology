@@ -40,6 +40,9 @@ public class BatchBlockSummaryModel : HistoPageModel
 
     public Batch? Batch { get; private set; }
 
+    /// <summary>Animal awaiting delete confirmation — drives the inline GOV.UK confirmation panel (replaces browser confirm()).</summary>
+    [BindProperty(SupportsGet = true)] public int? ConfirmDeleteAnimalId { get; set; }
+
     /// <summary>Tissue detail strings keyed by AnimalID for the Tissue Details column.</summary>
     public IReadOnlyDictionary<int, IReadOnlyList<string>> TissuesByAnimalId { get; private set; } =
         new Dictionary<int, IReadOnlyList<string>>();
@@ -140,10 +143,12 @@ public class BatchBlockSummaryModel : HistoPageModel
         return Page();
     }
 
-    public async Task<IActionResult> OnPostSelectAsync(int animalId)
+    public IActionResult OnPostSelect(int animalId)
     {
         Session.AnimalID = animalId;
-        return RedirectToPage("/Blocks/BlockDetails");
+        // Route to the animal-scoped blocks page (correctly filters by this sample) rather than
+        // the batch-wide /Blocks/BlockDetails, which lists every block in the batch regardless of sample.
+        return RedirectToPage("/Submissions/SubmissionDetailsBlock");
     }
 
     /// <summary>

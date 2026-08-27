@@ -1,3 +1,4 @@
+using Histo.Core.Domain;
 using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
@@ -9,15 +10,15 @@ namespace Histo.Web.Pages.Submissions;
 
 /// <summary>
 /// Replaces <c>SubmissionDetailsBlock.aspx</c> — block summary for the current sample (animal)
-/// within a batch submission (cassetted workflow).
+/// within a batch submission (cassetted workflow). This is the single, animal-scoped page for
+/// managing a sample's blocks (add/edit/delete/copy) — <c>Pages/Blocks/BlockDetails.cshtml</c>
+/// remains the separate batch-wide view reached from Submission details "Assign blocks".
 ///
 /// SIMPLIFIED: the legacy page renders a hierarchical block/tissue grid with per-block
 /// test-assignment checkboxes (EO, H&amp;E, H&amp;E BSE, IHC Prp, IHC Other, Special Stain).
 /// The migrated <see cref="Block"/> model does not carry per-block test flags (see
 /// <c>BatchService.GetTestItemRowsAsync</c> scope notes for the existing precedent) — this
-/// page presents block reference, customer ref, comment, repeat, and status only, consistent
-/// with <c>Pages/Blocks/BlockDetails.cshtml</c>. Add/Edit/Copy/Block-ref-search actions from
-/// the legacy toolbar are not reproduced; only list and delete are provided.
+/// page presents block reference, customer ref, comment, repeat, and status only.
 /// </summary>
 public class SubmissionDetailsBlockModel : HistoPageModel
 {
@@ -34,8 +35,19 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     [BindProperty] public string? PMDate { get; set; }
     [BindProperty] public string? HistologyRef { get; set; }
 
+    [BindProperty] public string? NewBlockRef { get; set; }
+    [BindProperty] public string? NewCustomerRef { get; set; }
+    [BindProperty] public bool NewRepeatBlock { get; set; }
+
+    /// <summary>Block awaiting delete confirmation — drives the inline GOV.UK confirmation panel (replaces browser confirm()).</summary>
+    [BindProperty(SupportsGet = true)] public int? ConfirmDeleteBlockId { get; set; }
+
+    /// <summary>Set when the user has requested the inline "Check used block refs" lookup for this sample.</summary>
+    [BindProperty(SupportsGet = true)] public bool ShowUsedRefs { get; set; }
+
     public Animal? Animal { get; private set; }
     public IReadOnlyList<Block> Blocks { get; private set; } = [];
+    public IReadOnlyList<BlockRefRangeHelpers.BlockRefRangeRow> UsedBlockRefResults { get; private set; } = [];
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -50,6 +62,14 @@ public class SubmissionDetailsBlockModel : HistoPageModel
 
         var allBlocks = await _blocks.GetByBatchAsync(Session.BatchID ?? 0);
         Blocks = allBlocks.Where(b => b.AnimalID == Animal.ID).ToList();
+
+        if (ShowUsedRefs)
+        {
+            var used = await _blocks.GetUsedBlockRefsBySenderRefAsync(Animal.SenderRef);
+            UsedBlockRefResults = BlockRefRangeHelpers.ComputeRanges(
+                used.Select(b => (b.BlockRef, b.Status)).ToList());
+        }
+
         return Page();
     }
 
@@ -78,6 +98,24 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         };
 
         await _submissions.UpdateAnimalAsync(updated, Session.UserID);
+        return RedirectToPage();
+    }
+
+    /// <summary>Adds a new block for this sample \u2014 restores the "Add block" action missing from the migrated page.</summary>
+    public async Task<IActionResult> OnPostAddBlockAsync()
+    {
+        var redirect = await LoadAnimalAsync();
+        if (redirect is not null) return redirect;
+
+        if (!string.IsNullOrWhiteSpace(NewBlockRef))
+        {
+            var allBlocks = await _blocks.GetByBatchAsync(Session.BatchID ?? 0);
+            var existingOrders = allBlocks.Select(b => b.Order);
+            await _blocks.AddBlockAsync(
+                Session.BatchID ?? 0, Animal!.ID, NewBlockRef, existingOrders, Session.UserID,
+                NewCustomerRef, comment: null, repeatBlock: NewRepeatBlock);
+        }
+
         return RedirectToPage();
     }
 

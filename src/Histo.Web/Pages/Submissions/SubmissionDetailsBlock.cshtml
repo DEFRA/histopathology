@@ -41,6 +41,87 @@ else
     </form>
 
     <h2 class="govuk-heading-m">Blocks</h2>
+
+    @* "Check used block refs" — inline lookup pre-filled with this sample's sender ref, replacing
+       the separate top-level Search block refs detour. *@
+    <details class="govuk-details">
+        <summary class="govuk-details__summary">
+            <span class="govuk-details__summary-text">Check used block refs for this sample</span>
+        </summary>
+        <div class="govuk-details__text">
+            <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-ShowUsedRefs="true"
+               class="govuk-button govuk-button--secondary govuk-!-margin-bottom-2" data-module="govuk-button">Check now</a>
+            @if (Model.ShowUsedRefs)
+            {
+                @if (Model.UsedBlockRefResults.Any())
+                {
+                    <table class="govuk-table">
+                        <thead class="govuk-table__head">
+                            <tr class="govuk-table__row">
+                                <th scope="col" class="govuk-table__header">Used block refs</th>
+                                <th scope="col" class="govuk-table__header">Unused block refs</th>
+                                <th scope="col" class="govuk-table__header">Pre booked block refs</th>
+                            </tr>
+                        </thead>
+                        <tbody class="govuk-table__body">
+                            @foreach (var r in Model.UsedBlockRefResults)
+                            {
+                                <tr class="govuk-table__row">
+                                    <td class="govuk-table__cell">@r.UsedBlockRefs</td>
+                                    <td class="govuk-table__cell">@r.UnusedBlockRefs</td>
+                                    <td class="govuk-table__cell">@r.PreBookedBlockRefs</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="govuk-body">No block refs found for this sender ref.</p>
+                }
+            }
+        </div>
+    </details>
+
+    @* "Add block" — restores the missing add action for this sample's blocks. *@
+    <form method="post" asp-page-handler="AddBlock" class="govuk-!-margin-bottom-6">
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="NewBlockRef">Block ref</label>
+            <input class="govuk-input" asp-for="NewBlockRef" />
+        </div>
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="NewCustomerRef">Customer reference</label>
+            <input class="govuk-input" asp-for="NewCustomerRef" />
+        </div>
+        <div class="govuk-form-group">
+            <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                <div class="govuk-checkboxes__item">
+                    <input class="govuk-checkboxes__input" asp-for="NewRepeatBlock" type="checkbox" />
+                    <label class="govuk-label govuk-checkboxes__label" for="NewRepeatBlock">Additional request (repeat block)</label>
+                </div>
+            </div>
+        </div>
+        <button type="submit" class="govuk-button" data-module="govuk-button">Add block</button>
+    </form>
+
+    @* Inline GOV.UK confirmation panel — replaces the browser confirm() dialog for Delete. *@
+    @if (Model.ConfirmDeleteBlockId is int confirmBlockId)
+    {
+        var confirmBlock = Model.Blocks.FirstOrDefault(b => b.ID == confirmBlockId);
+        <div class="govuk-warning-text">
+            <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+            <strong class="govuk-warning-text__text">
+                <span class="govuk-visually-hidden">Warning</span>
+                Are you sure you want to delete block @(confirmBlock?.BlockRef ?? "this block")?
+            </strong>
+        </div>
+        <form method="post" asp-page-handler="Delete" class="govuk-!-display-inline">
+            <input type="hidden" name="blockId" value="@confirmBlockId" />
+            <button type="submit" class="govuk-button govuk-button--warning" data-module="govuk-button">Yes, delete block</button>
+            <a asp-page="/Submissions/SubmissionDetailsBlock" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        </form>
+    }
+
     <form method="post" asp-page-handler="Copy">
         <table class="govuk-table">
             <thead class="govuk-table__head">
@@ -70,9 +151,9 @@ else
                         <td class="govuk-table__cell">@(b.RepeatBlock ? "Yes" : "No")</td>
                         <td class="govuk-table__cell">@b.Status</td>
                         <td class="govuk-table__cell">
-                            <button type="submit" asp-page-handler="Delete" name="blockId" value="@b.ID"
-                                    class="govuk-button govuk-button--warning govuk-!-margin-bottom-0"
-                                    onclick="return confirm('Delete this block?')">Delete</button>
+                            @* "Delete" — links to the inline confirmation panel above instead of a browser confirm() dialog. *@
+                            <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-ConfirmDeleteBlockId="@b.ID"
+                               class="govuk-button govuk-button--warning govuk-!-margin-bottom-0">Delete</a>
                         </td>
                     </tr>
                 }

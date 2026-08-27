@@ -11,6 +11,24 @@
 
 <a asp-page="/Blocks/CopySamples" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy samples</a>
 
+@* Inline GOV.UK confirmation panel — replaces the browser confirm() dialog for Delete. *@
+@if (Model.ConfirmDeleteBlockId is int confirmBlockId)
+{
+    var confirmBlock = Model.Blocks.FirstOrDefault(b => b.ID == confirmBlockId);
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <strong class="govuk-warning-text__text">
+            <span class="govuk-visually-hidden">Warning</span>
+            Are you sure you want to delete block @(confirmBlock?.BlockRef ?? "this block")?
+        </strong>
+    </div>
+    <form method="post" asp-page-handler="Delete" class="govuk-!-display-inline">
+        <input type="hidden" name="blockId" value="@confirmBlockId" />
+        <button type="submit" class="govuk-button govuk-button--warning" data-module="govuk-button">Yes, delete block</button>
+        <a asp-page="/Blocks/BlockDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    </form>
+}
+
 <table class="govuk-table">
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
@@ -32,11 +50,9 @@
                 <td class="govuk-table__cell">@(b.RepeatBlock ? "Yes" : "No")</td>
                 <td class="govuk-table__cell">@b.Status</td>
                 <td class="govuk-table__cell">
-                    <form method="post" asp-page-handler="Delete" class="govuk-!-display-inline">
-                        <input type="hidden" name="blockId" value="@b.ID" />
-                        <button type="submit" class="govuk-button govuk-button--warning govuk-!-margin-bottom-0"
-                                onclick="return confirm('Delete this block?')">Delete</button>
-                    </form>
+                    @* "Delete" — links to the inline confirmation panel above instead of a browser confirm() dialog. *@
+                    <a asp-page="/Blocks/BlockDetails" asp-route-ConfirmDeleteBlockId="@b.ID"
+                       class="govuk-button govuk-button--warning govuk-!-margin-bottom-0">Delete</a>
                 </td>
             </tr>
         }

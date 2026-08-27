@@ -11,16 +11,17 @@
 
 @* "Bypass sort" — legacy chkByPassSort: when checked, animals display in block-insertion order
    instead of the default SenderRef / HistologyRef ascending order. Placed above the table to
-   match legacy BatchBlockSummary.aspx layout. *@
+   match legacy BatchBlockSummary.aspx layout. An explicit Apply button is used instead of
+   auto-submitting on change, per WCAG 3.2.2 (On Input). *@
 <form method="post" asp-page-handler="ToggleByPassSort" class="govuk-!-margin-bottom-4">
     <div class="govuk-checkboxes" data-module="govuk-checkboxes">
         <div class="govuk-checkboxes__item">
             <input class="govuk-checkboxes__input" id="byPassSort" type="checkbox"
-                   name="byPassSort" @(Model.Batch?.ByPassSort == true ? "checked" : "")
-                   onchange="this.form.submit()" />
+                   name="byPassSort" @(Model.Batch?.ByPassSort == true ? "checked" : "") />
             <label class="govuk-label govuk-checkboxes__label" for="byPassSort">Bypass sort</label>
         </div>
     </div>
+    <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Apply</button>
 </form>
 
 @* "Add sample" — legacy btnAddSubmission, only enabled while the batch is still Submitted/Rejected
@@ -29,6 +30,24 @@
 @if (Model.CanModifySamples && !Model.IsViewMode)
 {
     <a asp-page="/Submissions/AddSubmission" class="govuk-button govuk-!-margin-bottom-4" data-module="govuk-button">Add sample</a>
+}
+
+@* Inline GOV.UK confirmation panel — replaces the browser confirm() dialog for Delete sample. *@
+@if (Model.ConfirmDeleteAnimalId is int confirmId)
+{
+    var confirmAnimal = Model.Animals.FirstOrDefault(a => a.ID == confirmId);
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <strong class="govuk-warning-text__text">
+            <span class="govuk-visually-hidden">Warning</span>
+            Are you sure you want to delete sample @(confirmAnimal?.SenderRef ?? "this sample")?
+        </strong>
+    </div>
+    <form method="post" asp-page-handler="Delete" class="govuk-!-display-inline">
+        <input type="hidden" name="animalId" value="@confirmId" />
+        <button type="submit" class="govuk-button govuk-button--warning" data-module="govuk-button">Yes, delete sample</button>
+        <a asp-page="/Submissions/BatchBlockSummary" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    </form>
 }
 
 <table class="govuk-table">
@@ -85,14 +104,9 @@
                            so copying passes the source Sender Ref as a query parameter to pre-fill the Add Sample form. *@
                         <a asp-page="/Submissions/AddSample" asp-route-senderRef="@a.SenderRef"
                            class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Copy sample</a>
-                        @* "Delete sample" — replaces legacy BatchBlockSummary.aspx "Delete Sample". *@
-                        <form method="post" asp-page-handler="Delete" class="govuk-!-display-inline">
-                            <input type="hidden" name="animalId" value="@a.ID" />
-                            <button type="submit" class="govuk-button govuk-button--warning govuk-!-margin-bottom-0"
-                                    onclick="return confirm('Delete this sample?')">
-                                Delete sample
-                            </button>
-                        </form>
+                        @* "Delete sample" — links to the inline confirmation panel above instead of a browser confirm() dialog. *@
+                        <a asp-page="/Submissions/BatchBlockSummary" asp-route-ConfirmDeleteAnimalId="@a.ID"
+                           class="govuk-button govuk-button--warning govuk-!-margin-bottom-0">Delete sample</a>
                     }
                 </td>
             </tr>
