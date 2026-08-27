@@ -1144,3 +1144,134 @@ Recommendations and required changes to achieve full parity and GDS compliance.
 8. Procedure or function AddluContacts expects parameter @ID which was not supplied.
 
 9. Run journal-updater to document all the issue and fixes to update the details run-log-v2.md and session-metrics.md and User-Prompts-Log.md file from time after 3 PM today.
+
+---
+
+## Prompt 56 — TSE/NON-TSE Submission workflow GDS redesign (2026-08-27)
+
+> Review the following TSE/NON-TSE Submission workflow and propose a simplified, user-centred design aligned with Government Digital Service (GDS) principles. Focus on reducing navigation steps, minimising user effort, improving accessibility, eliminating unnecessary screens/popups, and streamlining the overall user journey, keep the existing functionality as it is.
+>
+> **Current Workflow:** Navigate to New TSE Submission → Submission Samples → Sample Summary → Blocking → Block Details → Search Block Refs → View Old ICC Sub Data.
+>
+> **Required Output:** Identify usability issues and pain points; recommend a simplified GDS-compliant user journey; suggest which screens can be consolidated, removed, or replaced; propose alternatives to popup windows and excessive page navigation; provide a target-state workflow diagram/user journey; explain how the proposed solution improves usability, accessibility, and task completion rates.
+
+---
+
+## Prompt 57 — Elaborate on the task-list concept
+
+> Expand on the Not Implemented section. What is the 'task-list'. Eleaborate on what was not implemented
+
+---
+
+## Prompt 58 — How can this be solved?
+
+> How can this be solved?
+
+---
+
+## Prompt 59 — Implementation plan for the two unimplemented sections
+
+> Make an implementation plan for the two unimplemented sections
+
+---
+
+## Prompt 60 — Implement the plan (Phase 0/1)
+
+> Implement this plan.
+
+---
+
+## Prompt 61 — Implement the rest of the plan (Phase 2/3)
+
+> impliment the rest of the plan
+
+---
+
+## Prompt 62 — GDS standards and functional gap check (first pass)
+
+> Are the current changes in line with the GDS standards, is there any function gap between the legacy system (found in the Histopathology folder) and the current system?
+
+---
+
+## Prompt 63 — Assess relevance of identified gaps
+
+> You have mentioned several things that are missing in the current system compared to the legacy system. Check to see if any of these points are relevant to be added to the new system
+
+---
+
+## Prompt 64 — Implement relevant changes and summarise remaining gap
+
+> Impliment all the relevant changes and give a summary of the new function gap between legacy and current for these points.
+
+---
+
+## Prompt 65 — Resolve the last three open sections
+
+> Please resolve the last three open sections aswell
+
+---
+
+## Prompt 66 — Finish the plan for production readiness
+
+> Finish what is left of the plan so that I can consider this change production ready
+
+---
+
+## Prompt 67 — Apply the guard-testability steps
+
+> Impliment these steps
+
+---
+
+## Prompt 68 — GDS standards and functional gap check (second pass)
+
+> Are the current changes in line with the GDS standards, is there any function gap between the legacy system (found in the Histopathology folder) and the current system?
+
+---
+
+## Prompt 69 — New Submission Create/Edit flow, Submission Type default, Submission date component (2026-08-27)
+
+> **New Submission Create/Edit Flow & Submission Type Validation**
+>
+> Please analyse and fix the New Submission Create/Edit workflow to ensure it matches the legacy application. Current issue: when a user clicks Add Sample from BatchBlockSummary.cshtml, the application navigates to AddSubmission.cshtml, but Sender Reference search/selection is missing and the workflow does not proceed to the Sample Blocks page as legacy does.
+>
+> Cassetted.cshtml — Submission Type dropdown is automatically defaulting to "Pre Cassetted Tissue" when the page loads; it should default to "Select Submission Type" with no pre-selection, and validation must prevent continuing without an explicit selection.
+>
+> Issue 3: BatchDetails.cshtml shows Submission date as a text box — it should be a date component.
+
+---
+
+## Prompt 70 — Apply the three fixes
+
+> Now apply these changes.
+
+---
+
+## Prompt 71 — Submission journey button visibility investigation (2026-08-27)
+
+> ### Investigation and Validation Required for Submission Journeys
+>
+> 1. Create Submission Journey - BatchDetails.cshtml: why are QC Notes, Print Submission Form, and Print Submission Notes buttons displayed? Confirm whether required and explain the business logic behind their visibility.
+> 2. View Submission Journey: only Print Submission Form and Print Submission Notes should be displayed — verify the implementation.
+> 3. Validation of Other Journeys: review all other submission-related journeys and validate button visibility.
+> 4. Create Submission Journey - Submission Details Status: why is "Submission Details – Completed" displayed for a sample when a button already exists for accessing the submission information?
+> 5. Create Submission Journey - Sample Link Visibility: why is the sample link displayed along with the status, alongside the button? Should both navigate to BatchBlockSummary.cshtml? Is there a reason for having both?
+> 6. Navigation Issue When Adding Animals: after Create Submission → Sample → BatchBlockSummary → Add Sample → AddSubmission.cshtml → enter Sender Reference → Add Animal, the application redirects to the Home page instead of continuing the workflow. Investigate the root cause.
+
+---
+
+## Prompt 72 — GDS standards and functional gap check (third pass)
+
+> Are the current changes in line with the GDS standards, is there any function gap between the legacy system (found in the Histopathology folder) and the current system?
+
+---
+
+## Prompt 73 — Commit message for submission journey fixes
+
+> Please create a brief of the changes made of a commit message
+
+---
+
+## Prompt 74 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session
+
+> Please update the details run-log-v2.md (what fix applied) and session-metrics.md (duration), User-Prompts-Log.md (prompt) file for this session
