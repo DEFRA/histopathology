@@ -41,6 +41,9 @@ public class CopySamplesSummaryModel : HistoPageModel
         var ids = ParseIds(targetAnimalIds);
         if (Session.BatchID is not null && ids.Count > 0)
         {
+            var forbidden = await CheckBatchAccessAsync(_batches, Session.BatchID.Value);
+            if (forbidden is not null) return forbidden;
+
             var currentAnimals = await _submissions.GetAnimalsByBatchAsync(Session.BatchID ?? 0);
             TargetAnimals = currentAnimals.Where(a => ids.Contains(a.ID)).OrderBy(a => a.SenderRef).ToList();
         }

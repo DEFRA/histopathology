@@ -41,18 +41,26 @@ public class BatchDetailsModel : HistoPageModel
     private readonly IBatchService _batches;
     private readonly ILookupService _lookups;
     private readonly IUserService _users;
+    private readonly ISubmissionService _submissions;
 
-    public BatchDetailsModel(ISessionService session, IBatchService batches, ILookupService lookups, IUserService users)
+    public BatchDetailsModel(ISessionService session, IBatchService batches, ILookupService lookups, IUserService users, ISubmissionService submissions)
         : base(session)
     {
         _batches = batches;
         _lookups = lookups;
         _users   = users;
+        _submissions = submissions;
     }
 
     // ── Query param — "create" activates the new-batch form ──
     [BindProperty(SupportsGet = true)] public string? Mode { get; set; }
     public bool IsCreateMode => string.Equals(Mode, "create", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Batch ID from the URL (route/query), used in view mode only — create mode has no batch yet.
+    /// Falls back to <see cref="ISessionService.BatchID"/> for links not yet migrated.
+    /// </summary>
+    [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
 
     // ── Create-mode form fields (map to AddBatch SP params) ──
     [BindProperty] public string? Create_ProjectContractCode { get; set; }
@@ -92,6 +100,9 @@ public class BatchDetailsModel : HistoPageModel
     public IDictionary<string, string> Errors { get; private set; } = new Dictionary<string, string>();
 
     public Batch? Batch { get; private set; }
+
+    /// <summary>Number of samples added so far — drives the "Samples" progress row in the task-list summary.</summary>
+    public int SampleCount { get; private set; }
 
     /// <summary>Batch-level test type selections (histology, antibodies, special stains).</summary>
     public BatchTestSelections TestSelections { get; private set; } = new();
@@ -177,6 +188,9 @@ public class BatchDetailsModel : HistoPageModel
     /// <summary>True when blocks can be assigned — Received or InProgress (lab is working on it).</summary>
     public bool CanAssignBlocks => Batch?.Status is BatchStatus.Received or BatchStatus.InProgress;
 
+    /// <summary>True while the submission is still being built — drives the task-list-style progress summary.</summary>
+    public bool CanModifySamples => Batch?.Status is BatchStatus.Submitted or BatchStatus.Rejected;
+
     /// <summary>True when the customer received date (date returned) can be set — Completed only.</summary>
     public bool CanDateReturned => Batch?.Status == BatchStatus.Completed;
 
@@ -212,9 +226,17 @@ public class BatchDetailsModel : HistoPageModel
         }
 
         if (Session.BatchID is null or <= 0) return RedirectToPage("/Index");
+        var effectiveBatchId = BatchId ?? Session.BatchID;
+        if (effectiveBatchId is null or <= 0) return RedirectToPage("/Index");
+
+        var forbidden = await CheckBatchAccessAsync(_batches, effectiveBatchId.Value);
+        if (forbidden is not null) return forbidden;
+
+        Session.BatchID = effectiveBatchId; // keep session in sync as a fallback for links not yet migrated
+        BatchId = effectiveBatchId;
         try
         {
-            Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0);
+            Batch = await _batches.GetByIdAsync(effectiveBatchId.Value);
         }
         catch (Exception ex)
         {
@@ -226,7 +248,7 @@ public class BatchDetailsModel : HistoPageModel
             Session.BatchType = Batch.BatchType;  // ISS-023: restore from DB for downstream lookup selection
 
             // Load batch-level test selections and translate codes to descriptions.
-            var batchId = Session.BatchID ?? 0;
+            var batchId = effectiveBatchId.Value;
             var antibodyTableId = Batch.BatchType == BatchTypeConstants.NonTse ? 5 : 4;
 
             var selectionsTask     = _batches.GetBatchTestSelectionsAsync(batchId);
@@ -241,10 +263,13 @@ public class BatchDetailsModel : HistoPageModel
             var projectsLookup     = _lookups.GetLookupDataAsync(LookupProjects);
             var contactsLookup     = _lookups.GetLookupDataAsync(LookupContacts);
             var fixationsLookup    = _lookups.GetLookupDataAsync(LookupFixation);
+            var animalsTask        = _submissions.GetAnimalsByBatchAsync(batchId);
 
             await Task.WhenAll(selectionsTask, histologyTask, antibodyTask, stainTask,
                                speciesTask, usersTask, userAreasTask, submittedAsTask, submittedAsLookup,
-                               projectsLookup, contactsLookup, fixationsLookup);
+                               projectsLookup, contactsLookup, fixationsLookup, animalsTask);
+
+            SampleCount     = animalsTask.Result.Count;
 
             TestSelections  = selectionsTask.Result;
             HistologyNames  = ToDictionary(histologyTask.Result);

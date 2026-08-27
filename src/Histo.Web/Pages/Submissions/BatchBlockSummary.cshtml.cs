@@ -40,6 +40,12 @@ public class BatchBlockSummaryModel : HistoPageModel
 
     public Batch? Batch { get; private set; }
 
+    /// <summary>
+    /// Batch ID from the URL (route/query). Falls back to <see cref="ISessionService.BatchID"/> for
+    /// links not yet migrated to pass it explicitly — Phase 1 of the route-based-state rollout.
+    /// </summary>
+    [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
+
     /// <summary>Animal awaiting delete confirmation — drives the inline GOV.UK confirmation panel (replaces browser confirm()).</summary>
     [BindProperty(SupportsGet = true)] public int? ConfirmDeleteAnimalId { get; set; }
 
@@ -74,15 +80,22 @@ public class BatchBlockSummaryModel : HistoPageModel
     {
         ViewData["Title"] = "Sample summary";
         ViewData["PageTitle"] = "Sample summary";
-        if (Session.BatchID is null or <= 0) return RedirectToPage("/Index");
-        var batchId = Session.BatchID.Value;
-        Batch = await _batches.GetByIdAsync(batchId);
-        var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(batchId);
+        var batchId = BatchId ?? Session.BatchID;
+        if (batchId is null or <= 0) return RedirectToPage("/Index");
+
+        var forbidden = await CheckBatchAccessAsync(_batches, batchId.Value);
+        if (forbidden is not null) return forbidden;
+
+        Session.BatchID = batchId; // keep session in sync as a fallback for links not yet migrated
+        BatchId = batchId;
+        var batchIdValue = batchId.Value;
+        Batch = await _batches.GetByIdAsync(batchIdValue);
+        var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(batchIdValue);
         // Fall back to submission-level animals for non-cassetted batches where the
         // block SP returns no rows (mirrors CopyBatch's IsCassetted detection).
         var animals = blockAnimals.Count > 0
             ? blockAnimals
-            : await _submissions.GetAnimalsByBatchAsync(batchId);
+            : await _submissions.GetAnimalsByBatchAsync(batchIdValue);
 
         // Default sort: SenderRef ASC then HistologyRef ASC, matching legacy ByPassSort=false behaviour.
         // When ByPassSort=true the user has explicitly requested block-insertion order — preserve SP order.
@@ -92,7 +105,7 @@ public class BatchBlockSummaryModel : HistoPageModel
 
         // Load submissions upfront — needed for tissue resolution fallback (mirrors CopyBatch which uses
         // firstSubmId when BatchSubmissionID is 0 or the column wasn't returned by the block-animal SP).
-        var submissions  = await _submissions.GetSubmissionsByBatchAsync(batchId);
+        var submissions  = await _submissions.GetSubmissionsByBatchAsync(batchIdValue);
         var firstSubmId  = submissions.Count > 0 ? submissions[0].ID : 0;
         var submissionIds = submissions.Select(s => s.ID).ToHashSet();
 
@@ -101,7 +114,7 @@ public class BatchBlockSummaryModel : HistoPageModel
         var tissueNames = tissueTypes
             .Where(t => t.Code != null)
             .ToDictionary(t => t.Code!, t => t.Name, StringComparer.OrdinalIgnoreCase);
-        var allTissues = await _submissions.GetBatchSubmissionTissuesAsync(batchId);
+        var allTissues = await _submissions.GetBatchSubmissionTissuesAsync(batchIdValue);
         var tissuesBySubmId = allTissues
             .GroupBy(t => t.OwnerID)
             .ToDictionary(
@@ -135,7 +148,7 @@ public class BatchBlockSummaryModel : HistoPageModel
         else
         {
             // First visit for this batch: create the default batch submission record.
-            var sub = new BatchSubmission { BatchID = batchId, SubmissionName = "Default", Order = 1 };
+            var sub = new BatchSubmission { BatchID = batchIdValue, SubmissionName = "Default", Order = 1 };
             var subId = await _submissions.AddSubmissionAsync(sub, Session.UserID);
             if (subId > 0) Session.BatchSubmissionID = subId;
         }
@@ -148,7 +161,7 @@ public class BatchBlockSummaryModel : HistoPageModel
         Session.AnimalID = animalId;
         // Route to the animal-scoped blocks page (correctly filters by this sample) rather than
         // the batch-wide /Blocks/BlockDetails, which lists every block in the batch regardless of sample.
-        return RedirectToPage("/Submissions/SubmissionDetailsBlock");
+        return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId = BatchId ?? Session.BatchID, animalId });
     }
 
     /// <summary>
@@ -159,7 +172,7 @@ public class BatchBlockSummaryModel : HistoPageModel
     public async Task<IActionResult> OnPostDeleteAsync(int animalId)
     {
         await _submissions.DeleteAnimalAsync(animalId, Session.UserID);
-        return RedirectToPage();
+        return RedirectToPage(new { batchId = BatchId ?? Session.BatchID });
     }
 
     /// <summary>
@@ -168,11 +181,11 @@ public class BatchBlockSummaryModel : HistoPageModel
     /// </summary>
     public async Task<IActionResult> OnPostToggleByPassSortAsync()
     {
-        if (Session.BatchID is null or <= 0) return RedirectToPage();
-        var batchId = Session.BatchID.Value;
-        var current = await _batches.GetByIdAsync(batchId);
+        var batchId = BatchId ?? Session.BatchID;
+        if (batchId is null or <= 0) return RedirectToPage();
+        var current = await _batches.GetByIdAsync(batchId.Value);
         if (current is not null)
-            await _batches.SetByPassSortAsync(batchId, !current.ByPassSort, Session.UserID);
-        return RedirectToPage();
+            await _batches.SetByPassSortAsync(batchId.Value, !current.ByPassSort, Session.UserID);
+        return RedirectToPage(new { batchId });
     }
 }

@@ -6,10 +6,10 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Submissions/BatchBlockSummary" class="govuk-back-link">Back</a>
+    <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" class="govuk-back-link">Back</a>
 }
 
-<a asp-page="/Blocks/CopySamples" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy samples</a>
+<a asp-page="/Blocks/CopySamples" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy samples</a>
 
 @* Inline GOV.UK confirmation panel — replaces the browser confirm() dialog for Delete. *@
 @if (Model.ConfirmDeleteBlockId is int confirmBlockId)
@@ -24,8 +24,9 @@
     </div>
     <form method="post" asp-page-handler="Delete" class="govuk-!-display-inline">
         <input type="hidden" name="blockId" value="@confirmBlockId" />
+        <input type="hidden" asp-for="BatchId" />
         <button type="submit" class="govuk-button govuk-button--warning" data-module="govuk-button">Yes, delete block</button>
-        <a asp-page="/Blocks/BlockDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        <a asp-page="/Blocks/BlockDetails" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
     </form>
 }
 
@@ -51,7 +52,7 @@
                 <td class="govuk-table__cell">@b.Status</td>
                 <td class="govuk-table__cell">
                     @* "Delete" — links to the inline confirmation panel above instead of a browser confirm() dialog. *@
-                    <a asp-page="/Blocks/BlockDetails" asp-route-ConfirmDeleteBlockId="@b.ID"
+                    <a asp-page="/Blocks/BlockDetails" asp-route-BatchId="@Model.BatchId" asp-route-ConfirmDeleteBlockId="@b.ID"
                        class="govuk-button govuk-button--warning govuk-!-margin-bottom-0">Delete</a>
                 </td>
             </tr>
@@ -63,4 +64,4 @@
     </tbody>
 </table>
 
-<a asp-page="/Submissions/BatchBlockSummary" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to animals</a>
+<a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to animals</a>

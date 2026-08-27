@@ -318,6 +318,33 @@
     }
     else
     {
+    @* Task-list-style progress summary for a submission still being built (Submitted/Rejected).
+       Reuses this existing hub page rather than a separate overview page, since it already
+       lists every subsequent action for the batch. Uses govuk-summary-list + govuk-tag, matching
+       the status-tag pattern already used elsewhere on this page (selected test types, below). *@
+    @if (Model.CanModifySamples)
+    {
+        <dl class="govuk-summary-list govuk-!-margin-bottom-6">
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">Submission details</dt>
+                <dd class="govuk-summary-list__value"><strong class="govuk-tag govuk-tag--green">Completed</strong></dd>
+            </div>
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key"><a class="govuk-link" asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId">Samples</a></dt>
+                <dd class="govuk-summary-list__value">
+                    @if (Model.SampleCount > 0)
+                    {
+                        <strong class="govuk-tag govuk-tag--green">@Model.SampleCount added</strong>
+                    }
+                    else
+                    {
+                        <strong class="govuk-tag govuk-tag--grey">Not started</strong>
+                    }
+                </dd>
+            </div>
+        </dl>
+    }
+
     <dl class="govuk-summary-list">
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Submission number</dt>
@@ -481,12 +508,12 @@
        list-page action panels, not from this read-only view page. *@
     <div class="govuk-button-group">
 
-        <a asp-page="/Submissions/BatchBlockSummary" class="govuk-button" data-module="govuk-button">Samples</a>
+        <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button" data-module="govuk-button">Samples</a>
 
-        @* Assign blocks � Received or InProgress only. *@
+        @* Assign blocks — Received or InProgress only. *@
         @if (Model.CanAssignBlocks)
         {
-            <a asp-page="/Blocks/BlockDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Assign blocks</a>
+            <a asp-page="/Blocks/BlockDetails" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Assign blocks</a>
         }
 
         @* Date returned � Completed status only. *@

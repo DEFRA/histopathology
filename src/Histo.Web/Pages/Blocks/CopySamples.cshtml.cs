@@ -58,6 +58,8 @@ public class CopySamplesModel : HistoPageModel
     {
         SetTitle();
         if (Session.BatchID is null) return RedirectToPage("/Index");
+        var forbidden = await CheckBatchAccessAsync(_batches, Session.BatchID.Value);
+        if (forbidden is not null) return forbidden;
         TargetAnimals = await _submissions.GetAnimalsByBatchAsync(Session.BatchID ?? 0);
         return Page();
     }
@@ -66,6 +68,8 @@ public class CopySamplesModel : HistoPageModel
     {
         SetTitle();
         if (Session.BatchID is null) return RedirectToPage("/Index");
+        var forbidden = await CheckBatchAccessAsync(_batches, Session.BatchID.Value);
+        if (forbidden is not null) return forbidden;
         TargetAnimals = await _submissions.GetAnimalsByBatchAsync(Session.BatchID ?? 0);
 
         var batch = await _batches.GetByIdAsync(SourceBatchId);
@@ -99,6 +103,8 @@ public class CopySamplesModel : HistoPageModel
     {
         SetTitle();
         if (Session.BatchID is null) return RedirectToPage("/Index");
+        var forbidden = await CheckBatchAccessAsync(_batches, Session.BatchID.Value);
+        if (forbidden is not null) return forbidden;
         var currentBatchId = Session.BatchID ?? 0;
         TargetAnimals = await _submissions.GetAnimalsByBatchAsync(currentBatchId);
 

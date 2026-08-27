@@ -1,3 +1,5 @@
+using Histo.Core.Domain;
+using Histo.Submissions.Interfaces;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -42,4 +44,18 @@ public abstract class HistoPageModel : PageModel
 
         await next();
     }
+
+    /// <summary>
+    /// Object-level access check for batch-scoped pages that accept a batch ID from the
+    /// URL (route/query) rather than only from session state. Histo users see every area;
+    /// other roles are restricted to their own <see cref="ISessionService.UserAreaID"/>.
+    /// Returns <see langword="null"/> when access is allowed, or a Forbid result otherwise.
+    /// </summary>
+    protected async Task<IActionResult?> CheckBatchAccessAsync(IBatchService batches, int batchId)
+    {
+        var batch = await batches.GetByIdAsync(batchId);
+        var allowed = BatchAccessDecision.IsAllowed(Session.IsHistoUser, batch?.UserAreaCode, Session.UserAreaID);
+        return allowed ? null : Forbid();
+    }
 }
+

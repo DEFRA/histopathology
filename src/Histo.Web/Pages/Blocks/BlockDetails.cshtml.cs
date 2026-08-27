@@ -1,5 +1,6 @@
 using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
+using Histo.Submissions.Interfaces;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,11 +10,18 @@ namespace Histo.Web.Pages.Blocks;
 public class BlockDetailsModel : HistoPageModel
 {
     private readonly IBlockService _blocks;
+    private readonly IBatchService _batches;
 
-    public BlockDetailsModel(ISessionService session, IBlockService blocks)
-        : base(session) => _blocks = blocks;
+    public BlockDetailsModel(ISessionService session, IBlockService blocks, IBatchService batches)
+        : base(session)
+    {
+        _blocks = blocks;
+        _batches = batches;
+    }
 
-    /// <summary>Block awaiting delete confirmation \u2014 drives the inline GOV.UK confirmation panel (replaces browser confirm()).</summary>
+    [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
+
+    /// <summary>Block awaiting delete confirmation -- drives the inline GOV.UK confirmation panel (replaces browser confirm()).</summary>
     [BindProperty(SupportsGet = true)] public int? ConfirmDeleteBlockId { get; set; }
 
     public IReadOnlyList<Block> Blocks { get; private set; } = [];
@@ -22,20 +30,27 @@ public class BlockDetailsModel : HistoPageModel
     {
         ViewData["Title"] = "Block Details";
         ViewData["PageTitle"] = "Block Details";
-        if (Session.BatchID <= 0) return RedirectToPage("/Index");
-        Blocks = await _blocks.GetByBatchAsync(Session.BatchID ?? 0);
+        var batchId = BatchId ?? Session.BatchID;
+        if (batchId is null or <= 0) return RedirectToPage("/Index");
+
+        var forbidden = await CheckBatchAccessAsync(_batches, batchId.Value);
+        if (forbidden is not null) return forbidden;
+
+        Session.BatchID = batchId;
+        BatchId = batchId;
+        Blocks = await _blocks.GetByBatchAsync(batchId.Value);
         return Page();
     }
 
-    public async Task<IActionResult> OnPostSelectAsync(int blockId)
+    public IActionResult OnPostSelect(int blockId)
     {
         Session.BlockID = blockId;
-        return await Task.FromResult(RedirectToPage("/Blocks/BlockDetails"));
+        return RedirectToPage("/Blocks/BlockDetails", new { batchId = BatchId ?? Session.BatchID });
     }
 
     public async Task<IActionResult> OnPostDeleteAsync(int blockId, byte[] rowStamp)
     {
         await _blocks.DeleteBlockAsync(blockId, Session.UserID);
-        return RedirectToPage();
+        return RedirectToPage(new { batchId = BatchId ?? Session.BatchID });
     }
 }
