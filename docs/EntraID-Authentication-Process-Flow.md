@@ -106,7 +106,7 @@ Entra ID (Authentication only)          Your App (Authorisation)
 |---|---|---|
 | Enterprise App → Properties → Assignment required | **No** | Any authenticated tenant user can attempt login; the DB is the actual gate |
 | Enterprise App → Properties → Visible to users | **No** (optional) | Prevents the app appearing in My Apps for users who have no DB row |
-| `Login.cshtml` / future Entra ID OIDC handler | Check `UserService.ResolveUserAsync()` result | If null or `Active = false` → redirect to `AccessDenied.cshtml` |
+| `AuthController` SAML ACS endpoint (decommissioned `Login.cshtml`) | Check `UserService.ResolveUserAsync()` result | If null or `Active = false` → redirect to `AccessDenied.cshtml` |
 | `tblUser.NTLogin` column | Populate with UPN (`user@domain.com`) during Phase B data migration | Entra ID sends UPN, not `DOMAIN\username` — see ISS-009 |
 
 ---

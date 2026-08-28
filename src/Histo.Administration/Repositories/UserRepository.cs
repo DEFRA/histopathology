@@ -48,6 +48,34 @@ public sealed class UserRepository : IUserRepository
     }
 
     /// <inheritdoc/>
+    public async Task<User?> GetUserByEmailAsync(string email, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var result = await conn.QuerySingleOrDefaultAsync<dynamic>(
+            "GetUserByEmail",
+            new { Email = email },
+            commandType: System.Data.CommandType.StoredProcedure);
+
+        if (result is null) return null;
+
+        var d = (IDictionary<string, object>)result;
+        bool active = d.TryGetValue("Active", out var a) && Convert.ToBoolean(a);
+        if (!active) return null;
+
+        return new User
+        {
+            UserID    = d.TryGetValue("ID",        out var id)  ? ToIntSafe(id)                              : 0,
+            Name      = d.TryGetValue("Name",      out var n)   ? (string?)n ?? string.Empty                 : string.Empty,
+            GroupCode = d.TryGetValue("UserGroup", out var gc)  ? ToIntSafe(gc)                              : 0,
+            GroupName = d.TryGetValue("GroupName", out var gn)  ? (string?)gn ?? string.Empty                : string.Empty,
+            Email     = d.TryGetValue("Email",     out var em)  ? (string?)em ?? string.Empty                : string.Empty,
+            AreaCode  = d.TryGetValue("UserArea",  out var uc)  ? ToIntSafe(uc)                              : 0,
+            AreaName  = d.TryGetValue("AreaName",  out var an)  ? (string?)an ?? string.Empty                : string.Empty,
+            Active    = active,
+        };
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<User>> GetUsersAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();

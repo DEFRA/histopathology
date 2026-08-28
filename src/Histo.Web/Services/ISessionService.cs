@@ -61,6 +61,14 @@ public interface ISessionService
     void PopulateFromUser(Histo.Administration.Models.User user);
 
     /// <summary>
+    /// Hydrates all session identity fields from the claims attached to the authenticated
+    /// <see cref="System.Security.Claims.ClaimsPrincipal"/> after SAML sign-in.
+    /// Called by <see cref="Histo.Web.Pages.HistoPageModel"/> on the first request after
+    /// the SAML ACS redirect bakes app claims into the auth cookie.
+    /// </summary>
+    void PopulateFromClaims(System.Security.Claims.ClaimsPrincipal principal);
+
+    /// <summary>
     /// The page path the user navigated from before arriving at BatchDetails.
     /// Used by <c>BatchDetails.cshtml</c> to provide a context-aware back link.
     /// Set by <c>ViewSubmissionsModel</c> and <c>SearchSubmissionsModel</c> in their
