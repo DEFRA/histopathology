@@ -65,7 +65,7 @@ public class ReceiveBatchModel : HistoPageModel
     public string? SubmittedAreaName { get; private set; }
     public string? SpeciesName { get; private set; }
 
-    /// <summary>True when any block on this batch is flagged as a repeat block (read-only indicator).</summary>
+    /// <summary> True when any block on this batch is flagged as a repeat block (read-only indicator).</summary>
     public bool HasRepeatBlocks { get; private set; }
 
     public IReadOnlyList<User> Users { get; private set; } = [];
