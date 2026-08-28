@@ -24,7 +24,7 @@ public class AddSubmissionModel : HistoPageModel
 
     public string? ModelError { get; private set; }
 
-    public async Task OnGetAsync()
+    public async Task OnGetAsync(string? senderRef)
     {
         ViewData["Title"] = "Add sample";
         BatchId ??= Session.BatchID;
@@ -37,9 +37,12 @@ public class AddSubmissionModel : HistoPageModel
             if (existing.Count > 0) BatchSubmissionId = existing[0].ID;
         }
 
-        // Restore the sender ref chosen via the Search Sender picker (SearchSender.cshtml).
+        // Restore the sender ref chosen via the Search Sender picker (SearchSender.cshtml),
+        // or pre-fill from the "Copy sample" query parameter (BatchBlockSummary/SearchSample).
         if (TempData.TryGetValue("SenderRefPicker_Selected", out var chosen) && chosen is string chosenRef)
             SenderRef = chosenRef;
+        else if (!string.IsNullOrWhiteSpace(senderRef))
+            SenderRef = senderRef;
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -70,7 +73,14 @@ public class AddSubmissionModel : HistoPageModel
 
         Session.BatchSubmissionID = submissionId;
 
-        await _submissions.AddAnimalAsync(submissionId.Value, SenderRef, IsNeuropath, Session.UserID);
+        var newAnimalId = await _submissions.AddAnimalAsync(submissionId.Value, SenderRef, IsNeuropath, Session.UserID);
+        if (newAnimalId <= 0)
+        {
+            // AddAnimalAsync swallows the underlying SQL exception and returns 0 on failure —
+            // redirecting anyway here previously hid the fact that no sample was actually saved.
+            ModelError = "Could not add the sample. Please try again.";
+            return Page();
+        }
 
         return RedirectToPage("/Submissions/BatchBlockSummary", new { batchId });
     }

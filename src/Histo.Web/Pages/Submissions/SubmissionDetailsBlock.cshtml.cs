@@ -11,10 +11,13 @@ using Microsoft.AspNetCore.Mvc;
 namespace Histo.Web.Pages.Submissions;
 
 /// <summary>
-/// Replaces <c>SubmissionDetailsBlock.aspx</c> — block summary for the current sample (animal)
-/// within a batch submission (cassetted workflow). This is the single, animal-scoped page for
-/// managing a sample's blocks (add/edit/delete/copy) — <c>Pages/Blocks/BlockDetails.cshtml</c>
-/// remains the separate batch-wide view reached from Submission details "Assign blocks".
+/// Replaces <c>SubmissionDetailsBlock.aspx</c> — block summary for a batch submission's samples
+/// (cassetted workflow). Consolidates the previously separate batch-wide
+/// <c>Pages/Blocks/BlockDetails.cshtml</c> into a single page: when <see cref="AnimalId"/> is
+/// supplied (reached from BatchBlockSummary's "Edit sample"), it shows the full add/edit/delete/copy
+/// view for that one sample's blocks; when omitted (reached from BatchDetails' "Assign blocks"), it
+/// shows a read/delete/copy overview of every block in the batch, each row linking into the
+/// animal-scoped view to add/edit blocks for that specific sample.
 ///
 /// SIMPLIFIED: the legacy page renders a hierarchical block/tissue grid with per-block
 /// test-assignment checkboxes (EO, H&amp;E, H&amp;E BSE, IHC Prp, IHC Other, Special Stain).
@@ -48,6 +51,11 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     /// <see cref="ISessionService.AnimalID"/> for links not yet migrated — Phase 1 of the route-based-state rollout.
     /// </summary>
     [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
+
+    /// <summary>
+    /// Optional — when omitted, the page shows a batch-wide overview of every block instead of
+    /// one sample's blocks (the former <c>Blocks/BlockDetails.cshtml</c> use case).
+    /// </summary>
     [BindProperty(SupportsGet = true)] public int? AnimalId { get; set; }
 
     [BindProperty] public string? PMDate { get; set; }
@@ -86,6 +94,9 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     public IReadOnlyDictionary<int, IReadOnlyList<Tissue>> TissuesByBlockId { get; private set; } =
         new Dictionary<int, IReadOnlyList<Tissue>>();
 
+    /// <summary>Sender ref keyed by AnimalID — used only in batch-wide mode (no <see cref="AnimalId"/>) to label each row.</summary>
+    public IReadOnlyDictionary<int, string> SenderRefsByAnimalId { get; private set; } = new Dictionary<int, string>();
+
     public string? ErrorMessage { get; private set; }
 
     public async Task<IActionResult> OnGetAsync()
@@ -96,7 +107,16 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
 
-        PMDate = Animal!.PMDate;
+        if (Animal is null)
+        {
+            // Batch-wide overview (former Blocks/BlockDetails.cshtml behaviour) — every block in the batch.
+            Blocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
+            var animals = await _submissions.GetAnimalsByBatchAsync(BatchId ?? 0);
+            SenderRefsByAnimalId = animals.ToDictionary(a => a.ID, a => a.SenderRef);
+            return Page();
+        }
+
+        PMDate = Animal.PMDate;
         HistologyRef = Animal.HistologyRef;
 
         var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
@@ -121,6 +141,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
 
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
+        if (Animal is null) return RedirectToPage("/Submissions/BatchBlockSummary", new { batchId = BatchId });
 
         var updated = new Animal
         {
@@ -147,6 +168,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     {
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
+        if (Animal is null) return RedirectToPage("/Submissions/BatchBlockSummary", new { batchId = BatchId });
         await LoadSupportingDataAsync();
 
         if (IsPreCassetted && !PreBookedBlockRefs.Any(b => b.BlockRef == NewBlockRef))
@@ -197,6 +219,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     {
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
+        if (Animal is null) return RedirectToPage("/Submissions/BatchBlockSummary", new { batchId = BatchId });
 
         if (NewTissueBlockId > 0 && !string.IsNullOrWhiteSpace(NewTissueCode))
         {
@@ -238,25 +261,33 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         return RedirectToPage("/Blocks/CopyBlocks");
     }
 
-    /// <summary>Resolves <see cref="Animal"/> from the URL's batch/animal ID (falling back to session). Returns a redirect if unavailable.</summary>
+    /// <summary>
+    /// Resolves <see cref="Animal"/> from the URL's batch/animal ID. Returns a redirect if the
+    /// batch is unavailable. <see cref="AnimalId"/> is optional — when the caller did not supply
+    /// it explicitly (batch-wide mode), <see cref="Animal"/> is left null rather than falling back
+    /// to a possibly-stale <see cref="ISessionService.AnimalID"/> from browsing a different sample.
+    /// </summary>
     private async Task<IActionResult?> LoadAnimalAsync()
     {
         var batchId = BatchId ?? Session.BatchID;
-        var animalId = AnimalId ?? Session.AnimalID;
         if (batchId is null or <= 0) return RedirectToPage("/Index");
 
         var forbidden = await CheckBatchAccessAsync(_batches, batchId.Value);
         if (forbidden is not null) return forbidden;
 
-        if (animalId is null) return RedirectToPage("/Submissions/BatchBlockSummary", new { batchId });
-
         Session.BatchID = batchId; // keep session in sync as a fallback for links not yet migrated
-        Session.AnimalID = animalId;
         BatchId = batchId;
-        AnimalId = animalId;
+
+        if (AnimalId is null or <= 0)
+        {
+            Animal = null;
+            return null;
+        }
+
+        Session.AnimalID = AnimalId;
 
         var animals = await _submissions.GetAnimalsByBatchAsync(batchId.Value);
-        Animal = animals.FirstOrDefault(a => a.ID == animalId);
+        Animal = animals.FirstOrDefault(a => a.ID == AnimalId);
         return Animal is null ? RedirectToPage("/Submissions/BatchBlockSummary", new { batchId }) : null;
     }
 

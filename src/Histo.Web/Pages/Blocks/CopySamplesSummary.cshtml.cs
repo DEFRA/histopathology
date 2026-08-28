@@ -51,7 +51,7 @@ public class CopySamplesSummaryModel : HistoPageModel
         return Page();
     }
 
-    public IActionResult OnPostDone() => RedirectToPage("/Blocks/BlockDetails");
+    public IActionResult OnPostDone() => RedirectToPage("/Submissions/SubmissionDetailsBlock");
 
     private static List<int> ParseIds(string? csv) =>
         string.IsNullOrEmpty(csv)

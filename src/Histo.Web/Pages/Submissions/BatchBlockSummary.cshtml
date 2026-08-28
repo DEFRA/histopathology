@@ -30,7 +30,9 @@
    Completed/OnHold batches, where the animal list is locked. *@
 @if (Model.CanModifySamples && !Model.IsViewMode)
 {
-    <a asp-page="/Submissions/AddSubmission" asp-route-BatchId="@Model.BatchId" asp-route-batchSubmissionId="@Model.BatchSubmissionId" class="govuk-button govuk-!-margin-bottom-4" data-module="govuk-button">Add sample</a>
+    <div class="govuk-button-group">
+        <a asp-page="/Submissions/AddSubmission" asp-route-BatchId="@Model.BatchId" asp-route-batchSubmissionId="@Model.BatchSubmissionId" class="govuk-button" data-module="govuk-button">Add sample</a>
+    </div>
 }
 
 @* Inline GOV.UK confirmation panel — replaces the browser confirm() dialog for Delete sample. *@
@@ -102,10 +104,10 @@
                     @if (Model.CanModifySamples && !Model.IsViewMode)
                     {
                         @* "Copy sample" — replaces legacy btnCopySubmission_Click, which redirected to AddSample.aspx
-                           with the source animal's data pre-filled. The migrated AddSample page only carries the
-                           Sender Ref forward (its other legacy fields were already dropped — see AddSampleModel),
-                           so copying passes the source Sender Ref as a query parameter to pre-fill the Add Sample form. *@
-                        <a asp-page="/Submissions/AddSample" asp-route-batchId="@Model.BatchId" asp-route-batchSubmissionId="@Model.BatchSubmissionId" asp-route-senderRef="@a.SenderRef"
+                           with the source animal's data pre-filled. AddSample.cshtml was consolidated into
+                           AddSubmission.cshtml (both were near-duplicate "add a sample by Sender Ref" screens) —
+                           copying passes the source Sender Ref as a query parameter to pre-fill the Add sample form. *@
+                        <a asp-page="/Submissions/AddSubmission" asp-route-batchId="@Model.BatchId" asp-route-batchSubmissionId="@Model.BatchSubmissionId" asp-route-senderRef="@a.SenderRef"
                            class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Copy sample</a>
                         @* "Delete sample" — links to the inline confirmation panel above instead of a browser confirm() dialog. *@
                         <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" asp-route-ConfirmDeleteAnimalId="@a.ID"
@@ -122,4 +124,6 @@
 </table>
 
 @* "Done" — replaces legacy BatchBlockSummary.aspx btnCancel Text="Done" → BatchDetails.aspx. *@
-<a asp-page="/Batches/BatchDetails" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
+<div class="govuk-button-group">
+    <a asp-page="/Batches/BatchDetails" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
+</div>

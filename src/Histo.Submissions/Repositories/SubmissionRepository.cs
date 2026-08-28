@@ -120,20 +120,19 @@ public sealed class SubmissionRepository : ISubmissionRepository
     {
         using var conn = _db.CreateConnection();
         var parameters = new DynamicParameters();
-        parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
-        parameters.Add("BatchSubmissionID", animal.BatchSubmissionID);
+        // Legacy SP signature (clsAnimal.vb::AddAnimal / UpdateAnimalRow's Added-row branch):
+        // SenderRef, HistologyRef, NextBlockRef, PMDate, OnHold, @NewID (output) — no
+        // BatchSubmissionID/PMDateSet/IsPGNumber/UserID parameters exist on this SP for inserts.
         parameters.Add("SenderRef", animal.SenderRef);
-        parameters.Add("NextBlockRef", animal.NextBlockRef);
         parameters.Add("HistologyRef", animal.HistologyRef, dbType: System.Data.DbType.String);
+        parameters.Add("NextBlockRef", animal.NextBlockRef);
+        parameters.Add("PMDate", (object?)animal.PMDate ?? DBNull.Value, dbType: System.Data.DbType.String);
         parameters.Add("OnHold", animal.OnHold);
-        parameters.Add("PMDate", (object?)animal.PMDate ?? DBNull.Value);
-        parameters.Add("PMDateSet", animal.PMDateSet);
-        parameters.Add("IsPGNumber", animal.IsPGNumber);
-        parameters.Add("UserID", userId);
+        parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync("AddAnimal", parameters,
             commandType: System.Data.CommandType.StoredProcedure);
-        return parameters.Get<int>("RETURN_VALUE");
+        return parameters.Get<int>("NewID");
     }
 
     /// <inheritdoc/>
@@ -198,7 +197,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         var parameters = new DynamicParameters();
         parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
         parameters.Add("SenderRef", senderRef);
-        parameters.Add("NewHistologyRef", (object?)newHistologyRef ?? DBNull.Value);
+        parameters.Add("NewHistologyRef", (object?)newHistologyRef ?? DBNull.Value, dbType: System.Data.DbType.String);
         parameters.Add("UserID", userId);
 
         await conn.ExecuteAsync("EditAnimalHistologyRef", parameters,
@@ -273,7 +272,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         parameters.Add(keyParam, tissue.OwnerID);
         parameters.Add("TissueCode", tissue.TissueCode);
         parameters.Add("NoPieces", tissue.NoPieces);
-        parameters.Add("Comment", (object?)tissue.Comment ?? DBNull.Value);
+        parameters.Add("Comment", (object?)tissue.Comment ?? DBNull.Value, dbType: System.Data.DbType.String);
         parameters.Add("UserID", userId);
 
         await conn.ExecuteAsync(procName, parameters,

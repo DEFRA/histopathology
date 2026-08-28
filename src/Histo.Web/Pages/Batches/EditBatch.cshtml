@@ -180,4 +180,6 @@
 @* "Samples" — this page only edits submission header fields; sample/animal/block details
    (Add sample, Edit sample, Copy sample, Delete sample) are on BatchBlockSummary, matching
    the same "Samples" entry point already used from BatchDetails.cshtml. *@
-<a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples</a>
+<div class="govuk-button-group">
+    <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples</a>
+</div>

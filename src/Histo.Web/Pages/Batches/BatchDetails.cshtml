@@ -493,7 +493,7 @@
         @* Assign blocks — Received or InProgress only. *@
         @if (Model.CanAssignBlocks)
         {
-            <a asp-page="/Blocks/BlockDetails" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Assign blocks</a>
+            <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Assign blocks</a>
         }
 
         @* Date returned � Completed status only. *@

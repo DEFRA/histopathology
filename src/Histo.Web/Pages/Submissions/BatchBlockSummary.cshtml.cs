@@ -93,11 +93,16 @@ public class BatchBlockSummaryModel : HistoPageModel
         var batchIdValue = batchId.Value;
         Batch = await _batches.GetByIdAsync(batchIdValue);
         var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(batchIdValue);
-        // Fall back to submission-level animals for non-cassetted batches where the
-        // block SP returns no rows (mirrors CopyBatch's IsCassetted detection).
+        var allAnimals = await _submissions.GetAnimalsByBatchAsync(batchIdValue);
+        // Merge rather than either/or: GetBlockAnimalsByBatchAsync only returns animals that
+        // already have at least one block assigned, so a newly added sample (no blocks yet)
+        // would silently disappear from the list whenever any OTHER animal in the same batch
+        // already had a block. Union by ID instead — keep the richer block-animal rows (correct
+        // SenderRef/HistologyRef per legacy CreateSenderHistoRefData) and append anything not
+        // yet block-assigned from the plain animal list.
         var animals = blockAnimals.Count > 0
-            ? blockAnimals
-            : await _submissions.GetAnimalsByBatchAsync(batchIdValue);
+            ? MergeAnimals(blockAnimals, allAnimals)
+            : allAnimals;
 
         // Default sort: SenderRef ASC then HistologyRef ASC, matching legacy ByPassSort=false behaviour.
         // When ByPassSort=true the user has explicitly requested block-insertion order — preserve SP order.
@@ -162,7 +167,7 @@ public class BatchBlockSummaryModel : HistoPageModel
     {
         Session.AnimalID = animalId;
         // Route to the animal-scoped blocks page (correctly filters by this sample) rather than
-        // the batch-wide /Blocks/BlockDetails, which lists every block in the batch regardless of sample.
+        // the batch-wide overview mode (no animalId), which lists every block in the batch regardless of sample.
         return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId = BatchId ?? Session.BatchID, animalId });
     }
 
@@ -189,5 +194,13 @@ public class BatchBlockSummaryModel : HistoPageModel
         if (current is not null)
             await _batches.SetByPassSortAsync(batchId.Value, !current.ByPassSort, Session.UserID);
         return RedirectToPage(new { batchId });
+    }
+
+    /// <summary>Unions two animal lists by ID, keeping the first list's entries and appending any not already present.</summary>
+    private static IReadOnlyList<Animal> MergeAnimals(IReadOnlyList<Animal> primary, IReadOnlyList<Animal> supplementary)
+    {
+        var seenIds = primary.Select(a => a.ID).ToHashSet();
+        var missing = supplementary.Where(a => !seenIds.Contains(a.ID));
+        return [.. primary, .. missing];
     }
 }
