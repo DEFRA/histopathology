@@ -54,11 +54,17 @@
                         <button type="button" class="govuk-service-navigation__toggle govuk-js-service-navigation-toggle"
                                 aria-controls="navigation" hidden>Menu</button>
                         <ul class="govuk-service-navigation__list" id="navigation">
-                            @await Html.PartialAsync("_NavPartial")
+                            @if (User.Identity?.IsAuthenticated == true)
+                            {
+                                @await Html.PartialAsync("_NavPartial")
+                            }
                         </ul>
                     </nav>
                     <p class="govuk-body-s app-header-user govuk-!-margin-bottom-0">
-                        @await Html.PartialAsync("_UserContextPartial")
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            @await Html.PartialAsync("_UserContextPartial")
+                        }
                     </p>
                 </div>
             </div>
