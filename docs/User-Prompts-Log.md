@@ -1275,3 +1275,100 @@ Recommendations and required changes to achieve full parity and GDS compliance.
 ## Prompt 74 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session
 
 > Please update the details run-log-v2.md (what fix applied) and session-metrics.md (duration), User-Prompts-Log.md (prompt) file for this session
+
+---
+
+## Prompt 75 — AddAnimal button not visible in BatchBlockSummary (2026-08-27 22:49)
+
+> Addanimal button is not visible in BatchBlockSummary.cshtml it was working before
+
+---
+
+## Prompt 76 — Scenario-based enable/disable of Add/Edit/Copy sample buttons (2026-08-27 22:57)
+
+> Add sample and Edit sample, copy sample should based on scenrio, there is multiple add submission journey, edit submission journey should work, based on the joury edit sample and copy sample button should enable disaple
+
+---
+
+## Prompt 77 — Where to edit sample/animal/block details in Edit Submission journey (2026-08-27 23:01)
+
+> Edit submission journey where should i edit the sample or animal detailas or block details
+
+---
+
+## Prompt 78 — Add sample flow redirect not showing added sample (2026-08-27 23:09)
+
+> can you check add sample flow, it's taking to AddSubmission.cshtmls page after adding its not displaying int add sample page, check the legacy and make ncessary changes as per GDs
+
+---
+
+## Prompt 79 — Create journey navigation complexity review (2026-08-27 23:13)
+
+> Current create journeny flow is it compelx flow in GDS with .net 10 Razor pages, is there arey optimised navigation on this ?
+>
+> - New TSE Submission → Submission Samples → Sample Summary
+> - New TSE Submission → Submission Samples → Blocking → Block Details
+> - New TSE Submission → Submission Samples → Blocking → Search Block Refs
+
+---
+
+## Prompt 80 — Implement BlockDetails/SubmissionDetailsBlock consolidation (2026-08-27 23:20)
+
+> implement that consolidation now (merge `Blocks/BlockDetails.cshtml` into `SubmissionDetailsBlock.cshtml`, add the inline block-ref-check panel), or would you prefer to review the full doc first and tell me which specific piece to tackle?
+>
+> functiality it should work
+
+---
+
+## Prompt 81 — Simplify Add sample/Add animal screens; animal not showing on sample page (2026-08-27 23:30)
+
+> i requested to simplify or consolidate the add sample and add animal screen if that paossible with GDS to complex naviagiont, still after adding animal it's not showing in sample page
+
+---
+
+## Prompt 82 — BatchBlockSummary still not showing added sample/block details (2026-08-27 23:39)
+
+> Still BatchBlockSummary.cshtml pages is not showing added sample details and how user will add block details
+
+---
+
+## Prompt 83 — PMDate DBNull exception in AddAnimalAsync (2026-08-27 23:44)
+
+> System.NotSupportedException: 'The member PMDate of type System.DBNull cannot be used as a parameter value'
+>     Histo.Submissions.Repositories.SubmissionRepository.AddAnimalAsync(Histo.Submissions.Models.Animal, int, System.Threading.CancellationToken) in SubmissionRepository.cs
+
+---
+
+## Prompt 84 — AddAnimal SP too many arguments exception (2026-08-27 23:49)
+
+> Microsoft.Data.SqlClient.SqlException: 'Procedure or function AddAnimal has too many arguments specified.'
+> This exception was originally thrown at this call stack:
+>     [External Code]
+>     Histo.Submissions.Repositories.SubmissionRepository.AddAnimalAsync(Histo.Submissions.Models.Animal, int, System.Threading.CancellationToken) in SubmissionRepository.cs
+>     Histo.Submissions.Services.SubmissionService.AddAnimalAsync(int, string, bool, int, string, bool, System.Threading.CancellationToken) in SubmissionService.cs
+
+---
+
+## Prompt 85 — Verify journey navigation and fix button alignment (BatchBlockSummary, AddSubmission)
+
+> alos verify the navigatin like back button, cance, etc for these funcaitlligy
+>
+> Button alingment for below screen BatchBlockSummary.cshtml AddSubmission.cshmtls in button not allinged properly button name is 'Check historical data for this sender ref'
+
+---
+
+## Prompt 86 — Apply the two identified GDS button-alignment fixes
+
+> I have enabled the agent mode can you fix these isseue **Recommended fix:** **Finding #2 — Fix (Low priority):** add the missing attribute: **Finding #1 — Fix (Medium priority):** move the "Samples" link inside the button group:
+
+---
+
+## Prompt 87 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for the button-alignment session
+
+> update the details  run-log-v2.md **(what fix applied)**  and session-metrics.md **(duration)**, User-Prompts-Log.md **(prompt)** file
+
+---
+
+## Prompt 88 — Document issues and fixes for 27 Aug 2026 10:47 PM – 11:50 PM
+
+> alos need to dcoument the issues and fixes which has done during yesterday that 27 aug 2026 10:47 PM - 11.50 PM

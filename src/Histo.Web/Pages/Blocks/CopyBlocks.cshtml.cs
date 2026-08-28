@@ -69,8 +69,14 @@ public class CopyBlocksModel : HistoPageModel
         ViewData["Title"] = "Copy Blocks";
         ViewData["PageTitle"] = "Copy Blocks";
 
-        if (Session.BatchID is null || BlockIds.Count == 0)
-            return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId = BatchId ?? Session.BatchID });
+        var batchId = BatchId ?? Session.BatchID;
+        if (batchId is null || BlockIds.Count == 0)
+            return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId });
+
+        var forbidden = await CheckBatchAccessAsync(_batches, batchId.Value);
+        if (forbidden is not null) return forbidden;
+
+        Session.BatchID = batchId;
 
         if (TargetAnimalIds.Count == 0)
         {
@@ -79,16 +85,15 @@ public class CopyBlocksModel : HistoPageModel
             return Page();
         }
 
-        var batchId = Session.BatchID ?? 0;
         var userId = Session.UserID;
-        var allBlocks = await _blocks.GetByBatchAsync(batchId);
+        var allBlocks = await _blocks.GetByBatchAsync(batchId.Value);
         var sourceBlocks = allBlocks.Where(b => BlockIds.Contains(b.ID)).ToList();
 
         foreach (var targetAnimalId in TargetAnimalIds)
-            await CopyBlocksToAnimalAsync(sourceBlocks, allBlocks, batchId, targetAnimalId, userId);
+            await CopyBlocksToAnimalAsync(sourceBlocks, allBlocks, batchId.Value, targetAnimalId, userId);
 
         TempData["StatusMessage"] = $"Copied {sourceBlocks.Count} block(s) to {TargetAnimalIds.Count} sample(s).";
-        return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId });
+        return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId = batchId.Value });
     }
 
     /// <summary>
