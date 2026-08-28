@@ -112,6 +112,12 @@ try
         RevocationMode            = X509RevocationMode.NoCheck,
     };
 
+    // Entra ID sets the assertion's <AudienceRestriction> to the SP Entity ID — without
+    // registering it here, audience validation always fails (IDX10214) regardless of
+    // what the IdP sends, since AllowedAudienceUris would otherwise be empty.
+    if (!string.IsNullOrEmpty(saml2Config.Issuer))
+        saml2Config.AllowedAudienceUris.Add(saml2Config.Issuer);
+
     // SP signing certificate (optional in dev; required in all deployed environments).
     var spCertThumbprint = saml2Section["SPCertificateThumbprint"];
     if (!string.IsNullOrEmpty(spCertThumbprint))
