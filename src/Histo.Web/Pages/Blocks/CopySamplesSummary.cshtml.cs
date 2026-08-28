@@ -41,6 +41,9 @@ public class CopySamplesSummaryModel : HistoPageModel
         var ids = ParseIds(targetAnimalIds);
         if (Session.BatchID is not null && ids.Count > 0)
         {
+            var forbidden = await CheckBatchAccessAsync(_batches, Session.BatchID.Value);
+            if (forbidden is not null) return forbidden;
+
             var currentAnimals = await _submissions.GetAnimalsByBatchAsync(Session.BatchID ?? 0);
             TargetAnimals = currentAnimals.Where(a => ids.Contains(a.ID)).OrderBy(a => a.SenderRef).ToList();
         }
@@ -48,7 +51,7 @@ public class CopySamplesSummaryModel : HistoPageModel
         return Page();
     }
 
-    public IActionResult OnPostDone() => RedirectToPage("/Blocks/BlockDetails");
+    public IActionResult OnPostDone() => RedirectToPage("/Submissions/SubmissionDetailsBlock");
 
     private static List<int> ParseIds(string? csv) =>
         string.IsNullOrEmpty(csv)

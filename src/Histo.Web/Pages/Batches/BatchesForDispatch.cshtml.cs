@@ -1,4 +1,3 @@
-using Histo.Core.Domain;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -36,6 +35,7 @@ public class BatchesForDispatchModel : HistoPageModel
     public IActionResult OnPostSelect(int batchId)
     {
         Session.BatchID = batchId;
+        Session.IsViewSubmissionMode = false;
         return RedirectToPage("/QC/QualityData");
     }
 
@@ -51,11 +51,9 @@ public class BatchesForDispatchModel : HistoPageModel
             return Page();
         }
 
-        var batch = await _batches.GetByIdAsync(QuickGoId.Value);
-        // Legacy accepted InProgress OR (Received + cassetted); check both here
-        if (batch is null ||
-            (batch.Status != BatchStatus.InProgress &&
-             batch.Status != BatchStatus.Received))
+        // Use the dispatch list itself as the validation source — if the SP returned it, it's ready.
+        var batchInList = Batches.FirstOrDefault(b => b.ID == QuickGoId.Value);
+        if (batchInList is null)
         {
             GoError = $"Submission {QuickGoId.Value} could not be found or is not ready for quality data entry.";
             return Page();

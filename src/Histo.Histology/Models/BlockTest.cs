@@ -51,6 +51,9 @@ public sealed class BlockTest
 
     /// <summary>SQL Server rowversion — used for optimistic concurrency on update.</summary>
     public byte[]? RowStamp { get; init; }
+
+    /// <summary>Premium-charge codes currently selected for this test. ID is the DB row primary key needed for delta deletes.</summary>
+    public IReadOnlyList<TcCode> TCCodes { get; init; } = [];
 }
 
 /// <summary>Test type discriminator values. Legacy source: clsBatch.vb table constants.</summary>
@@ -60,6 +63,13 @@ public static class BlockTestType
     public const string Antibodies = "Antibodies";
     public const string Stain      = "Stain";
 }
+
+/// <summary>
+/// One premium-charge (TC code) row for a test.
+/// Legacy source: clsBatch.vb BLOCK_*_TCCODES tables from GetBatchBlocksByID.
+/// ID is the DB primary key — required to issue a targeted DELETE SP call.
+/// </summary>
+public sealed record TcCode(int Id, string Code);
 
 /// <summary>Test result values. Legacy source: QualityData.aspx.vb ddlTestResult items.</summary>
 public static class BlockTestResult

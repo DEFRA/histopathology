@@ -80,6 +80,27 @@
 | 68 | 2026-08-03 | `gds-ui` | — | — | **~10 min** | Run #50 — Search menu label reverted to "Search outputs"; FixCompletedDates legacy provenance confirmed (URL-only). |
 | 69 | 2026-08-03 | `gds-ui` | — | — | **~5 min** | Run #51 — Remove FixCompletedDates from Index.cshtml Administration panel (preserves legacy URL-only behaviour). |
 | 70 | 2026-08-03 | `gds-ui` | — | — | **~5 min** | Run #52 — Remove "Batches received" from Index.cshtml Laboratory panel and _NavPartial.cshtml. |
+| 71 | 2026-08-27 | `GitHub Copilot` | — | — | **~330 min (5h 30m)** | Run #87 — TSE/NON-TSE submission workflow GDS redesign (docs/TSE-NonTSE-Submission-Workflow-Redesign.md) + route-based state/access-guard rollout (Phase 0–2) + BatchAccessDecision unit tests + per-block tissue/pre-booked-ref/bulk-block additions + New Submission Create/Edit flow fixes (AddSubmission Sender Ref search + Sample Blocks redirect + BatchSubmissionID resilience, Cassetted submission-type default fix, BatchDetails native date input) + BatchDetails button-visibility/journey gating (IsViewMode/CanPrint) and redundant task-list cleanup. Duration is a complexity-based estimate — no exact start/end timestamps captured. See sub-task breakdown below. |
+| 72 | 2026-08-27 | `GitHub Copilot` | 22:47 | 23:50 | **~63 min (1h 03m)** | Run #88 — Submission scenario gating (Add/Edit/Copy sample per journey), `BlockDetails`→`SubmissionDetailsBlock` consolidation, `BatchBlockSummary` animal-list merge fix, and two `AddAnimal` stored-procedure bugs fixed (`PMDate` DBNull `dbType`, `AddAnimal` too-many-arguments parameter mismatch vs real SP). Duration per user-reported start/end time. |
+| 73 | 2026-08-28 | `GitHub Copilot` | — | — | **~25 min** | Run #89 — Submission-journey navigation verification (all 4 journeys' back/cancel targets confirmed correct) + GDS button-alignment fixes across 4 files (`EditBatch` Samples link into button-group, `SubmissionDetailsBlock` missing `data-module`, `AddSubmission` Add sample/Cancel/Check-historical-data button-groups, `BatchBlockSummary` Add sample/Done button-groups). Duration is a complexity-based estimate. Build: 0 errors. |
+
+---
+
+## Run #87 sub-task breakdown (2026-08-27)
+
+| # | Duration | Area | Summary |
+|---|----------|------|---------|
+| 1 | **~40 min** | Docs — TSE/NON-TSE workflow redesign | Analysed legacy Block Details/Sample Blocks/Search Block Refs/View old ICC_Sub Data screens vs current Razor Pages; produced `docs/TSE-NonTSE-Submission-Workflow-Redesign.md` with pain points, GDS-aligned target journey, and Mermaid diagram |
+| 2 | **~50 min** | `SubmissionDetailsBlock`, `BatchBlockSummary`, `Blocks/BlockDetails` | Consolidated block management onto `SubmissionDetailsBlock`; replaced browser `confirm()` with inline GOV.UK confirmation panels; replaced auto-submitting checkbox with explicit Apply button; added inline "check used block refs" lookup |
+| 3 | **~45 min** | `HistoPageModel`, `BatchAccessDecision` (`Histo.Core.Domain`) | Phase 0 — added `CheckBatchAccessAsync` object-level access guard; extracted pure `BatchAccessDecision.IsAllowed` for unit testing without a Razor Pages harness |
+| 4 | **~40 min** | `BatchBlockSummary`, `SubmissionDetailsBlock` | Phase 1 — route/query-based `BatchId`/`AnimalId` with session fallback, threaded through all links/forms between the two pages |
+| 5 | **~35 min** | `BatchDetails`, `Blocks/BlockDetails`, `CopyBlocks`, `CopySamples(Summary)` | Phase 2 — extended route-based state + access guard to the rest of the submission wizard |
+| 6 | **~15 min** | `BatchAccessDecisionTests.cs` | Added unit tests (Histo user bypass, area match/mismatch, batch-not-found pass-through); all pass |
+| 7 | **~30 min** | `SubmissionDetailsBlock` | Added per-block tissue assignment (add/delete), pre-booked block ref dropdown + mandatory histology ref for pre-cassetted submissions, bulk "number of blocks" creation; added link to existing QC test-management page rather than guessing an unverified stored procedure for per-block test creation |
+| 8 | **~25 min** | `AddSubmission`, `BatchBlockSummary` | Restored Sender Ref search/select via the existing `SearchSender` picker; redirect after adding a sample now goes to Sample Blocks (`SubmissionDetailsBlock`/`SubmissionDetails`) instead of back to the sample list; resolved/created `BatchSubmissionID` instead of silently redirecting to Home when missing |
+| 9 | **~15 min** | `Cassetted.cshtml.cs` | Fixed Submission Type dropdown defaulting to a previous selection via stale `TempData` instead of "Select submission type" |
+| 10 | **~15 min** | `BatchDetails.cshtml(.cs)` | Submission date changed from free-text input to native `type="date"` component |
+| 11 | **~40 min** | `BatchDetails.cshtml(.cs)` | Investigated and fixed button visibility across Create/View Submission journeys (`IsViewMode`/`CanPrint`); removed redundant QC notes button and duplicate Samples task-list row/link |
 
 ---
 
@@ -138,3 +159,104 @@ Write-Host "Elapsed duration  : $elapsed minutes"
 ```
 
 > **Tip:** Keep a PowerShell terminal open for the duration of each agent run. `$agentStart` persists in the session until the terminal is closed.
+
+---
+
+## Session 2026-08-25 � Entra ID Auth + Quality Data Parity
+
+| Item | Value |
+|---|---|
+| Date | 2026-08-25 |
+| Start time | 10:59 |
+| End time | 17:45 |
+| Duration | **4h 00m** (240 min — measured from session log timestamps) |
+| Agent | GitHub Copilot (Chat) |
+| Build result | 0 errors, 0 warnings |
+
+### Work completed
+
+| Area | Change |
+|---|---|
+| Auth � SAML scheme | Fixed ChallengeResult("Cookies") ? ChallengeResult("saml2") in HistoPageModel.cs |
+| Auth � dev config | Populated ppsettings.Development.json with real Entra ID tenant/app IDs |
+| Auth � AccessDenied | Replaced inline HTML + Windows messaging with GDS layout + Entra ID email claim |
+| Auth � ServiceProblem | Created GDS service-problem page; fixed Program.cs error middleware |
+| Auth � Security groups | Analysis: Option A (Enterprise App assignment) recommended; portal steps provided |
+| QC � BatchesForDispatch | Column names corrected to legacy labels; Completed Date + Customer Ref removed |
+| QC � QualityData batch summary | 10 legacy fields added (Project, Pathologist, Entered/Submitted By/Area, dates) |
+| QC � QualityData grid | On Hold column added; Failed/Passed columns separated; filters wired |
+| QC � EditQualityDataTest | Not Tested radio; QC Note Ref link; JS conditionals; missing validations; Charges UI |
+| QC � TC Codes full stack | TcCode model + BlockTestRepository reads result sets 7-9 + SaveTCCodesAsync delta || QC — Quick-Go bug | BatchesForDispatch Quick-Go rejected valid batches; fixed validation against dispatch list |
+| QC — GDS JS cleanup | EditQualityDataTest custom JS replaced with govuk-radios/checkboxes conditional reveal |
+| QC — Div structure fix | EditQualityDataTest stray div + misaligned dispatched conditional nesting fixed |
+| QC — Test name display | QualityData grid Test column resolved from lookup codes to display names |
+| QC — QC Note Ref | EditQualityDataTest always shows QC Note Ref (None/link) regardless of state |
+| QC — GDS row colours | Row CSS tinting removed; govuk-tag in Result column is sole status indicator |
+### Outstanding items
+
+- Entra admin: add localhost Reply URL + create security group + set Assignment required
+- Verify TC code SPs exist in DB (sys.procedures query)
+- Fix EditUser.cshtml antiforgery form attribute (ISS-R05)
+- Add dedicated 404 page (ISS-R03)
+- Pagination for QualityData and EditQualityDataTest (deferred)
+
+---
+
+## Session 2026-08-26 — Navigation, BatchesForEditing, and QC Note Parity
+
+| Item | Value |
+|---|---|
+| Date | 2026-08-26 |
+| Start time | — |
+| End time | — |
+| Duration | **~90 min** (complexity-based estimate — sum of 5 sub-tasks below) |
+| Agent | GitHub Copilot (Chat) |
+| Build result | 0 errors (Histo.QualityControl); solution build had only pre-existing file-lock copy errors from a running dev process |
+
+### Work completed
+
+| Sub | Duration | Area | Change |
+|---|---|---|---|
+| 1 | **~25 min** | Nav / BatchesForEditing / EditBatch (ISS-R13) | Removed duplicate `Quality data` nav link (replaced with `Edit QC notes` → `/QC/QCNotes`); fixed `BatchesForEditingModel.OnPostSelect` to redirect to `/Batches/EditBatch` (was `/Batches/BatchDetails`, matching legacy `grdBatchesForEditing_SelectedIndexChanged`); corrected `BatchesForEditing.cshtml` grid headers/columns to match legacy `BatchesForEditing.aspx` exactly (removed `Received date`/`Customer ref`, renamed headers) |
+| 2 | **~15 min** | QC — EditQCNote (ISS-R14) | Restored legacy QC Note Ref summary box (QC note ref, Submission number, Project, Species, Stain ref) and Created by/Date created footer, missing entirely from the migrated page; added `CreatedBy`/`DateCreated` to `QCNote` model and repository mapping |
+| 3 | **~10 min** | QC — QCNoteRepository (ISS-R15) | Fixed regression from Sub-task 2 — `RuntimeBinderException` on dynamic access to possibly-absent SP columns silently swallowed by service catch, making the QCNotes Edit button appear non-functional; replaced with safe `IDictionary<string, object>` + `TryGetValue` mapping |
+| 4 | **~25 min** | QC — QCNoteRepository (ISS-R16) | Notes missing entirely for antibody-test QC notes — added the missing `GetQCNoteAntibodiesInformation` SP call (legacy calls both SPs and combines result sets); added `BuildDefaultNoteText` to reproduce legacy's padded Sender Ref/Histo Ref/Block Ref/Test table shown when a note has no saved text yet |
+| 5 | **~15 min** | QC — QCNoteRepository (ISS-R17) | Created-by date missing next to username — `DateCreated` arrives as a `dd/MM/yyyy` string but dynamic/IDictionary reads bypass Dapper's `NullableDateTimeTypeHandler`; added a `ParseDate` helper mirroring that handler's logic |
+
+### Outstanding items
+
+- None raised this session — all 5 issues found were resolved in-session.
+---
+
+## Session 2026-08-26 (afternoon) � Submission creation flow + Edit Submission + Pick List fixes
+
+| Item | Value |
+|---|---|
+| Date | 2026-08-26 |
+| Start time | 15:23 |
+| End time | 16:53 |
+| Duration | **90 min** (measured from session log timestamps) |
+| Agent | GitHub Copilot (Chat) |
+| Build result | 0 errors, 0 warnings |
+| Turns | 198 |
+
+### Work completed (13 fixes)
+
+| Area | Fix |
+|---|---|
+| Cassetted / BatchDetails | Submission creation flow restored to two-step legacy pattern |
+| BatchDetails create mode | Histology/Antibody/Stain checkboxes added to create form |
+| BatchDetails view | "Batch not found. }" text rendering bug fixed (unbalanced @if blocks) |
+| Cassetted state | Previous selections restored on back-navigation via Session + TempData |
+| Cassetted SubmittedAs | Default to blank fixed (replaced asp-for with name on select) |
+| SearchSubmissions | CanEditSubmission conditions were inverted � fixed to Submitted/Rejected |
+| BatchesForEditing | Session.ReturnPage set in OnPostSelect |
+| EditBatch | Back link / Cancel / save now context-aware via ReturnPage |
+| EditLookupItem | Area column shows name not numeric code for tables 18/19 |
+| EditLookupItem | Area dropdown added to Add/Edit form for tables 18/19 |
+| LookupRepository | AddluContacts @ID parameter now supplied on insert |
+| QualityData | Test name resolution fixed to use GetHistologyTypesAsync() |
+
+### Outstanding items
+
+- None raised this session � all 13 issues resolved in-session.

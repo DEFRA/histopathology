@@ -40,6 +40,15 @@ public class BatchBlockSummaryModel : HistoPageModel
 
     public Batch? Batch { get; private set; }
 
+    /// <summary>
+    /// Batch ID from the URL (route/query). Falls back to <see cref="ISessionService.BatchID"/> for
+    /// links not yet migrated to pass it explicitly — Phase 1 of the route-based-state rollout.
+    /// </summary>
+    [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
+
+    /// <summary>Animal awaiting delete confirmation — drives the inline GOV.UK confirmation panel (replaces browser confirm()).</summary>
+    [BindProperty(SupportsGet = true)] public int? ConfirmDeleteAnimalId { get; set; }
+
     /// <summary>Tissue detail strings keyed by AnimalID for the Tissue Details column.</summary>
     public IReadOnlyDictionary<int, IReadOnlyList<string>> TissuesByAnimalId { get; private set; } =
         new Dictionary<int, IReadOnlyList<string>>();
@@ -57,6 +66,9 @@ public class BatchBlockSummaryModel : HistoPageModel
     /// <c>BatchBlockSummary.aspx.vb</c> keeps Edit selectable in View mode (unlike <c>BatchSummary.aspx.vb</c>,
     /// which force-disables it too), since block assignment/viewing continues after a batch has been received.
     /// </summary>
+    /// <summary>Exposes the session-resolved submission ID so the Copy sample link can pass it explicitly to AddSample.</summary>
+    public int? BatchSubmissionId => Session.BatchSubmissionID;
+
     public bool CanModifySamples => Batch?.Status is BatchStatus.Submitted or BatchStatus.Rejected;
 
     /// <summary>
@@ -64,22 +76,33 @@ public class BatchBlockSummaryModel : HistoPageModel
     /// (ViewSubmissions or SearchSubmissions → BatchDetails → Samples). All sample actions are
     /// read-only in this mode.
     /// </summary>
-    public bool IsViewMode =>
-        Session.ReturnPage is "/Submissions/ViewSubmissions" or "/Search/SearchSubmissions";
+    public bool IsViewMode => Session.IsViewSubmissionMode;
 
     public async Task<IActionResult> OnGetAsync()
     {
         ViewData["Title"] = "Sample summary";
         ViewData["PageTitle"] = "Sample summary";
-        if (Session.BatchID is null or <= 0) return RedirectToPage("/Index");
-        var batchId = Session.BatchID.Value;
-        Batch = await _batches.GetByIdAsync(batchId);
-        var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(batchId);
-        // Fall back to submission-level animals for non-cassetted batches where the
-        // block SP returns no rows (mirrors CopyBatch's IsCassetted detection).
+        var batchId = BatchId ?? Session.BatchID;
+        if (batchId is null or <= 0) return RedirectToPage("/Index");
+
+        var forbidden = await CheckBatchAccessAsync(_batches, batchId.Value);
+        if (forbidden is not null) return forbidden;
+
+        Session.BatchID = batchId; // keep session in sync as a fallback for links not yet migrated
+        BatchId = batchId;
+        var batchIdValue = batchId.Value;
+        Batch = await _batches.GetByIdAsync(batchIdValue);
+        var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(batchIdValue);
+        var allAnimals = await _submissions.GetAnimalsByBatchAsync(batchIdValue);
+        // Merge rather than either/or: GetBlockAnimalsByBatchAsync only returns animals that
+        // already have at least one block assigned, so a newly added sample (no blocks yet)
+        // would silently disappear from the list whenever any OTHER animal in the same batch
+        // already had a block. Union by ID instead — keep the richer block-animal rows (correct
+        // SenderRef/HistologyRef per legacy CreateSenderHistoRefData) and append anything not
+        // yet block-assigned from the plain animal list.
         var animals = blockAnimals.Count > 0
-            ? blockAnimals
-            : await _submissions.GetAnimalsByBatchAsync(batchId);
+            ? MergeAnimals(blockAnimals, allAnimals)
+            : allAnimals;
 
         // Default sort: SenderRef ASC then HistologyRef ASC, matching legacy ByPassSort=false behaviour.
         // When ByPassSort=true the user has explicitly requested block-insertion order — preserve SP order.
@@ -89,7 +112,7 @@ public class BatchBlockSummaryModel : HistoPageModel
 
         // Load submissions upfront — needed for tissue resolution fallback (mirrors CopyBatch which uses
         // firstSubmId when BatchSubmissionID is 0 or the column wasn't returned by the block-animal SP).
-        var submissions  = await _submissions.GetSubmissionsByBatchAsync(batchId);
+        var submissions  = await _submissions.GetSubmissionsByBatchAsync(batchIdValue);
         var firstSubmId  = submissions.Count > 0 ? submissions[0].ID : 0;
         var submissionIds = submissions.Select(s => s.ID).ToHashSet();
 
@@ -98,7 +121,7 @@ public class BatchBlockSummaryModel : HistoPageModel
         var tissueNames = tissueTypes
             .Where(t => t.Code != null)
             .ToDictionary(t => t.Code!, t => t.Name, StringComparer.OrdinalIgnoreCase);
-        var allTissues = await _submissions.GetBatchSubmissionTissuesAsync(batchId);
+        var allTissues = await _submissions.GetBatchSubmissionTissuesAsync(batchIdValue);
         var tissuesBySubmId = allTissues
             .GroupBy(t => t.OwnerID)
             .ToDictionary(
@@ -132,7 +155,7 @@ public class BatchBlockSummaryModel : HistoPageModel
         else
         {
             // First visit for this batch: create the default batch submission record.
-            var sub = new BatchSubmission { BatchID = batchId, SubmissionName = "Default", Order = 1 };
+            var sub = new BatchSubmission { BatchID = batchIdValue, SubmissionName = "Default", Order = 1 };
             var subId = await _submissions.AddSubmissionAsync(sub, Session.UserID);
             if (subId > 0) Session.BatchSubmissionID = subId;
         }
@@ -140,10 +163,12 @@ public class BatchBlockSummaryModel : HistoPageModel
         return Page();
     }
 
-    public async Task<IActionResult> OnPostSelectAsync(int animalId)
+    public IActionResult OnPostSelect(int animalId)
     {
         Session.AnimalID = animalId;
-        return RedirectToPage("/Blocks/BlockDetails");
+        // Route to the animal-scoped blocks page (correctly filters by this sample) rather than
+        // the batch-wide overview mode (no animalId), which lists every block in the batch regardless of sample.
+        return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId = BatchId ?? Session.BatchID, animalId });
     }
 
     /// <summary>
@@ -154,7 +179,7 @@ public class BatchBlockSummaryModel : HistoPageModel
     public async Task<IActionResult> OnPostDeleteAsync(int animalId)
     {
         await _submissions.DeleteAnimalAsync(animalId, Session.UserID);
-        return RedirectToPage();
+        return RedirectToPage(new { batchId = BatchId ?? Session.BatchID });
     }
 
     /// <summary>
@@ -163,11 +188,19 @@ public class BatchBlockSummaryModel : HistoPageModel
     /// </summary>
     public async Task<IActionResult> OnPostToggleByPassSortAsync()
     {
-        if (Session.BatchID is null or <= 0) return RedirectToPage();
-        var batchId = Session.BatchID.Value;
-        var current = await _batches.GetByIdAsync(batchId);
+        var batchId = BatchId ?? Session.BatchID;
+        if (batchId is null or <= 0) return RedirectToPage();
+        var current = await _batches.GetByIdAsync(batchId.Value);
         if (current is not null)
-            await _batches.SetByPassSortAsync(batchId, !current.ByPassSort, Session.UserID);
-        return RedirectToPage();
+            await _batches.SetByPassSortAsync(batchId.Value, !current.ByPassSort, Session.UserID);
+        return RedirectToPage(new { batchId });
+    }
+
+    /// <summary>Unions two animal lists by ID, keeping the first list's entries and appending any not already present.</summary>
+    private static IReadOnlyList<Animal> MergeAnimals(IReadOnlyList<Animal> primary, IReadOnlyList<Animal> supplementary)
+    {
+        var seenIds = primary.Select(a => a.ID).ToHashSet();
+        var missing = supplementary.Where(a => !seenIds.Contains(a.ID));
+        return [.. primary, .. missing];
     }
 }

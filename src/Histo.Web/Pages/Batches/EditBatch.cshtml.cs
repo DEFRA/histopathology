@@ -56,6 +56,11 @@ public class EditBatchModel : HistoPageModel
     public Batch?  Batch     { get; private set; }
     public string? SaveError { get; private set; }
 
+    // Falls back to BatchesForEditing when no context is available (legacy SV_RedirectCancelPage)
+    public string ReturnPage => string.IsNullOrWhiteSpace(Session.ReturnPage)
+        ? "/Batches/BatchesForEditing"
+        : Session.ReturnPage;
+
     // ---- Lookup data for dropdowns ----
     public IReadOnlyList<LookupItem> Projects    { get; private set; } = [];
     public IReadOnlyList<LookupItem> Contacts    { get; private set; } = [];
@@ -73,6 +78,12 @@ public class EditBatchModel : HistoPageModel
         try { Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0); }
         catch (Exception ex) { SaveError = $"Error loading submission: {ex.Message}"; await LoadLookupsAsync(); return Page(); }
         if (Batch is null) return RedirectToPage("/Index");
+
+        // Entering the Edit submission journey unambiguously means "not read-only" — clears a stale
+        // IsViewSubmissionMode flag left over from a prior ViewSubmissions/SearchSubmissions visit,
+        // which otherwise kept Add/Edit/Copy sample hidden on BatchBlockSummary. Mirrors legacy
+        // btnEditSubmission_Click: Session(SV_ViewSubmission) = False.
+        Session.IsViewSubmissionMode = false;
 
         // Pre-populate editable fields from loaded batch
         ProjectContractCode = Batch.ProjectContractCode;
@@ -182,7 +193,7 @@ public class EditBatchModel : HistoPageModel
             return Page();
         }
 
-        return RedirectToPage("/Batches/BatchDetails");
+        return RedirectToPage(ReturnPage);
     }
 
     private async Task LoadLookupsAsync()

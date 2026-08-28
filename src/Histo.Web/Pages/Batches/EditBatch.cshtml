@@ -8,7 +8,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Batches/BatchDetails" class="govuk-back-link">Back</a>
+    <a href="@Url.Page(Model.ReturnPage)" class="govuk-back-link">Back</a>
 }
 
 @if (!string.IsNullOrEmpty(Model.SaveError))
@@ -173,6 +173,13 @@
 
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
-        <a asp-page="/Batches/BatchesForEditing" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        <a href="@Url.Page(Model.ReturnPage)" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
     </div>
 </form>
+
+@* "Samples" — this page only edits submission header fields; sample/animal/block details
+   (Add sample, Edit sample, Copy sample, Delete sample) are on BatchBlockSummary, matching
+   the same "Samples" entry point already used from BatchDetails.cshtml. *@
+<div class="govuk-button-group">
+    <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples</a>
+</div>

@@ -18,11 +18,18 @@ public interface IBlockTestRepository
     /// </summary>
     Task<IReadOnlyList<BlockTest>> GetByBatchAsync(int batchId, CancellationToken ct = default);
 
-    /// <summary>
-    /// Updates a single test record's result, QC, dispatch and archive fields.
+    /// <summary>Updates a single test record's result, QC, dispatch and archive fields.
     /// Maps to <c>EditBlockHistology</c>, <c>EditBlockAntibodies</c> or
     /// <c>EditBlockStain</c>, selected by <see cref="BlockTest.TestType"/>.
     /// Throws <see cref="BlockTestConcurrencyException"/> on rowstamp mismatch.
     /// </summary>
     Task UpdateAsync(BlockTest test, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Delta-saves premium-charge (TC code) selections for a single test.
+    /// Deletes removed codes via Delete*TCCode SPs; inserts added codes via Add*TCCode SPs.
+    /// </summary>
+    Task SaveTCCodesAsync(int batchId, int testId, string testType,
+        IReadOnlyList<TcCode> existing, IReadOnlyList<string> selected,
+        int userId, CancellationToken ct = default);
 }

@@ -2,13 +2,15 @@
 @model Histo.Web.Pages.Batches.CassettedModel
 @using Histo.Submissions.Models
 @{
-    ViewData["Title"] = "New submission";
-    ViewData["PageTitle"] = "New submission";
+    ViewData["Title"] = "Submission type";
+    ViewData["PageTitle"] = "Submission type";
 }
 
 @section BeforeHeading {
     <a asp-page="/Index" class="govuk-back-link">Back</a>
 }
+
+<p class="govuk-body">Select the submission type and click Next.</p>
 
 @if (Model.Errors.Count > 0)
 {
@@ -27,11 +29,15 @@
     </div>
 }
 
-<form method="post">
-    @* Submission category — TSE / Non-TSE *@
-    <div class="govuk-form-group">
+<form method="post" asp-page="/Batches/Cassetted">
+    @* Submission category (TSE / Non-TSE) *@
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("BatchType") ? "govuk-form-group--error" : "")">
         <fieldset class="govuk-fieldset">
             <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Submission category</legend>
+            @if (Model.Errors.TryGetValue("BatchType", out var btErr))
+            {
+                <p id="BatchType-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @btErr</p>
+            }
             <div class="govuk-radios" data-module="govuk-radios">
                 <div class="govuk-radios__item">
                     <input class="govuk-radios__input" type="radio" asp-for="BatchType"
@@ -50,136 +56,28 @@
     @* Submission type (SubmittedAs) *@
     <div class="govuk-form-group @(Model.Errors.ContainsKey("SubmittedAs") ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="SubmittedAs">Submission type</label>
+        <div class="govuk-hint">Select how the samples are being submitted.</div>
         @if (Model.Errors.TryGetValue("SubmittedAs", out var saErr))
         {
-            <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @saErr</p>
+            <p id="SubmittedAs-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @saErr</p>
         }
-        <select class="govuk-select @(Model.Errors.ContainsKey("SubmittedAs") ? "govuk-select--error" : "")" asp-for="SubmittedAs">
-            <option value="">-- Select --</option>
+        <select class="govuk-select @(Model.Errors.ContainsKey("SubmittedAs") ? "govuk-select--error" : "")"
+                name="SubmittedAs" id="SubmittedAs">
+            <option value="">-- Select submission type --</option>
             @foreach (var o in Model.SubmittedAsOptions)
             {
-                <option value="@o.ID" selected="@(Model.SubmittedAs == o.ID)">@o.Name</option>
+                @if (Model.SubmittedAs == o.ID) {
+                <option value="@o.ID" selected>@o.Name</option>
+            } else {
+                <option value="@o.ID">@o.Name</option>
+            }
             }
         </select>
-    </div>
-
-    @* Project / contract code *@
-    <div class="govuk-form-group @(Model.Errors.ContainsKey("ProjectContractCode") ? "govuk-form-group--error" : "")">
-        <label class="govuk-label" for="ProjectContractCode">Project / contract code</label>
-        @if (Model.Errors.TryGetValue("ProjectContractCode", out var pErr))
-        {
-            <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @pErr</p>
-        }
-        <select class="govuk-select @(Model.Errors.ContainsKey("ProjectContractCode") ? "govuk-select--error" : "")" asp-for="ProjectContractCode">
-            <option value="">-- Select --</option>
-            @foreach (var p in Model.Projects)
-            {
-                <option value="@p.ID" selected="@(Model.ProjectContractCode == p.ID.ToString())">@p.Name</option>
-            }
-        </select>
-    </div>
-
-    @* Pathologist / contact *@
-    <div class="govuk-form-group @(Model.Errors.ContainsKey("ContactName") ? "govuk-form-group--error" : "")">
-        <label class="govuk-label" for="ContactName">Pathologist</label>
-        @if (Model.Errors.TryGetValue("ContactName", out var cnErr))
-        {
-            <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @cnErr</p>
-        }
-        <select class="govuk-select @(Model.Errors.ContainsKey("ContactName") ? "govuk-select--error" : "")" asp-for="ContactName">
-            <option value="">-- Select --</option>
-            @foreach (var c in Model.Contacts)
-            {
-                <option value="@c.ID" selected="@(Model.ContactName == c.ID.ToString())">@c.Name</option>
-            }
-        </select>
-    </div>
-
-    @* Species *@
-    <div class="govuk-form-group @(Model.Errors.ContainsKey("SpeciesId") ? "govuk-form-group--error" : "")">
-        <label class="govuk-label" for="SpeciesId">Species</label>
-        @if (Model.Errors.TryGetValue("SpeciesId", out var spErr))
-        {
-            <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @spErr</p>
-        }
-        <select class="govuk-select @(Model.Errors.ContainsKey("SpeciesId") ? "govuk-select--error" : "")" asp-for="SpeciesId">
-            <option value="">-- Select --</option>
-            @foreach (var s in Model.SpeciesList)
-            {
-                <option value="@s.ID" selected="@(Model.SpeciesId == s.ID.ToString())">@s.Name</option>
-            }
-        </select>
-    </div>
-
-    @* Submission date *@
-    <div class="govuk-form-group @(Model.Errors.ContainsKey("BatchDateStr") ? "govuk-form-group--error" : "")">
-        <label class="govuk-label" for="BatchDateStr">Date of submission</label>
-        <div class="govuk-hint">For example, 27/03/2025</div>
-        @if (Model.Errors.TryGetValue("BatchDateStr", out var bdErr))
-        {
-            <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @bdErr</p>
-        }
-        <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("BatchDateStr") ? "govuk-input--error" : "")"
-               asp-for="BatchDateStr" autocomplete="off" />
-    </div>
-
-    @* Fixation (optional) *@
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="Fixation">Fixation</label>
-        <select class="govuk-select" asp-for="Fixation">
-            <option value="">-- Not specified --</option>
-            @foreach (var f in Model.Fixations)
-            {
-                <option value="@(f.Code ?? f.ID.ToString())" selected="@(Model.Fixation == (f.Code ?? f.ID.ToString()))">@f.Name</option>
-            }
-        </select>
-    </div>
-
-    @* Is it adequately fixed? *@
-    <div class="govuk-form-group">
-        <fieldset class="govuk-fieldset">
-            <legend class="govuk-fieldset__legend">Is it adequately fixed?</legend>
-            <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-                <div class="govuk-checkboxes__item">
-                    <input class="govuk-checkboxes__input" asp-for="SafeToHandle" type="checkbox" />
-                    <label class="govuk-label govuk-checkboxes__label" for="SafeToHandle">Yes</label>
-                </div>
-            </div>
-        </fieldset>
-    </div>
-
-    @* External submitter (optional) *@
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="OtherSubmittedBy">Submitted by (external)</label>
-        <div class="govuk-hint">The person at the external organisation who submitted the samples. Leave blank if not applicable.</div>
-        <select class="govuk-select" asp-for="OtherSubmittedBy">
-            <option value="">-- None --</option>
-            @foreach (var u in Model.AllUsers)
-            {
-                <option value="@u.UserID" selected="@(Model.OtherSubmittedBy == u.UserID)">@u.Name</option>
-            }
-        </select>
-    </div>
-
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="OtherSubmittedArea">Submitted area (external)</label>
-        <select class="govuk-select" asp-for="OtherSubmittedArea">
-            <option value="">-- None --</option>
-            @foreach (var a in Model.UserAreas)
-            {
-                <option value="@a.ID" selected="@(Model.OtherSubmittedArea == a.ID.ToString())">@a.Name</option>
-            }
-        </select>
-    </div>
-
-    @* Comments (optional) *@
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="Comments">Comments</label>
-        <textarea class="govuk-textarea" asp-for="Comments" rows="3"></textarea>
     </div>
 
     <div class="govuk-button-group">
-        <button type="submit" class="govuk-button" data-module="govuk-button">Create submission</button>
+        <button type="submit" class="govuk-button" data-module="govuk-button">Next</button>
         <a asp-page="/Index" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
     </div>
 </form>
+

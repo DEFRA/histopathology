@@ -29,7 +29,7 @@
     <strong>Test:</strong> @(Model.Test?.TestDetails ?? Model.Test?.Code)
 </p>
 
-<form method="post">
+<form method="post" asp-page="/QC/EditQualityDataTest">
     <input type="hidden" asp-for="TestId" />
 
     <div class="govuk-form-group">
@@ -37,20 +37,47 @@
             <legend class="govuk-fieldset__legend">Test result</legend>
             <div class="govuk-radios" data-module="govuk-radios">
                 <div class="govuk-radios__item">
-                    <input class="govuk-radios__input" type="radio" asp-for="Result" id="ResultPassed" value="@Histo.Histology.Models.BlockTestResult.Passed">
+                    <input class="govuk-radios__input" type="radio" asp-for="Result" id="ResultPassed"
+                           value="@Histo.Histology.Models.BlockTestResult.Passed"
+                           data-aria-controls="conditional-qc-note">
                     <label class="govuk-label govuk-radios__label" for="ResultPassed">Passed</label>
+                </div>
+                <div class="govuk-radios__conditional govuk-radios__conditional--hidden" id="conditional-qc-note">
+                    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" type="checkbox" asp-for="QCNote" id="QCNote">
+                            <label class="govuk-label govuk-checkboxes__label" for="QCNote">Raise a QC note</label>
+                        </div>
+                    </div>
                 </div>
                 <div class="govuk-radios__item">
                     <input class="govuk-radios__input" type="radio" asp-for="Result" id="ResultFailed" value="@Histo.Histology.Models.BlockTestResult.Failed">
                     <label class="govuk-label govuk-radios__label" for="ResultFailed">Failed</label>
+                </div>
+                <div class="govuk-radios__item">
+                    <input class="govuk-radios__input" type="radio" asp-for="Result" id="ResultNotTested" value="">
+                    <label class="govuk-label govuk-radios__label" for="ResultNotTested">Not tested</label>
                 </div>
             </div>
         </fieldset>
     </div>
 
     <div class="govuk-form-group">
+        <p class="govuk-body govuk-!-margin-bottom-1"><strong>QC note ref:</strong>
+            @if (Model.Test?.QCNoteRef is > 0)
+            {
+                <a asp-page="/Reports/QCNote" asp-route-qcNoteRef="@Model.Test.QCNoteRef" class="govuk-link">@Model.Test.QCNoteRef</a>
+            }
+            else
+            {
+                <span>None</span>
+            }
+        </p>
+    </div>
+
+    <div class="govuk-form-group">
         <label class="govuk-label" for="StainRef">Stain ref</label>
-        <input class="govuk-input" asp-for="StainRef" maxlength="20" />
+        <input class="govuk-input govuk-input--width-20" asp-for="StainRef" maxlength="20" />
     </div>
 
     <div class="govuk-form-group">
@@ -64,12 +91,7 @@
         </select>
     </div>
 
-    <div class="govuk-checkboxes__item">
-        <input class="govuk-checkboxes__input" type="checkbox" asp-for="QCNote" id="QCNote">
-        <label class="govuk-label govuk-checkboxes__label" for="QCNote">Raise a QC note</label>
-    </div>
-
-    <div class="govuk-form-group govuk-!-margin-top-4">
+    <div class="govuk-form-group">
         <label class="govuk-label" for="RemedialAction">Remedial action</label>
         <select class="govuk-select" asp-for="RemedialAction">
             <option value="">Select</option>
@@ -80,30 +102,34 @@
         </select>
     </div>
 
-    <div class="govuk-checkboxes__item">
-        <input class="govuk-checkboxes__input" type="checkbox" asp-for="Dispatched" id="Dispatched">
-        <label class="govuk-label govuk-checkboxes__label" for="Dispatched">Dispatched</label>
-    </div>
-
-    <div class="govuk-form-group govuk-!-margin-top-4">
-        <label class="govuk-label" for="DispatchedDate">Dispatched date</label>
-        <input class="govuk-input govuk-input--width-10" type="date" asp-for="DispatchedDate" />
-    </div>
-
     <div class="govuk-form-group">
-        <label class="govuk-label" for="DispatchedBy">Dispatched by</label>
-        <select class="govuk-select" asp-for="DispatchedBy">
-            <option value="">Select</option>
-            @foreach (var u in Model.Users)
-            {
-                <option value="@u.UserID">@u.Name</option>
-            }
-        </select>
-    </div>
-
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="DispatchedTo">Dispatched to</label>
-        <input class="govuk-input" asp-for="DispatchedTo" maxlength="30" />
+        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" type="checkbox" asp-for="Dispatched" id="Dispatched"
+                       data-aria-controls="conditional-dispatched">
+                <label class="govuk-label govuk-checkboxes__label" for="Dispatched">Dispatched</label>
+            </div>
+            <div class="govuk-checkboxes__conditional govuk-checkboxes__conditional--hidden" id="conditional-dispatched">
+                <div class="govuk-form-group govuk-!-margin-top-4">
+                    <label class="govuk-label" for="DispatchedDate">Dispatched date</label>
+                    <input class="govuk-input govuk-input--width-10" type="date" asp-for="DispatchedDate" />
+                </div>
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="DispatchedBy">Dispatched by</label>
+                    <select class="govuk-select" asp-for="DispatchedBy">
+                        <option value="">Select</option>
+                        @foreach (var u in Model.Users)
+                        {
+                            <option value="@u.UserID">@u.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="DispatchedTo">Dispatched to</label>
+                    <input class="govuk-input govuk-input--width-30" asp-for="DispatchedTo" maxlength="30" />
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="govuk-form-group">
@@ -127,9 +153,33 @@
         <textarea class="govuk-textarea" asp-for="ArchiveComment" rows="2" maxlength="200"></textarea>
     </div>
 
+    @if (Model.PremiumCharges.Any())
+    {
+        <div class="govuk-form-group">
+            <fieldset class="govuk-fieldset">
+                <legend class="govuk-fieldset__legend">Charges</legend>
+                <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                    @foreach (var charge in Model.PremiumCharges)
+                    {
+                        var chargeCode = charge.Code ?? charge.Name;
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input"
+                                   type="checkbox"
+                                   name="SelectedCharges"
+                                   value="@chargeCode"
+                                   id="charge-@chargeCode"
+                                   @(Model.SelectedCharges.Contains(chargeCode) ? "checked" : "")>
+                            <label class="govuk-label govuk-checkboxes__label" for="charge-@chargeCode">@charge.Name</label>
+                        </div>
+                    }
+                </div>
+            </fieldset>
+        </div>
+    }
+
     <div class="govuk-form-group">
         <label class="govuk-label" for="NumberOfSlides">Number of blocks/slides</label>
-        <input class="govuk-input govuk-input--width-5" asp-for="NumberOfSlides" />
+        <input class="govuk-input govuk-input--width-5" type="number" min="1" max="9999" asp-for="NumberOfSlides" />
     </div>
 
     <div class="govuk-form-group">
@@ -137,6 +187,8 @@
         <textarea class="govuk-textarea" asp-for="Comment" rows="4" maxlength="2000"></textarea>
     </div>
 
-    <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
-    <a asp-page="/QC/QualityData" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
+        <a asp-page="/QC/QualityData" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    </div>
 </form>

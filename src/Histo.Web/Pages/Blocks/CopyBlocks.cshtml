@@ -6,7 +6,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Submissions/SubmissionDetailsBlock" class="govuk-back-link">Back</a>
+    <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" class="govuk-back-link">Back</a>
 }
 
 @if (!string.IsNullOrEmpty(Model.Error))
@@ -45,6 +45,7 @@
 </table>
 
 <form method="post">
+    <input type="hidden" asp-for="BatchId" />
     @foreach (var b in Model.SourceBlocks)
     {
         <input type="hidden" name="BlockIds" value="@b.ID" />
@@ -73,5 +74,5 @@
     {
         <button type="submit" class="govuk-button" data-module="govuk-button">Copy blocks</button>
     }
-    <a asp-page="/Submissions/SubmissionDetailsBlock" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
 </form>

@@ -67,7 +67,7 @@
         @foreach (var i in Model.Items.Where(i => Model.ShowDeactivated || i.Active))
         {
             <tr class="govuk-table__row">
-                <td class="govuk-table__cell">@(Model.ShowAreaColumn ? i.Area : (i.Code ?? i.ID.ToString()))</td>
+                <td class="govuk-table__cell">@(Model.ShowAreaColumn ? (Model.AreaNameById.TryGetValue(i.Area ?? "", out var aName) ? aName : i.Area) : (i.Code ?? i.ID.ToString()))</td>
                 <td class="govuk-table__cell">@i.Name</td>
                 <td class="govuk-table__cell">@(i.Active ? "Yes" : "No")</td>
                 <td class="govuk-table__cell">
@@ -98,6 +98,28 @@
     <input type="hidden" asp-for="TableId" />
     <input type="hidden" asp-for="ItemId" />
     <input type="hidden" asp-for="OriginalCode" />
+
+    @* Area dropdown — only for Contacts (table 18) and Projects (table 19) *@
+    @if (Model.ShowAreaColumn)
+    {
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="Area">Area</label>
+            <select class="govuk-select" asp-for="Area" id="Area">
+                <option value="">-- Select area --</option>
+                @foreach (var a in Model.UserAreas)
+                {
+                    if (Model.Area == a.ID.ToString())
+                    {
+                        <option value="@a.ID" selected>@a.Name</option>
+                    }
+                    else
+                    {
+                        <option value="@a.ID">@a.Name</option>
+                    }
+                }
+            </select>
+        </div>
+    }
     @if (Model.TableHasCodes)
     {
         var codeError = Model.Errors.FirstOrDefault(e => e.IndexOf("code", StringComparison.OrdinalIgnoreCase) >= 0);

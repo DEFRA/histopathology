@@ -102,3 +102,10 @@ src/Histo.Web/wwwroot/govuk/
 node_modules/
 npm-debug.log*
 .npm
+
+# -----------------------------------------------------------------------
+# Legacy codebase — not pushed to remote
+# -----------------------------------------------------------------------
+HistopathologySystem/
+.github
+.copilotignore
