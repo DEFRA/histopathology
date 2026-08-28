@@ -78,4 +78,4 @@ After registration, populate these values in each environment's `appsettings.{en
 - [ ] SP signing certificate provisioned for non-dev environments
 - [ ] `ISS-009` data migration run: `tblUser.Email` values verified against Entra ID UPNs
 - [ ] Dry-run reconciliation report produced and reviewed before go-live
-- [ ] `Login.cshtml` and `Login.cshtml.cs` decommissioned (files to delete after SAML is live)
+- [x] `Login.cshtml` and `Login.cshtml.cs` decommissioned — deleted 2026-08-28 (see `docs/ADR/ADR-006-manual-login-page-bridge.md`)

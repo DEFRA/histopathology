@@ -1,17 +1,19 @@
 # Legacy vs. Current Application — Full Parity Audit Report
 
 **Project:** Histopathology System — VB.NET ASP.NET WebForms → C# .NET 10 Razor Pages (GOV.UK Design System)
-**Audit date:** 2026-08-01 (original audit) — **updated 2026-08-01 following remediation batches A–F** — **further updated 2026-08-03 following ISS-022 resolution (Run Log #43)**
+**Audit date:** 2026-08-01 (original audit) — **updated 2026-08-01 following remediation batches A–F** — **further updated 2026-08-03 following ISS-022 resolution (Run Log #43)** — **further updated 2026-08-28: Entra ID SAML 2.0 authentication (F-07/ISS-001) implemented and confirmed — see §12**
 **Scope:** Every module, screen, feature, workflow, business rule, and CRUD operation in the legacy application (`HistopathologySystem/`), compared against the current application (`src/Histo.Web/` + domain modules).
 **Method:** Full directory enumeration of both codebases, 1:1 page-name mapping, repository/service-layer interface inspection for CRUD completeness, and targeted grep of legacy business-rule and authorization patterns (`CheckPermissions()`, `web.config`, `HistopathologyLib`). Cross-referenced against `docs/migration-run-journal.md` Open Issues (ISS-001 → ISS-022) to avoid duplicate reporting.
 
 > **Post-audit update (2026-08-03):** All page-migration gaps identified below are now resolved, including ISS-022 (the final Phase 5 gap — the per-animal Sender/Histology Ref rename workflow, `Admin/EditAnimalRef.cshtml`). **The page-by-page table in §2 and the Executive Summary in §1 have been corrected in place below to reflect current state** — the original pre-remediation figures are retained in §1a and §10 for audit-trail purposes only. Authentication (F-07/ISS-001) remains open and is unaffected by this remediation work — it is now the sole critical pre-production blocker.
+>
+> **Post-audit update (2026-08-28):** Authentication/authorization (F-07/ISS-001) is now **implemented and confirmed** — Entra ID SAML 2.0 via `ITfoxtec.Identity.Saml2.MvcCore`, with the temporary NTLogin bridge (ADR-006, `Login.cshtml`) decommissioned. This was the last remaining **Critical**-severity finding in this report. See §12 for the full closure detail. The Executive Summary and §6/§7/§9/§11 tables below are corrected in place; historical figures are retained for audit-trail purposes.
 
 ---
 
 ## 1. Executive Summary
 
-**Current status (2026-08-03):** 60 of 64 legacy pages migrated or functionally superseded; 3 pages (`FinalPrintBatch`, `SubmissionForm`, `SubmissionNotes`) remain blocked on Phase 2 (Reporting, still 0% started); 1 page (`CalendarPopup`) is not applicable (superseded by the native GDS date input). The domain/repository CRUD layer is now at full parity with its consuming UI — no outstanding "backend exists, page missing" gaps remain (ISS-018, ISS-020, ISS-021, ISS-022 all resolved). **Authentication/authorization remains 0% implemented and is the sole critical pre-production blocker** (ISS-001, F-07 — unchanged since the original audit).
+**Current status (2026-08-28):** 60 of 64 legacy pages migrated or functionally superseded; 3 pages (`FinalPrintBatch`, `SubmissionForm`, `SubmissionNotes`) remain blocked on Phase 2 (Reporting, still 0% started); 1 page (`CalendarPopup`) is not applicable (superseded by the native GDS date input). The domain/repository CRUD layer is now at full parity with its consuming UI — no outstanding "backend exists, page missing" gaps remain (ISS-018, ISS-020, ISS-021, ISS-022 all resolved). **Authentication/authorization is now fully implemented** — Entra ID SAML 2.0 via `ITfoxtec.Identity.Saml2.MvcCore`, replacing the temporary NTLogin bridge (ADR-006, decommissioned 2026-08-28) — closing the sole remaining critical pre-production blocker (ISS-001, F-07).
 
 | Area | Legacy count | Migrated / Superseded | Blocked / N/A | Completion |
 |---|---|---|---|---|
@@ -19,9 +21,9 @@
 | ASCX user controls | 8 | 8 functionally replaced (see §3) | — | 100% |
 | Crystal Reports (.rpt) | 9 | 0 | 9 | **0%** — Phase 2 not started |
 | Domain/repository CRUD (Batch, Submission, Animal, Tissue, Block, HistologyRef, QCNote, Lookup) | — | Create/Update/Delete methods present at interface level **and** exposed via UI for every entity | None outstanding | **Full parity** |
-| Authentication / authorization (`CheckPermissions()`) | ~60+ call sites across all pages | 0 | All | **0%** — no `[Authorize]`, `AddAuthentication`, or Entra ID wiring exists anywhere in `Histo.Web`; only a hard-coded Development-only stub identity |
+| Authentication / authorization (`CheckPermissions()`) | ~60+ call sites across all pages | 60/60 pages gated via `HistoPageModel`'s two-gate model (SAML `ChallengeResult` + `tblUser` group-claim check) | None outstanding | **100% — Implemented** |
 
-**Headline finding (current):** UI migration (Phase 5) is complete for every page that does not depend on Phase 2 Reporting. The application is **not yet production-ready** — authentication/authorization remains entirely unimplemented, which is now the only critical blocker to further deployment. See §11 for the full list of pending migrations and gaps.
+**Headline finding (current):** UI migration (Phase 5) is complete for every page that does not depend on Phase 2 Reporting, and authentication/authorization (Phase 2) is now fully implemented via Entra ID SAML 2.0. The application's only remaining pre-production gap is **Crystal Reports migration (Phase 3/Reporting)** — see §11 for the full list of pending migrations and gaps.
 
 ---
 
@@ -171,9 +173,9 @@ This is the most important nuance of this audit: **the backend domain layer (Pha
 | PG-number auto-reversal | `HistopathologyLib/clsAnimal.vb` | ✅ Ported to `AnimalHelpers` per Phase 4, confirmed via existing `SubmissionServiceAnimalTests` |
 | QC Note rowstamp concurrency | `clsQCNote.vb` | ✅ Ported — `QCNoteConcurrencyException` implemented and unit-tested |
 | Batch status rowstamp concurrency | `clsBatch.vb` | ✅ `UpdateStatusAsync(..., byte[] rowStamp, ...)` present in `IBatchRepository` |
-| **Authorization (`CheckPermissions()`)** | Present in **every** legacy code-behind (confirmed ≥60 call sites across `ArchiveBlocks`, `ArchiveMenu`, `ArchiveTissues`, `AuditLogByDate/BySubmission/ByUser/Menu`, `BatchBlocks`, `BatchesForArchiving`, `BatchesForDispatch`, `BatchesForEditing`, and all remaining pages per ISS-004) | ❌ **Not implemented.** No `[Authorize]` attribute, `AddAuthentication`, or `AddMicrosoftIdentityWebApp` call exists anywhere in `Histo.Web/Program.cs` or any Razor Page. The only identity mechanism present is a **hard-coded Development-environment stub** (`GroupName = "Maintenance"`, added under ISS-013) that grants full access unconditionally in dev. This is consistent with Phase Tracker's Phase 1 status of "In Progress" but confirms **zero production-ready authorization exists today** — every migrated page is currently wide open with no group/role gating equivalent to the legacy Customer/Histopathology User/Maintenance group checks. |
-| Session-scoped user context (`SessionVars`) | `SessionVars.vb` | ✅ Replaced by `ISessionService`/`SessionService` (ISS-013 fix) — functionally equivalent for `GroupName`/`UserID`/`UserArea` propagation, but **not yet gated by any authorization policy** (see above) |
-| Windows Authentication → Entra ID | Web.config `<authentication mode="Windows">` | ❌ Not started — ISS-001/ISS-009/D-004 all still Open |
+| **Authorization (`CheckPermissions()`)** | Present in **every** legacy code-behind (confirmed ≥60 call sites across `ArchiveBlocks`, `ArchiveMenu`, `ArchiveTissues`, `AuditLogByDate/BySubmission/ByUser/Menu`, `BatchBlocks`, `BatchesForArchiving`, `BatchesForDispatch`, `BatchesForEditing`, and all remaining pages per ISS-004) | ✅ **Implemented (2026-08-28).** `HistoPageModel.OnPageHandlerExecutionAsync` enforces a two-gate model: Gate 1 (authentication) issues a SAML `ChallengeResult("saml2")` via `ITfoxtec.Identity.Saml2.MvcCore` for unauthenticated requests; Gate 2 (authorization) requires an active `tblUser` row, surfaced as the `AppClaimTypes.GroupName` claim, redirecting to `AccessDenied.cshtml` if absent. The temporary Development-only stub identity and the NTLogin bridge page (ADR-006, `Login.cshtml`) have both been removed. |
+| Session-scoped user context (`SessionVars`) | `SessionVars.vb` | ✅ Replaced by `ISessionService`/`SessionService` — populated from Entra ID claims via `Session.PopulateFromClaims(User)` on first request after sign-in, and now gated by the authorization policy above |
+| Windows Authentication → Entra ID | Web.config `<authentication mode="Windows">` | ✅ **Implemented (2026-08-28)** — Entra ID SAML 2.0, SP-initiated sign-in via `/Saml2/login` → `POST /Saml2/Acs` (`AuthController`) |
 
 ---
 
@@ -187,7 +189,7 @@ This is the most important nuance of this audit: **the backend domain layer (Pha
 | F-04 | `SearchMenu.cshtml` is a live menu page linking to 8 search screens, none of which exist — a functional dead end for any user navigating to Search | High | **Resolved** (ISS-020, Runs #27/#35, 2026-08-01) | All 8 search screens built; menu links now all functional. |
 | F-05 | No "Add QC Note" page exists — `IQCNoteRepository.AddAsync` is unreachable from the UI; only note-editing is exposed | Medium | **Resolved** (ISS-021, Batch A, 2026-08-01) | `QC/AddQCNote.cshtml` built, mirroring the `EditQCNote` pattern. |
 | F-06 | `EditHistologyRef.aspx` has no current equivalent despite `IHistologyRepository.UpdateRefAsync` already existing | Medium | **Resolved** (ISS-021, Batch A, 2026-08-01) | `Bookings/EditHistologyRef.cshtml` built for the pool-counter workflow. **Note:** this uncovered a second, distinct gap — the true per-animal renamer — tracked separately as ISS-022 and also now resolved (see below). |
-| F-07 | Authentication/authorization is entirely unimplemented in `Histo.Web` — only a Development-only stub identity exists; no `[Authorize]` policies replace any of the ~60+ legacy `CheckPermissions()` call sites | **Critical (pre-production blocker)** | **Still Open — unchanged since original audit** (ISS-001, D-004) | This must be resolved before any environment beyond local development is exposed. Now the **only** remaining critical-severity finding in this report — all page-migration and CRUD-parity findings (F-01–F-06, F-09) are resolved. Recommend engaging the `Identity Migration Agent (Entra ID for .NET Framework 4.8)`-equivalent workflow for .NET 10/Entra ID as the next priority. |
+| F-07 | Authentication/authorization is entirely unimplemented in `Histo.Web` — only a Development-only stub identity exists; no `[Authorize]` policies replace any of the ~60+ legacy `CheckPermissions()` call sites | **Critical (pre-production blocker)** | **Resolved 2026-08-28** (ISS-001, D-004) | Entra ID SAML 2.0 implemented via `ITfoxtec.Identity.Saml2.MvcCore`; `HistoPageModel`'s two-gate model replaces all legacy `CheckPermissions()` call sites. NTLogin bridge (ADR-006) decommissioned. This was the only remaining critical-severity finding in this report — all findings F-01–F-10 are now resolved except F-02/F-10 (Reporting/secrets, tracked separately). |
 | F-08 | `MouseNumber.ascx` and `SenderRef.ascx` have no confirmed current replacement | Low | **Partially resolved** — `SenderRef.ascx` confirmed replaced (Search module + AddSample built); `MouseNumber.ascx` confirmed as dead/unwired code, not a missing feature | `ValidateMouseNumber` exists in `Histo.Core` but is never called — low-severity cleanup item, see §11. |
 | F-09 | `SubmissionForm.aspx` vs. `AddSubmission.cshtml` overlap is unconfirmed | Low | **Resolved** (Batch C, 2026-08-01) | Confirmed distinct — `SubmissionForm.aspx`/`SubmissionNotes.aspx` are pure Crystal Reports PDF-export popups, reclassified as Phase 2 (Reporting) scope, not a Phase 5 UI gap. |
 | F-10 | Plaintext SQL credential and `debug="true"` in legacy `Web.config` | High | Open — **scope expanded 2026-08-03** | The identical plaintext credential (`HistologyUser`/`HistologyUser9245`) is now also committed in the **current, migrated app's** [src/Histo.Web/appsettings.json](../src/Histo.Web/appsettings.json) and `appsettings.Development.json`, not only the legacy `Web.config` — this is a more severe finding than originally scoped, since it is in the actively-shipped codebase. Remediate per `azure-infra.instructions.md` §3 (Managed Identity + Key Vault) before any Azure deployment. |
@@ -207,9 +209,9 @@ This is the most important nuance of this audit: **the backend domain layer (Pha
 
 ---
 
-## 9. Cross-Reference to Existing Open Issues (updated 2026-08-03)
+## 9. Cross-Reference to Existing Open Issues (updated 2026-08-28)
 
-As of this update, ISS-018, ISS-020, ISS-021, and ISS-022 (all raised by this audit or its remediation batches) are **Resolved**. The following issues remain **Open** and require action before further deployment: ISS-001 (auth wiring — critical), ISS-006 (Web.config secrets, now scope-expanded to include `src/Histo.Web/appsettings*.json`), ISS-007 (`debug="true"`), ISS-009 (NT login→UPN mapping), ISS-010 (key-person risk), ISS-011 (Azure admin/Entra ID dependency). ISS-004 (all 64 pages required before cutover) is now effectively satisfied for every non-reporting-blocked page — see §1/§2. See §11 for the consolidated list of everything still pending.
+As of this update, ISS-001 (authentication, F-07), ISS-018, ISS-020, ISS-021, and ISS-022 (all raised by this audit or its remediation batches) are **Resolved**. The following issues remain **Open** and require action before further deployment: ISS-006 (Web.config secrets, scope-expanded to include `src/Histo.Web/appsettings*.json`), ISS-007 (`debug="true"`), ISS-009 (NT login→UPN mapping — superseded in practice by claims-based email/UPN resolution, verify no residual dependency), ISS-010 (key-person risk), ISS-011 (Azure admin/Entra ID dependency — satisfied for dev environment, confirm test/UAT/prod). ISS-004 (all 64 pages required before cutover) is now effectively satisfied for every non-reporting-blocked page — see §1/§2. See §11 for the consolidated list of everything still pending.
 
 ---
 
@@ -247,7 +249,7 @@ Following the original audit above, the user directed a full remediation pass pr
 
 ### What remains open (unaffected by this remediation)
 
-- **F-07 / ISS-001 (Critical):** Authentication/authorization is still 0% implemented. No page — old or newly built in this remediation — has any `[Authorize]` gating. This remains the top-priority blocker for any non-development deployment.
+- ~~**F-07 / ISS-001 (Critical):** Authentication/authorization is still 0% implemented. No page — old or newly built in this remediation — has any `[Authorize]` gating. This remains the top-priority blocker for any non-development deployment.~~ **Resolved 2026-08-28** — see §12.
 - ~~**ISS-022 (new, found during Batch A):** The true legacy `EditHistologyRef.aspx` per-animal Sender/Histology Ref renamer has no repository support at all (distinct from the pool-level counter update that was built). Open, medium severity.~~ **Resolved 2026-08-03** (Run Log #43) — see §11.
 - **Phase 2 (Reporting):** Still 0% — all 9 Crystal Reports, plus the 3 print-popup pages, remain unmigrated.
 - **F-08/F-09 verification items** from the original audit were resolved during remediation (SubmissionForm confirmed distinct/reporting-only; MouseNumber.ascx/SenderRef.ascx dependencies resolved as part of the AddSample/Search work).
@@ -262,9 +264,9 @@ now-resolved items in §7 (Consolidated Findings). Cross-referenced against
 
 | Gap | Area | Status | Severity | Tracking |
 |---|---|---|---|---|
-| Authentication / Authorization (Entra ID) | `src/Histo.Web/Program.cs` | 0% — `app.UseAuthentication()`/`app.UseAuthorization()` commented out at line 132; no `[Authorize]` attribute anywhere | **Critical** | ISS-001, F-07 |
-| NT-login → UPN mapping | `Histo.Administration::UserService` | Open — required before Auth cutover can resolve real users | High | ISS-009 |
-| Azure Entra app registration / group IDs | Programme / Azure admin | Open — external dependency, blocks Phase 1 start | High | ISS-011 |
+| ~~Authentication / Authorization (Entra ID)~~ | ~~`src/Histo.Web/Program.cs`~~ | **Resolved 2026-08-28** — Entra ID SAML 2.0 via `ITfoxtec.Identity.Saml2.MvcCore`; `HistoPageModel` two-gate model live; ADR-006 bridge decommissioned | ~~Critical~~ | ISS-001, F-07 (closed) |
+| NT-login → UPN mapping | `Histo.Administration::UserService` | Verify no residual dependency — claims-based resolution (`Session.PopulateFromClaims`) is now the live path | Medium | ISS-009 |
+| Azure Entra app registration / group IDs | Programme / Azure admin | Satisfied for dev environment (App ID + Federation Metadata URL received); confirm test/UAT/prod registrations | Medium | ISS-011 |
 | Reporting Phase 2 (9 Crystal Reports) | `src/Histo.Reporting/` | 0% — empty project stub, no source files | High | Phase Tracker Phase 2 |
 | `FinalPrintBatch.aspx`, `SubmissionForm.aspx`, `SubmissionNotes.aspx` | `src/Histo.Web/Pages/` | Blocked on Reporting Phase 2 — confirmed non-functional shells would add no value until then | High | Run #36, #42 |
 | Plaintext SQL credential in **current app** config | `src/Histo.Web/appsettings.json`, `appsettings.Development.json` | Open — same credential as legacy `Web.config`, now also committed in the migrated codebase | High | Scope-expanded ISS-006 |
@@ -282,26 +284,43 @@ now-resolved items in §7 (Consolidated Findings). Cross-referenced against
 ### Prioritized migration plan
 
 **P0 — Critical, blocks any non-dev deployment**
-1. **Authentication (Phase 1):** Wire `AddAuthentication`/`AddMicrosoftIdentityWebApp` + `UseAuthentication`/`UseAuthorization` in `Program.cs`; map legacy `CheckPermissions()` groups (Customer/Histopathology User/Maintenance) to Entra ID groups/claims; add `[Authorize]` to all 60 pages.
-   - *Dependency:* ISS-011 (Azure admin must create the app registration + group IDs first) — escalate now, it is the longest lead-time item.
-   - *Risk:* Every migrated page is currently wide open; the application cannot go beyond local dev without this.
+1. ~~Authentication (Phase 1)~~ — **Resolved 2026-08-28.** Entra ID SAML 2.0 wired in `Program.cs`; `[Authorize]`-equivalent two-gate model enforced in `HistoPageModel` for all pages.
 2. **Secrets hardening:** Replace the plaintext credential in `appsettings.json`/`appsettings.Development.json` and legacy `Web.config` with Managed Identity connection strings; move remaining secrets to Key Vault.
    - *Dependency:* Key Vault + Azure SQL provisioning (`azure-infra.instructions.md` §3).
 
 **P1 — High, required before hard-switch cutover (ISS-004: no strangler-fig path)**
 3. **Reporting (Phase 2):** Build the `ReportDefinition.json` pipeline for the 9 `.rpt` files; unblocks `FinalPrintBatch`/`SubmissionForm`/`SubmissionNotes`.
    - *Risk:* `HistologyReport.rpt` sub-report nesting needs manual ViewModel design (ISS-002); no Phase 0 baseline PDFs captured yet for RMSE validation.
-4. **NT-login → UPN mapping (ISS-009):** Must land before or alongside the Phase 1 cutover, or user resolution breaks for every account.
+4. **NT-login → UPN mapping (ISS-009):** Verify no residual dependency on the legacy NT-login format now that claims-based resolution is live.
 
 **P2 — Medium, quality/cleanup, can run in parallel**
-5. **Testing & Cutover (Phase 6):** Add integration/E2E (Playwright) coverage for the 28 pages built in Batches A–F before any environment cutover, given the hard-switch constraint.
+5. **Testing & Cutover (Phase 6):** Add integration/E2E (Playwright) coverage for the 28 pages built in Batches A–F before any environment cutover, given the hard-switch constraint. Include auth flow coverage (sign-in redirect, session claims population, sign-out) per `auth-aspnetcore.instructions.md`.
 6. **Minor cleanup:** Remove or wire up `MouseNumber.ascx`/`ValidateMouseNumber` (F-08); rename `modernisation.agent .md` (ISS-005); confirm `IBlockRepository` Create/Update completeness is fully exercised by the Copy workflows.
 
-**Suggested sequencing:** P0 items 1–2 run in parallel now (Auth is the long pole via ISS-011). P1 item 3
-(Reporting) can start immediately in parallel — no dependency on Auth. P1 item 4 must complete before
-the Auth cutover goes live. P2 starts once P0/P1 are substantially underway, and must complete before
+**Suggested sequencing:** P0 item 2 (secrets hardening) is now the sole remaining P0 item — Managed Identity DB connection is documented but not yet wired to a live secret value (see `docs/Azure-ManagedIdentity-EntraID-WebJob.md` §2). P1 item 3
+(Reporting) can proceed in parallel — no dependency on Auth. P1 item 4 should be verified opportunistically. P2 starts once P0/P1 are substantially underway, and must complete before
 the hard-switch cutover per ISS-004.
 
 ---
 
-*Generation date: 2026-08-01, updated 2026-08-03. This report is a point-in-time audit based on static code/directory inspection — no live application testing was performed as part of this pass.*
+## 12. Authentication Closure — Entra ID SAML 2.0 (2026-08-28)
+
+This section records the closure of F-07/ISS-001, the last remaining **Critical** finding in this report.
+
+| Item | Detail |
+|---|---|
+| Protocol implemented | SAML 2.0 (SP-initiated), **not** the OIDC/`Microsoft.Identity.Web` approach originally proposed in `docs/Migration-Plan.md` Phase 2 |
+| Library | `ITfoxtec.Identity.Saml2.MvcCore` v4.20.1 |
+| Authentication gate | `HistoPageModel.OnPageHandlerExecutionAsync` — issues `ChallengeResult("saml2")` for unauthenticated requests |
+| Authorization gate | Requires an active `tblUser` row, surfaced as `AppClaimTypes.GroupName`; redirects to `AccessDenied.cshtml` if absent |
+| Session population | `Session.PopulateFromClaims(User)` on first request after sign-in, from claims baked in at ACS time |
+| SAML endpoints | `GET /Saml2/login` (challenge), `POST /Saml2/Acs` (assertion consumer), `GET /Saml2/Logout` (SLO) — all in `AuthController` |
+| Superseded bridge | ADR-006 manual NTLogin page (`Login.cshtml`/`Login.cshtml.cs`) — **deleted** 2026-08-28; see `docs/ADR/ADR-006-manual-login-page-bridge.md` |
+| Verification performed | Confirmed via static code inspection: `Program.cs` `AddSaml2`/`app.UseSaml2()` registration, `AuthController` ACS/logout actions, `HistoPageModel` two-gate model, zero remaining references to `Login.cshtml`/`LoginModel` in `src/` |
+| Residual follow-ups | Managed Identity DB connection string not yet wired to a live Key Vault secret (tracked as P0 item 2 above); SP signing certificate required before test/UAT/prod (`Saml2:SPCertificateThumbprint`) |
+
+**Conclusion:** F-07/ISS-001 is closed. Authentication/authorization is no longer a blocker for non-development deployment; the remaining pre-production blocker is P0 item 2 (secrets hardening / Managed Identity), not authentication.
+
+---
+
+*Generation date: 2026-08-01, updated 2026-08-03, updated 2026-08-28 (authentication closure). This report is a point-in-time audit based on static code/directory inspection — no live application testing was performed as part of this pass.*

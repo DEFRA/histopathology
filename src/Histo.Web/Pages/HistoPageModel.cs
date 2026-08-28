@@ -1,9 +1,6 @@
 using Histo.Web.Auth;
-<<<<<<< HEAD
 using Histo.Core.Domain;
 using Histo.Submissions.Interfaces;
-=======
->>>>>>> 351607732625fba3ca3dad48fbba1c32f021a658
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
