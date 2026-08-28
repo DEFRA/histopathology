@@ -39,7 +39,14 @@
                     <ul class="govuk-list govuk-error-summary__list">
                         @foreach (var e in Model.Errors)
                         {
-                            <li><a href="#@e.Key" class="govuk-link">@e.Value</a></li>
+                            var anchor = e.Key switch
+                            {
+                                "Create_Histology" => "create-histology-checkboxes",
+                                "Create_Antibodies" => "create-antibodies-section",
+                                "Create_Stains" => "create-stains-section",
+                                _ => e.Key
+                            };
+                            <li><a href="#@anchor" class="govuk-link">@e.Value</a></li>
                         }
                     </ul>
                 </div>
@@ -53,7 +60,7 @@
         <dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-4">
             <div class="govuk-summary-list__row">
                 <dt class="govuk-summary-list__key">Submission type</dt>
-                <dd class="govuk-summary-list__value">@(Model.Create_SubmittedAsName ?? "�")</dd>
+                <dd class="govuk-summary-list__value">@(Model.Create_SubmittedAsName ?? "-")</dd>
             </div>
             <div class="govuk-summary-list__row">
                 <dt class="govuk-summary-list__key">Entered by</dt>
@@ -285,9 +292,9 @@
     (function () {
         function syncTestSections() {
             var codes = Array.from(document.querySelectorAll('#create-histology-checkboxes input:checked')).map(function(cb){ return cb.value; });
-            var ihc   = ['4','6'];
+                var ihc   = ['@Histo.Submissions.Models.HistologyCode.IhcPrp','@Histo.Submissions.Models.HistologyCode.IhcOther'];
             document.getElementById('create-antibodies-section').style.display = codes.some(function(c){ return ihc.indexOf(c) >= 0; }) ? '' : 'none';
-            document.getElementById('create-stains-section').style.display     = codes.indexOf('3') >= 0 ? '' : 'none';
+                document.getElementById('create-stains-section').style.display     = codes.indexOf('@Histo.Submissions.Models.HistologyCode.SpecialStain') >= 0 ? '' : 'none';
         }
         document.getElementById('create-histology-checkboxes').addEventListener('change', syncTestSections);
     })();
