@@ -114,6 +114,27 @@ public sealed class Batch
     /// Rendered as "Yes", "No", or "Not specified" in the view.
     /// </summary>
     public bool? SafeToHandle { get; init; }
+
+    /// <summary>
+    /// Time-of-day code the submission was received/rejected (foreign key to LOOKUP_TIME_RECEIVED = 3).
+    /// Legacy source: <c>tblBatch.TimeReceived</c>, set on <c>ReceiveBatch.aspx</c> (<c>ddlTimeReceived</c>).
+    /// Resolved to a description via <c>ILookupService.GetLookupDataAsync(3)</c> in the view layer.
+    /// </summary>
+    public string? TimeReceived { get; init; }
+
+    /// <summary>
+    /// ID of the user who received/rejected this submission.
+    /// Legacy source: <c>tblBatch.ReceivedBy</c>, set on <c>ReceiveBatch.aspx</c> (<c>ddlReceivedBy</c>).
+    /// Resolved to a display name via <c>GetAllUsersAsync</c> in the view layer.
+    /// </summary>
+    public int? ReceivedBy { get; init; }
+
+    /// <summary>
+    /// Free-text detail entered when "Other" is ticked in the post-fixation checkbox list.
+    /// Legacy source: <c>tblBatch.PostFixationOther</c>, set on <c>ReceiveBatch.aspx</c>
+    /// (<c>mtxtPostFixationOther</c>).
+    /// </summary>
+    public string? PostFixationOther { get; init; }
 }
 
 /// <summary>

@@ -79,4 +79,10 @@ public interface IBatchService
     /// Legacy: <c>LOOKUP_SUBMITTEDAS = 11</c> is used by the caller to resolve the code to a display name.
     /// </summary>
     Task<string?> GetSubmittedAsCodeAsync(int batchId, CancellationToken ct = default);
+
+    /// <summary>Returns the post-fixation codes currently selected for a batch.</summary>
+    Task<IReadOnlyList<string>> GetPostFixationCodesAsync(int batchId, CancellationToken ct = default);
+
+    /// <summary>Persists post-fixation selections. Returns <see langword="false"/> on failure.</summary>
+    Task<bool> SavePostFixationCodesAsync(int batchId, IReadOnlyList<string> codes, int userId, CancellationToken ct = default);
 }

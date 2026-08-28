@@ -288,4 +288,30 @@ public sealed class BatchService : IBatchService
             return null;
         }
     }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<string>> GetPostFixationCodesAsync(int batchId, CancellationToken ct = default)
+    {
+        try { return await _batches.GetPostFixationCodesAsync(batchId, ct); }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get post-fixation codes for batch {BatchId}.", ex, batchId);
+            return [];
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> SavePostFixationCodesAsync(int batchId, IReadOnlyList<string> codes, int userId, CancellationToken ct = default)
+    {
+        try
+        {
+            await _batches.SavePostFixationCodesAsync(batchId, codes, userId, ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to save post-fixation codes for batch {BatchId}.", ex, batchId);
+            return false;
+        }
+    }
 }

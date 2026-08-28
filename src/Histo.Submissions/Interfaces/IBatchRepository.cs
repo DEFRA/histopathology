@@ -187,4 +187,24 @@ public interface IBatchRepository
     /// reads <c>foundRows(0)("Code")</c> then resolves via <c>GetListType(code, LOOKUP_SUBMITTEDAS)</c>.
     /// </summary>
     Task<string?> GetSubmittedAsCodeAsync(int batchId, CancellationToken ct = default);
+
+    // -----------------------------------------------------------------------
+    // Post-fixation selections (Receive Submission workflow)
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns the post-fixation codes currently selected for a batch, from
+    /// BATCH_POSTFIXATION_TABLE (result-set index 4 of <c>GetCommonBatchTablesByID</c>).
+    /// Legacy source: <c>ReceiveBatch.aspx.vb::InitialiseControls</c> — reads
+    /// <c>dsBatchData.Tables(BATCH_POSTFIXATION_TABLE)</c>.
+    /// </summary>
+    Task<IReadOnlyList<string>> GetPostFixationCodesAsync(int batchId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Persists post-fixation selections using the same insert/delete delta strategy as
+    /// <see cref="SaveBatchTestSelectionsAsync"/>.
+    /// Insert/delete stored procedures: <c>AddPostFixation</c> / <c>DeletePostFixation</c>.
+    /// Legacy source: <c>HistopathologyLib/clsCheckBoxData.vb</c> — table type 4 (BATCH_POSTFIXATION_TABLE).
+    /// </summary>
+    Task SavePostFixationCodesAsync(int batchId, IReadOnlyList<string> codes, int userId, CancellationToken ct = default);
 }

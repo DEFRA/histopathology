@@ -134,6 +134,9 @@ public sealed class BatchRepository : IBatchRepository
                 batch.StatusComments,
                 batch.ReceivedDate,
                 batch.CompletedDate,
+                batch.TimeReceived,
+                batch.ReceivedBy,
+                batch.PostFixationOther,
                 batch.RowStamp,
                 UserID = userId,
             },
@@ -408,5 +411,43 @@ public sealed class BatchRepository : IBatchRepository
                     commandType: System.Data.CommandType.StoredProcedure);
             }
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Post-fixation selections (Receive Submission workflow)
+    // -----------------------------------------------------------------------
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<string>> GetPostFixationCodesAsync(int batchId, CancellationToken ct = default)
+    {
+        var rows = await GetPostFixationRowsAsync(batchId, ct);
+        return rows.Select(r => r.Code).ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task SavePostFixationCodesAsync(int batchId, IReadOnlyList<string> codes, int userId, CancellationToken ct = default)
+    {
+        var current = await GetPostFixationRowsAsync(batchId, ct);
+
+        using var conn = _db.CreateConnection();
+        await ApplyTestSelectionDeltaAsync(conn, batchId, userId,
+            current, codes, "AddPostFixation", "DeletePostFixation");
+    }
+
+    private async Task<List<BatchTestSelectionRow>> GetPostFixationRowsAsync(int batchId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        using var multi = await conn.QueryMultipleAsync(
+            "GetCommonBatchTablesByID",
+            new { ID = batchId },
+            commandType: System.Data.CommandType.StoredProcedure);
+
+        // Discard result-sets 0–3 (BATCH_TABLE, HISTOLOGY, ANTIBODIES, STAIN);
+        // BATCH_POSTFIXATION_TABLE is result-set index 4.
+        for (int i = 0; i < 4; i++)
+            await multi.ReadAsync<dynamic>();
+
+        var rows = await multi.ReadAsync<BatchTestSelectionRow>();
+        return rows.ToList();
     }
 }
