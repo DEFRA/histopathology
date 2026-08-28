@@ -15,6 +15,7 @@ using ITfoxtec.Identity.Saml2.MvcCore;
 using ITfoxtec.Identity.Saml2.MvcCore.Configuration;
 using ITfoxtec.Identity.Saml2.Schemas.Metadata;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
 using Serilog;
 using System.Security.Cryptography.X509Certificates;
@@ -134,6 +135,31 @@ try
     builder.Services.AddSingleton(saml2Config); // saml2Config ref captured for post-build metadata load below
 
     builder.Services.AddSaml2(loginPath: "/Saml2/login", slidingExpiration: true, accessDeniedPath: "/AccessDenied");
+
+    // The default cookie challenge/forbid handlers build an ABSOLUTE redirect URI from
+    // Request.Scheme/Request.Host. Behind a reverse proxy that doesn't forward a trusted
+    // X-Forwarded-Host (or forwards headers UseForwardedHeaders isn't picking up), that
+    // leaks the App Service origin hostname instead of the public custom domain. Forcing
+    // a relative redirect removes the dependency on Request.Host entirely — the browser
+    // resolves it against whatever host is currently in the address bar.
+    builder.Services.PostConfigure<CookieAuthenticationOptions>("saml2", options =>
+    {
+        var originalRedirectToLogin = options.Events.OnRedirectToLogin;
+        options.Events.OnRedirectToLogin = context =>
+        {
+            if (Uri.TryCreate(context.RedirectUri, UriKind.Absolute, out var absoluteUri))
+                context.RedirectUri = absoluteUri.PathAndQuery;
+            return originalRedirectToLogin(context);
+        };
+
+        var originalRedirectToAccessDenied = options.Events.OnRedirectToAccessDenied;
+        options.Events.OnRedirectToAccessDenied = context =>
+        {
+            if (Uri.TryCreate(context.RedirectUri, UriKind.Absolute, out var absoluteUri))
+                context.RedirectUri = absoluteUri.PathAndQuery;
+            return originalRedirectToAccessDenied(context);
+        };
+    });
 
     // Claims transformation — fallback DB lookup; normal path bakes claims in AuthController at ACS time.
     builder.Services.AddScoped<IClaimsTransformation, HistopathologyClaimsTransformation>();
