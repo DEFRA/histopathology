@@ -64,12 +64,6 @@ try
             "ConnectionStrings:HistologyDb is not configured. " +
             "Set it in appsettings.json (dev) or via App Service configuration (non-dev).");
 
-    if (connectionString.StartsWith("@Microsoft.KeyVault(", StringComparison.OrdinalIgnoreCase))
-        throw new InvalidOperationException(
-            "ConnectionStrings:HistologyDb contains an unresolved App Service Key Vault reference. " +
-            "For local development, set a real SQL connection string in appsettings.Development.json " +
-            "or the ConnectionStrings__HistologyDb environment variable.");
-
     builder.Services.AddSingleton<IDbConnectionFactory>(
         new SqlConnectionFactory(connectionString));
 
