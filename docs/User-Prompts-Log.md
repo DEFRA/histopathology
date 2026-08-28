@@ -1019,6 +1019,7 @@ Added `IsViewMode` computed property to `BatchBlockSummaryModel` that checks `Se
 
 ## Prompt 56 -  Entrat Id integration 
 
+<<<<<<< HEAD
 
 ## Prompt - Enter Quality Data
 
@@ -1376,3 +1377,5 @@ Recommendations and required changes to achieve full parity and GDS compliance.
 ## Prompt 88 — Document issues and fixes for 27 Aug 2026 10:47 PM – 11:50 PM
 
 > alos need to dcoument the issues and fixes which has done during yesterday that 27 aug 2026 10:47 PM - 11.50 PM
+=======
+>>>>>>> 351607732625fba3ca3dad48fbba1c32f021a658
