@@ -15,6 +15,7 @@ using ITfoxtec.Identity.Saml2.MvcCore;
 using ITfoxtec.Identity.Saml2.MvcCore.Configuration;
 using ITfoxtec.Identity.Saml2.Schemas.Metadata;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.HttpOverrides;
 using Serilog;
 using System.Security.Cryptography.X509Certificates;
 
@@ -47,6 +48,21 @@ try
     // -- Strongly-typed options -----------------------------------------------
     builder.Services.Configure<AppOptions>(
         builder.Configuration.GetSection(AppOptions.SectionName));
+
+    // -- Forwarded headers (reverse proxy / edge in front of App Service) -----
+    // dev-cde.azure.defra.cloud terminates TLS and forwards to the App Service's
+    // default hostname. Without this, Request.Scheme/Request.Host reflect the
+    // origin (devcdewebaw1401.azurewebsites.net) rather than the public custom
+    // domain, causing absolute redirects (e.g. the SAML cookie challenge) to leak
+    // the origin hostname. Azure's edge proxy IPs are not fixed, so the default
+    // KnownNetworks/KnownProxies allow-list is cleared to trust the forwarded
+    // headers regardless of hop address.
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
 
     // -- DB connection factory ------------------------------------------------
     // Connection string comes from ConnectionStrings:HistologyDb in appsettings.json
@@ -219,6 +235,7 @@ try
     }
 
     app.UseSerilogRequestLogging();
+    app.UseForwardedHeaders();  // must run before UseHttpsRedirection/UseAuthentication
     app.UseHttpsRedirection();
     app.UseStaticFiles();
     app.UseRouting();
