@@ -205,6 +205,12 @@ public class ReceiveBatchModel : HistoPageModel
     /// </summary>
     private bool ValidateData()
     {
+        if (Status is not (BatchStatus.Submitted or BatchStatus.Received or BatchStatus.Rejected))
+        {
+            Error = "Invalid submission status.";
+            return false;
+        }
+
         if (Status is BatchStatus.Received or BatchStatus.Rejected)
         {
             if (ReceivedByUserId is null or <= 0)
