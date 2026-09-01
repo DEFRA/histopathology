@@ -187,7 +187,7 @@ public class ReceiveBatchModel : HistoPageModel
         return RedirectToPage("/Batches/BatchesNotReceived");
     }
 
-    public IActionResult OnPostCancel() => Redirect(BackLinkPage);
+    public IActionResult OnPostCancel() => RedirectToPage(BackLinkPage);
 
     // ── Private helpers ─────────────────────────────────────────────────────
 
