@@ -178,7 +178,11 @@ public class ReceiveBatchModel : HistoPageModel
             return Page();
         }
 
-        await _batches.SavePostFixationCodesAsync(Batch.ID, SelectedPostFixationCodes, Session.UserID);
+        if (!await _batches.SavePostFixationCodesAsync(Batch.ID, SelectedPostFixationCodes, Session.UserID))
+        {
+            Error = "Could not save the post-fixation selections. Please try again.";
+            return Page();
+        }
 
         return RedirectToPage("/Batches/BatchesNotReceived");
     }
