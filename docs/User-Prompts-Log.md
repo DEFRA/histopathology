@@ -1490,3 +1490,78 @@ Recommendations and required changes to achieve full parity and GDS compliance.
 ## Prompt 102 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-01)
 
 > Can you read the prompt and and fix, gap from the afer 4 PM in this session and why it's not fixed as part migraiton, add these details into, run-log-v2.md  session-metrics  User-Prompts-Log.md
+
+---
+
+## Prompt 103 — Module-to-Page Mapping navigation audit (2026-09-01)
+
+> Is there any naviagtion link that required for any other module to align with below ?
+> Module-to-Page Mapping
+
+Found and fixed 2 orphaned pages with zero inbound links: `Batches/SubmissionsOnHold` (legacy `EditBatch.aspx` "Put Samples On Hold" button was the only entry point and was not carried across) — restored via a "Samples on hold" button on `EditBatch.cshtml`; `Bookings/EditHistologyRef` (histology-ref counter maintenance, orphaned from `BookingMenu`) — restored via an "Edit next histology ref" link. Flagged the Module-to-Page Mapping table in `Migration-Plan.md` as stale (still listing consolidated/superseded legacy page names) but did not refresh it in this turn.
+
+---
+
+## Prompt 104 — Is the BatchSummary/BatchBlockSummary consolidation GDS-acceptable? (2026-09-01)
+
+> is below consolidation is good approach as per GDS ?, batch summary merged into batch block summary will that acceptable as per GDS ?
+
+Compared both legacy pages directly — identical action set (Add/Edit/Delete/Copy Sample, Done, Bypass sort), differing only in the Edit-sample navigation target and a Tissue Details column. Confirmed the merge is GDS-sound (avoids two near-duplicate screens forked purely on a persistence-layer distinction), but flagged 3 issues: the surviving route name `BatchBlockSummary` is meaningless for Wet Tissue submissions; inline histology-ref grid editing was silently dropped; grid paging was silently dropped. Recommended: keep the merge, rename the route, log the two capability drops in the parity register.
+
+---
+
+## Prompt 105 — Confirm paging is out of scope; proceed with the route-rename recommendation (2026-09-01)
+
+> Pagin is planned separatly so can go with recommendation ?
+
+Proceeded with the route rename recommendation. `BatchBlockSummary` → `SampleSummary`: `git mv` on both files, `BatchBlockSummaryModel` → `SampleSummaryModel`, all `asp-page`/`RedirectToPage` references across 9 dependent files updated, a permanent redirect registered in `Program.cs` for the legacy path (preserving query string), and `Parity-Audit-Report.md` §13 / `Migration-Plan.md` / `TSE-NonTSE-Submission-Workflow-Redesign.md` updated to the new name. Registered D-1 through D-7 accepted-consolidation deviations in a new `Parity-Audit-Report.md` §13. Build: 0 errors. Tests: 144 pass, 1 skipped.
+
+---
+
+## Prompt 106 — How does the user know whether a submission is Wet Tissue or Wax Block on this page? (2026-09-01)
+
+> How user will come to know that wheather it BatchBlockSummary
+
+Confirmed via grep that no page ever set `ViewData["BatchNo"]` — the caption slot in `_Layout.cshtml` was unused everywhere, and `SampleSummary`'s `IsWetTissue` flag (already computed for internal routing) was never surfaced to the user. Proposed setting `ViewData["BatchNo"]` from `Model.IsWetTissue` to render "Wet Tissue" / "Wax Block / Cassetted" as a caption above the heading.
+
+---
+
+## Prompt 107 — Implement the submission-type caption (2026-09-01)
+
+> implement this
+
+Added `ViewData["BatchNo"] = Model.IsWetTissue ? "Wet Tissue" : "Wax Block / Cassetted";` to `SampleSummary.cshtml`. Build: 0 errors, 0 warnings.
+
+---
+
+## Prompt 108 — Add sample on Wax Block still redirects to AddSubmission list, not Add block screen — fix not working (2026-09-01)
+
+> I have slected Wax Block eventhough i'm seeing samply summary page with add sample button, it take me to add submision which wrong, u said that you fixed below code but it's not working this kind of wasting my token
+> `var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId.Value); return submittedAsCode == "4" ? RedirectToPage(...) : RedirectToPage(...);`
+
+Re-verified the fix was still present in `AddSubmission.cshtml.cs` (confirmed, unchanged). Root cause of the "not working" report: an earlier build attempt had failed to copy the compiled `.exe` because a running `Histo.Web` process (PID 7384) held it locked (`MSB3027` in the build log); the user's live test was hitting that already-running, pre-fix instance. Also identified that the verification step used afterward (`dotnet test`) does not rebuild `Histo.Web` at all, giving a false "all good" signal. Confirmed the locking process had since exited, rebuilt `Histo.Web` cleanly (0 errors), and asked the user to restart their running instance and retest.
+
+---
+
+## Prompt 109 — Should we implement inline histology-ref grid editing (D-1) and add a PM date field to Add sample? (2026-09-01)
+
+> what is suggestin on the below should we impmment the histology ref editing, also one PM date filed also should be on add sample wet tissue / wax block ?
+
+Checked legacy source directly for both: (1) PM Date — confirmed `AddSubmission.aspx.vb`/`AddSample.aspx.vb` call the 4-argument `clsAnimal.NewRecord` overload, which never touches `PMDate`; PM Date is legacy-only ever captured later on `SubmissionDetails.aspx`/`SubmissionDetailsBlock.aspx`, exactly where the migrated app already places it — recommended **not** adding it to Add sample, as that would add scope legacy never had. (2) D-1 inline grid editing — recommended **not** replicating the legacy editable-grid pattern (no GOV.UK Design System equivalent; violates "one thing per page"); the existing one-click "Edit sample" link to a dedicated field is the correct GDS replacement, especially now that the Add-sample redirect fix (Prompt 108's underlying fix) lands users there directly.
+
+---
+
+## Prompt 110 — Update the D-1 parity register entry (2026-09-01)
+
+> update the Want me to update the D-1 entry in Parity-Audit-Report.md §13 to reflect this,
+
+Updated D-1 in `Parity-Audit-Report.md` §13: severity downgraded Medium → Low, disposition changed from "Needs user validation" to "Resolved by design (2026-09-01)", with rationale tying it to the GDS anti-pattern assessment and the Add-sample redirect fix.
+
+---
+
+## Prompt 111 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-01)
+
+> can you add the fix and gap duration in Session Metrics run-log-v2.md User-Prompts-Log.md journal-updater.agent.md
+
+Invoked `journal-updater` in Mode B (uncommitted Copilot Chat session — `git status --short` showed 18 modified/renamed files, no commits). Appended Run #18 to `run-log-v2.md` covering the full parity audit, nav-gap fixes, route rename, D-1 downgrade, and the Add-sample redirect regression + stale-build debugging; appended Session Metrics row #79 (complexity-based duration estimate — no exact timestamps captured this session); appended Prompts 103–111 to this file.
+

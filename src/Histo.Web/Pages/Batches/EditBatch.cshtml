@@ -178,8 +178,10 @@
 </form>
 
 @* "Samples" — this page only edits submission header fields; sample/animal/block details
-   (Add sample, Edit sample, Copy sample, Delete sample) are on BatchBlockSummary, matching
+   (Add sample, Edit sample, Copy sample, Delete sample) are on SampleSummary, matching
    the same "Samples" entry point already used from BatchDetails.cshtml. *@
 <div class="govuk-button-group">
-    <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples</a>
+    <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples</a>
+    @* Legacy EditBatch.aspx btnSamplesOnHold — the only entry point to the on-hold list. *@
+    <a asp-page="/Batches/SubmissionsOnHold" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples on hold</a>
 </div>

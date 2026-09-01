@@ -47,7 +47,7 @@ Legend: ✅ Migrated · ❌ Missing · ⚠️ Partial/Read-only gap (already tra
 
 | # | Legacy page | Current equivalent | Status | Notes |
 |---|---|---|---|---|
-| 1 | `AddSample.aspx` | [Submissions/AddSample.cshtml](../src/Histo.Web/Pages/Submissions/AddSample.cshtml) | ✅ | Built in Batch D1 — landing page for adding an *existing* animal (found via Search/SearchSample) to the current batch. |
+| 1 | `AddSample.aspx` | [Submissions/AddSubmission.cshtml](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml) | ⚠️ Superseded, with deviations | Consolidated into `AddSubmission` (optional `senderRef` pre-fill). Mouse-range bulk entry and Excel upload not reproduced — see §13. |
 | 2 | `AddSubmission.aspx` | [Submissions/AddSubmission.cshtml](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml) | ✅ | |
 | 3 | `AppError.aspx` | [Shared/Error.cshtml](../src/Histo.Web/Pages/Shared/Error.cshtml) | ✅ | Functional equivalent (ASP.NET Core error page pattern) |
 | 4 | `ArchiveBlocks.aspx` | [Archive/ArchiveBlocks.cshtml](../src/Histo.Web/Pages/Archive/ArchiveBlocks.cshtml) | ✅ | |
@@ -57,16 +57,16 @@ Legend: ✅ Migrated · ❌ Missing · ⚠️ Partial/Read-only gap (already tra
 | 8 | `AuditLogBySubmission.aspx` | [AuditLog/AuditLogBySubmission.cshtml](../src/Histo.Web/Pages/AuditLog/AuditLogBySubmission.cshtml) | ✅ | |
 | 9 | `AuditLogByUser.aspx` | [AuditLog/AuditLogByUser.cshtml](../src/Histo.Web/Pages/AuditLog/AuditLogByUser.cshtml) | ✅ | |
 | 10 | `AuditLogMenu.aspx` | [AuditLog/AuditLogMenu.cshtml](../src/Histo.Web/Pages/AuditLog/AuditLogMenu.cshtml) | ✅ | |
-| 11 | `BatchBlocks.aspx` | [Blocks/BlockDetails.cshtml](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml) | ✅ Superseded | Confirmed in Batch E2 — functionally covered, no separate page needed. |
-| 12 | `BatchBlockSummary.aspx` | [Submissions/ViewSamples.cshtml](../src/Histo.Web/Pages/Submissions/ViewSamples.cshtml) + [Submissions/SubmissionDetailsBlock.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml) | ✅ Superseded | Confirmed in Batch E2. |
+| 11 | `BatchBlocks.aspx` | [Submissions/SubmissionDetailsBlock.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml) | ✅ Superseded | Batch-wide mode (no `AnimalId`). `Blocks/BlockDetails.cshtml` was deleted in the 2026-08-28 consolidation. |
+| 12 | `BatchBlockSummary.aspx` | [Submissions/SampleSummary.cshtml](../src/Histo.Web/Pages/Submissions/SampleSummary.cshtml) + [Submissions/SubmissionDetailsBlock.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml) | ⚠️ Superseded, with deviations | Merged with `BatchSummary.aspx` into one sample list. See §13 for dropped inline histology-ref editing and paging. |
 | 13 | `BatchDetails.aspx` | [Batches/BatchDetails.cshtml](../src/Histo.Web/Pages/Batches/BatchDetails.cshtml) | ✅ | |
 | 14 | `BatchesForArchiving.aspx` | [Batches/BatchesForArchiving.cshtml](../src/Histo.Web/Pages/Batches/BatchesForArchiving.cshtml) | ✅ | |
 | 15 | `BatchesForDispatch.aspx` | [Batches/BatchesForDispatch.cshtml](../src/Histo.Web/Pages/Batches/BatchesForDispatch.cshtml) | ✅ | |
 | 16 | `BatchesForEditing.aspx` | [Batches/BatchesForEditing.cshtml](../src/Histo.Web/Pages/Batches/BatchesForEditing.cshtml) | ✅ | |
 | 17 | `BatchesNotReceived.aspx` | [Batches/BatchesNotReceived.cshtml](../src/Histo.Web/Pages/Batches/BatchesNotReceived.cshtml) | ✅ | |
 | 18 | `BatchesReceived.aspx` | [Batches/BatchesReceived.cshtml](../src/Histo.Web/Pages/Batches/BatchesReceived.cshtml) | ✅ | |
-| 19 | `BatchSummary.aspx` | [Submissions/ViewSamples.cshtml](../src/Histo.Web/Pages/Submissions/ViewSamples.cshtml) + [Submissions/SubmissionDetails.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml) | ✅ Superseded | Confirmed in Batch E2. |
-| 20 | `BlockDetails.aspx` | [Blocks/BlockDetails.cshtml](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml) | ✅ | |
+| 19 | `BatchSummary.aspx` | [Submissions/SampleSummary.cshtml](../src/Histo.Web/Pages/Submissions/SampleSummary.cshtml) + [Submissions/SubmissionDetails.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml) | ⚠️ Superseded, with deviations | Merged with `BatchBlockSummary.aspx` into one sample list. See §13. |
+| 20 | `BlockDetails.aspx` | [Submissions/SubmissionDetailsBlock.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml) | ✅ Superseded | Animal-scoped mode (`AnimalId` supplied). |
 | 21 | `BookBlockRef.aspx` | [Bookings/BookBlockRef.cshtml](../src/Histo.Web/Pages/Bookings/BookBlockRef.cshtml) | ✅ | |
 | 22 | `BookHistologyRef.aspx` | [Bookings/BookHistologyRef.cshtml](../src/Histo.Web/Pages/Bookings/BookHistologyRef.cshtml) | ✅ | |
 | 23 | `BookingMenu.aspx` | [Bookings/BookingMenu.cshtml](../src/Histo.Web/Pages/Bookings/BookingMenu.cshtml) | ✅ | |
@@ -323,4 +323,28 @@ This section records the closure of F-07/ISS-001, the last remaining **Critical*
 
 ---
 
-*Generation date: 2026-08-01, updated 2026-08-03, updated 2026-08-28 (authentication closure). This report is a point-in-time audit based on static code/directory inspection — no live application testing was performed as part of this pass.*
+## 13. Accepted Deviations from Screen Consolidation (2026-09-01)
+
+Several legacy screens were deliberately merged during Phase 5 under the GDS-alignment work in
+`docs/TSE-NonTSE-Submission-Workflow-Redesign.md`. The consolidations themselves are approved, but
+they carry capability reductions that were previously recorded only in code comments. They are
+registered here so the Phase 5 sign-off gate reflects them explicitly.
+
+| # | Deviation | Legacy source | Current state | Severity | Disposition |
+|---|---|---|---|---|---|
+| D-1 | Inline histology-ref editing removed from the sample list | `BatchBlockSummary.aspx` grid `EditItemTemplate` (`txtHistologyRefEdit` + format validator) | Histology ref is editable only on the per-sample detail page | Low | **Resolved by design (2026-09-01).** Replicating a legacy editable-grid row is a GOV.UK Design System anti-pattern — no such component exists, and it would violate "one thing per page". `AddSubmission` now redirects straight into `SubmissionDetails`/`SubmissionDetailsBlock` after adding a sample (matching legacy's own `SV_AddSampleNextPage` redirect), and every row on `SampleSummary` already carries a one-click "Edit sample" link to a dedicated Histology reference field. Residual cost is N clicks instead of 0 only when bulk-correcting refs across many existing samples in one sitting — accepted as a minor efficiency gap, not a missing capability. |
+| D-2 | Grid paging removed from the sample list | `BatchSummary.aspx` / `BatchBlockSummary.aspx` (`AllowPaging="True"` + `DataGridPager`) | Flat table renders all samples | Medium | **Planned separately** — tracked outside this register. |
+| D-3 | Mouse-number range bulk entry not reproduced | `AddSample.aspx` / `AddSubmission.aspx` (`MouseNumber1`/`MouseNumber2` range → bulk `NewRecord`) | Samples added one Sender Ref at a time | Medium | Open — confirm whether Mouse Bioassay users still rely on this. |
+| D-4 | Excel mouse-number upload not reproduced | `AddSample.aspx::btnUpload_Click` → `ImportMouseNumbers` (OLE DB / Jet, `MOUSE_NUMBERS` sheet) | No bulk import | Medium | Open. Note the legacy implementation depends on the Jet OLE DB provider, which is unavailable on Linux containers — any replacement needs a different reader. |
+| D-5 | TSE / Non-TSE submission-type match check dropped from Copy samples | `CopySamples.aspx` | Not reproduced — the migrated `Batch` model carries no batch type | Medium | Open — requires a `BatchType` property before it can be restored. |
+| D-6 | "Auto-generate histology ref" option dropped from Copy blocks | `CopyBlocks.aspx` (`cbAutoGenerateHisto`, PG-number reversal, neuropath range lookup) | Target samples keep their existing histology ref | Medium | Open — equivalent logic exists in `AnimalHelpers.ComputePgAutoHistologyRef`. |
+| D-7 | Per-block test-type selection absent from block management | `SubmissionDetailsBlock.aspx` per-block checkboxes (EO, H&E, H&E BSE, IHC Prp, IHC Other, Special Stain) | Managed downstream via `QC/QualityData.cshtml` | Low | Open — needs confirmation that block creation populates `BlockTest` rows. |
+
+**Route rename (2026-09-01):** `/Submissions/BatchBlockSummary` → `/Submissions/SampleSummary`, because
+"Block" is meaningless for Wet Tissue submissions and GOV.UK treats URLs as user-facing content. A
+permanent redirect from the old path is registered in `Program.cs`. The page `<h1>` was already
+"Sample summary" and is unchanged.
+
+---
+
+*Generation date: 2026-08-01, updated 2026-08-03, updated 2026-08-28 (authentication closure), updated 2026-09-01 (consolidation deviations, §13). This report is a point-in-time audit based on static code/directory inspection — no live application testing was performed as part of this pass.*

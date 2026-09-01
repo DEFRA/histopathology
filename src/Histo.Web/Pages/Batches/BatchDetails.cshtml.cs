@@ -195,7 +195,7 @@ public class BatchDetailsModel : HistoPageModel
     public bool CanDateReturned => Batch?.Status == BatchStatus.Completed;
 
     /// <summary>
-    /// Mirrors <c>BatchBlockSummaryModel.IsViewMode</c>: true when reached via the View Submission
+    /// Mirrors <c>SampleSummaryModel.IsViewMode</c>: true when reached via the View Submission
     /// journey (ViewSubmissions or SearchSubmissions), as opposed to the Create Submission journey.
     /// </summary>
     public bool IsViewMode => Session.IsViewSubmissionMode;

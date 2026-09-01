@@ -1,8 +1,10 @@
 @page
-@model Histo.Web.Pages.Submissions.BatchBlockSummaryModel
+@model Histo.Web.Pages.Submissions.SampleSummaryModel
 @{
     ViewData["Title"] = "Sample summary";
     ViewData["PageTitle"] = "Sample summary";
+    // Surfaces the submission type since this page no longer has a type-specific name/URL.
+    ViewData["BatchNo"] = Model.IsWetTissue ? "Wet Tissue" : "Wax Block / Cassetted";
 }
 
 @section BeforeHeading {
@@ -48,7 +50,7 @@
         <input type="hidden" name="animalId" value="@confirmId" />
         <input type="hidden" asp-for="BatchId" />
         <button type="submit" class="govuk-button govuk-button--warning" data-module="govuk-button">Yes, delete sample</button>
-        <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
     </form>
 }
 
@@ -106,7 +108,7 @@
                         <a asp-page="/Submissions/AddSubmission" asp-route-batchId="@Model.BatchId" asp-route-batchSubmissionId="@Model.BatchSubmissionId" asp-route-senderRef="@a.SenderRef"
                            class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Copy sample</a>
                         @* "Delete sample" — links to the inline confirmation panel above instead of a browser confirm() dialog. *@
-                        <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" asp-route-ConfirmDeleteAnimalId="@a.ID"
+                        <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" asp-route-ConfirmDeleteAnimalId="@a.ID"
                            class="govuk-button govuk-button--warning govuk-!-margin-bottom-0">Delete sample</a>
                     }
                 </td>

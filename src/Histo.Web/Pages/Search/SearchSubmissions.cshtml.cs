@@ -77,8 +77,11 @@ public class SearchSubmissionsModel : HistoPageModel
     // Received/OnHold/InProgress: all six buttons enabled.
 
     public bool CanPrintSubmission => SelectedBatchStatus is not null && SelectedBatchStatus != BatchStatus.Rejected;
-    public bool CanEditSubmission  => SelectedBatchStatus == BatchStatus.Submitted
-                                   || SelectedBatchStatus == BatchStatus.Rejected;
+    // Legacy grdSearchResults_SelectedIndexChanged: Edit is disabled for Submitted, Completed and
+    // Rejected, and enabled only for the remaining statuses (Received / On Hold / In Progress).
+    public bool CanEditSubmission  => SelectedBatchStatus == BatchStatus.Received
+                                   || SelectedBatchStatus == BatchStatus.OnHold
+                                   || SelectedBatchStatus == BatchStatus.InProgress;
     public bool CanViewSubmission  => SelectedBatchStatus is not null && SelectedBatchStatus != BatchStatus.Submitted;
     public bool CanViewQualityData => SelectedBatchStatus == BatchStatus.Completed
                                    || SelectedBatchStatus == BatchStatus.Received

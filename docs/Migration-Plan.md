@@ -364,13 +364,17 @@ Swap deployment slot back to legacy App Service. Legacy IIS remains available fo
 
 ## Module-to-Page Mapping
 
+> **Updated 2026-09-01** to reflect shipped state. Pages consolidated during Phase 5 are shown at
+> their surviving route; the legacy names they absorbed are listed in brackets. Deviations arising
+> from those consolidations are registered in `docs/Parity-Audit-Report.md` §13.
+
 | Module | Pages Served |
 |---|---|
-| `Histo.Submissions` | `AddSubmission`, `SubmissionForm`, `SubmissionDetails`, `SubmissionDetailsBlock`, `ViewSubmissions`, `SubmissionsOnHold`, `SubmissionNotes`, `BatchDetails`, `BatchSummary`, `BatchBlockSummary`, `ReceiveBatch`, `EditBatch`, `FinalPrintBatch`, `Cassetted`, `CopyBatch*`, `CopySamples*`, `AddSample`, `ViewSamples` |
-| `Histo.Histology` | `BatchBlocks`, `BlockDetails`, `BookBlockRef`, `BookHistologyRef`, `EditHistologyRef`, `CopyBlocks`, `CopyBatchBlocks*`, `ArchiveBlocks`, `ArchiveTissues` |
-| `Histo.QualityControl` | `QCNotes`, `QCNoteForm`, `EditQCNote`, `QualityData` |
-| `Histo.Reporting` | `HistologyReport`, `QCNoteReport`, `SubmissionAntibodiesReport`, `SubmissionBlocksReport`, `SubmissionHistologyReport`, `SubmissionNotesReport`, `SubmissionSpecialStainReport`, `SubmissionTissuesReport` |
+| `Histo.Submissions` | `AddSubmission` *(absorbed `AddSample`)*, `SampleSummary` *(absorbed `BatchSummary` + `BatchBlockSummary`)*, `SubmissionDetails`, `SubmissionDetailsBlock` *(absorbed `BlockDetails`, `BatchBlocks`)*, `ViewSubmissions`, `SubmissionsOnHold`, `BatchDetails`, `ReceiveBatch`, `EditBatch`, `EditBatchTests`, `DateReturned`, `Cassetted`, `CopyBatch`, `CopyBatchSummary`, `CopySamples`, `CopySamplesSummary`, `ViewSamples` |
+| `Histo.Histology` | `BookBlockRef`, `BookHistologyRef`, `EditHistologyRef`, `CopyBlocks`, `ArchiveBlocks`, `ArchiveTissues`, `ArchiveMenu`, `BookingMenu` |
+| `Histo.QualityControl` | `QCNotes`, `AddQCNote`, `EditQCNote`, `QualityData`, `EditQualityDataTest` |
+| `Histo.Reporting` | `HistologyReport`, `QCNote`, `SubmissionNotes` — remaining reports (`SubmissionAntibodies`, `SubmissionBlocks`, `SubmissionHistology`, `SubmissionSpecialStain`, `SubmissionTissues`, `SubmissionForm`, `FinalPrintBatch`) pending Phase 3 |
 | `Histo.AuditLog` | `AuditLogByDate`, `AuditLogByUser`, `AuditLogBySubmission`, `AuditLogMenu` |
-| `Histo.Administration` | `UserMaintenance`, `PickListMaintenance`, `PickListMaintenanceID`, `PickListUserArea` |
-| `Histo.Administration` | `SearchSubmissions`, `SearchSample`, `SearchSender`, `SearchTest`, `SearchBlockRefs`, `SearchPMDates`, `SearchArchiveLocation`, `SearchUnUsedHistologyRefs` |
-| All modules | `Home` (dashboard — links composed from all module permissions) |
+| `Histo.Administration` (admin) | `UserMaintenance`, `AddUser`, `EditUser`, `PickListMaintenance`, `EditLookupItem`, `PickListUserArea`, `EditAnimalRef`, `FixCompletedDates` |
+| `Histo.Administration` (search) | `SearchMenu`, `SearchSubmissions`, `SearchSample`, `SearchSender`, `SearchTest`, `SearchBlockRefs`, `SearchPMDates`, `SearchArchiveLocation`, `SearchUnUsedHistologyRefs`, `ViewImportedData` |
+| All modules | `Index` (dashboard — links composed from all module permissions), `Help`, `AccessDenied` |
