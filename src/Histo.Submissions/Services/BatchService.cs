@@ -26,7 +26,11 @@ public sealed class BatchService : IBatchService
     public async Task<Batch?> GetByIdAsync(int batchId, CancellationToken ct = default)
     {
         try { return await _batches.GetByIdAsync(batchId, ct); }
-        catch (Exception ex) { _logger.LogError("Failed to get batch {BatchId}.", ex, batchId); return null; }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get batch {BatchId}: {Message}", ex, batchId, ex.Message);
+            throw;
+        }
     }
 
     /// <summary>Returns all received batches.</summary>
@@ -91,7 +95,12 @@ public sealed class BatchService : IBatchService
     public async Task<int> AddAsync(Batch batch, int userId, CancellationToken ct = default)
     {
         try { return await _batches.AddAsync(batch, userId, ct); }
-        catch (Exception ex) { _logger.LogError("Failed to add batch.", ex); return 0; }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to add batch: {Message}", ex, ex.Message);
+            // Rethrow so the page model can surface the actual error for diagnosis.
+            throw;
+        }
     }
 
     /// <summary>
@@ -101,7 +110,11 @@ public sealed class BatchService : IBatchService
     public async Task<bool> UpdateAsync(Batch batch, int userId, CancellationToken ct = default)
     {
         try { await _batches.UpdateAsync(batch, userId, ct); return true; }
-        catch (Exception ex) { _logger.LogError("Failed to update batch {BatchId}.", ex, batch.ID); return false; }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to update batch {BatchId}: {Message}", ex, batch.ID, ex.Message);
+            throw;
+        }
     }
 
     /// <summary>
@@ -113,6 +126,12 @@ public sealed class BatchService : IBatchService
     {
         try { await _batches.SetCustomerReceivedDateAsync(batchId, date, rowStamp, userId, ct); return true; }
         catch (Exception ex) { _logger.LogError("Failed to set customer received date for batch {BatchId}.", ex, batchId); return false; }
+    }
+
+    public async Task<bool> SetByPassSortAsync(int batchId, bool byPassSort, int userId, CancellationToken ct = default)
+    {
+        try { await _batches.SetByPassSortAsync(batchId, byPassSort, userId, ct); return true; }
+        catch (Exception ex) { _logger.LogError("Failed to set ByPassSort for batch {BatchId}.", ex, batchId); return false; }
     }
 
     /// <summary>
@@ -128,12 +147,20 @@ public sealed class BatchService : IBatchService
     {
         var batch = new Batch
         {
-            Status            = BatchStatus.Submitted,
-            CustomerRef        = source.CustomerRef,
-            Comments           = source.Comments,
-            SubmittedByUserID  = userId,
-            UserAreaCode       = source.UserAreaCode,
-            IsPreCassetted     = source.IsPreCassetted,
+            Status              = BatchStatus.Submitted,
+            Comments            = source.Comments,
+            SubmittedByUserID   = userId,
+            UserAreaCode        = source.UserAreaCode,
+            IsPreCassetted      = source.IsPreCassetted,
+            BatchType           = source.BatchType,
+            ProjectContractCode = source.ProjectContractCode,
+            ContactName         = source.ContactName,
+            Species             = source.Species,
+            BatchDate           = source.BatchDate ?? DateTime.Today,
+            Fixation            = source.Fixation,
+            SafeToHandle        = source.SafeToHandle,
+            OtherSubmittedBy    = source.OtherSubmittedBy,
+            OtherSubmittedArea  = source.OtherSubmittedArea ?? "",
         };
 
         try { return await _batches.AddAsync(batch, userId, ct); }
@@ -144,11 +171,10 @@ public sealed class BatchService : IBatchService
     /// Updates batch status. Throws <see cref="BatchConcurrencyException"/> on
     /// concurrent modification.
     /// </summary>
-    public async Task<bool> UpdateStatusAsync(int batchId, string newStatus, byte[] rowStamp, int userId, CancellationToken ct = default)
+    public async Task<bool> UpdateStatusAsync(int batchId, string newStatus, int userId, CancellationToken ct = default)
     {
         // BatchConcurrencyException propagates — the UI must handle it
-        await _batches.UpdateStatusAsync(batchId, newStatus, rowStamp, userId, ct);
-        return true;
+        return await _batches.UpdateStatusAsync(batchId, newStatus, userId, ct);
     }
 
     // -----------------------------------------------------------------------
@@ -287,6 +313,12 @@ public sealed class BatchService : IBatchService
             _logger.LogError("Failed to read submitted-as code for batch {BatchId}.", ex, batchId);
             return null;
         }
+    }
+
+    public async Task SaveSubmittedAsAsync(int batchId, string code, int userId, CancellationToken ct = default)
+    {
+        try { await _batches.SaveSubmittedAsAsync(batchId, code, userId, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to save SubmittedAs for batch {BatchId}.", ex, batchId); }
     }
 
     /// <inheritdoc/>

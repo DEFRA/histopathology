@@ -51,4 +51,21 @@ public sealed class BlockTestService : IBlockTestService
         // Let BlockTestConcurrencyException propagate — the UI layer must handle it
         await _repo.UpdateAsync(test, userId, ct);
     }
+
+    /// <inheritdoc/>
+    public async Task SaveTCCodesAsync(
+        int batchId, int testId, string testType,
+        IReadOnlyList<TcCode> existing, IReadOnlyList<string> selected,
+        int userId, CancellationToken ct = default)
+    {
+        try
+        {
+            await _repo.SaveTCCodesAsync(batchId, testId, testType, existing, selected, userId, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to save TC codes for test {TestId}.", ex, testId);
+            throw;
+        }
+    }
 }

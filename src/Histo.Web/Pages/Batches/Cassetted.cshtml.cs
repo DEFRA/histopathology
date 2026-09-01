@@ -1,6 +1,5 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
-using Histo.Core.Domain;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -9,80 +8,70 @@ using Microsoft.AspNetCore.Mvc;
 namespace Histo.Web.Pages.Batches;
 
 /// <summary>
-/// Replaces <c>Cassetted.aspx</c> — the "Submission Type" step shown when the
-/// user starts a new submission from Home. Despite the legacy page name, this
-/// is not a blocks status transition; it lets the user pick how the samples
-/// are being submitted (Wet Tissue, Blocks, etc.) from the SubmittedAs pick
-/// list, creates the new batch header, and routes to Batch Details.
-///
-/// Legacy source: Cassetted.aspx.vb. The multi-select checkbox list in the
-/// legacy page enforces single-selection in code (<c>chkblSubmittedAs_SelectedIndexChanged</c>);
-/// this is reproduced here as a single-select dropdown.
-///
-/// ISS-023 fix: the legacy Home.aspx exposed two separate links ("New TSE Submission"
-/// and "New Non-TSE Submission") that set <c>SV_SubmissionType</c> in session before
-/// routing here. This page now captures that choice directly via the BatchType
-/// radio group, consistent with GOV.UK single-page-per-question design.
+/// Step 1 of new submission � mirrors legacy <c>Cassetted.aspx</c>.
+/// Collects submission category (TSE/NonTSE) and submission type (SubmittedAs) only,
+/// then stores them in session and redirects to <c>BatchDetails.cshtml?mode=create</c>
+/// where the user fills in all remaining batch header fields.
 /// </summary>
 public class CassettedModel : HistoPageModel
 {
-    private const int LookupSubmittedAs = 11; // Legacy source: HistopathologySystem/Common.vb — LOOKUP_SUBMITTEDAS
+    private const int LookupSubmittedAs = 11; // Common.vb LOOKUP_SUBMITTEDAS
 
     private readonly ILookupService _lookups;
-    private readonly IBatchService _batches;
 
-    public CassettedModel(ISessionService session, ILookupService lookups, IBatchService batches)
-        : base(session)
-    {
-        _lookups = lookups;
-        _batches = batches;
-    }
+    public CassettedModel(ISessionService session, ILookupService lookups)
+        : base(session) => _lookups = lookups;
 
+    [BindProperty] public int  BatchType   { get; set; } = BatchTypeConstants.Tse;
     [BindProperty] public int? SubmittedAs { get; set; }
 
-    /// <summary>0 = TSE (default), 1 = Non-TSE. Mirrors legacy SUBMISSION_TSE/SUBMISSION_NONTSE.</summary>
-    [BindProperty] public int BatchType { get; set; } = BatchTypeConstants.Tse;
-
     public IReadOnlyList<LookupItem> SubmittedAsOptions { get; private set; } = [];
-    public string? SaveError { get; private set; }
+    public IDictionary<string, string> Errors { get; private set; } = new Dictionary<string, string>();
 
     public async Task OnGetAsync()
     {
-        ViewData["Title"] = "Submission Type";
-        ViewData["PageTitle"] = "Submission Type";
-        SubmittedAsOptions = await _lookups.GetLookupDataAsync(LookupSubmittedAs);
+        ViewData["Title"]     = "Submission type";
+        ViewData["PageTitle"] = "Submission type";
+        await LoadLookupsAsync();
+
+        // Every fresh visit starts with nothing selected — do not restore a previous choice from
+        // TempData here, since it can leak from an abandoned/completed earlier submission attempt
+        // and wrongly pre-select a submission type (e.g. always showing "Pre Cassetted Tissue").
+        BatchType = Session.BatchType;
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Submission Type";
-        ViewData["PageTitle"] = "Submission Type";
-        SubmittedAsOptions = await _lookups.GetLookupDataAsync(LookupSubmittedAs);
+        ViewData["Title"]     = "Submission type";
+        ViewData["PageTitle"] = "Submission type";
+        await LoadLookupsAsync();
+
+        var errors = new Dictionary<string, string>();
 
         var selected = SubmittedAsOptions.FirstOrDefault(o => o.ID == SubmittedAs);
         if (selected is null)
+            errors["SubmittedAs"] = "Select a submission type.";
+
+        if (errors.Count > 0)
         {
-            SaveError = "Select a submission type.";
+            Errors = errors;
             return Page();
         }
 
-        var batch = new Batch
-        {
-            SubmittedByUserID = Session.UserID,
-            UserAreaCode      = Session.UserAreaID,
-            IsPreCassetted    = ValidationHelpers.IsBatchPreCassetted(selected.ID.ToString()),
-            BatchType         = BatchType,
-        };
+        // Store type selection in session � BatchDetails create mode reads these.
+        Session.BatchType = BatchType;
+        Session.BatchID   = null; // clear any previous batch        // Clear a stale "reached via View/Search Submissions" flag from an earlier, unrelated visit
+        // in the same session — otherwise BatchBlockSummary.IsViewMode/BatchDetails.IsViewMode stay
+        // stuck true for this brand-new batch, hiding Add sample and other edit actions.
+        Session.ReturnPage = string.Empty;
+        // Pass SubmittedAs code and pre-cassetted flag via TempData so BatchDetails can read them once.
+        TempData["CreateSubmittedAsId"]   = selected!.ID.ToString();
+        TempData["CreateSubmittedAsCode"] = selected.Code ?? selected.ID.ToString();
+        TempData["CreateIsPreCassetted"]  = Histo.Core.Domain.ValidationHelpers.IsBatchPreCassetted(selected.Code ?? selected.ID.ToString()).ToString();
 
-        var batchId = await _batches.AddAsync(batch, Session.UserID);
-        if (batchId <= 0)
-        {
-            SaveError = "Failed to create the new submission.";
-            return Page();
-        }
-
-        Session.BatchID   = batchId;
-        Session.BatchType = BatchType;  // ISS-023: persist for downstream lookup selection
-        return RedirectToPage("/Batches/BatchDetails");
+        return RedirectToPage("/Batches/BatchDetails", new { mode = "create" });
     }
+
+    private async Task LoadLookupsAsync() =>
+        SubmittedAsOptions = await _lookups.GetLookupDataAsync(LookupSubmittedAs);
 }

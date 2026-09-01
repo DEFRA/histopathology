@@ -73,7 +73,13 @@ public interface IBatchRepository
     /// Updates batch status. Maps to <c>EditBatchStatus</c>.
     /// Throws <see cref="BatchConcurrencyException"/> on rowstamp mismatch.
     /// </summary>
-    Task UpdateStatusAsync(int batchId, string newStatus, byte[] rowStamp, int userId, CancellationToken ct = default);
+    Task<bool> UpdateStatusAsync(int batchId, string newStatus, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Persists the ByPassSort flag. Reloads current batch to supply the full EditBatch parameter set.
+    /// Legacy source: <c>BatchBlockSummary.aspx.vb</c>::<c>chkByPassSort_CheckedChanged</c>.
+    /// </summary>
+    Task SetByPassSortAsync(int batchId, bool byPassSort, int userId, CancellationToken ct = default);
 
     /// <summary>Returns comment rows for a batch. Maps to <c>GetAllBatchComments</c>.</summary>
     Task<IReadOnlyList<string>> GetCommentsAsync(int batchId, CancellationToken ct = default);
@@ -187,6 +193,9 @@ public interface IBatchRepository
     /// reads <c>foundRows(0)("Code")</c> then resolves via <c>GetListType(code, LOOKUP_SUBMITTEDAS)</c>.
     /// </summary>
     Task<string?> GetSubmittedAsCodeAsync(int batchId, CancellationToken ct = default);
+
+    /// <summary>Saves (replaces) the SubmittedAs code. Calls <c>AddSubmittedAs</c> SP.</summary>
+    Task SaveSubmittedAsAsync(int batchId, string code, int userId, CancellationToken ct = default);
 
     // -----------------------------------------------------------------------
     // Post-fixation selections (Receive Submission workflow)

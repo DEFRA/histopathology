@@ -24,19 +24,14 @@ public sealed class SubmissionRepository : ISubmissionRepository
     {
         using var conn = _db.CreateConnection();
 
-        // GetBatchSubmissionDetailsByBatchID is a multi-result-set SP that populates the
-        // full batch DataSet.  Legacy constant BATCH_SUBMISSION_TABLE = 6 (clsBatch.vb)
-        // means the batch-submission rows are in the 7th result set (0-indexed).
-        // Use QueryMultiple and skip the first 6 result sets to reach submissions.
+        // GetBatchSubmissionDetailsByBatchID returns 3 result sets:
+        //   0 = BATCH_SUBMISSION_TABLE, 1 = BATCH_TISSUES_TABLE, 2 = BATCH_ANIMAL_TABLE.
+        // Legacy assembles these into a DataSet already containing 6 common-batch tables,
+        // giving assembled indices 6/7/8, but within this SP submissions are at index 0.
         using var multi = await conn.QueryMultipleAsync(
             "GetBatchSubmissionDetailsByBatchID",
             new { ID = batchId },
             commandType: System.Data.CommandType.StoredProcedure);
-
-        // Skip result sets 0–5 (batch header, tests, tissues, animals, etc.)
-        const int batchSubmissionTableIndex = 6;
-        for (var i = 0; i < batchSubmissionTableIndex; i++)
-            await multi.ReadAsync<dynamic>();
 
         var rows = await multi.ReadAsync<BatchSubmission>();
         return rows.ToList();
@@ -47,15 +42,20 @@ public sealed class SubmissionRepository : ISubmissionRepository
     {
         using var conn = _db.CreateConnection();
         var parameters = new DynamicParameters();
-        parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
-        parameters.Add("BatchID",        submission.BatchID);
-        parameters.Add("SubmissionName", submission.SubmissionName);
-        parameters.Add("Order",          submission.Order);
-        parameters.Add("UserID",         userId);
+        // Legacy SP signature: ID (0 = new), BatchID, AnimalID, Order, OldID (out), NewID (out).
+        // AnimalID is NOT NULL on the table; legacy's typed DataSet defaulted new rows to 0
+        // when no animal is known yet (the "default empty submission" case) — passing DBNull
+        // violates the NOT NULL constraint, so 0 is sent instead to match legacy behaviour.
+        parameters.Add("ID",        0,                      dbType: System.Data.DbType.Int32);
+        parameters.Add("BatchID",   submission.BatchID,     dbType: System.Data.DbType.Int32);
+        parameters.Add("AnimalID",  0,                      dbType: System.Data.DbType.Int32);
+        parameters.Add("Order",     submission.Order,       dbType: System.Data.DbType.Int32);
+        parameters.Add("OldID",     dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+        parameters.Add("NewID",     dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync("AddBatchSubmission", parameters,
             commandType: System.Data.CommandType.StoredProcedure);
-        return parameters.Get<int>("RETURN_VALUE");
+        return parameters.Get<int>("NewID");
     }
 
     /// <inheritdoc/>
@@ -84,13 +84,9 @@ public sealed class SubmissionRepository : ISubmissionRepository
     public async Task<IReadOnlyList<Animal>> GetAnimalsByBatchAsync(int batchId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        // BUG FIX: was calling "GetAnimalsByBatchID", a stored procedure name that does not exist anywhere
-        // in the legacy codebase. The correct legacy source is clsAnimal.vb::GetAnimalsForBatch, which calls
-        // "GetBatchAnimal" with the same { ID = batchId } parameter shape and returns exactly the columns
-        // this model expects (SenderRef, NextBlockRef, HistologyRef, OnHold, PMDate, IsPGNumber) — used by
-        // AddSubmission.aspx.vb, BatchBlocks.aspx.vb, CopyBlocks.aspx.vb, and CopySamples.aspx.vb for this
-        // same "list current animals in a batch" purpose. The wrong SP name was the root cause of
-        // Histology Ref / On Hold not populating correctly on BatchBlockSummary.
+        // Legacy source: clsAnimal.vb::GetAnimalsForBatch → SP "GetBatchAnimal" @ID = batchId.
+        // QueryAsync<Animal> works here because Animal uses set (not init) properties,
+        // allowing Dapper's DefaultTypeMap to set every column via its IL-emitted callvirt.
         var rows = await conn.QueryAsync<Animal>(
             "GetBatchAnimal",
             new { ID = batchId },
@@ -99,24 +95,44 @@ public sealed class SubmissionRepository : ISubmissionRepository
     }
 
     /// <inheritdoc/>
+    public async Task<IReadOnlyList<Animal>> GetBlockAnimalsByBatchAsync(int batchId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        // Legacy source: clsBatch.vb::GetBatchBlockDetails → SP "GetBatchBlocksByID" @ID = batchId.
+        // BATCH_BLOCK_ANIMAL = 11 in the assembled DataSet = result-set index 5 within GetBatchBlocksByID
+        // (indices 0–4 are: BATCH_BLOCK_TABLE, BATCH_BLOCK_TISSUES, BATCH_BLOCK_HISTOLOGY,
+        // BATCH_BLOCK_ANTIBODIES, BATCH_BLOCK_STAIN). This is the exact data source used by
+        // BatchBlockSummary.aspx via clsBatchSummary.CreateSenderHistoRefData, which reads
+        // SenderRef and HistologyRef from dsDataSet.Tables(BATCH_BLOCK_ANIMAL).
+        using var multi = await conn.QueryMultipleAsync(
+            "GetBatchBlocksByID",
+            new { ID = batchId },
+            commandType: System.Data.CommandType.StoredProcedure);
+        const int blockAnimalResultSetIndex = 5;
+        for (var i = 0; i < blockAnimalResultSetIndex; i++)
+            await multi.ReadAsync<dynamic>();
+        var rows = await multi.ReadAsync<Animal>();
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
     public async Task<int> AddAnimalAsync(Animal animal, int userId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
         var parameters = new DynamicParameters();
-        parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
-        parameters.Add("BatchSubmissionID", animal.BatchSubmissionID);
-        parameters.Add("SenderRef",         animal.SenderRef);
-        parameters.Add("NextBlockRef",      animal.NextBlockRef);
-        parameters.Add("HistologyRef",      (object?)animal.HistologyRef ?? DBNull.Value);
-        parameters.Add("OnHold",            animal.OnHold);
-        parameters.Add("PMDate",            (object?)animal.PMDate ?? DBNull.Value);
-        parameters.Add("PMDateSet",         animal.PMDateSet);
-        parameters.Add("IsPGNumber",        animal.IsPGNumber);
-        parameters.Add("UserID",            userId);
+        // Legacy SP signature (clsAnimal.vb::AddAnimal / UpdateAnimalRow's Added-row branch):
+        // SenderRef, HistologyRef, NextBlockRef, PMDate, OnHold, @NewID (output) — no
+        // BatchSubmissionID/PMDateSet/IsPGNumber/UserID parameters exist on this SP for inserts.
+        parameters.Add("SenderRef", animal.SenderRef);
+        parameters.Add("HistologyRef", animal.HistologyRef, dbType: System.Data.DbType.String);
+        parameters.Add("NextBlockRef", animal.NextBlockRef);
+        parameters.Add("PMDate", (object?)animal.PMDate ?? DBNull.Value, dbType: System.Data.DbType.String);
+        parameters.Add("OnHold", animal.OnHold);
+        parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync("AddAnimal", parameters,
             commandType: System.Data.CommandType.StoredProcedure);
-        return parameters.Get<int>("RETURN_VALUE");
+        return parameters.Get<int>("NewID");
     }
 
     /// <inheritdoc/>
@@ -130,13 +146,13 @@ public sealed class SubmissionRepository : ISubmissionRepository
                 animal.ID,
                 animal.SenderRef,
                 animal.NextBlockRef,
-                HistologyRef  = (object?)animal.HistologyRef ?? DBNull.Value,
+                HistologyRef = (object?)animal.HistologyRef ?? DBNull.Value,
                 animal.OnHold,
-                PMDate        = (object?)animal.PMDate ?? DBNull.Value,
+                PMDate = (object?)animal.PMDate ?? DBNull.Value,
                 animal.PMDateSet,
                 animal.IsPGNumber,
                 animal.RowStamp,
-                UserID        = userId,
+                UserID = userId,
             },
             commandType: System.Data.CommandType.StoredProcedure);
     }
@@ -181,7 +197,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         var parameters = new DynamicParameters();
         parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
         parameters.Add("SenderRef", senderRef);
-        parameters.Add("NewHistologyRef", (object?)newHistologyRef ?? DBNull.Value);
+        parameters.Add("NewHistologyRef", (object?)newHistologyRef ?? DBNull.Value, dbType: System.Data.DbType.String);
         parameters.Add("UserID", userId);
 
         await conn.ExecuteAsync("EditAnimalHistologyRef", parameters,
@@ -213,6 +229,38 @@ public sealed class SubmissionRepository : ISubmissionRepository
     }
 
     /// <inheritdoc/>
+    public async Task<IReadOnlyList<Tissue>> GetBatchSubmissionTissuesAsync(int batchId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        // BATCH_TISSUES_TABLE = result-set index 7 within GetBatchSubmissionDetailsByBatchID
+        // (indices 0-5 = common tables, 6 = BATCH_SUBMISSION_TABLE, 7 = BATCH_TISSUES_TABLE).
+        using var multi = await conn.QueryMultipleAsync(
+            "GetBatchSubmissionDetailsByBatchID",
+            new { ID = batchId },
+            commandType: System.Data.CommandType.StoredProcedure);
+        // BATCH_TISSUES_TABLE is at result-set index 1 within GetBatchSubmissionDetailsByBatchID
+        // (0 = BATCH_SUBMISSION_TABLE, 1 = BATCH_TISSUES_TABLE, 2 = BATCH_ANIMAL_TABLE).
+        const int tissueTableIndex = 1;
+        for (var i = 0; i < tissueTableIndex; i++)
+            await multi.ReadAsync<dynamic>();
+        var rows = await multi.ReadAsync<dynamic>();
+        return rows.Select(r =>
+        {
+            var d = (IDictionary<string, object>)r;
+            // Try both common FK column names — SP may use either alias.
+            var submId = d.TryGetValue("BatchSubmissionID", out var bsid) ? Convert.ToInt32(bsid) :
+                         d.TryGetValue("SubmissionID", out var sid) ? Convert.ToInt32(sid) : 0;
+            return new Tissue
+            {
+                OwnerID = submId,
+                Owner = TissueOwner.Submission,
+                TissueCode = d.TryGetValue("TissueCode", out var tc) ? Convert.ToString(tc) ?? "" : "",
+                NoPieces = d.TryGetValue("NoPieces", out var np) ? Convert.ToInt16(np) : (short)0,
+            };
+        }).ToList();
+    }
+
+    /// <inheritdoc/>
     public async Task<int> AddTissueAsync(Tissue tissue, int userId, CancellationToken ct = default)
     {
         var procName = tissue.Owner == TissueOwner.Submission ? "AddTissue" : "AddBlockTissue";
@@ -221,11 +269,11 @@ public sealed class SubmissionRepository : ISubmissionRepository
         using var conn = _db.CreateConnection();
         var parameters = new DynamicParameters();
         parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
-        parameters.Add(keyParam,       tissue.OwnerID);
-        parameters.Add("TissueCode",   tissue.TissueCode);
-        parameters.Add("NoPieces",     tissue.NoPieces);
-        parameters.Add("Comment",      (object?)tissue.Comment ?? DBNull.Value);
-        parameters.Add("UserID",       userId);
+        parameters.Add(keyParam, tissue.OwnerID);
+        parameters.Add("TissueCode", tissue.TissueCode);
+        parameters.Add("NoPieces", tissue.NoPieces);
+        parameters.Add("Comment", (object?)tissue.Comment ?? DBNull.Value, dbType: System.Data.DbType.String);
+        parameters.Add("UserID", userId);
 
         await conn.ExecuteAsync(procName, parameters,
             commandType: System.Data.CommandType.StoredProcedure);
@@ -245,12 +293,12 @@ public sealed class SubmissionRepository : ISubmissionRepository
                 tissue.ID,
                 tissue.TissueCode,
                 tissue.NoPieces,
-                Comment        = (object?)tissue.Comment       ?? DBNull.Value,
-                ArchiveLocation= (object?)tissue.ArchiveLocation ?? DBNull.Value,
-                ArchivedDate   = (object?)tissue.ArchivedDate   ?? DBNull.Value,
+                Comment = (object?)tissue.Comment ?? DBNull.Value,
+                ArchiveLocation = (object?)tissue.ArchiveLocation ?? DBNull.Value,
+                ArchivedDate = (object?)tissue.ArchivedDate ?? DBNull.Value,
                 ArchiveComment = (object?)tissue.ArchiveComment ?? DBNull.Value,
                 tissue.RowStamp,
-                UserID         = userId,
+                UserID = userId,
             },
             commandType: System.Data.CommandType.StoredProcedure);
     }
@@ -312,11 +360,25 @@ public sealed class SubmissionRepository : ISubmissionRepository
         using var conn = _db.CreateConnection();
         // GetAnimalBySender performs an exact match on SenderRef — legacy source:
         // clsAnimal.vb::GetAnimalBySender, used by EditHistologyRef.aspx::getHistologyRef.
-        var rows = await conn.QueryAsync<SenderSearchResult>(
+        // Use dynamic mapping with a case-insensitive dictionary to handle column-name
+        // variations between SP versions (e.g. HistologyRef vs HistoRef).
+        var rows = await conn.QueryAsync<dynamic>(
             "GetAnimalBySender",
             new { SenderRef = senderRef },
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+        return rows.Select(r =>
+        {
+            var d = new Dictionary<string, object?>(
+                ((IDictionary<string, object>)r).ToDictionary(p => p.Key, p => (object?)p.Value),
+                StringComparer.OrdinalIgnoreCase);
+            return new SenderSearchResult
+            {
+                ID = d.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0,
+                SenderRef = d.TryGetValue("SenderRef", out var sr) ? Convert.ToString(sr) : null,
+                HistologyRef = d.TryGetValue("HistologyRef", out var hr) ? Convert.ToString(hr) :
+                               d.TryGetValue("HistoRef", out var hr2) ? Convert.ToString(hr2) : null,
+            };
+        }).ToList();
     }
 
     /// <inheritdoc/>

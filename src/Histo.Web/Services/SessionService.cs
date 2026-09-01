@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Histo.Administration.Models;
+using Histo.Web.Auth;
 
 namespace Histo.Web.Services;
 
@@ -30,6 +31,7 @@ public sealed class SessionService : ISessionService
     private const string KeyBlockID   = "BlockID";
     private const string KeyBatchType  = "BatchType";
     private const string KeyReturnPage = "ReturnPage";
+    private const string KeyIsViewSubmissionMode = "IsViewSubmissionMode";
 
     private readonly ISession _session;
 
@@ -87,6 +89,12 @@ public sealed class SessionService : ISessionService
         set => _session.SetString(KeyReturnPage, value);
     }
 
+    public bool IsViewSubmissionMode
+    {
+        get => GetNullableInt(KeyIsViewSubmissionMode) == 1;
+        set => SetNullableInt(KeyIsViewSubmissionMode, value ? 1 : 0);
+    }
+
     // ── Role helpers ─────────────────────────────────────────────────────────
 
     public bool IsCustomer    => GroupName == "Customer";
@@ -123,6 +131,21 @@ public sealed class SessionService : ISessionService
         _session.Set(KeyUserID,    BitConverter.GetBytes(user.UserID));
         _session.Set(KeyGroupID,   BitConverter.GetBytes(user.GroupCode));
         _session.Set(KeyUserAreaID,BitConverter.GetBytes(user.AreaCode));
+    }
+
+    /// <inheritdoc/>
+    public void PopulateFromClaims(ClaimsPrincipal principal)
+    {
+        _session.SetString(KeyUserName,  principal.FindFirstValue(ClaimTypes.Name) ?? string.Empty);
+        _session.SetString(KeyGroupName, principal.FindFirstValue(AppClaimTypes.GroupName) ?? string.Empty);
+        _session.SetString(KeyUserEmail, principal.FindFirstValue(ClaimTypes.Email)
+                                         ?? principal.FindFirstValue("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")
+                                         ?? string.Empty);
+        _session.SetString(KeyUserArea,  principal.FindFirstValue(AppClaimTypes.UserArea) ?? string.Empty);
+
+        if (int.TryParse(principal.FindFirstValue(AppClaimTypes.UserDbId),   out var uid)) _session.Set(KeyUserID,     BitConverter.GetBytes(uid));
+        if (int.TryParse(principal.FindFirstValue(AppClaimTypes.GroupId),    out var gid)) _session.Set(KeyGroupID,    BitConverter.GetBytes(gid));
+        if (int.TryParse(principal.FindFirstValue(AppClaimTypes.UserAreaId), out var aid)) _session.Set(KeyUserAreaID, BitConverter.GetBytes(aid));
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

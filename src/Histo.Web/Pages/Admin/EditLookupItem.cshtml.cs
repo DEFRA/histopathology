@@ -19,6 +19,7 @@ public class EditLookupItemModel : HistoPageModel
         : base(session) => _lookups = lookups;
 
     [BindProperty(SupportsGet = true)] public int TableId { get; set; }
+    [BindProperty(SupportsGet = true)] public bool ShowDeactivated { get; set; }
     // ID-keyed tables (Contacts 18, Projects 19): identify the row being edited.
     [BindProperty(SupportsGet = true)] public int? ItemId { get; set; }
     // Code-keyed tables (Archive Location 16, QC Code 14, etc.): identify the row by its
@@ -36,6 +37,11 @@ public class EditLookupItemModel : HistoPageModel
     /// <summary>True when the loaded table's items carry a distinct string Code column (tables 14, 15, 16, etc.).
     /// False for ID-keyed tables (Contacts 18, Projects 19) which have no Code field.</summary>
     public bool TableHasCodes { get; private set; }
+    /// <summary>Area-scoped tables (Contacts/Pathologists = 18, Projects = 19) show the Area column instead of Code.</summary>
+    public bool ShowAreaColumn => TableId is 18 or 19;
+    public IReadOnlyList<LookupItem> UserAreas   { get; private set; } = [];
+    public IReadOnlyDictionary<string, string> AreaNameById { get; private set; } = new Dictionary<string, string>();
+    [BindProperty] public string? Area { get; set; }
     public List<string> Errors { get; } = [];
     public string? StatusMessage { get; private set; }
 
@@ -53,10 +59,10 @@ public class EditLookupItemModel : HistoPageModel
             var item = Items.FirstOrDefault(i => string.Equals(i.Code, ItemCode, StringComparison.OrdinalIgnoreCase));
             if (item is not null)
             {
-                Description   = item.Name;
-                Active        = item.Active;
-                Code          = item.Code ?? string.Empty;
-                OriginalCode  = item.Code ?? string.Empty;  // round-tripped for POST @Original_Code
+                Description = item.Name;
+                Active = item.Active;
+                Code = item.Code ?? string.Empty;
+                OriginalCode = item.Code ?? string.Empty;  // round-tripped for POST @Original_Code
             }
         }
         else if (ItemId is int id)
@@ -65,7 +71,8 @@ public class EditLookupItemModel : HistoPageModel
             if (item is not null)
             {
                 Description = item.Name;
-                Active      = item.Active;
+                Active = item.Active;
+                Area = item.Area; // pre-populate area for area-scoped tables (18/19)
             }
         }
         else
@@ -105,7 +112,7 @@ public class EditLookupItemModel : HistoPageModel
             // (Contacts/Projects — table IDs 18/19). Code-keyed tables (Archive Location 16,
             // QC Code 14, etc.) use BuildParamListCommon which expects Code/Description/IsActive
             // only — passing Area to those SPs causes "too many arguments".
-            var item = new LookupItem { Name = Description.Trim(), Active = Active, Area = TableHasCodes ? null : Session.UserArea, Code = TableHasCodes ? Code.Trim() : null };
+            var item = new LookupItem { Name = Description.Trim(), Active = Active, Area = TableHasCodes ? null : (Area ?? Session.UserArea), Code = TableHasCodes ? Code.Trim() : null };
             ok = await _lookups.CreateLookupItemAsync(TableId, item, Session.UserID);
         }
 
@@ -157,7 +164,16 @@ public class EditLookupItemModel : HistoPageModel
 
     private async Task LoadItemsAsync()
     {
+        // Always load ALL items (active and inactive) so that TableHasCodes is derived
+        // from the full table shape and the duplicate-code check is exhaustive.
+        // The view filters displayed rows based on ShowDeactivated.
         Items = await _lookups.GetLookupDataAsync(TableId, includeInactive: true);
         TableHasCodes = Items.Any(i => i.Code is not null);
+
+        if (ShowAreaColumn)
+        {
+            UserAreas  = await _lookups.GetUserAreasAsync();
+            AreaNameById = UserAreas.ToDictionary(a => a.ID.ToString(), a => a.Name, StringComparer.OrdinalIgnoreCase);
+        }
     }
 }

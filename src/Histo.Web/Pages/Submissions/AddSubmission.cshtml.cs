@@ -1,4 +1,5 @@
 using Histo.Submissions.Interfaces;
+using Histo.Submissions.Models;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,23 +13,75 @@ public class AddSubmissionModel : HistoPageModel
     public AddSubmissionModel(ISessionService session, ISubmissionService submissions)
         : base(session) => _submissions = submissions;
 
+    /// <summary>Batch ID from the URL (route/query). Falls back to <see cref="ISessionService.BatchID"/>.</summary>
+    [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
+
+    /// <summary>Submission ID carried through the form so POST never depends on session alone.</summary>
+    [BindProperty(SupportsGet = true)] public int? BatchSubmissionId { get; set; }
+
     [BindProperty] public string SenderRef   { get; set; } = string.Empty;
     [BindProperty] public bool   IsNeuropath { get; set; }
 
-    public async Task OnGetAsync()
+    public string? ModelError { get; private set; }
+
+    public async Task OnGetAsync(string? senderRef)
     {
-        ViewData["Title"] = "Add Submission";
-        await Task.CompletedTask;
+        ViewData["Title"] = "Add sample";
+        BatchId ??= Session.BatchID;
+
+        // Pre-resolve submission ID so the form POST never needs AddSubmissionAsync.
+        BatchSubmissionId ??= Session.BatchSubmissionID;
+        if ((BatchSubmissionId is null or <= 0) && BatchId is > 0)
+        {
+            var existing = await _submissions.GetSubmissionsByBatchAsync(BatchId.Value);
+            if (existing.Count > 0) BatchSubmissionId = existing[0].ID;
+        }
+
+        // Restore the sender ref chosen via the Search Sender picker (SearchSender.cshtml),
+        // or pre-fill from the "Copy sample" query parameter (BatchBlockSummary/SearchSample).
+        if (TempData.TryGetValue("SenderRefPicker_Selected", out var chosen) && chosen is string chosenRef)
+            SenderRef = chosenRef;
+        else if (!string.IsNullOrWhiteSpace(senderRef))
+            SenderRef = senderRef;
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Add Submission";
-        if (Session.BatchSubmissionID is null or <= 0) return RedirectToPage("/Index");
+        ViewData["Title"] = "Add sample";
 
-        await _submissions.AddAnimalAsync(
-            Session.BatchSubmissionID.Value, SenderRef, IsNeuropath, Session.UserID);
+        var batchId = BatchId ?? Session.BatchID;
+        if (batchId is null or <= 0) return RedirectToPage("/Index");
 
-        return RedirectToPage("/Submissions/BatchBlockSummary");
+        var submissionId = BatchSubmissionId ?? Session.BatchSubmissionID;
+        if (submissionId is null or <= 0)
+        {
+            // GET-time lookup found nothing — this is a brand-new batch with no submission
+            // record yet, so create the default one now rather than failing.
+            var existing = await _submissions.GetSubmissionsByBatchAsync(batchId.Value);
+            submissionId = existing.Count > 0
+                ? existing[0].ID
+                : await _submissions.AddSubmissionAsync(
+                    new BatchSubmission { BatchID = batchId.Value, SubmissionName = "Default", Order = 1 },
+                    Session.UserID);
+        }
+
+        if (submissionId is null or <= 0)
+        {
+            ModelError = "Could not add the sample. Please try again.";
+            return Page();
+        }
+
+        Session.BatchSubmissionID = submissionId;
+
+        var newAnimalId = await _submissions.AddAnimalAsync(submissionId.Value, SenderRef, IsNeuropath, Session.UserID);
+        if (newAnimalId <= 0)
+        {
+            // AddAnimalAsync swallows the underlying SQL exception and returns 0 on failure —
+            // redirecting anyway here previously hid the fact that no sample was actually saved.
+            ModelError = "Could not add the sample. Please try again.";
+            return Page();
+        }
+
+        return RedirectToPage("/Submissions/BatchBlockSummary", new { batchId });
     }
 }

@@ -133,24 +133,40 @@ public class ReceiveBatchModel : HistoPageModel
         // Post-fixation "Other" free text only persists when "Other" is ticked.
         var otherText = SelectedPostFixationCodes.Contains(PostFixationOtherCode) ? PostFixationOther : null;
 
+        // Full field carry-forward (mirrors legacy ReceiveBatch.aspx → UpdateBatchDetails → EditBatch SP)
+        // so EditBatch's exhaustive parameter set doesn't null out fields this page doesn't edit.
         var updated = new Batch
         {
-            ID                = Batch.ID,
-            Status            = Status,
-            CustomerRef       = Batch.CustomerRef,
-            Comments          = Batch.Comments,
-            StatusComments    = Reason,
-            BatchDate         = Batch.BatchDate,
-            ReceivedDate      = DateReceived,
-            TimeReceived      = TimeReceived,
-            ReceivedBy        = ReceivedByUserId,
-            PostFixationOther = otherText,
-            CompletedDate     = Batch.CompletedDate,
-            SubmittedByUserID = Batch.SubmittedByUserID,
-            UserAreaCode      = Batch.UserAreaCode,
-            IsPreCassetted    = Batch.IsPreCassetted,
-            BatchType         = Batch.BatchType,
-            RowStamp          = Batch.RowStamp,
+            ID                  = Batch.ID,
+            Status              = Status,
+            CustomerRef         = Batch.CustomerRef,
+            Comments            = Batch.Comments,
+            StatusComments      = Reason,
+            BatchDate           = Batch.BatchDate,
+            ReceivedDate        = DateReceived,
+            TimeReceived        = TimeReceived,
+            ReceivedBy          = ReceivedByUserId,
+            PostFixationOther   = otherText,
+            CompletedDate       = Batch.CompletedDate,
+            SubmittedByUserID   = Batch.SubmittedByUserID,
+            UserAreaCode        = Batch.UserAreaCode,
+            IsPreCassetted      = Batch.IsPreCassetted,
+            ByPassSort          = Batch.ByPassSort,
+            RowStamp            = Batch.RowStamp,
+            BatchType           = Batch.BatchType,
+            ProjectContractCode = Batch.ProjectContractCode,
+            ContactName         = Batch.ContactName,
+            Species             = Batch.Species,
+            Fixation            = Batch.Fixation,
+            CustomerReceivedDate = Batch.CustomerReceivedDate,
+            SubmittedBy         = Batch.SubmittedBy,
+            SubmittedArea       = Batch.SubmittedArea,
+            OtherSubmittedBy    = Batch.OtherSubmittedBy,
+            OtherSubmittedArea  = Batch.OtherSubmittedArea ?? "",
+            SafeToHandle        = Batch.SafeToHandle,
+            IsBlocked           = Batch.IsBlocked,
+            SampleSameProjects  = Batch.SampleSameProjects,
+            AllTissuesAssigned  = Batch.AllTissuesAssigned,
         };
 
         if (!await _batches.UpdateAsync(updated, Session.UserID))
@@ -247,14 +263,14 @@ public class ReceiveBatchModel : HistoPageModel
         var contactsById = contactsTask.Result.ToDictionary(i => i.ID.ToString(), i => i.Name);
         var speciesById  = speciesTask.Result.ToDictionary(i => i.ID.ToString(), i => i.Name, StringComparer.OrdinalIgnoreCase);
         var userById     = usersTask.Result.ToDictionary(u => u.UserID, u => u.Name);
-        var areaById     = userAreasTask.Result.ToDictionary(a => a.ID, a => a.Name);
+        var areaByCode   = userAreasTask.Result.ToDictionary(a => a.ID.ToString(), a => a.Name, StringComparer.OrdinalIgnoreCase);
 
         ProjectName       = !string.IsNullOrWhiteSpace(Batch.ProjectContractCode) && projectsById.TryGetValue(Batch.ProjectContractCode, out var pn) ? pn : Batch.ProjectContractCode;
         PathologistName   = !string.IsNullOrWhiteSpace(Batch.ContactName) && contactsById.TryGetValue(Batch.ContactName, out var cn) ? cn : Batch.ContactName;
         SpeciesName       = !string.IsNullOrWhiteSpace(Batch.Species) && speciesById.TryGetValue(Batch.Species, out var sn) ? sn : Batch.Species;
         EnteredByName     = Batch.SubmittedBy.HasValue && userById.TryGetValue(Batch.SubmittedBy.Value, out var eb) ? eb : null;
         SubmittedByName   = Batch.OtherSubmittedBy.HasValue && userById.TryGetValue(Batch.OtherSubmittedBy.Value, out var sb) ? sb : null;
-        EnteredAreaName   = Batch.SubmittedArea.HasValue && areaById.TryGetValue(Batch.SubmittedArea.Value, out var ea) ? ea : null;
-        SubmittedAreaName = Batch.OtherSubmittedArea.HasValue && areaById.TryGetValue(Batch.OtherSubmittedArea.Value, out var sa) ? sa : null;
+        EnteredAreaName   = !string.IsNullOrEmpty(Batch.SubmittedArea) && areaByCode.TryGetValue(Batch.SubmittedArea, out var ea) ? ea : null;
+        SubmittedAreaName = !string.IsNullOrEmpty(Batch.OtherSubmittedArea) && areaByCode.TryGetValue(Batch.OtherSubmittedArea, out var sa) ? sa : null;
     }
 }

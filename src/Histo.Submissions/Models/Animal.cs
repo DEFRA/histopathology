@@ -10,16 +10,16 @@ namespace Histo.Submissions.Models;
 /// </summary>
 public sealed class Animal
 {
-    public int ID { get; init; }
-    public int BatchSubmissionID { get; init; }
-    public string SenderRef { get; init; } = string.Empty;
-    public string NextBlockRef { get; init; } = "01";
-    public bool HistoRefSet { get; init; }
-    public string? HistologyRef { get; init; }
-    public bool OnHold { get; init; }
-    public string? PMDate { get; init; }
-    public bool PMDateSet { get; init; }
-    public bool IsPGNumber { get; init; }
-    public bool BookedHistologyRef { get; init; }
-    public byte[]? RowStamp { get; init; }
+    public int ID { get; set; }
+    public int BatchSubmissionID { get; set; }
+    public string SenderRef { get; set; } = string.Empty;
+    public string NextBlockRef { get; set; } = "01";
+    public bool HistoRefSet { get; set; }
+    public string? HistologyRef { get; set; }
+    public bool OnHold { get; set; }
+    public string? PMDate { get; set; }
+    public bool PMDateSet { get; set; }
+    public bool IsPGNumber { get; set; }
+    public bool BookedHistologyRef { get; set; }
+    public byte[]? RowStamp { get; set; }
 }

@@ -1,5 +1,8 @@
+using Histo.Administration.Interfaces;
 using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
+using Histo.Submissions.Interfaces;
+using Histo.Submissions.Models;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,19 +21,91 @@ namespace Histo.Web.Pages.QC;
 public class QualityDataModel : HistoPageModel
 {
     private readonly IBlockTestService _tests;
+    private readonly IBatchService _batches;
+    private readonly ILookupService _lookups;
+    private readonly IUserService _users;
 
-    public QualityDataModel(ISessionService session, IBlockTestService tests)
-        : base(session) => _tests = tests;
+    private const int LookupProjects          = 19;
+    private const int LookupContacts          = 18;
+    private const int LookupAntibodiesTse    = 4;
+    private const int LookupAntibodiesNonTse = 5;
+    private const int LookupSpecialStain     = 6;
+    private const int LookupHistologyTse     = 7;
+    private const int LookupHistologyNonTse  = 8;
+
+    public QualityDataModel(
+        ISessionService session,
+        IBlockTestService tests,
+        IBatchService batches,
+        ILookupService lookups,
+        IUserService users)
+        : base(session)
+    {
+        _tests   = tests;
+        _batches = batches;
+        _lookups = lookups;
+        _users   = users;
+    }
 
     public IReadOnlyList<BlockTest> Tests { get; private set; } = [];
     public int BatchID => Session.BatchID ?? 0;
+    public Batch? BatchSummary { get; private set; }
+
+    // Resolved display names for batch summary header
+    public string? ProjectName { get; private set; }
+    public string? PathologistName { get; private set; }
+    public string? EnteredByName { get; private set; }
+    public string? EnteredAreaName { get; private set; }
+    public string? SubmittedByName { get; private set; }
+    public string? SubmittedAreaName { get; private set; }
+
+    [BindProperty(SupportsGet = true)] public string? FilterHistologyRef { get; set; }
+    [BindProperty(SupportsGet = true)] public string? FilterTest { get; set; }
+
+    public IReadOnlyList<string> HistologyRefs { get; private set; } = [];
+    public IReadOnlyList<string> TestNames { get; private set; } = [];
+
+    // Resolved code→name map keyed as "TestType|Code"
+    private IReadOnlyDictionary<string, string> _testNameMap = new Dictionary<string, string>();
+
+    public string GetTestName(BlockTest t) =>
+        _testNameMap.TryGetValue($"{t.TestType}|{t.Code}", out var n) ? n : t.Code;
 
     public async Task<IActionResult> OnGetAsync()
     {
-        ViewData["Title"] = "Quality Data";
-        ViewData["PageTitle"] = "Quality Data";
+        ViewData["Title"] = "Quality data";
+        ViewData["PageTitle"] = "Quality data";
         if (!Session.BatchID.HasValue) return RedirectToPage("/Index");
-        Tests = await _tests.GetByBatchAsync(Session.BatchID.Value);
+
+        var allTests    = await _tests.GetByBatchAsync(Session.BatchID.Value);
+        BatchSummary    = await _batches.GetByIdAsync(Session.BatchID.Value);
+
+        if (BatchSummary is not null)
+            await ResolveBatchSummaryAsync(BatchSummary);
+
+        await ResolveTestNamesAsync(BatchSummary?.BatchType ?? Histo.Submissions.Models.BatchTypeConstants.Tse);
+
+        HistologyRefs = allTests
+            .Select(t => t.HistologyRef)
+            .Where(r => !string.IsNullOrEmpty(r))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(r => r)
+            .ToList()!;
+
+        TestNames = allTests
+            .Select(t => t.TestDetails ?? t.Code)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(n => n)
+            .ToList()!;
+
+        var filtered = allTests.AsEnumerable();
+        if (!string.IsNullOrEmpty(FilterHistologyRef))
+            filtered = filtered.Where(t => t.HistologyRef == FilterHistologyRef);
+        if (!string.IsNullOrEmpty(FilterTest))
+            filtered = filtered.Where(t => (t.TestDetails ?? t.Code) == FilterTest);
+        Tests = filtered.ToList();
+
         return Page();
     }
 
@@ -38,4 +113,50 @@ public class QualityDataModel : HistoPageModel
     {
         return RedirectToPage("/QC/EditQualityDataTest", new { testId });
     }
+
+    private async Task ResolveTestNamesAsync(int batchType)
+    {
+        var antibodyId = batchType == Histo.Submissions.Models.BatchTypeConstants.Tse ? LookupAntibodiesTse : LookupAntibodiesNonTse;
+
+        var histTask     = _lookups.GetHistologyTypesAsync();
+        var antibodyTask = _lookups.GetLookupDataAsync(antibodyId);
+        var stainTask    = _lookups.GetLookupDataAsync(LookupSpecialStain);
+        await Task.WhenAll(histTask, antibodyTask, stainTask);
+
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var i in histTask.Result)     map[$"Histology|{i.Code ?? i.ID.ToString()}"]  = i.Name;
+        foreach (var i in antibodyTask.Result) map[$"Antibodies|{i.Code ?? i.ID.ToString()}"] = i.Name;
+        foreach (var i in stainTask.Result)    map[$"Stain|{i.Code ?? i.ID.ToString()}"]      = i.Name;
+        _testNameMap = map;
+    }
+
+    private async Task ResolveBatchSummaryAsync(Batch batch)
+    {
+        var projectsTask  = _lookups.GetLookupDataAsync(LookupProjects);
+        var contactsTask  = _lookups.GetLookupDataAsync(LookupContacts);
+        var userAreasTask = _lookups.GetUserAreasAsync();
+        var usersTask     = _users.GetAllUsersAsync();
+
+        await Task.WhenAll(projectsTask, contactsTask, userAreasTask, usersTask);
+
+        var projectsById = projectsTask.Result.ToDictionary(p => p.ID.ToString(), p => p.Name, StringComparer.OrdinalIgnoreCase);
+        ProjectName = !string.IsNullOrWhiteSpace(batch.ProjectContractCode)
+            && projectsById.TryGetValue(batch.ProjectContractCode, out var pn) ? pn : batch.ProjectContractCode;
+
+        var contactsById = contactsTask.Result.ToDictionary(c => c.ID.ToString(), c => c.Name, StringComparer.OrdinalIgnoreCase);
+        PathologistName = !string.IsNullOrWhiteSpace(batch.ContactName)
+            && contactsById.TryGetValue(batch.ContactName, out var cn) ? cn : batch.ContactName;
+
+        var userById = usersTask.Result.ToDictionary(u => u.UserID, u => u.Name);
+        EnteredByName   = batch.SubmittedBy.HasValue      && userById.TryGetValue(batch.SubmittedBy.Value,      out var eb) ? eb : null;
+        SubmittedByName = batch.OtherSubmittedBy.HasValue && userById.TryGetValue(batch.OtherSubmittedBy.Value, out var sb) ? sb : null;
+
+        var areaById = userAreasTask.Result.ToDictionary(a => a.ID, a => a.Name);
+        EnteredAreaName = int.TryParse(batch.SubmittedArea, out var enteredAreaId)
+            && areaById.TryGetValue(enteredAreaId, out var ea) ? ea : batch.SubmittedArea;
+        SubmittedAreaName = int.TryParse(batch.OtherSubmittedArea, out var submittedAreaId)
+            && areaById.TryGetValue(submittedAreaId, out var sa) ? sa : batch.OtherSubmittedArea;
+    }
 }
+
+

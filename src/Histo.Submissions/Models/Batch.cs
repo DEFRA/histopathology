@@ -24,6 +24,12 @@ public sealed class Batch
     public int SubmittedByUserID { get; init; }
     public int UserAreaCode { get; init; }
     public bool IsPreCassetted { get; init; }
+    /// <summary>
+    /// When <see langword="true"/> the sample list is displayed in block-insertion order instead of
+    /// the default SenderRef / HistologyRef ascending sort. Persisted in <c>tblBatch.ByPassSort</c>.
+    /// Legacy source: <c>BatchBlockSummary.aspx.vb</c>::<c>chkByPassSort_CheckedChanged</c>.
+    /// </summary>
+    public bool ByPassSort { get; set; }
     public byte[]? RowStamp { get; init; }
 
     /// <summary>
@@ -86,11 +92,11 @@ public sealed class Batch
     public int? SubmittedBy { get; init; }
 
     /// <summary>
-    /// User area ID of the entering VLA staff member.
-    /// Legacy source: <c>tblBatch.SubmittedArea</c>, label "Entered Area" on BatchDetails.aspx.
+    /// User area code (varchar) of the entering VLA staff member.
+    /// Legacy source: <c>tblBatch.SubmittedArea varchar(10)</c>, label "Entered Area" on BatchDetails.aspx.
     /// Resolved to a description via <c>GetUserAreasAsync</c> in the view layer.
     /// </summary>
-    public int? SubmittedArea { get; init; }
+    public string? SubmittedArea { get; init; }
 
     /// <summary>
     /// ID of the external user who submitted this batch (the customer).
@@ -101,11 +107,11 @@ public sealed class Batch
     public int? OtherSubmittedBy { get; init; }
 
     /// <summary>
-    /// User area ID of the external submitter.
-    /// Legacy source: <c>tblBatch.OtherSubmittedArea</c>, label "Submitted Area" on BatchDetails.aspx.
+    /// User area code (varchar) of the external submitter.
+    /// Legacy source: <c>tblBatch.OtherSubmittedArea varchar(10)</c>, label "Submitted Area" on BatchDetails.aspx.
     /// Resolved to a description via <c>GetUserAreasAsync</c> in the view layer.
     /// </summary>
-    public int? OtherSubmittedArea { get; init; }
+    public string? OtherSubmittedArea { get; init; }
 
     /// <summary>
     /// Whether the samples are adequately fixed (formalin fixation).
@@ -114,6 +120,15 @@ public sealed class Batch
     /// Rendered as "Yes", "No", or "Not specified" in the view.
     /// </summary>
     public bool? SafeToHandle { get; init; }
+
+    /// <summary>Flag set when all tissues have been assigned to blocks.</summary>
+    public bool AllTissuesAssigned { get; init; }
+
+    /// <summary>Flag set when all samples share the same project code.</summary>
+    public bool SampleSameProjects { get; init; }
+
+    /// <summary>Whether the batch is blocked (all blocks assigned).</summary>
+    public bool IsBlocked { get; init; }
 
     /// <summary>
     /// Time-of-day code the submission was received/rejected (foreign key to LOOKUP_TIME_RECEIVED = 3).

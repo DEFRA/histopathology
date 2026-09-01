@@ -5,27 +5,20 @@ using Histo.AuditLog;
 using Histo.Histology;
 using Histo.Infrastructure;
 using Histo.QualityControl;
-using Histo.Submissions;
-using Histo.Web.Services;
-using Serilog;
-
-using Histo.Administration.Interfaces;
-using Histo.Administration.Repositories;
-using Histo.Administration.Services;
-using Histo.AuditLog.Interfaces;
-using Histo.AuditLog.Repositories;
-using Histo.AuditLog.Services;
-using Histo.Histology.Interfaces;
-using Histo.Histology.Repositories;
-using Histo.Histology.Services;
-using Histo.QualityControl.Interfaces;
-using Histo.QualityControl.Repositories;
-using Histo.QualityControl.Services;
-using Histo.Submissions.Interfaces;
-using Histo.Submissions.Repositories;
-using Histo.Submissions.Services;
 using Histo.Reporting.Reports;
 using Histo.Reporting.Services;
+using Histo.Submissions;
+using Histo.Web.Auth;
+using Histo.Web.Services;
+using ITfoxtec.Identity.Saml2;
+using ITfoxtec.Identity.Saml2.MvcCore;
+using ITfoxtec.Identity.Saml2.MvcCore.Configuration;
+using ITfoxtec.Identity.Saml2.Schemas.Metadata;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.HttpOverrides;
+using Serilog;
+using System.Security.Cryptography.X509Certificates;
 
 // Bootstrap Serilog before the host is built so startup errors are captured.
 Log.Logger = new LoggerConfiguration()
@@ -36,6 +29,7 @@ Log.Logger = new LoggerConfiguration()
 // return date columns as CONVERT(VARCHAR, col, 103) strings (dd/MM/yyyy format).
 // Must be called before any Dapper query executes.
 SqlMapper.AddTypeHandler(new NullableDateTimeTypeHandler());
+SqlMapper.AddTypeHandler(new DateTimeTypeHandler());
 // Map the audit log SP column "DateTime" → AuditLogEntry.ChangedAt
 AuditLogDapperSetup.RegisterTypeMaps();
 
@@ -55,6 +49,21 @@ try
     // -- Strongly-typed options -----------------------------------------------
     builder.Services.Configure<AppOptions>(
         builder.Configuration.GetSection(AppOptions.SectionName));
+
+    // -- Forwarded headers (reverse proxy / edge in front of App Service) -----
+    // dev-cde.azure.defra.cloud terminates TLS and forwards to the App Service's
+    // default hostname. Without this, Request.Scheme/Request.Host reflect the
+    // origin (devcdewebaw1401.azurewebsites.net) rather than the public custom
+    // domain, causing absolute redirects (e.g. the SAML cookie challenge) to leak
+    // the origin hostname. Azure's edge proxy IPs are not fixed, so the default
+    // KnownNetworks/KnownProxies allow-list is cleared to trust the forwarded
+    // headers regardless of hop address.
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
 
     // -- DB connection factory ------------------------------------------------
     // Connection string comes from ConnectionStrings:HistologyDb in appsettings.json
@@ -83,14 +92,89 @@ try
     // TODO Phase 1+: add SQL health check:
     //   .AddSqlServer(connectionString, name: "histology-db", tags: ["db"]);
 
-    // -- Razor Pages ----------------------------------------------------------
-    builder.Services.AddRazorPages();
+    // -- Razor Pages + MVC controllers (controllers needed for SAML2 endpoints) --
+    builder.Services.AddRazorPages()
+                    .AddSessionStateTempDataProvider();
+    builder.Services.AddControllers(); // AuthController (SAML2 protocol endpoints)
+    builder.Services.AddHttpClient();  // required for async IdP metadata loading post-build
+
+    // -- Entra ID SAML2 authentication (Phase 1 — replaces ADR-006 bridge) -----
+    // Library: ITfoxtec.Identity.Saml2.MvcCore v4.20.1
+    // See: ENTRA-REGISTRATION.md for app registration checklist.
+    // See: docs/EntraID-Implementation-plan.md Phase B for migration steps.
+    var saml2Section = builder.Configuration.GetSection("Saml2");
+
+    var saml2Config = new Saml2Configuration
+    {
+        Issuer             = saml2Section["SPEntityId"] ?? string.Empty,
+        SignatureAlgorithm = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+        CertificateValidationMode = System.ServiceModel.Security.X509CertificateValidationMode.ChainTrust,
+        RevocationMode            = X509RevocationMode.NoCheck,
+    };
+
+    // Entra ID sets the assertion's <AudienceRestriction> to the SP Entity ID — without
+    // registering it here, audience validation always fails (IDX10214) regardless of
+    // what the IdP sends, since AllowedAudienceUris would otherwise be empty.
+    if (!string.IsNullOrEmpty(saml2Config.Issuer))
+        saml2Config.AllowedAudienceUris.Add(saml2Config.Issuer);
+
+    // SP signing certificate (optional in dev; required in all deployed environments).
+    var spCertThumbprint = saml2Section["SPCertificateThumbprint"];
+    if (!string.IsNullOrEmpty(spCertThumbprint))
+    {
+        using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+        store.Open(OpenFlags.ReadOnly);
+        var cert = store.Certificates
+            .Find(X509FindType.FindByThumbprint, spCertThumbprint, false)
+            .OfType<X509Certificate2>()
+            .FirstOrDefault();
+        if (cert is not null)
+            saml2Config.SigningCertificate = cert;
+        else
+            Log.Warning("SP signing certificate with thumbprint {Thumbprint} was not found in the certificate store.", spCertThumbprint);
+    }
+    else
+    {
+        Log.Warning("Saml2:SPCertificateThumbprint is not configured — SP will not sign AuthnRequests. Required for all non-development environments.");
+    }
+
+    builder.Services.AddSingleton(saml2Config); // saml2Config ref captured for post-build metadata load below
+
+    builder.Services.AddSaml2(loginPath: "/Saml2/login", slidingExpiration: true, accessDeniedPath: "/AccessDenied");
+
+    // The default cookie challenge/forbid handlers build an ABSOLUTE redirect URI from
+    // Request.Scheme/Request.Host. Behind a reverse proxy that doesn't forward a trusted
+    // X-Forwarded-Host (or forwards headers UseForwardedHeaders isn't picking up), that
+    // leaks the App Service origin hostname instead of the public custom domain. Forcing
+    // a relative redirect removes the dependency on Request.Host entirely — the browser
+    // resolves it against whatever host is currently in the address bar.
+    builder.Services.PostConfigure<CookieAuthenticationOptions>("saml2", options =>
+    {
+        var originalRedirectToLogin = options.Events.OnRedirectToLogin;
+        options.Events.OnRedirectToLogin = context =>
+        {
+            if (Uri.TryCreate(context.RedirectUri, UriKind.Absolute, out var absoluteUri))
+                context.RedirectUri = absoluteUri.PathAndQuery;
+            return originalRedirectToLogin(context);
+        };
+
+        var originalRedirectToAccessDenied = options.Events.OnRedirectToAccessDenied;
+        options.Events.OnRedirectToAccessDenied = context =>
+        {
+            if (Uri.TryCreate(context.RedirectUri, UriKind.Absolute, out var absoluteUri))
+                context.RedirectUri = absoluteUri.PathAndQuery;
+            return originalRedirectToAccessDenied(context);
+        };
+    });
+
+    // Claims transformation — fallback DB lookup; normal path bakes claims in AuthController at ACS time.
+    builder.Services.AddScoped<IClaimsTransformation, HistopathologyClaimsTransformation>();
 
     // -- Session --------------------------------------------------------------
     builder.Services.AddDistributedMemoryCache();
     builder.Services.AddSession(o =>
     {
-        o.IdleTimeout     = TimeSpan.FromMinutes(30);
+        o.IdleTimeout = TimeSpan.FromMinutes(30);
         o.Cookie.HttpOnly = true;
         o.Cookie.IsEssential = true;
     });
@@ -128,19 +212,72 @@ try
 
     var app = builder.Build();
 
+    // -- Load IdP federation metadata (async — requires IHttpClientFactory from built container) --
+    // saml2Config is the same singleton object already registered; updating it here is safe
+    // because no requests are served until app.Run() is called.
+    // IdPMetadataUrl format: https://login.microsoftonline.com/{tenant-id}/federationmetadata/2007-06/federationmetadata.xml?appid={app-id}
+    var idpMetadataUrl = app.Configuration.GetSection("Saml2")["IdPMetadataUrl"];
+    if (!string.IsNullOrEmpty(idpMetadataUrl) && Uri.TryCreate(idpMetadataUrl, UriKind.Absolute, out var metadataUri))
+    {
+        try
+        {
+            var httpClientFactory = app.Services.GetRequiredService<IHttpClientFactory>();
+            var entityDescriptor  = new EntityDescriptor();
+            await entityDescriptor.ReadIdPSsoDescriptorFromUrlAsync(httpClientFactory, metadataUri);
+
+            if (entityDescriptor.IdPSsoDescriptor != null)
+            {
+                saml2Config.SingleSignOnDestination = entityDescriptor.IdPSsoDescriptor.SingleSignOnServices
+                    .FirstOrDefault(s => s.Binding.OriginalString.Contains("HTTP-Redirect"))?.Location
+                    ?? entityDescriptor.IdPSsoDescriptor.SingleSignOnServices.FirstOrDefault()?.Location;
+
+                saml2Config.SingleLogoutDestination = entityDescriptor.IdPSsoDescriptor.SingleLogoutServices
+                    .FirstOrDefault()?.Location;
+
+                saml2Config.SignatureValidationCertificates.AddRange(
+                    entityDescriptor.IdPSsoDescriptor.SigningCertificates);
+
+                Log.Information("Loaded SAML2 IdP metadata. SSO: {SsoUrl}. Signing certs: {CertCount}.",
+                    saml2Config.SingleSignOnDestination,
+                    saml2Config.SignatureValidationCertificates.Count);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Could not load IdP metadata from {MetadataUrl}. " +
+                "Configure Saml2:IdPMetadataUrl with the Entra ID federation metadata URL.", idpMetadataUrl);
+        }
+    }
+    else
+    {
+        Log.Warning("Saml2:IdPMetadataUrl is not a valid URL. " +
+                    "Set it to: https://login.microsoftonline.com/{{tenant-id}}/federationmetadata/2007-06/federationmetadata.xml?appid={{app-id}}");
+    }
+
     // -- Middleware pipeline --------------------------------------------------
-    if (!app.Environment.IsDevelopment())
-        app.UseExceptionHandler("/Error");
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseDeveloperExceptionPage();
+    }
+    else
+    {
+        // GDS "There is a problem with the service" for all unhandled 5xx
+        app.UseExceptionHandler("/Errors/ServiceProblem");
+        app.UseStatusCodePagesWithReExecute("/Errors/ServiceProblem");
+    }
 
     app.UseSerilogRequestLogging();
+    app.UseForwardedHeaders();  // must run before UseHttpsRedirection/UseAuthentication
     app.UseHttpsRedirection();
     app.UseStaticFiles();
     app.UseRouting();
     app.UseSession();
-
-    // Phase 2: app.UseAuthentication(); app.UseAuthorization();
+    app.UseAuthentication();
+    app.UseSaml2();         // ITfoxtec SAML2 middleware — must follow UseAuthentication
+    app.UseAuthorization();
 
     app.MapHealthChecks("/health");
+    app.MapControllers(); // AuthController — SAML2 /Saml2/* endpoints
     app.MapRazorPages();
 
     app.Run();

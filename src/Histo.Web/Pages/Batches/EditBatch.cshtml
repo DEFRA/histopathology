@@ -1,13 +1,14 @@
 @page
 @model Histo.Web.Pages.Batches.EditBatchModel
 @using Histo.Core.Domain
+@using Histo.Submissions.Models
 @{
-    ViewData["Title"] = "Edit submission status";
-    ViewData["PageTitle"] = "Edit submission status";
+    ViewData["Title"] = "Edit submission";
+    ViewData["PageTitle"] = "Edit submission";
 }
 
 @section BeforeHeading {
-    <a asp-page="/Batches/BatchDetails" class="govuk-back-link">Back</a>
+    <a href="@Url.Page(Model.ReturnPage)" class="govuk-back-link">Back</a>
 }
 
 @if (!string.IsNullOrEmpty(Model.SaveError))
@@ -24,35 +25,94 @@
     </div>
 }
 
-<form method="post">
+<form method="post" asp-page="/Batches/EditBatch">
     <input type="hidden" asp-for="OriginalStatus" />
 
+    @* Submission category *@
     <div class="govuk-form-group">
-        <label class="govuk-label" for="Status">Submission status</label>
-        <select class="govuk-select" asp-for="Status">
-            <option value="@BatchStatus.Submitted" selected="@(Model.Status == BatchStatus.Submitted)">Not started</option>
-            <option value="@BatchStatus.Received"  selected="@(Model.Status == BatchStatus.Received)">Received</option>
-            <option value="@BatchStatus.InProgress" selected="@(Model.Status == BatchStatus.InProgress)">In progress</option>
-            <option value="@BatchStatus.OnHold"    selected="@(Model.Status == BatchStatus.OnHold)">On hold</option>
-            <option value="@BatchStatus.Completed" selected="@(Model.Status == BatchStatus.Completed)">Completed</option>
-            <option value="@BatchStatus.Rejected"  selected="@(Model.Status == BatchStatus.Rejected)">Rejected</option>
+        <fieldset class="govuk-fieldset">
+            <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Submission category</legend>
+            <div class="govuk-radios govuk-radios--inline" data-module="govuk-radios">
+                <div class="govuk-radios__item">
+                    <input class="govuk-radios__input" type="radio" asp-for="BatchTypeField"
+                           value="@BatchTypeConstants.Tse" id="batchTypeField-tse" />
+                    <label class="govuk-label govuk-radios__label" for="batchTypeField-tse">TSE</label>
+                </div>
+                <div class="govuk-radios__item">
+                    <input class="govuk-radios__input" type="radio" asp-for="BatchTypeField"
+                           value="@BatchTypeConstants.NonTse" id="batchTypeField-nontse" />
+                    <label class="govuk-label govuk-radios__label" for="batchTypeField-nontse">Non-TSE</label>
+                </div>
+            </div>
+        </fieldset>
+    </div>
+
+    @* Project / contract code *@
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="ProjectContractCode">Project / contract code</label>
+        <select class="govuk-select" asp-for="ProjectContractCode">
+            <option value="">-- Not specified --</option>
+            @foreach (var p in Model.Projects)
+            {
+                <option value="@p.ID" selected="@(Model.ProjectContractCode == p.ID.ToString())">@p.Name</option>
+            }
         </select>
-        <div id="status-hint" class="govuk-hint govuk-!-margin-top-2">
-            Note: To mark a submission as Received, use the <a asp-page="/Batches/BatchesNotReceived" class="govuk-link">Receive Submissions</a> workflow.
+    </div>
+
+    @* Pathologist *@
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="ContactName">Pathologist</label>
+        <select class="govuk-select" asp-for="ContactName">
+            <option value="">-- Not specified --</option>
+            @foreach (var c in Model.Contacts)
+            {
+                <option value="@c.ID" selected="@(Model.ContactName == c.ID.ToString())">@c.Name</option>
+            }
+        </select>
+    </div>
+
+    @* Species *@
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="SpeciesId">Species</label>
+        <select class="govuk-select" asp-for="SpeciesId">
+            <option value="">-- Not specified --</option>
+            @foreach (var s in Model.SpeciesList)
+            {
+                <option value="@s.ID" selected="@(Model.SpeciesId == s.ID.ToString())">@s.Name</option>
+            }
+        </select>
+    </div>
+
+    @* Submission date *@
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="BatchDateStr">Date of submission</label>
+        <div class="govuk-hint">For example, 27/03/2025</div>
+        <input class="govuk-input govuk-input--width-10" asp-for="BatchDateStr" autocomplete="off" />
+    </div>
+
+    @* Fixation *@
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Fixation">Fixation</label>
+        <select class="govuk-select" asp-for="Fixation">
+            <option value="">-- Not specified --</option>
+            @foreach (var f in Model.Fixations)
+            {
+                <option value="@(f.Code ?? f.ID.ToString())" selected="@(Model.Fixation == (f.Code ?? f.ID.ToString()))">@f.Name</option>
+            }
+        </select>
+    </div>
+
+    @* Is it adequately fixed? *@
+    <div class="govuk-form-group">
+        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="SafeToHandle" type="checkbox" />
+                <label class="govuk-label govuk-checkboxes__label" for="SafeToHandle">Is it adequately fixed?</label>
+            </div>
         </div>
     </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="StatusComments">Reason / comments for status change</label>
-        <textarea class="govuk-textarea" asp-for="StatusComments" rows="3"></textarea>
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="CustomerRef">Customer reference</label>
-        <input class="govuk-input" asp-for="CustomerRef" />
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="Comments">Comments</label>
-        <textarea class="govuk-textarea" asp-for="Comments" rows="4"></textarea>
-    </div>
+
+    @* Pre-cassetted *@
     <div class="govuk-form-group">
         <div class="govuk-checkboxes" data-module="govuk-checkboxes">
             <div class="govuk-checkboxes__item">
@@ -61,6 +121,65 @@
             </div>
         </div>
     </div>
-    <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
-    <a asp-page="/Batches/BatchesForEditing" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+
+    @* External submitter *@
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="OtherSubmittedBy">Submitted by (external)</label>
+        <select class="govuk-select" asp-for="OtherSubmittedBy">
+            <option value="">-- None --</option>
+            @foreach (var u in Model.AllUsers)
+            {
+                <option value="@u.UserID" selected="@(Model.OtherSubmittedBy == u.UserID)">@u.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="OtherSubmittedArea">Submitted area (external)</label>
+        <select class="govuk-select" asp-for="OtherSubmittedArea">
+            <option value="">-- None --</option>
+            @foreach (var a in Model.UserAreas)
+            {
+                <option value="@a.ID" selected="@(Model.OtherSubmittedArea == a.ID.ToString())">@a.Name</option>
+            }
+        </select>
+    </div>
+
+    @* Status *@
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Status">Submission status</label>
+        <select class="govuk-select" asp-for="Status">
+            <option value="@BatchStatus.Submitted"  selected="@(Model.Status == BatchStatus.Submitted)">Not started</option>
+            <option value="@BatchStatus.Received"   selected="@(Model.Status == BatchStatus.Received)">Received</option>
+            <option value="@BatchStatus.InProgress" selected="@(Model.Status == BatchStatus.InProgress)">In progress</option>
+            <option value="@BatchStatus.OnHold"     selected="@(Model.Status == BatchStatus.OnHold)">On hold</option>
+            <option value="@BatchStatus.Completed"  selected="@(Model.Status == BatchStatus.Completed)">Completed</option>
+            <option value="@BatchStatus.Rejected"   selected="@(Model.Status == BatchStatus.Rejected)">Rejected</option>
+        </select>
+        <div class="govuk-hint govuk-!-margin-top-2">
+            To mark as Received, use <a asp-page="/Batches/BatchesNotReceived" class="govuk-link">Receive submissions</a>.
+        </div>
+    </div>
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="StatusComments">Reason / comments for status change</label>
+        <textarea class="govuk-textarea" asp-for="StatusComments" rows="3"></textarea>
+    </div>
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Comments">Comments</label>
+        <textarea class="govuk-textarea" asp-for="Comments" rows="4"></textarea>
+    </div>
+
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
+        <a href="@Url.Page(Model.ReturnPage)" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    </div>
 </form>
+
+@* "Samples" — this page only edits submission header fields; sample/animal/block details
+   (Add sample, Edit sample, Copy sample, Delete sample) are on BatchBlockSummary, matching
+   the same "Samples" entry point already used from BatchDetails.cshtml. *@
+<div class="govuk-button-group">
+    <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples</a>
+</div>

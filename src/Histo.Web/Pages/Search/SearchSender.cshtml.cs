@@ -24,6 +24,14 @@ public class SearchSenderModel : HistoPageModel
 
     [BindProperty] public string? SenderRef { get; set; }
 
+    // ── Picker mode: set by the calling page (e.g. CopyBatch) via query params. ──
+    [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
+    [BindProperty(SupportsGet = true)] public int?    ReturnId   { get; set; }
+    [BindProperty(SupportsGet = true)] public int     RowIndex   { get; set; } = -1;
+
+    /// <summary>True when the page is launched as a picker from another page.</summary>
+    public bool IsPickerMode => !string.IsNullOrEmpty(ReturnPage);
+
     public IReadOnlyList<SenderSearchResult> Results { get; private set; } = [];
 
     /// <summary>True once the user has submitted a non-empty search so the view knows
@@ -32,14 +40,14 @@ public class SearchSenderModel : HistoPageModel
 
     public void OnGet()
     {
-        ViewData["Title"] = "Search by Sender";
-        ViewData["PageTitle"] = "Search by Sender";
+        ViewData["Title"]     = IsPickerMode ? "Select sender ref" : "Search by Sender";
+        ViewData["PageTitle"] = IsPickerMode ? "Select sender ref" : "Search by Sender";
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Search by Sender";
-        ViewData["PageTitle"] = "Search by Sender";
+        ViewData["Title"]     = IsPickerMode ? "Select sender ref" : "Search by Sender";
+        ViewData["PageTitle"] = IsPickerMode ? "Select sender ref" : "Search by Sender";
 
         if (!string.IsNullOrWhiteSpace(SenderRef))
         {
@@ -48,5 +56,21 @@ public class SearchSenderModel : HistoPageModel
         }
 
         return Page();
+    }
+
+    /// <summary>
+    /// Picker mode: stores the chosen sender ref in TempData and redirects back to the origin page.
+    /// Reusable — any page can act as a caller by passing returnPage/returnId/rowIndex.
+    /// </summary>
+    public IActionResult OnPostSelect(string selectedSenderRef, string? returnPage, int? returnId)
+    {
+        TempData["SenderRefPicker_Selected"] = selectedSenderRef;
+        if (!string.IsNullOrEmpty(returnPage))
+        {
+            return returnId.HasValue
+                ? RedirectToPage(returnPage, new { sourceBatchId = returnId.Value })
+                : RedirectToPage(returnPage);
+        }
+        return RedirectToPage();
     }
 }

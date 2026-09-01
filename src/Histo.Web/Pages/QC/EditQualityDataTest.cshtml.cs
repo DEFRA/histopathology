@@ -27,9 +27,10 @@ public class EditQualityDataTestModel : HistoPageModel
     private readonly ILookupService _lookups;
     private readonly IUserService _users;
 
-    private const int LookupQcCode = 14;
-    private const int LookupRemedialAction = 15;
-    private const int LookupArchiveLocation = 16;
+    private const int LookupQcCode          = 14;
+    private const int LookupRemedialAction   = 15;
+    private const int LookupArchiveLocation  = 16;
+    private const int LookupPremiumCharges   = 17; // LOOKUP_PREMIUM_CHARGES from Common.vb
 
     public EditQualityDataTestModel(
         ISessionService session,
@@ -61,11 +62,13 @@ public class EditQualityDataTestModel : HistoPageModel
     [BindProperty] public string? ArchiveComment { get; set; }
     [BindProperty] public int? NumberOfSlides { get; set; }
     [BindProperty] public string? Comment { get; set; }
+    [BindProperty] public List<string> SelectedCharges { get; set; } = [];
 
     public BlockTest? Test { get; private set; }
     public IReadOnlyList<LookupItem> QCCodes { get; private set; } = [];
     public IReadOnlyList<LookupItem> RemedialActions { get; private set; } = [];
     public IReadOnlyList<LookupItem> ArchiveLocations { get; private set; } = [];
+    public IReadOnlyList<LookupItem> PremiumCharges { get; private set; } = [];
     public IReadOnlyList<User> Users { get; private set; } = [];
     public string? Error { get; private set; }
 
@@ -91,6 +94,7 @@ public class EditQualityDataTestModel : HistoPageModel
         ArchiveComment = Test.ArchiveComment;
         NumberOfSlides = Test.NumberOfSlides;
         Comment = Test.Comment;
+        SelectedCharges = Test.TCCodes.Select(tc => tc.Code).ToList();
 
         await LoadLookupsAsync();
         return Page();
@@ -111,16 +115,45 @@ public class EditQualityDataTestModel : HistoPageModel
             return Page();
         }
 
-        if (Dispatched && DispatchedDate is null)
+        if (Dispatched)
         {
-            Error = "Enter a dispatched date.";
+            if (DispatchedDate is null)
+            {
+                Error = "Enter a dispatched date.";
+                await LoadLookupsAsync();
+                return Page();
+            }
+            if (string.IsNullOrWhiteSpace(DispatchedBy))
+            {
+                Error = "Select who dispatched the test.";
+                await LoadLookupsAsync();
+                return Page();
+            }
+            if (string.IsNullOrWhiteSpace(DispatchedTo))
+            {
+                Error = "Enter who the test was dispatched to.";
+                await LoadLookupsAsync();
+                return Page();
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(RemedialAction))
+        {
+            Error = "Select a remedial action.";
             await LoadLookupsAsync();
             return Page();
         }
 
         if (!string.IsNullOrWhiteSpace(ArchiveLocation) && ArchivedDate is null)
         {
-            Error = "Enter an archive date.";
+            Error = "Enter an archive date when an archive location is selected.";
+            await LoadLookupsAsync();
+            return Page();
+        }
+
+        if (ArchivedDate is not null && string.IsNullOrWhiteSpace(ArchiveLocation))
+        {
+            Error = "Select an archive location when an archive date is entered.";
             await LoadLookupsAsync();
             return Page();
         }
@@ -169,6 +202,9 @@ public class EditQualityDataTestModel : HistoPageModel
         try
         {
             await _tests.UpdateAsync(updated, Session.UserID);
+            await _tests.SaveTCCodesAsync(
+                Session.BatchID.Value, TestId, Test.TestType,
+                Test.TCCodes, SelectedCharges, Session.UserID);
             return RedirectToPage("/QC/QualityData");
         }
         catch (BlockTestConcurrencyException)
@@ -187,9 +223,10 @@ public class EditQualityDataTestModel : HistoPageModel
 
     private async Task LoadLookupsAsync()
     {
-        QCCodes = await _lookups.GetLookupDataAsync(LookupQcCode);
+        QCCodes         = await _lookups.GetLookupDataAsync(LookupQcCode);
         RemedialActions = await _lookups.GetLookupDataAsync(LookupRemedialAction);
         ArchiveLocations = await _lookups.GetLookupDataAsync(LookupArchiveLocation);
-        Users = await _users.GetAllUsersAsync();
+        PremiumCharges  = await _lookups.GetLookupDataAsync(LookupPremiumCharges);
+        Users           = await _users.GetAllUsersAsync();
     }
 }

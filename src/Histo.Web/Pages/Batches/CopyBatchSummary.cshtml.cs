@@ -45,6 +45,9 @@ public class CopyBatchSummaryModel : HistoPageModel
     public IActionResult OnPostViewAsync(int newBatchId)
     {
         Session.BatchID = newBatchId;
+        // A freshly copied batch is a new, fully editable Submitted-status batch — never inherit a
+        // stale read-only flag from an earlier, unrelated ViewSubmissions/SearchSubmissions visit.
+        Session.IsViewSubmissionMode = false;
         return RedirectToPage("/Batches/BatchDetails");
     }
 }

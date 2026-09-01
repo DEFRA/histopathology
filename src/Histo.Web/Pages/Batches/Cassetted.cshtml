@@ -10,26 +10,34 @@
     <a asp-page="/Index" class="govuk-back-link">Back</a>
 }
 
-@if (Model.SaveError is not null)
+<p class="govuk-body">Select the submission type and click Next.</p>
+
+@if (Model.Errors.Count > 0)
 {
     <div class="govuk-error-summary" data-module="govuk-error-summary">
         <div role="alert">
             <h2 class="govuk-error-summary__title">There is a problem</h2>
             <div class="govuk-error-summary__body">
                 <ul class="govuk-list govuk-error-summary__list">
-                    <li>@Model.SaveError</li>
+                    @foreach (var e in Model.Errors)
+                    {
+                        <li><a href="#@e.Key" class="govuk-link">@e.Value</a></li>
+                    }
                 </ul>
             </div>
         </div>
     </div>
 }
 
-<form method="post">
-    <div class="govuk-form-group">
+<form method="post" asp-page="/Batches/Cassetted">
+    @* Submission category (TSE / Non-TSE) *@
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("BatchType") ? "govuk-form-group--error" : "")">
         <fieldset class="govuk-fieldset">
-            <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">
-                Submission category
-            </legend>
+            <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Submission category</legend>
+            @if (Model.Errors.TryGetValue("BatchType", out var btErr))
+            {
+                <p id="BatchType-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @btErr</p>
+            }
             <div class="govuk-radios" data-module="govuk-radios">
                 <div class="govuk-radios__item">
                     <input class="govuk-radios__input" type="radio" asp-for="BatchType"
@@ -44,16 +52,32 @@
             </div>
         </fieldset>
     </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="SubmittedAs">Select the submission type, then click Next. Only one submission type can be selected.</label>
-        <select class="govuk-select" asp-for="SubmittedAs">
-            <option value="">-- Select --</option>
+
+    @* Submission type (SubmittedAs) *@
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("SubmittedAs") ? "govuk-form-group--error" : "")">
+        <label class="govuk-label" for="SubmittedAs">Submission type</label>
+        <div class="govuk-hint">Select how the samples are being submitted.</div>
+        @if (Model.Errors.TryGetValue("SubmittedAs", out var saErr))
+        {
+            <p id="SubmittedAs-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @saErr</p>
+        }
+        <select class="govuk-select @(Model.Errors.ContainsKey("SubmittedAs") ? "govuk-select--error" : "")"
+                name="SubmittedAs" id="SubmittedAs">
+            <option value="">-- Select submission type --</option>
             @foreach (var o in Model.SubmittedAsOptions)
             {
+                @if (Model.SubmittedAs == o.ID) {
+                <option value="@o.ID" selected>@o.Name</option>
+            } else {
                 <option value="@o.ID">@o.Name</option>
+            }
             }
         </select>
     </div>
-    <button type="submit" class="govuk-button" data-module="govuk-button">Next</button>
-    <a asp-page="/Index" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Next</button>
+        <a asp-page="/Index" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    </div>
 </form>
+

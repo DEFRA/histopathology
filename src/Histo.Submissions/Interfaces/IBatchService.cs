@@ -29,7 +29,13 @@ public interface IBatchService
     Task<int> CopyBatchHeaderAsync(Batch source, int userId, CancellationToken ct = default);
 
     /// <summary>Updates batch status. Throws <see cref="BatchConcurrencyException"/> on concurrent modification.</summary>
-    Task<bool> UpdateStatusAsync(int batchId, string newStatus, byte[] rowStamp, int userId, CancellationToken ct = default);
+    Task<bool> UpdateStatusAsync(int batchId, string newStatus, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Persists the ByPassSort flag on a batch.
+    /// Legacy source: <c>BatchBlockSummary.aspx.vb</c>::<c>chkByPassSort_CheckedChanged</c>.
+    /// </summary>
+    Task<bool> SetByPassSortAsync(int batchId, bool byPassSort, int userId, CancellationToken ct = default);
 
     /// <summary>Multi-field submission search.</summary>
     Task<IReadOnlyList<BatchSearchResult>> SearchAsync(BatchSearchCriteria criteria, CancellationToken ct = default);
@@ -79,6 +85,9 @@ public interface IBatchService
     /// Legacy: <c>LOOKUP_SUBMITTEDAS = 11</c> is used by the caller to resolve the code to a display name.
     /// </summary>
     Task<string?> GetSubmittedAsCodeAsync(int batchId, CancellationToken ct = default);
+
+    /// <summary>Inserts a SubmittedAs code record for the batch. Does not replace any existing entry.</summary>
+    Task SaveSubmittedAsAsync(int batchId, string code, int userId, CancellationToken ct = default);
 
     /// <summary>Returns the post-fixation codes currently selected for a batch.</summary>
     Task<IReadOnlyList<string>> GetPostFixationCodesAsync(int batchId, CancellationToken ct = default);

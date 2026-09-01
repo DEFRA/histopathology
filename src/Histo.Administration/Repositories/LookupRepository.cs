@@ -164,6 +164,10 @@ public sealed class LookupRepository : ILookupRepository
         // have a required @Code parameter on their insert SPs. Pass it when present.
         if (!string.IsNullOrEmpty(item.Code))
             parameters.Add("Code", item.Code);
+        // ID-keyed tables (Contacts 18, Projects 19) require @ID on insert — legacy BuildParamListID.
+        // Pass item.ID (0 for new items; the SP uses IDENTITY or treats 0 as auto-assign).
+        else
+            parameters.Add("ID", item.ID);
         if (!string.IsNullOrEmpty(item.Area))
             parameters.Add("Area", item.Area);
 
@@ -244,6 +248,7 @@ public sealed class LookupRepository : ILookupRepository
             Name   = d.TryGetValue("Description", out var desc)   ? Convert.ToString(desc) ?? "" : "",
             Active = d.TryGetValue("IsActive",     out var active) ? Convert.ToBoolean(active)    : true,
             Code   = d.TryGetValue("Code",         out var code)   ? Convert.ToString(code)       : null,
+            Area   = d.TryGetValue("Area",         out var area)   ? Convert.ToString(area)       : null,
         };
     }
 

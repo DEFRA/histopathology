@@ -61,6 +61,14 @@ public interface ISessionService
     void PopulateFromUser(Histo.Administration.Models.User user);
 
     /// <summary>
+    /// Hydrates all session identity fields from the claims attached to the authenticated
+    /// <see cref="System.Security.Claims.ClaimsPrincipal"/> after SAML sign-in.
+    /// Called by <see cref="Histo.Web.Pages.HistoPageModel"/> on the first request after
+    /// the SAML ACS redirect bakes app claims into the auth cookie.
+    /// </summary>
+    void PopulateFromClaims(System.Security.Claims.ClaimsPrincipal principal);
+
+    /// <summary>
     /// The page path the user navigated from before arriving at BatchDetails.
     /// Used by <c>BatchDetails.cshtml</c> to provide a context-aware back link.
     /// Set by <c>ViewSubmissionsModel</c> and <c>SearchSubmissionsModel</c> in their
@@ -68,4 +76,19 @@ public interface ISessionService
     /// Replaces the legacy <c>SessionVars.SV_RedirectCancelPage</c> pattern.
     /// </summary>
     string ReturnPage { get; set; }
+
+    /// <summary>
+    /// True when the user is in the read-only "View Submission" journey (legacy
+    /// <c>SessionVars.SV_ViewSubmission</c>). Gates Add/Edit/Copy/Delete sample on
+    /// <c>BatchBlockSummary</c>/<c>BatchDetails</c>.
+    ///
+    /// Distinct from <see cref="ReturnPage"/> (a navigation breadcrumb) — legacy sets/clears
+    /// this flag independently per action button (e.g. "View submission" sets it true,
+    /// "Edit submission"/"Copy submission" set it false), not merely on row selection.
+    /// Set true by <c>ViewSubmissionsModel</c>/<c>SearchSubmissionsModel.OnPostSelectAsync</c>;
+    /// cleared false by any journey that enters an editable context (<c>EditBatchModel</c>,
+    /// <c>CassettedModel</c>, <c>BatchesForEditing</c>/<c>BatchesReceived</c>/<c>BatchesForDispatch</c>/
+    /// <c>SubmissionsOnHold.OnPostSelect</c>, <c>CopyBatchSummaryModel</c>).
+    /// </summary>
+    bool IsViewSubmissionMode { get; set; }
 }

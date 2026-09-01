@@ -121,6 +121,14 @@ Delete the new solution directory. Legacy solution is untouched.
 
 ## Phase 2 — Authentication Migration
 
+> **Status: Complete (2026-08-28).** Implemented as **Entra ID SAML 2.0** via `ITfoxtec.Identity.Saml2.MvcCore`
+> (not the OIDC/`Microsoft.Identity.Web` approach originally proposed below — SAML 2.0 was the confirmed
+> protocol per the Enterprise Application registration). `HistoPageModel` implements the two-gate model
+> (SAML `ChallengeResult` for authentication, `tblUser`-backed group-claim check for authorisation) described
+> in the exit criteria. The temporary `Login.cshtml` NTLogin bridge (ADR-006) has been decommissioned —
+> see `docs/ADR/ADR-006-manual-login-page-bridge.md`. See `docs/Parity-Audit-Report.md` F-07 for the
+> corresponding parity-audit closure.
+
 **Purpose:** Replace Windows Authentication + `VLAHeader::getUserDetails()` with Azure Entra ID.
 
 ### Entry criteria
@@ -149,6 +157,13 @@ Delete the new solution directory. Legacy solution is untouched.
 - Sign-in redirect to Entra ID completes; user lands on home stub
 - `ISessionService.CurrentUser` populated with correct UserID and GroupName
 - Auth equivalence: same three role groups enforced; no access widening
+
+> **Actual implementation note:** Sign-in is SP-initiated SAML 2.0 (`ChallengeResult("saml2")` →
+> `/Saml2/login` → Entra ID → `POST /Saml2/Acs` → `AuthController`), not the OIDC redirect flow
+> described above. Session population happens via `Session.PopulateFromClaims(User)` from the
+> authenticated `ClaimsPrincipal` on first request after sign-in, rather than a dedicated
+> `GetUserByEntraUpnAsync` call at ACS time. Functionally equivalent to the exit criteria — confirmed
+> met.
 
 ### Rollback
 Remove `Microsoft.Identity.Web` wiring from `Program.cs`. Legacy app continues running on Windows Auth.

@@ -13,11 +13,12 @@ public class AuditLogBySubmissionModel : HistoPageModel
     public AuditLogBySubmissionModel(ISessionService session, IAuditLogService auditLog)
         : base(session) => _auditLog = auditLog;
 
-    [BindProperty] public int    SubmissionID { get; set; }
-    [BindProperty] public DateTime? StartDate { get; set; }
-    [BindProperty] public DateTime? EndDate   { get; set; }
+    [BindProperty] public int      SubmissionID { get; set; }
+    [BindProperty] public DateTime? StartDate    { get; set; }
+    [BindProperty] public DateTime? EndDate      { get; set; }
 
     public IReadOnlyList<AuditLogEntry> Results { get; private set; } = [];
+    public List<string> Errors { get; } = [];
 
     public void OnGet()
     {
@@ -31,6 +32,10 @@ public class AuditLogBySubmissionModel : HistoPageModel
     {
         ViewData["Title"] = "Audit log by submission";
         ViewData["PageTitle"] = "Audit log — by submission";
+
+        if (SubmissionID <= 0) Errors.Add("Enter a submission number.");
+        if (Errors.Count > 0) return Page();
+
         Results = await _auditLog.GetBySubmissionAsync(SubmissionID, StartDate, EndDate);
         return Page();
     }

@@ -11,6 +11,20 @@
 
 <h2 class="govuk-heading-m">@Model.TableName</h2>
 
+<form method="get" class="govuk-!-margin-bottom-4">
+    <input type="hidden" name="tableId" value="@Model.TableId" />
+    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" type="checkbox" id="showDeactivated"
+                   name="ShowDeactivated" value="true"
+                   @(Model.ShowDeactivated ? "checked" : "")
+                   onchange="this.form.submit()" />
+            <label class="govuk-label govuk-checkboxes__label" for="showDeactivated">Show deactivated items</label>
+        </div>
+    </div>
+    <input type="hidden" name="ShowDeactivated" value="false" />
+</form>
+
 @if (!string.IsNullOrEmpty(Model.StatusMessage))
 {
     <div class="govuk-notification-banner govuk-notification-banner--success" role="alert" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
@@ -43,17 +57,17 @@
 <table class="govuk-table">
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
-            <th scope="col" class="govuk-table__header">Code</th>
+            <th scope="col" class="govuk-table__header">@(Model.ShowAreaColumn ? "Area" : "Code")</th>
             <th scope="col" class="govuk-table__header">Description</th>
             <th scope="col" class="govuk-table__header">Active</th>
             <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
         </tr>
     </thead>
     <tbody class="govuk-table__body">
-        @foreach (var i in Model.Items)
+        @foreach (var i in Model.Items.Where(i => Model.ShowDeactivated || i.Active))
         {
             <tr class="govuk-table__row">
-                <td class="govuk-table__cell">@(i.Code ?? i.ID.ToString())</td>
+                <td class="govuk-table__cell">@(Model.ShowAreaColumn ? (Model.AreaNameById.TryGetValue(i.Area ?? "", out var aName) ? aName : i.Area) : (i.Code ?? i.ID.ToString()))</td>
                 <td class="govuk-table__cell">@i.Name</td>
                 <td class="govuk-table__cell">@(i.Active ? "Yes" : "No")</td>
                 <td class="govuk-table__cell">
@@ -84,18 +98,40 @@
     <input type="hidden" asp-for="TableId" />
     <input type="hidden" asp-for="ItemId" />
     <input type="hidden" asp-for="OriginalCode" />
-@if (Model.TableHasCodes)
-{
-    var codeError = Model.Errors.FirstOrDefault(e => e.IndexOf("code", StringComparison.OrdinalIgnoreCase) >= 0);
-    <div class="govuk-form-group @(codeError is not null ? "govuk-form-group--error" : "")">
-        <label class="govuk-label" for="Code">Code</label>
-        @if (codeError is not null)
-        {
-            <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @codeError</p>
-        }
-        <input class="govuk-input @(codeError is not null ? "govuk-input--error" : "")" asp-for="Code" maxlength="10" />
-    </div>
-}
+
+    @* Area dropdown — only for Contacts (table 18) and Projects (table 19) *@
+    @if (Model.ShowAreaColumn)
+    {
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="Area">Area</label>
+            <select class="govuk-select" asp-for="Area" id="Area">
+                <option value="">-- Select area --</option>
+                @foreach (var a in Model.UserAreas)
+                {
+                    if (Model.Area == a.ID.ToString())
+                    {
+                        <option value="@a.ID" selected>@a.Name</option>
+                    }
+                    else
+                    {
+                        <option value="@a.ID">@a.Name</option>
+                    }
+                }
+            </select>
+        </div>
+    }
+    @if (Model.TableHasCodes)
+    {
+        var codeError = Model.Errors.FirstOrDefault(e => e.IndexOf("code", StringComparison.OrdinalIgnoreCase) >= 0);
+        <div class="govuk-form-group @(codeError is not null ? "govuk-form-group--error" : "")">
+            <label class="govuk-label" for="Code">Code</label>
+            @if (codeError is not null)
+            {
+                <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @codeError</p>
+            }
+            <input class="govuk-input @(codeError is not null ? "govuk-input--error" : "")" asp-for="Code" maxlength="10" />
+        </div>
+    }
     <div class="govuk-form-group">
         <label class="govuk-label" for="Description">Description</label>
         <input class="govuk-input" asp-for="Description" maxlength="50" />

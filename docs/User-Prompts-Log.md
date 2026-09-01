@@ -918,5 +918,464 @@ Only use dynamic when the result set is genuinely variable.
 Ensure date fields and result mappings remain strongly typed and consistent with legacy behavior.
 ---
 
+## Prompt 50 — AuditLog validation + BatchBlockSummary SenderRef/HistologyRef fix (2026-08-20)
+
+> Please add validation messages for the following pages, using the implementation in `AuditLogByDate.cshtml` and `AuditLogByDate.cs` as a reference.
+>
+> 1. **AuditLogBySubmission.cshtml** and **AuditLogBySubmission.cs**
+> - `SubmissionID` is a mandatory field.
+> - Display an appropriate validation message when it is not provided.
+>
+> 2. **AuditLogByUser.cshtml** and **AuditLogByUser.cs**
+> - The following fields are mandatory: `StartDate`, `EndDate`, `UserID`
+> - Display validation messages when any required field is missing.
+> - Validate that `EndDate` is the same as or later than `StartDate`.
+
+Validation was missing from both AuditLog pages. Added `Errors` list, GDS `govuk-error-summary`, and inline `govuk-form-group--error` / `govuk-error-message` / `govuk-input--error` states to `AuditLogBySubmission` (SubmissionID mandatory) and `AuditLogByUser` (StartDate/EndDate/UserID mandatory, EndDate ≥ StartDate). Matches the reference pattern from `AuditLogByDate`.
+
+**Build:** Succeeded. 0 warnings, 0 errors.
+
+**Files changed:** `AuditLog/AuditLogBySubmission.cshtml.cs`, `AuditLog/AuditLogBySubmission.cshtml`, `AuditLog/AuditLogByUser.cshtml.cs`, `AuditLog/AuditLogByUser.cshtml`.
+
+---
+
+## Prompt 51 — BatchBlockSummary SenderRef/HistologyRef + ByPassSort + CopyBatch multi-fix (2026-08-20)
+
+> Investigate and fix the issue in **`BatchBlockSummary.cshtml`** and **`BatchBlockSummary.cs`** where data is not being loaded/displayed for `SenderRef` and `HistologyRef`.
+>
+> Also: the **Bypass Sort** checkbox exists in `BatchBlockSummary.aspx` but is missing from the new application.
+>
+> And: clicking **Copy Submission** navigates to `CopyBatch.cshtml` but the data is not loading. The page displays a "Customer Reference for New Submission" textbox (not in legacy). The button is labelled "Copy Submission" instead of "Finish". Legacy buttons: Change, Summary, Cancel, Finish. Please investigate whether these match the legacy functionality and UI behaviour.
+
+Multi-fix session (Run #85) with ~17 sub-prompts including follow-ups on tissue details, data loading, and Change button:
+
+1. **BatchBlockSummary SenderRef/HistologyRef** — root cause: `GetAnimalsByBatchAsync` (GetBatchAnimal SP) queries wrong table for cassetted batches. Added `GetBlockAnimalsByBatchAsync` reading `BATCH_BLOCK_ANIMAL` (result-set 5 of `GetBatchBlocksByID`); `Animal` model `init`→`set` for reliable Dapper string-property mapping.
+2. **ByPassSort** — added `ByPassSort` to `Batch` model; `SetByPassSortAsync` full stack (IBatchRepository/BatchRepository/IBatchService/BatchService); GDS checkbox + `OnPostToggleByPassSortAsync` on `BatchBlockSummary`; default sort applied (SenderRef ASC, HistologyRef ASC) when ByPassSort=false.
+3. **CopyBatch** — removed erroneous `NewCustomerRef` textbox; always uses `GetBlockAnimalsByBatchAsync` (matches legacy forced `SV_Cassetted=True` path); `IsCassetted` changed from `IsPreCassetted`-derived computed property to data-driven flag; Finish/Summary/Cancel/Change buttons added matching legacy button set.
+4. **CopyBatch Scenario 2** — non-cassetted path implemented: `GetAnimalsByBatchAsync` + `GetBatchSubmissionTissuesAsync` (reads `BATCH_TISSUES_TABLE` result-set 1 of `GetBatchSubmissionDetailsByBatchID`) + GDS `<details>/<summary>` expandable tissue details column.
+5. **Root-cause SP fix** — `GetBatchSubmissionDetailsByBatchID` has 3 result sets (0=submissions, 1=tissues, 2=animals). Corrected `GetSubmissionsByBatchAsync` skip from 6→0 and `GetBatchSubmissionTissuesAsync` skip from 7→1. `BatchSubmission` model `init`→`set`.
+6. **CopyBatch Change button** — per-row `Change` anchor focusing the `NewSenderRef` input, replacing the legacy navigate-away `AddSubmission.aspx` round-trip.
+
+**Build:** Succeeded. 0 warnings, 0 errors (all fixes).
+
+**Files changed:** `Submissions/BatchBlockSummary.cshtml.cs`, `Submissions/BatchBlockSummary.cshtml`, `Submissions/Models/Animal.cs`, `Submissions/Models/BatchSubmission.cs`, `Submissions/Interfaces/ISubmissionRepository.cs`, `Submissions/Repositories/SubmissionRepository.cs`, `Submissions/Interfaces/ISubmissionService.cs`, `Submissions/Services/SubmissionService.cs`, `Submissions/Models/Batch.cs`, `Submissions/Interfaces/IBatchRepository.cs`, `Submissions/Repositories/BatchRepository.cs`, `Submissions/Interfaces/IBatchService.cs`, `Submissions/Services/BatchService.cs`, `Batches/CopyBatch.cshtml.cs`, `Batches/CopyBatch.cshtml`.
+
+---
+
+## Prompt 52 — BatchBlockSummary Tissue Details column not displaying + UI fixes (2026-08-21)
+
+> can you make the following UI updates:
+> 1. **BatchBlockSummary.cshtml** — Fix the Tissue Details column so that it displays tissue details correctly, matching the behavior in CopyBatch.cshtml.
+> 2. **Pathologists - EditLookupItem.cshtml** — Remove the Code column from the Pathologist lookup. Add the Area column.
+> 3. **Projects - EditLookupItem.cshtml** — Remove the Code column from the Project lookup. Add the Area column.
+> 4. **PickListMaintenance.cshtml** — Do not display the User Area in the Pick List name. Match the legacy system behavior.
+
+Root cause of tissue details not showing: `GetBlockAnimalsByBatchAsync` (BATCH_BLOCK_ANIMAL SP) does not return `BatchSubmissionID`, so all animals had `BatchSubmissionID = 0`. The tissue lookup was keyed by `BatchSubmissionID`, so no match was ever found. Fix: load `submissions` before tissue resolution and use `firstSubmId` as fallback — exact mirror of `CopyBatch.ResolveTissues`. Also fixed Razor `@foreach` → `@for` index loop to avoid `IReadOnlyList<string> tissues = []` parse ambiguity. Bullet points removed from tissue list. Area column added for tables 18/19 via `ShowAreaColumn` property. User Area filtered from PickListMaintenance.
+
+**Build:** Succeeded. 0 warnings, 0 errors.
+
+**Files changed:** `Submissions/BatchBlockSummary.cshtml.cs`, `Submissions/BatchBlockSummary.cshtml`, `Admin/EditLookupItem.cshtml.cs`, `Admin/EditLookupItem.cshtml`, `Admin/PickListMaintenance.cshtml`, `Administration/Repositories/LookupRepository.cs`.
+
+---
+
+## Prompt 53 — Help link opens new tab (GDS standard) + AuditLogDapperSetup warnings (2026-08-21)
+
+> Help page should open new tab — is it GDS standard? Can you fix it.
+
+Yes — GDS standard requires help/guidance links to open in a new tab so users don't lose their place. Added `target="_blank" rel="noreferrer noopener"` to the Help nav link. Also fixed two CS8603 nullable warnings in `AuditLogDapperSetup.cs` by adding null-forgiving `!` operators to both `GetProperty` calls.
+
+**Build:** Succeeded. 0 warnings, 0 errors.
+
+**Files changed:** `Shared/_NavPartial.cshtml`, `Histo.AuditLog/AuditLogDapperSetup.cs`.
+
+---
+
+## Prompt 54 — CopyBatch Sender Ref search-and-select flow (Option B) (2026-08-21)
+
+> Implement a simple and reusable Sender Reference change flow from CopyBatch.cshtml. When a user clicks "Change Sender Reference", navigate to the Sender Reference search page. Preserve the current Copy Batch data during navigation. On the Search Sender page, display the Sender Reference and History Log Reference grid. When the user selects a row, return to the originating page. If the user came from CopyBatch, restore the Copy Batch data and update the selected row with the new Sender Reference. The solution should be reusable so the same Search Sender page can also be used from AddSubmission/CreateSubmission in the future. Use a return URL/origin page parameter and avoid hardcoded navigation logic.
+
+Implemented Option B (per-row navigate + TempData return). `OnPostPick` in CopyBatch serialises the full Animals list to `TempData` and redirects to `SearchSender` with `returnPage`/`returnId`/`rowIndex` query params. `SearchSender` extended with picker mode: `IsPickerMode` computed property, hidden fields to persist params across search POST, Select button per result row, `OnPostSelect` handler that stores chosen ref in TempData and redirects back. `CopyBatch.OnGetAsync` checks TempData at entry — if Animals JSON present, restores state and injects selected ref into the correct row. No hardcoded caller logic in SearchSender: any future page can use the same picker by setting `returnPage`.
+
+**Build:** Succeeded. 0 warnings, 0 errors.
+
+**Files changed:** `Batches/CopyBatch.cshtml.cs`, `Batches/CopyBatch.cshtml`, `Search/SearchSender.cshtml.cs`, `Search/SearchSender.cshtml`.
+
+---
+
+## Prompt 55 — BatchBlockSummary view-mode read-only (IsViewMode) (2026-08-21)
+
+> In BatchBlockSummary.cshtml, disable the following buttons when the user navigates from the View Submission journey: Add Sample, Edit Sample, Copy Sample, Delete Sample.
+>
+> Flow: View Submission → Batch Details → Samples → BatchBlockSummary
+>
+> If the user reaches BatchBlockSummary.cshtml from View Submission, all sample maintenance actions should be read-only. Users should still be able to view sample details, but not add, edit, copy, or delete samples.
+
+Added `IsViewMode` computed property to `BatchBlockSummaryModel` that checks `Session.ReturnPage` — the same session key set by `ViewSubmissions.cshtml.cs` and `SearchSubmissions.cshtml.cs` when selecting a batch, equivalent to legacy `SV_ViewSubmission`. When `true`, all four sample action buttons (Add, Edit, Copy, Delete) are hidden. Tissue details and page content remain fully visible.
+
+**Build:** Succeeded. 0 warnings, 0 errors.
+
+**Files changed:** `Submissions/BatchBlockSummary.cshtml.cs`, `Submissions/BatchBlockSummary.cshtml`.
 
 
+## Prompt 56 -  Entrat Id integration 
+
+<<<<<<< HEAD
+
+## Prompt - Enter Quality Data
+
+In the navigation menu, there is a link labeled "Enter Quality Data" that points to the BatchesForDispatch workflow. Please confirm whether "Quality Data" refers to QC Notes or if it represents a different business process/entity.
+
+Perform a detailed analysis and validation of the "Enter Quality Data" functionality by comparing the legacy application with the new application implementation.
+
+Legacy Pages:
+
+BatchesForDispatch.aspx
+QualityData.aspx
+New Application Pages:
+
+BatchesForDispatch.cshtml
+
+QualityData.cshtml
+
+Validate the following:
+
+All fields are present and correctly mapped from the legacy application.
+
+All filters function as expected and match legacy behavior.
+
+Labels, headings, and field names are consistent with the legacy application and business requirements.
+
+Page layout, alignment, spacing, and overall UI comply with GDS standards and design components.
+
+Colors, typography, and styling are aligned with the approved design system.
+
+Validation messages, help text, and user guidance are correctly implemented.
+
+Navigation flow and user interactions match the intended functionality.
+
+Any missing, incorrect, or newly introduced functionality is identified and documented.
+
+Provide a gap analysis highlighting:
+
+Functional differences between the legacy and new applications.
+
+UI/UX inconsistencies.
+
+Missing fields, filters, validations, or business rules.
+
+Recommendations and required changes to achieve full parity and GDS compliance.
+
+2026-08-25 Session prompts
+
+1. An unhandled exception occurred while processing the request. InvalidOperationException: No authentication handler is registered for the scheme Cookies. The registered schemes are: saml2.
+
+2. Here is Dev environment config details. Can you make the config changes and give me steps which i can test this entra id integration from local code base. Identifier (Entity ID) https://dev-cde.azure.defra.cloud. Reply URL https://dev-cde.azure.defra.cloud/Saml2/Acs. Sign-on URL https://dev-cde.azure.defra.cloud/. Logout URL https://dev-cde.azure.defra.cloud/Saml2/Logout.
+
+3. is there any accessdenied page in this application, else create one using as per GDS UI
+
+4. Can you implement the There is a problem with the service pages as per GDS. Source design-system.service.gov.uk/patterns/problem-with-the-service-pages. Mandatory content rules for title, h1, body copy, breadcrumbs, error codes, red warning text.
+
+5. Review the codebase to verify whether an Entra ID security group is being created and properly associated with the relevant resources. If a security group is not currently implemented, identify the changes required to create an Entra ID security group and attach it appropriately.
+
+6. security groupw would be used to for authentication, db groups customer, maintenace, etch will be used for authorisaiton, for authenticaiton will there be any issue or any code changes requried ?
+
+7. How to this group will be attache to the respective application ? SG-HistopathologySystem-Users
+
+8. In the navigation menu, there is a link labeled Enter Quality Data that points to the BatchesForDispatch workflow. Please confirm whether Quality Data refers to QC Notes or if it represents a different business process/entity. Perform a detailed analysis and validation of the Enter Quality Data functionality by comparing the legacy application with the new application implementation.
+
+9. Can you implement the suggestion, except the pagination and sortable column because this has to added for all the pages, i will implement later. Fix other issue and gab
+
+10. Thoroughly review the following documents: session-metrics.md and migration-run-journal.md. Review recent issue fixes and incorporate any relevant learnings or patterns to prevent regressions. Previously identified issues from migration and session review documents do not reoccur. On the below functionality: QualityData.cshtml, EditQualityDataTest.cshtml, BatchesForDispatch.cshtml
+
+11. In BatchesForDispatch.cshtml update column names to match legacy. In QualityData.cshtml review and validate the grid - why is QC Notes displayed, why is On Hold missing, missing fields Entered By, Submitted By, Project/Contract Code, Pathologist, Entered Area, Submitted Area, Submission Date, Species. In EditQualityDataTest.cshtml add missing fields Remedial Action, QC Note Ref, Charges with multiple checkboxes.
+
+12. How legacy is making saving these details for TC Codes?
+
+13. is there any implementation is pending now for TC Codes?
+
+14. Please document all fixes, gaps, issues, findings, and recommendations identified during this session from 11:00 AM until now in run-log-v2.md.
+
+15. I'm getting below message, actually in the grid has this data - Submission 29395 could not be found or is not ready for quality data entry.
+
+16. check the EditQualityDataTest.cshtml there is issue in rendering
+
+17. In legacy Quality Data page shows submission summary and a colour-coded results grid. in new page QualityData.cshtml is that achievable using GDS standard? Green = awaiting result, Grey = Passed, Purple = Failed, White = dispatched.
+
+18. Is it as per GDS?
+
+19. align with GDS and remove the row CSS and keep only the tags with respective colour?
+
+20. In legacy this QualityData.aspx has Failed and Passed column, how this has changed QualityData.cshtml it's show column Results.
+
+21. Please review the following observations in EditQualityDataTest.cshtml: 1. Why is the Raise a QC Note checkbox displayed? When the Passed radio button is selected, the QC Note checkbox is automatically checked. 2. The QC Note Reference field is not available on the Edit Quality Data Test screen. 3. When the Dispatched checkbox is selected, the related dispatched fields become visible. 4. The Test column is currently displaying numeric values instead of text.
+
+22. Remove QC note column from QualityData.cshtml. Still can't see QC Note Ref in EditQualityDataTest.cshtml. Still Test column shows numeric codes in QualityData.cshtml.
+
+23. update issue and fix in run-log-v2.md file duration time session-metrics.md file. update the prompt in User-Prompts-Log.md file.
+
+2026-08-26 Session prompts
+
+1. Review and Update Navigation, Batch Editing, and Legacy Functionality Alignment — Review the current implementation of Quality Data navigation (BatchesForEditing.cshtml) and compare it with the EditSubmissionStatus functionality. Currently, clicking Quality Data redirects users to BatchesForEditing.cshtml — if it is same as EditSubmissionStatus then evaluate whether the existing Quality Data navigation link should be replaced with Edit QC Notes functionality link, routing to QC/QCNotes. Compare BatchesForEditing.cshtml with the legacy BatchesForEditing.aspx — review the grid implementation, add any missing columns, validate column names/ordering/formatting. Verify row selection redirects to EditBatch.cshtml mirroring legacy EditBatch.aspx. Review validations and business rules against legacy. Perform a detailed gap analysis and review session-metrics.md/migration-run-journal.md for known migration issues to ensure they are resolved and do not reoccur.
+
+2. Compare the QCNote edit form in the current system against the original legacy version, present in the HistopathologySystem folder. On the current version, the QC Note Ref section is missing and the username and date section below the note is missing. Please restore these sections.
+
+3. The edit button on the Edit QC Note page no longer works, please resolve this.
+
+4. Please update the details run-log-v2.md (what fix applied) and session-metrics.md (duration), User-Prompts-Log.md (prompt) files to contain the relevant data pertaining to this session.
+
+5. When comparing the legacy and current version of the Edit QC note page. The current system doesn't always present all the data that is presented on the Legacy system. (Notes are loaded into the legacy system but they do not appear in the current system, The created date appears in legacy but not in current). Please review the current system to ensure that all the correct data is loaded into the form.
+
+6. The correct notes have started to appear, however the dates next to the username all missing, while they are present in the legacy system. Please resolve this issue.
+
+7. Please update the details run-log-v2.md (what fix applied) and session-metrics.md (duration), User-Prompts-Log.md (prompt) files to contain the relevent data pertaining to this session.
+
+
+2026-08-26 afternoon session prompts (15:23 onwards)
+
+1. Please update the submission creation flow to match the legacy application. Legacy: Cassetted.aspx is used only for submission type selection, and BatchDetails.aspx handles submission creation and editing. New Application: Cassetted.cshtml currently contains the submission creation fields and logic. Required Changes: Analyse the legacy and make the changes like when the user clicks New Submission, navigate to BatchDetails.cshtml instead of Cassetted.cshtml. Use BatchDetails.cshtml as the primary screen for creating and editing submissions. Recreate the legacy submission creation flow where possible.
+
+2. Can we do something for create option to achieve it, is there any GDS issue one thing per page pattern is blocking? Histology/Antibody/Stain checkboxes - Accessible via Edit test types button on read-mode view - deferred.
+
+3. Unknown text is showing now in BatchDetails.cshtml file: Batch not found. }
+
+4. Where are these files BatchDetails being called from - edit submission or view submission?
+
+5. Suggestion: Before moving the Submission Category and Submission Type fields from Cassetted.cshtml to BatchDetails.cshtml, please assess the impact on the overall workflow and navigation.
+
+6. Then how to keep value if I selected something from either submission category and submission type if navigate to next pages if I come back to this page should I have keep track of selected values?
+
+7. EditLookupItem.cshtml - When editing Pick List Maintenance and selecting Pathologists, the Area field should display Area Name but currently displays numeric values. When adding a new Pick List Maintenance record selecting Pathologists the Area field should be displayed as a dropdown but it is not appearing. In Edit Pick List when Pathologists is selected the Area field should show Area Name instead of numeric identifier. Cassetted.cshtml - Submission Type field currently defaulting to Pre Cassetted Tissue. It should not have a default value selected and should require the user to explicitly choose a Submission Type.
+
+8. Procedure or function AddluContacts expects parameter @ID which was not supplied.
+
+9. Run journal-updater to document all the issue and fixes to update the details run-log-v2.md and session-metrics.md and User-Prompts-Log.md file from time after 3 PM today.
+
+---
+
+## Prompt 56 — TSE/NON-TSE Submission workflow GDS redesign (2026-08-27)
+
+> Review the following TSE/NON-TSE Submission workflow and propose a simplified, user-centred design aligned with Government Digital Service (GDS) principles. Focus on reducing navigation steps, minimising user effort, improving accessibility, eliminating unnecessary screens/popups, and streamlining the overall user journey, keep the existing functionality as it is.
+>
+> **Current Workflow:** Navigate to New TSE Submission → Submission Samples → Sample Summary → Blocking → Block Details → Search Block Refs → View Old ICC Sub Data.
+>
+> **Required Output:** Identify usability issues and pain points; recommend a simplified GDS-compliant user journey; suggest which screens can be consolidated, removed, or replaced; propose alternatives to popup windows and excessive page navigation; provide a target-state workflow diagram/user journey; explain how the proposed solution improves usability, accessibility, and task completion rates.
+
+---
+
+## Prompt 57 — Elaborate on the task-list concept
+
+> Expand on the Not Implemented section. What is the 'task-list'. Eleaborate on what was not implemented
+
+---
+
+## Prompt 58 — How can this be solved?
+
+> How can this be solved?
+
+---
+
+## Prompt 59 — Implementation plan for the two unimplemented sections
+
+> Make an implementation plan for the two unimplemented sections
+
+---
+
+## Prompt 60 — Implement the plan (Phase 0/1)
+
+> Implement this plan.
+
+---
+
+## Prompt 61 — Implement the rest of the plan (Phase 2/3)
+
+> impliment the rest of the plan
+
+---
+
+## Prompt 62 — GDS standards and functional gap check (first pass)
+
+> Are the current changes in line with the GDS standards, is there any function gap between the legacy system (found in the Histopathology folder) and the current system?
+
+---
+
+## Prompt 63 — Assess relevance of identified gaps
+
+> You have mentioned several things that are missing in the current system compared to the legacy system. Check to see if any of these points are relevant to be added to the new system
+
+---
+
+## Prompt 64 — Implement relevant changes and summarise remaining gap
+
+> Impliment all the relevant changes and give a summary of the new function gap between legacy and current for these points.
+
+---
+
+## Prompt 65 — Resolve the last three open sections
+
+> Please resolve the last three open sections aswell
+
+---
+
+## Prompt 66 — Finish the plan for production readiness
+
+> Finish what is left of the plan so that I can consider this change production ready
+
+---
+
+## Prompt 67 — Apply the guard-testability steps
+
+> Impliment these steps
+
+---
+
+## Prompt 68 — GDS standards and functional gap check (second pass)
+
+> Are the current changes in line with the GDS standards, is there any function gap between the legacy system (found in the Histopathology folder) and the current system?
+
+---
+
+## Prompt 69 — New Submission Create/Edit flow, Submission Type default, Submission date component (2026-08-27)
+
+> **New Submission Create/Edit Flow & Submission Type Validation**
+>
+> Please analyse and fix the New Submission Create/Edit workflow to ensure it matches the legacy application. Current issue: when a user clicks Add Sample from BatchBlockSummary.cshtml, the application navigates to AddSubmission.cshtml, but Sender Reference search/selection is missing and the workflow does not proceed to the Sample Blocks page as legacy does.
+>
+> Cassetted.cshtml — Submission Type dropdown is automatically defaulting to "Pre Cassetted Tissue" when the page loads; it should default to "Select Submission Type" with no pre-selection, and validation must prevent continuing without an explicit selection.
+>
+> Issue 3: BatchDetails.cshtml shows Submission date as a text box — it should be a date component.
+
+---
+
+## Prompt 70 — Apply the three fixes
+
+> Now apply these changes.
+
+---
+
+## Prompt 71 — Submission journey button visibility investigation (2026-08-27)
+
+> ### Investigation and Validation Required for Submission Journeys
+>
+> 1. Create Submission Journey - BatchDetails.cshtml: why are QC Notes, Print Submission Form, and Print Submission Notes buttons displayed? Confirm whether required and explain the business logic behind their visibility.
+> 2. View Submission Journey: only Print Submission Form and Print Submission Notes should be displayed — verify the implementation.
+> 3. Validation of Other Journeys: review all other submission-related journeys and validate button visibility.
+> 4. Create Submission Journey - Submission Details Status: why is "Submission Details – Completed" displayed for a sample when a button already exists for accessing the submission information?
+> 5. Create Submission Journey - Sample Link Visibility: why is the sample link displayed along with the status, alongside the button? Should both navigate to BatchBlockSummary.cshtml? Is there a reason for having both?
+> 6. Navigation Issue When Adding Animals: after Create Submission → Sample → BatchBlockSummary → Add Sample → AddSubmission.cshtml → enter Sender Reference → Add Animal, the application redirects to the Home page instead of continuing the workflow. Investigate the root cause.
+
+---
+
+## Prompt 72 — GDS standards and functional gap check (third pass)
+
+> Are the current changes in line with the GDS standards, is there any function gap between the legacy system (found in the Histopathology folder) and the current system?
+
+---
+
+## Prompt 73 — Commit message for submission journey fixes
+
+> Please create a brief of the changes made of a commit message
+
+---
+
+## Prompt 74 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session
+
+> Please update the details run-log-v2.md (what fix applied) and session-metrics.md (duration), User-Prompts-Log.md (prompt) file for this session
+
+---
+
+## Prompt 75 — AddAnimal button not visible in BatchBlockSummary (2026-08-27 22:49)
+
+> Addanimal button is not visible in BatchBlockSummary.cshtml it was working before
+
+---
+
+## Prompt 76 — Scenario-based enable/disable of Add/Edit/Copy sample buttons (2026-08-27 22:57)
+
+> Add sample and Edit sample, copy sample should based on scenrio, there is multiple add submission journey, edit submission journey should work, based on the joury edit sample and copy sample button should enable disaple
+
+---
+
+## Prompt 77 — Where to edit sample/animal/block details in Edit Submission journey (2026-08-27 23:01)
+
+> Edit submission journey where should i edit the sample or animal detailas or block details
+
+---
+
+## Prompt 78 — Add sample flow redirect not showing added sample (2026-08-27 23:09)
+
+> can you check add sample flow, it's taking to AddSubmission.cshtmls page after adding its not displaying int add sample page, check the legacy and make ncessary changes as per GDs
+
+---
+
+## Prompt 79 — Create journey navigation complexity review (2026-08-27 23:13)
+
+> Current create journeny flow is it compelx flow in GDS with .net 10 Razor pages, is there arey optimised navigation on this ?
+>
+> - New TSE Submission → Submission Samples → Sample Summary
+> - New TSE Submission → Submission Samples → Blocking → Block Details
+> - New TSE Submission → Submission Samples → Blocking → Search Block Refs
+
+---
+
+## Prompt 80 — Implement BlockDetails/SubmissionDetailsBlock consolidation (2026-08-27 23:20)
+
+> implement that consolidation now (merge `Blocks/BlockDetails.cshtml` into `SubmissionDetailsBlock.cshtml`, add the inline block-ref-check panel), or would you prefer to review the full doc first and tell me which specific piece to tackle?
+>
+> functiality it should work
+
+---
+
+## Prompt 81 — Simplify Add sample/Add animal screens; animal not showing on sample page (2026-08-27 23:30)
+
+> i requested to simplify or consolidate the add sample and add animal screen if that paossible with GDS to complex naviagiont, still after adding animal it's not showing in sample page
+
+---
+
+## Prompt 82 — BatchBlockSummary still not showing added sample/block details (2026-08-27 23:39)
+
+> Still BatchBlockSummary.cshtml pages is not showing added sample details and how user will add block details
+
+---
+
+## Prompt 83 — PMDate DBNull exception in AddAnimalAsync (2026-08-27 23:44)
+
+> System.NotSupportedException: 'The member PMDate of type System.DBNull cannot be used as a parameter value'
+>     Histo.Submissions.Repositories.SubmissionRepository.AddAnimalAsync(Histo.Submissions.Models.Animal, int, System.Threading.CancellationToken) in SubmissionRepository.cs
+
+---
+
+## Prompt 84 — AddAnimal SP too many arguments exception (2026-08-27 23:49)
+
+> Microsoft.Data.SqlClient.SqlException: 'Procedure or function AddAnimal has too many arguments specified.'
+> This exception was originally thrown at this call stack:
+>     [External Code]
+>     Histo.Submissions.Repositories.SubmissionRepository.AddAnimalAsync(Histo.Submissions.Models.Animal, int, System.Threading.CancellationToken) in SubmissionRepository.cs
+>     Histo.Submissions.Services.SubmissionService.AddAnimalAsync(int, string, bool, int, string, bool, System.Threading.CancellationToken) in SubmissionService.cs
+
+---
+
+## Prompt 85 — Verify journey navigation and fix button alignment (BatchBlockSummary, AddSubmission)
+
+> alos verify the navigatin like back button, cance, etc for these funcaitlligy
+>
+> Button alingment for below screen BatchBlockSummary.cshtml AddSubmission.cshmtls in button not allinged properly button name is 'Check historical data for this sender ref'
+
+---
+
+## Prompt 86 — Apply the two identified GDS button-alignment fixes
+
+> I have enabled the agent mode can you fix these isseue **Recommended fix:** **Finding #2 — Fix (Low priority):** add the missing attribute: **Finding #1 — Fix (Medium priority):** move the "Samples" link inside the button group:
+
+---
+
+## Prompt 87 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for the button-alignment session
+
+> update the details  run-log-v2.md **(what fix applied)**  and session-metrics.md **(duration)**, User-Prompts-Log.md **(prompt)** file
+
+---
+
+## Prompt 88 — Document issues and fixes for 27 Aug 2026 10:47 PM – 11:50 PM
+
+> alos need to dcoument the issues and fixes which has done during yesterday that 27 aug 2026 10:47 PM - 11.50 PM
+=======
+>>>>>>> 351607732625fba3ca3dad48fbba1c32f021a658
