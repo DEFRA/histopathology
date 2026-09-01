@@ -6,7 +6,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" class="govuk-back-link">Back</a>
+    <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-back-link">Back</a>
 }
 
 @if (Model.Animal is null)
@@ -29,6 +29,8 @@ else
     </dl>
 
     <form method="post" asp-page-handler="SaveDetails">
+        <input type="hidden" asp-for="BatchId" />
+        <input type="hidden" asp-for="AnimalId" />
         <div class="govuk-form-group">
             <label class="govuk-label" for="PMDate">PM date</label>
             @if (Model.IsViewMode)
@@ -58,6 +60,26 @@ else
     </form>
 
     <h2 class="govuk-heading-m">Tissues</h2>
+
+    @* Inline GOV.UK confirmation panel — replaces the browser confirm() dialog for Delete tissue. *@
+    @if (Model.ConfirmDeleteTissueId is int confirmTissueId)
+    {
+        <div class="govuk-warning-text">
+            <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+            <strong class="govuk-warning-text__text">
+                <span class="govuk-visually-hidden">Warning</span>
+                Are you sure you want to delete this tissue?
+            </strong>
+        </div>
+        <form method="post" asp-page-handler="DeleteTissue" class="govuk-!-display-inline">
+            <input type="hidden" name="tissueId" value="@confirmTissueId" />
+            <input type="hidden" asp-for="BatchId" />
+            <input type="hidden" asp-for="AnimalId" />
+            <button type="submit" class="govuk-button govuk-button--warning" data-module="govuk-button">Yes, delete tissue</button>
+            <a asp-page="/Submissions/SubmissionDetails" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        </form>
+    }
+
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
@@ -77,11 +99,11 @@ else
                     <td class="govuk-table__cell">
                         @if (!Model.IsViewMode)
                         {
-                            <form method="post" asp-page-handler="DeleteTissue" class="govuk-!-display-inline">
-                                <input type="hidden" name="tissueId" value="@t.ID" />
-                                <button type="submit" class="govuk-button govuk-button--warning govuk-!-margin-bottom-0"
-                                        onclick="return confirm('Delete this tissue?')">Delete</button>
-                            </form>
+                            <a asp-page="/Submissions/SubmissionDetails"
+                               asp-route-BatchId="@Model.BatchId"
+                               asp-route-AnimalId="@Model.AnimalId"
+                               asp-route-ConfirmDeleteTissueId="@t.ID"
+                               class="govuk-button govuk-button--warning govuk-!-margin-bottom-0">Delete</a>
                         }
                     </td>
                 </tr>
@@ -97,6 +119,8 @@ else
     {
         <h2 class="govuk-heading-m">Add tissue</h2>
         <form method="post" asp-page-handler="AddTissue">
+            <input type="hidden" asp-for="BatchId" />
+            <input type="hidden" asp-for="AnimalId" />
             <div class="govuk-form-group">
                 <label class="govuk-label" for="TissueCode">Tissue code</label>
                 <input class="govuk-input" asp-for="TissueCode" />
@@ -113,5 +137,5 @@ else
         </form>
     }
 
-    <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to samples</a>
+    <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to samples</a>
 }

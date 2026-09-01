@@ -280,6 +280,10 @@ try
     app.MapControllers(); // AuthController — SAML2 /Saml2/* endpoints
     app.MapRazorPages();
 
+    // Renamed to /Submissions/SampleSummary — "Block" is meaningless for Wet Tissue submissions.
+    app.MapGet("/Submissions/BatchBlockSummary", (HttpRequest request) =>
+        Results.Redirect($"/Submissions/SampleSummary{request.QueryString}", permanent: true));
+
     app.Run();
 }
 catch (Exception ex) when (ex is not HostAbortedException)

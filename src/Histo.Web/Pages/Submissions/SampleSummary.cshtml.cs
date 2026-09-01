@@ -22,13 +22,13 @@ namespace Histo.Web.Pages.Submissions;
 /// non-batch-scoped tissue/block search reached from the Home page) — see
 /// <see cref="ViewSamplesModel"/> for that page's migration.
 /// </summary>
-public class BatchBlockSummaryModel : HistoPageModel
+public class SampleSummaryModel : HistoPageModel
 {
     private readonly ISubmissionService _submissions;
     private readonly IBatchService _batches;
     private readonly ILookupService _lookups;
 
-    public BatchBlockSummaryModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups)
+    public SampleSummaryModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups)
         : base(session)
     {
         _submissions = submissions;

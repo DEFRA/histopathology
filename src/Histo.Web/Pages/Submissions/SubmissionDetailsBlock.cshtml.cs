@@ -14,7 +14,7 @@ namespace Histo.Web.Pages.Submissions;
 /// Replaces <c>SubmissionDetailsBlock.aspx</c> — block summary for a batch submission's samples
 /// (cassetted workflow). Consolidates the previously separate batch-wide
 /// <c>Pages/Blocks/BlockDetails.cshtml</c> into a single page: when <see cref="AnimalId"/> is
-/// supplied (reached from BatchBlockSummary's "Edit sample"), it shows the full add/edit/delete/copy
+/// supplied (reached from SampleSummary's "Edit sample"), it shows the full add/edit/delete/copy
 /// view for that one sample's blocks; when omitted (reached from BatchDetails' "Assign blocks"), it
 /// shows a read/delete/copy overview of every block in the batch, each row linking into the
 /// animal-scoped view to add/edit blocks for that specific sample.
@@ -141,7 +141,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
 
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
-        if (Animal is null) return RedirectToPage("/Submissions/BatchBlockSummary", new { batchId = BatchId });
+        if (Animal is null) return RedirectToPage("/Submissions/SampleSummary", new { batchId = BatchId });
 
         var updated = new Animal
         {
@@ -168,7 +168,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     {
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
-        if (Animal is null) return RedirectToPage("/Submissions/BatchBlockSummary", new { batchId = BatchId });
+        if (Animal is null) return RedirectToPage("/Submissions/SampleSummary", new { batchId = BatchId });
         await LoadSupportingDataAsync();
 
         if (IsPreCassetted && !PreBookedBlockRefs.Any(b => b.BlockRef == NewBlockRef))
@@ -219,7 +219,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     {
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
-        if (Animal is null) return RedirectToPage("/Submissions/BatchBlockSummary", new { batchId = BatchId });
+        if (Animal is null) return RedirectToPage("/Submissions/SampleSummary", new { batchId = BatchId });
 
         if (NewTissueBlockId > 0 && !string.IsNullOrWhiteSpace(NewTissueCode))
         {
@@ -288,7 +288,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
 
         var animals = await _submissions.GetAnimalsByBatchAsync(batchId.Value);
         Animal = animals.FirstOrDefault(a => a.ID == AnimalId);
-        return Animal is null ? RedirectToPage("/Submissions/BatchBlockSummary", new { batchId }) : null;
+        return Animal is null ? RedirectToPage("/Submissions/SampleSummary", new { batchId }) : null;
     }
 
     /// <summary>Loads the batch (for the pre-cassetted flag), pre-booked block refs, tissue pick-list, and per-block tissues.</summary>
