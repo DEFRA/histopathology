@@ -124,6 +124,9 @@ public class ReceiveBatchModel : HistoPageModel
             return Page();
         }
 
+        if (Batch.Status != BatchStatus.Submitted)
+            return RedirectToPage();
+
         await LoadLookupsAsync();
         HasRepeatBlocks = (await _blocks.GetByBatchAsync(Batch.ID)).Any(b => b.RepeatBlock);
 
