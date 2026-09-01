@@ -1019,7 +1019,6 @@ Added `IsViewMode` computed property to `BatchBlockSummaryModel` that checks `Se
 
 ## Prompt 56 -  Entrat Id integration 
 
-<<<<<<< HEAD
 
 ## Prompt - Enter Quality Data
 
@@ -1377,5 +1376,117 @@ Recommendations and required changes to achieve full parity and GDS compliance.
 ## Prompt 88 — Document issues and fixes for 27 Aug 2026 10:47 PM – 11:50 PM
 
 > alos need to dcoument the issues and fixes which has done during yesterday that 27 aug 2026 10:47 PM - 11.50 PM
-=======
->>>>>>> 351607732625fba3ca3dad48fbba1c32f021a658
+
+---
+
+## Prompt 89 — Skip Entra ID locally; dev-only auth bypass via config (2026-09-01)
+
+> I have Entra id implementaiton in this applicaiton, I can't use entra id from local so that how skip entra id locally to test fucntinlity locally
+
+---
+
+## Prompt 90 — Provide email to bypass sign-in and show user details in app (2026-09-01)
+
+> Can we skip authentication itself i can give my email to show the user details in applicaiton
+
+---
+
+## Prompt 91 — What is user-secrets? (2026-09-01)
+
+> what is user-secrets ?
+
+---
+
+## Prompt 92 — Alternative to user-secrets: comment out login code? (2026-09-01)
+
+> is there any other way comment the login code ?
+
+---
+
+## Prompt 93 — Hardcode bypass email in config instead of user-secrets (2026-09-01)
+
+> can we hardcode this value instead of user-secrets
+> "DevAuth:BypassUserEmail" "your.email@apha.gov.uk"
+
+---
+
+## Prompt 94 — Store bypass email in appsettings.Development.json (not committed) (2026-09-01)
+
+> i will not commit this changes
+> appsettings.Development.json
+
+---
+
+## Prompt 95 — Access denied after bypass — no matching tblUser row (2026-09-01)
+
+> i made this changes but getting below page ?
+>
+> # Access denied
+> You signed in as **Silambarasan.Duraiswamy@defra.gov.uk**, but that account is not set up in the Histopathology System.
+> Your account may not have been created yet, or it may have been deactivated.
+> Contact your system administrator to request access or reactivate your account.
+
+---
+
+## Prompt 96 — Dev bypass code in HistoPageModel not working (2026-09-01)
+
+> Why this piece of code is not working ?
+> `// LOCAL-DEV-ONLY (uncommitted): skips Entra ID sign-in entirely. // Enabled only via appsettings.Development.json's "DevAuthBypass" flag (gitignored).`
+
+---
+
+## Prompt 97 — Nav menu and home page links not visible (2026-09-01)
+
+> i could not see navigation menue and home page links
+
+---
+
+## Prompt 98 — Apply dev bypass to HistoPageModel.cs (2026-09-01)
+
+> can you  implement the same in HistoPageModel.cs file
+
+---
+
+## Prompt 99 — Empty page shown after HistoPageModel bypass applied (2026-09-01)
+
+> i can see empty page now
+
+---
+
+## Prompt 100 — Review and validate TSE submission flow across all submission types (2026-09-01)
+
+> **Review and validate the new TSE submission flow against the legacy implementation.**
+>
+> **Legacy submission flow:**
+> Home Page → Create New TSE Submission → Submission Type → Submission Details → Sample Summary → Finish
+>
+> **Submission Types:**
+> - Pre-Cassetted Tissue
+> - Stained Section
+> - Unstained Section
+> - Wax Block
+> - Wet Tissue
+>
+> 1. **BatchBlockSummary.cshtml** — Verify existing functionality, identify missing or regressed functionality for Wax Block and Wet Tissue.
+> 2. **UI Alignment** — Review Apply and Add Sample controls alignment; fix inconsistencies.
+> 3. **Edit Sample Functionality** — Investigate why Edit Sample is not responding.
+> 4. **Navigation Validation** — End-to-end navigation for all submission types, particularly Wax Block and Wet Tissue.
+
+---
+
+## Prompt 101 — Analysis of Add/Edit sample, Add block, per submission type for all journeys (2026-09-01)
+
+> can you aslo do anlaysis on the add sample / add block / edit block etc and also consider the below submission type for create and Edit, view submission, copy
+>
+> **Submission Types:**
+> - Pre-Cassetted Tissue
+> - Stained Section
+> - Unstained Section
+> - Wax Block
+> - Wet Tissue
+
+---
+
+## Prompt 102 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-01)
+
+> Can you read the prompt and and fix, gap from the afer 4 PM in this session and why it's not fixed as part migraiton, add these details into, run-log-v2.md  session-metrics  User-Prompts-Log.md

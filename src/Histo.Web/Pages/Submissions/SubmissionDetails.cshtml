@@ -6,7 +6,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Submissions/BatchBlockSummary" class="govuk-back-link">Back</a>
+    <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" class="govuk-back-link">Back</a>
 }
 
 @if (Model.Animal is null)
@@ -31,13 +31,30 @@ else
     <form method="post" asp-page-handler="SaveDetails">
         <div class="govuk-form-group">
             <label class="govuk-label" for="PMDate">PM date</label>
-            <input class="govuk-input" asp-for="PMDate" />
+            @if (Model.IsViewMode)
+            {
+                <input class="govuk-input" asp-for="PMDate" readonly disabled />
+            }
+            else
+            {
+                <input class="govuk-input" asp-for="PMDate" />
+            }
         </div>
         <div class="govuk-form-group">
             <label class="govuk-label" for="HistologyRef">Histology reference</label>
-            <input class="govuk-input" asp-for="HistologyRef" />
+            @if (Model.IsViewMode)
+            {
+                <input class="govuk-input" asp-for="HistologyRef" readonly disabled />
+            }
+            else
+            {
+                <input class="govuk-input" asp-for="HistologyRef" />
+            }
         </div>
-        <button type="submit" class="govuk-button" data-module="govuk-button">Save details</button>
+        @if (!Model.IsViewMode)
+        {
+            <button type="submit" class="govuk-button" data-module="govuk-button">Save details</button>
+        }
     </form>
 
     <h2 class="govuk-heading-m">Tissues</h2>
@@ -58,11 +75,14 @@ else
                     <td class="govuk-table__cell">@t.NoPieces</td>
                     <td class="govuk-table__cell">@t.Comment</td>
                     <td class="govuk-table__cell">
-                        <form method="post" asp-page-handler="DeleteTissue" class="govuk-!-display-inline">
-                            <input type="hidden" name="tissueId" value="@t.ID" />
-                            <button type="submit" class="govuk-button govuk-button--warning govuk-!-margin-bottom-0"
-                                    onclick="return confirm('Delete this tissue?')">Delete</button>
-                        </form>
+                        @if (!Model.IsViewMode)
+                        {
+                            <form method="post" asp-page-handler="DeleteTissue" class="govuk-!-display-inline">
+                                <input type="hidden" name="tissueId" value="@t.ID" />
+                                <button type="submit" class="govuk-button govuk-button--warning govuk-!-margin-bottom-0"
+                                        onclick="return confirm('Delete this tissue?')">Delete</button>
+                            </form>
+                        }
                     </td>
                 </tr>
             }
@@ -73,22 +93,25 @@ else
         </tbody>
     </table>
 
-    <h2 class="govuk-heading-m">Add tissue</h2>
-    <form method="post" asp-page-handler="AddTissue">
-        <div class="govuk-form-group">
-            <label class="govuk-label" for="TissueCode">Tissue code</label>
-            <input class="govuk-input" asp-for="TissueCode" />
-        </div>
-        <div class="govuk-form-group">
-            <label class="govuk-label" for="NoPieces">No. pieces</label>
-            <input class="govuk-input govuk-input--width-3" asp-for="NoPieces" />
-        </div>
-        <div class="govuk-form-group">
-            <label class="govuk-label" for="Comment">Comment</label>
-            <textarea class="govuk-textarea" asp-for="Comment" rows="2"></textarea>
-        </div>
-        <button type="submit" class="govuk-button" data-module="govuk-button">Add tissue</button>
-    </form>
+    @if (!Model.IsViewMode)
+    {
+        <h2 class="govuk-heading-m">Add tissue</h2>
+        <form method="post" asp-page-handler="AddTissue">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="TissueCode">Tissue code</label>
+                <input class="govuk-input" asp-for="TissueCode" />
+            </div>
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="NoPieces">No. pieces</label>
+                <input class="govuk-input govuk-input--width-3" asp-for="NoPieces" />
+            </div>
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="Comment">Comment</label>
+                <textarea class="govuk-textarea" asp-for="Comment" rows="2"></textarea>
+            </div>
+            <button type="submit" class="govuk-button" data-module="govuk-button">Add tissue</button>
+        </form>
+    }
 
-    <a asp-page="/Submissions/BatchBlockSummary" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to samples</a>
+    <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to samples</a>
 }

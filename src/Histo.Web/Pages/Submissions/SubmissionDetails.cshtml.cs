@@ -16,6 +16,9 @@ public class SubmissionDetailsModel : HistoPageModel
     public SubmissionDetailsModel(ISessionService session, ISubmissionService submissions)
         : base(session) => _submissions = submissions;
 
+    /// <summary>Batch ID from the URL (route/query). Needed for back-link and view-mode awareness.</summary>
+    [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
+
     [BindProperty] public string? PMDate { get; set; }
     [BindProperty] public string? HistologyRef { get; set; }
 
@@ -26,11 +29,15 @@ public class SubmissionDetailsModel : HistoPageModel
     public Animal? Animal { get; private set; }
     public IReadOnlyList<Tissue> Tissues { get; private set; } = [];
 
+    /// <summary>Mirrors <see cref="BatchBlockSummaryModel.IsViewMode"/> — hides edit/delete/add in View Submission journey.</summary>
+    public bool IsViewMode => Session.IsViewSubmissionMode;
+
     public async Task<IActionResult> OnGetAsync()
     {
         ViewData["Title"] = "Sample Details";
         ViewData["PageTitle"] = "Sample Details";
 
+        BatchId ??= Session.BatchID;
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
 
@@ -94,11 +101,12 @@ public class SubmissionDetailsModel : HistoPageModel
     /// <summary>Resolves <see cref="Animal"/> from the current session's BatchID/AnimalID. Returns a redirect if unavailable.</summary>
     private async Task<IActionResult?> LoadAnimalAsync()
     {
-        if (Session.BatchID <= 0) return RedirectToPage("/Index");
-        if (Session.AnimalID is null) return RedirectToPage("/Submissions/BatchBlockSummary");
+        BatchId ??= Session.BatchID;
+        if (BatchId is null or <= 0) return RedirectToPage("/Index");
+        if (Session.AnimalID is null) return RedirectToPage("/Submissions/BatchBlockSummary", new { batchId = BatchId });
 
-        var animals = await _submissions.GetAnimalsByBatchAsync(Session.BatchID ?? 0);
+        var animals = await _submissions.GetAnimalsByBatchAsync(BatchId.Value);
         Animal = animals.FirstOrDefault(a => a.ID == Session.AnimalID);
-        return Animal is null ? RedirectToPage("/Submissions/BatchBlockSummary") : null;
+        return Animal is null ? RedirectToPage("/Submissions/BatchBlockSummary", new { batchId = BatchId }) : null;
     }
 }
