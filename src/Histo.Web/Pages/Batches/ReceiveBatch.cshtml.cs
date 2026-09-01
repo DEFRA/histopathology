@@ -14,8 +14,7 @@ namespace Histo.Web.Pages.Batches;
 ///
 /// Legacy behaviour preserved:
 /// <list type="bullet">
-/// <item>Submission status can be set to Received or Rejected (the only two transitions
-///   available from this page — other statuses are set via <c>EditBatch</c>).</item>
+/// <item>Submission status can be set to Not started, Received or Rejected (other statuses are set via <c>EditBatch</c>).</item>
 /// <item>Received/Rejected requires Date received, Time received and Received/Rejected by.</item>
 /// <item>Rejected additionally requires a Reason.</item>
 /// <item>Date received must be on or after the submission date and on or before today.</item>
