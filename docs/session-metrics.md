@@ -83,11 +83,11 @@
 | 71 | 2026-08-24 | `Identity-migration` | — | — | **40 min** | Run Entra id integration agents |
 | 72 | 2026-08-24 | `Identity-migration` | — | — | **10 min** | SAML config validation |
 | 73 | 2026-08-24 | `gds-ui` | — | — | **15 min** | Access denied and There is a problem with the service pages implmentation - An unhandled exception occurred while processing the request. |
-<<<<<<< HEAD
 | 74 | 2026-08-27 | `GitHub Copilot` | — | — | **~330 min (5h 30m)** | Run #87 — TSE/NON-TSE submission workflow GDS redesign (docs/TSE-NonTSE-Submission-Workflow-Redesign.md) + route-based state/access-guard rollout (Phase 0–2) + BatchAccessDecision unit tests + per-block tissue/pre-booked-ref/bulk-block additions + New Submission Create/Edit flow fixes (AddSubmission Sender Ref search + Sample Blocks redirect + BatchSubmissionID resilience, Cassetted submission-type default fix, BatchDetails native date input) + BatchDetails button-visibility/journey gating (IsViewMode/CanPrint) and redundant task-list cleanup. Duration is a complexity-based estimate — no exact start/end timestamps captured. See sub-task breakdown below. |
 | 75 | 2026-08-27 | `GitHub Copilot` | 22:47 | 23:50 | **~63 min (1h 03m)** | Run #88 — Submission scenario gating (Add/Edit/Copy sample per journey), `BlockDetails`→`SubmissionDetailsBlock` consolidation, `BatchBlockSummary` animal-list merge fix, and two `AddAnimal` stored-procedure bugs fixed (`PMDate` DBNull `dbType`, `AddAnimal` too-many-arguments parameter mismatch vs real SP). Duration per user-reported start/end time. |
 | 76 | 2026-08-28 | `GitHub Copilot` | — | — | **~25 min** | Run #89 — Submission-journey navigation verification (all 4 journeys' back/cancel targets confirmed correct) + GDS button-alignment fixes across 4 files (`EditBatch` Samples link into button-group, `SubmissionDetailsBlock` missing `data-module`, `AddSubmission` Add sample/Cancel/Check-historical-data button-groups, `BatchBlockSummary` Add sample/Done button-groups). Duration is a complexity-based estimate. Build: 0 errors. |
-
+| 77 | 2026-08-28 | `GitHub Copilot` | 14:01 | 16:27 | **~146 min (2h 26m)** | Run #90 — Live Dev deployment debugging of the Entra ID SAML 2.0 sign-in chain: (1) added `UseForwardedHeaders()`; (2) diagnosed the fix wasn't deployed (feature branch unmerged), merged via PR; (3) added `PostConfigure<CookieAuthenticationOptions>("saml2", ...)` forcing a relative redirect on `OnRedirectToLogin`/`OnRedirectToAccessDenied` after the proxy still didn't yield the correct `Request.Host`; (4) fixed `IDX10214: Audience validation failed` by populating `saml2Config.AllowedAudienceUris`; also fixed `_Layout.cshtml` nav/user-context chrome rendering for anonymous requests. Confirmed via Log stream: SAML assertion now validates successfully end-to-end. Remaining blocker (infra, not code): `HistologyDb` SQL connection unreachable in Dev. Build: 0 errors. |
+| 78 | 2026-09-01 | `GitHub Copilot` | 12:15 | 19:07 | **~60 min** | Run #91 — Dev-only auth bypass in `HistoPageModel` (hardcoded principal, `DevAuthBypass` config flag, remove `SignInAsync`, make bypass unconditional to fix empty-session panel bug); submission-type routing analysis across all 5 types (Wet Tissue/Pre-Cassetted/Wax Block/Stained/Unstained) for Create/Edit/View/Copy journeys: fixed `OnPostSelect` to route Wet Tissue to `SubmissionDetails`; added `BatchId` route to `SubmissionDetails` back-links; added view-mode guards to `SubmissionDetails`; restored Edit sample visibility in View mode. Build: 0 errors. Duration estimated from session timestamps. |
 ---
 
 ## Run #87 sub-task breakdown (2026-08-27)
@@ -106,8 +106,6 @@
 | 10 | **~15 min** | `BatchDetails.cshtml(.cs)` | Submission date changed from free-text input to native `type="date"` component |
 | 11 | **~40 min** | `BatchDetails.cshtml(.cs)` | Investigated and fixed button visibility across Create/View Submission journeys (`IsViewMode`/`CanPrint`); removed redundant QC notes button and duplicate Samples task-list row/link |
 
-=======
->>>>>>> 351607732625fba3ca3dad48fbba1c32f021a658
 ---
 
 ## Run #85 Sub-task Breakdown (2026-08-19)

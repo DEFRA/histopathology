@@ -72,6 +72,14 @@ public class BatchBlockSummaryModel : HistoPageModel
     public bool CanModifySamples => Batch?.Status is BatchStatus.Submitted or BatchStatus.Rejected;
 
     /// <summary>
+    /// Wet Tissue (SubmittedAs code "4") routes Edit sample to SubmissionDetails (tissue-only view);
+    /// all other types (Wax Block, Pre-Cassetted, Stained/Unstained Section) route to SubmissionDetailsBlock.
+    /// Legacy source: <c>BatchSummary.aspx</c> vs <c>BatchBlockSummary.aspx</c> — separate pages per type;
+    /// both consolidated here but the Edit navigation target differs by type.
+    /// </summary>
+    public bool IsWetTissue { get; private set; }
+
+    /// <summary>
     /// Mirrors legacy <c>SV_ViewSubmission</c>: true when reached via the View Submission journey
     /// (ViewSubmissions or SearchSubmissions → BatchDetails → Samples). All sample actions are
     /// read-only in this mode.
@@ -92,6 +100,8 @@ public class BatchBlockSummaryModel : HistoPageModel
         BatchId = batchId;
         var batchIdValue = batchId.Value;
         Batch = await _batches.GetByIdAsync(batchIdValue);
+        var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchIdValue);
+        IsWetTissue = submittedAsCode == "4"; // LOOKUP_SUBMITTEDAS code 4 = Wet Tissue (Common.vb)
         var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(batchIdValue);
         var allAnimals = await _submissions.GetAnimalsByBatchAsync(batchIdValue);
         // Merge rather than either/or: GetBlockAnimalsByBatchAsync only returns animals that
@@ -166,9 +176,14 @@ public class BatchBlockSummaryModel : HistoPageModel
     public IActionResult OnPostSelect(int animalId)
     {
         Session.AnimalID = animalId;
-        // Route to the animal-scoped blocks page (correctly filters by this sample) rather than
-        // the batch-wide overview mode (no animalId), which lists every block in the batch regardless of sample.
-        return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId = BatchId ?? Session.BatchID, animalId });
+        // Wet Tissue submissions route to SubmissionDetails (tissue list + PM date/histology ref edit);
+        // all block-type submissions route to SubmissionDetailsBlock (block assignment view).
+        // Legacy source: BatchSummary.aspx btnEditSubmission → SubmissionDetails.aspx;
+        //                BatchBlockSummary.aspx btnEditSubmission → SubmissionDetailsBlock.aspx.
+        var batchId = BatchId ?? Session.BatchID;
+        if (IsWetTissue)
+            return RedirectToPage("/Submissions/SubmissionDetails", new { batchId, animalId });
+        return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId });
     }
 
     /// <summary>
