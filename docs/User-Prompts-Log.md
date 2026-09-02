@@ -1614,4 +1614,20 @@ Analysed the legacy flow via two parallel `Explore` subagents (`BatchDetails.asp
 
 Ran `journal-updater` in Mode A (committed session — `git status --short` clean; commit `91deb3f` "Implement return URL handling in user and batch management forms" contains all 12 changed files). Appended Run Log row #19 and Open Issues ISS-R20 … ISS-R28 to `run-log-v2.md`, plus a session section covering what was implemented, what was reviewed and confirmed correct, and what was raised. Appended Agent Run Timing row #80 and a full session block to `session-metrics.md`. Appended Prompts 112–113 to this file. Nothing was committed.
 
+---
+
+## Prompt 114 — Fix Wet Tissue Edit sample "does nothing" using a browser Network tab trace (2026-09-02)
+
+> as per below flow can you check if we bring BatchBlockSummary.cshtml file code base separatly will this issue would be solved, if so can you impmmente flow view submission, create submission, edit submission
+>
+> still facing same issue... this page was there before, because i asked merge these fucntionality BatchBlockSummary.cshtml may be casuing the issue... bring that page back and impmmente flow
+>
+> [Network tab trace showing: POST /Submissions/SampleSummary?handler=Select → 302; GET /Submissions/SubmissionDetails?batchId=29398&animalId=91478 → 302; GET /Submissions/SampleSummary?batchId=29398 → 200]
+
+User suspected the earlier `BatchBlockSummary` → `SampleSummary` rename had caused the regression and asked to recreate the old file. Proved via `git log --oneline --follow` that `SampleSummary.cshtml` **is** `BatchBlockSummary.cshtml` renamed with history preserved (`git mv`, commit `618b54b`), so recreating it would be a functionally identical no-op and would not fix anything. The user then supplied a browser Network tab trace, which pinpointed the real defect: `SampleSummary`'s POST-to-Select correctly routes to `SubmissionDetails` for this Wet Tissue batch (routing itself was correct), but the `GET` to `SubmissionDetails` returned 302 instead of 200 — silently bouncing back to `SampleSummary`, indistinguishable from the button doing nothing. Root cause: `SubmissionDetailsModel.LoadAnimalAsync` only checked the plain `GetAnimalsByBatchAsync` table and silently redirected on a miss — the identical bug class already fixed in `SubmissionDetailsBlockModel` earlier this session but never ported to this twin page for Wet Tissue submissions. Fixed by merging in `GetBlockAnimalsByBatchAsync` (matching `SampleSummary`/`SubmissionDetailsBlock`) and removing the silent redirect so the view's dormant "Sample not found" branch renders instead of bouncing; added null guards to `OnGetAsync`, `OnPostSaveDetailsAsync`, `OnPostAddTissueAsync`.
+
+**Build:** 0 errors, 3 pre-existing warnings. **Tests:** 145 passed, 1 skipped, 0 failed.
+
+**Files changed:** [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs).
+
 
