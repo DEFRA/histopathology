@@ -286,8 +286,15 @@ public class SubmissionDetailsBlockModel : HistoPageModel
 
         Session.AnimalID = AnimalId;
 
-        var animals = await _submissions.GetAnimalsByBatchAsync(batchId.Value);
-        Animal = animals.FirstOrDefault(a => a.ID == AnimalId);
+        // Mirrors SampleSummaryModel: GetAnimalsByBatchAsync alone is incomplete for cassetted
+        // batches — the animal may only exist in the block-animal table (BATCH_BLOCK_ANIMAL).
+        var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(batchId.Value);
+        Animal = blockAnimals.FirstOrDefault(a => a.ID == AnimalId);
+        if (Animal is null)
+        {
+            var animals = await _submissions.GetAnimalsByBatchAsync(batchId.Value);
+            Animal = animals.FirstOrDefault(a => a.ID == AnimalId);
+        }
         return Animal is null ? RedirectToPage("/Submissions/SampleSummary", new { batchId }) : null;
     }
 
