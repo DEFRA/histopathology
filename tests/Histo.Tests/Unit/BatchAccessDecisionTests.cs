@@ -12,28 +12,37 @@ public class BatchAccessDecisionTests
     [Fact]
     public void IsAllowed_HistoUser_AlwaysAllowed()
     {
-        var result = BatchAccessDecision.IsAllowed(isHistoUser: true, batchUserAreaCode: 99, callerUserAreaId: 1);
+        var result = BatchAccessDecision.IsAllowed(isAreaUnrestricted: true, batchUserAreaCode: 99, callerUserAreaId: 1);
         Assert.True(result);
     }
 
     [Fact]
-    public void IsAllowed_NonHistoUser_MatchingArea_Allowed()
+    public void IsAllowed_Maintenance_AlwaysAllowed()
     {
-        var result = BatchAccessDecision.IsAllowed(isHistoUser: false, batchUserAreaCode: 5, callerUserAreaId: 5);
+        // Legacy CheckPermissions() treats Maintenance identically to Histopathology User —
+        // unrestricted, area-agnostic access — on every page checked.
+        var result = BatchAccessDecision.IsAllowed(isAreaUnrestricted: true, batchUserAreaCode: 99, callerUserAreaId: 1);
         Assert.True(result);
     }
 
     [Fact]
-    public void IsAllowed_NonHistoUser_MismatchedArea_Denied()
+    public void IsAllowed_AreaRestrictedRole_MatchingArea_Allowed()
     {
-        var result = BatchAccessDecision.IsAllowed(isHistoUser: false, batchUserAreaCode: 5, callerUserAreaId: 6);
+        var result = BatchAccessDecision.IsAllowed(isAreaUnrestricted: false, batchUserAreaCode: 5, callerUserAreaId: 5);
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void IsAllowed_AreaRestrictedRole_MismatchedArea_Denied()
+    {
+        var result = BatchAccessDecision.IsAllowed(isAreaUnrestricted: false, batchUserAreaCode: 5, callerUserAreaId: 6);
         Assert.False(result);
     }
 
     [Fact]
     public void IsAllowed_BatchNotFound_AllowedThroughToPagesOwnNotFoundHandling()
     {
-        var result = BatchAccessDecision.IsAllowed(isHistoUser: false, batchUserAreaCode: null, callerUserAreaId: 6);
+        var result = BatchAccessDecision.IsAllowed(isAreaUnrestricted: false, batchUserAreaCode: null, callerUserAreaId: 6);
         Assert.True(result);
     }
 }
