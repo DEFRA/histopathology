@@ -6,10 +6,25 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Admin/PickListMaintenance" class="govuk-back-link">Back</a>
+    @if (Model.SafeReturnUrl is not null)
+    {
+        <a href="@Model.SafeReturnUrl" class="govuk-back-link">Back to submission</a>
+    }
+    else
+    {
+        <a asp-page="/Admin/PickListMaintenance" class="govuk-back-link">Back</a>
+    }
 }
 
 <h2 class="govuk-heading-m">@Model.TableName</h2>
+
+@if (Model.SafeReturnUrl is not null)
+{
+    <div class="govuk-inset-text">
+        Values added or changed here appear immediately in the submission you were completing.
+        Select <strong>Return to submission</strong> when you are finished — nothing you have already entered will be lost.
+    </div>
+}
 
 <p class="govuk-body">Use the form below to add, edit or deactivate entries in this table. The description field must be completed for the entry to be successfully saved.</p>
 
@@ -57,7 +72,7 @@
                 <td class="govuk-table__cell">@i.Name</td>
                 <td class="govuk-table__cell">@(i.Active ? "Yes" : "No")</td>
                 <td class="govuk-table__cell">
-                    <a asp-page="/Admin/PickListUserArea" asp-route-tableId="@Model.TableId" asp-route-userArea="@Model.UserArea" asp-route-itemId="@i.ID" class="govuk-link">Edit</a>
+                    <a asp-page="/Admin/PickListUserArea" asp-route-tableId="@Model.TableId" asp-route-userArea="@Model.UserArea" asp-route-itemId="@i.ID" asp-route-returnUrl="@Model.SafeReturnUrl" class="govuk-link">Edit</a>
                 </td>
             </tr>
         }
@@ -72,6 +87,7 @@
 
 <form method="post">
     <input type="hidden" asp-for="ItemId" />
+    <input type="hidden" asp-for="ReturnUrl" />
     <div class="govuk-form-group">
         <label class="govuk-label" for="Description">Description</label>
         <input class="govuk-input" asp-for="Description" maxlength="50" />
@@ -84,6 +100,15 @@
             </div>
         </div>
     </div>
-    <button type="submit" class="govuk-button" data-module="govuk-button">@(Model.ItemId is int ? "Save changes" : "Add item")</button>
-    <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">@(Model.ItemId is int ? "Save changes" : "Add item")</button>
+        @if (Model.SafeReturnUrl is not null)
+        {
+            <a href="@Model.SafeReturnUrl" class="govuk-button govuk-button--secondary" data-module="govuk-button">Return to submission</a>
+        }
+        else
+        {
+            <a asp-page="/Admin/PickListMaintenance" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
+        }
+    </div>
 </form>

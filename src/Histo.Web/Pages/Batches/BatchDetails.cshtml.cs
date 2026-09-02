@@ -217,6 +217,84 @@ public class BatchDetailsModel : HistoPageModel
 
     public string? LoadError { get; private set; }
 
+    /// <summary>
+    /// TempData slot holding the in-progress create form while the user detours to pick list
+    /// management. Restores the legacy behaviour where <c>btnNewProject</c>/<c>btnNewContact</c>
+    /// called <c>UpdateSessionWithBatchDetails()</c> before redirecting, so nothing was lost.
+    /// </summary>
+    private const string CreateDraftKey = "BatchDetails_CreateDraft";
+
+    private sealed record CreateDraft(
+        string? ProjectContractCode,
+        string? ContactName,
+        string? SpeciesId,
+        string? BatchDateStr,
+        string? Fixation,
+        bool SafeToHandle,
+        int? OtherSubmittedBy,
+        string? OtherSubmittedArea,
+        string? Comments,
+        List<string> Histology,
+        List<string> Antibodies,
+        List<string> Stains);
+
+    /// <summary>
+    /// Replaces legacy <c>btnNewSubmittedBy</c> / <c>btnNewProject</c> / <c>btnNewContact</c> —
+    /// saves the part-completed submission, then opens the maintenance page for that field's
+    /// value list with a return link back to this form.
+    /// </summary>
+    public IActionResult OnPostManagePickList(string field)
+    {
+        TempData[CreateDraftKey] = System.Text.Json.JsonSerializer.Serialize(new CreateDraft(
+            Create_ProjectContractCode,
+            Create_ContactName,
+            Create_SpeciesId,
+            Create_BatchDateStr,
+            Create_Fixation,
+            Create_SafeToHandle,
+            Create_OtherSubmittedBy,
+            Create_OtherSubmittedArea,
+            Create_Comments,
+            Create_SelectedHistologyCodes,
+            Create_SelectedAntibodyCodes,
+            Create_SelectedStainCodes));
+
+        var returnUrl = Url.Page("/Batches/BatchDetails", new { mode = "create" });
+
+        return field switch
+        {
+            "submittedBy" => RedirectToPage("/Admin/UserMaintenance", new { returnUrl }),
+            "project"     => RedirectToPage("/Admin/PickListUserArea", new { tableId = LookupProjects, returnUrl }),
+            "pathologist" => RedirectToPage("/Admin/PickListUserArea", new { tableId = LookupContacts, returnUrl }),
+            _             => RedirectToPage("/Batches/BatchDetails", new { mode = "create" }),
+        };
+    }
+
+    /// <summary>Re-applies a draft saved by <see cref="OnPostManagePickList"/>, if one is pending.</summary>
+    private bool RestoreCreateDraft()
+    {
+        if (TempData[CreateDraftKey] is not string json) return false;
+
+        CreateDraft? draft;
+        try { draft = System.Text.Json.JsonSerializer.Deserialize<CreateDraft>(json); }
+        catch (System.Text.Json.JsonException) { return false; }
+        if (draft is null) return false;
+
+        Create_ProjectContractCode   = draft.ProjectContractCode;
+        Create_ContactName           = draft.ContactName;
+        Create_SpeciesId             = draft.SpeciesId;
+        Create_BatchDateStr          = draft.BatchDateStr;
+        Create_Fixation              = draft.Fixation;
+        Create_SafeToHandle          = draft.SafeToHandle;
+        Create_OtherSubmittedBy      = draft.OtherSubmittedBy;
+        Create_OtherSubmittedArea    = draft.OtherSubmittedArea;
+        Create_Comments              = draft.Comments;
+        Create_SelectedHistologyCodes = draft.Histology ?? [];
+        Create_SelectedAntibodyCodes  = draft.Antibodies ?? [];
+        Create_SelectedStainCodes     = draft.Stains ?? [];
+        return true;
+    }
+
     public async Task<IActionResult> OnGetAsync()
     {
         ViewData["Title"]     = IsCreateMode ? "New submission" : "Submission details";
@@ -225,7 +303,8 @@ public class BatchDetailsModel : HistoPageModel
         if (IsCreateMode)
         {
             await LoadCreateLookupsAsync();
-            Create_BatchDateStr = DateTime.Today.ToString("yyyy-MM-dd");
+            if (!RestoreCreateDraft())
+                Create_BatchDateStr = DateTime.Today.ToString("yyyy-MM-dd");
             // Resolve SubmittedAs name from TempData for display
             if (TempData.TryGetValue("CreateSubmittedAsId", out var saId))
             {

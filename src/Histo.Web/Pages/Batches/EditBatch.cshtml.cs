@@ -101,9 +101,82 @@ public class EditBatchModel : HistoPageModel
         StatusComments      = Batch.StatusComments;
         OriginalStatus      = Batch.Status;
 
+        RestoreDraft(); // unsaved edits made before a detour to pick list management
+
         Session.BatchType = Batch.BatchType;
         await LoadLookupsAsync();
         return Page();
+    }
+
+    /// <summary>
+    /// TempData slot holding unsaved edits while the user detours to pick list management.
+    /// Mirrors legacy <c>btnNewProject</c>/<c>btnNewContact</c>, which called
+    /// <c>UpdateSessionWithBatchDetails()</c> before redirecting so nothing was lost.
+    /// </summary>
+    private const string DraftKey = "EditBatch_Draft";
+
+    private sealed record EditDraft(
+        string? ProjectContractCode,
+        string? ContactName,
+        string? SpeciesId,
+        string? BatchDateStr,
+        int BatchTypeField,
+        string? Fixation,
+        bool SafeToHandle,
+        bool IsPreCassetted,
+        string? Comments,
+        int? OtherSubmittedBy,
+        string? OtherSubmittedArea,
+        string? Status,
+        string? StatusComments,
+        string? OriginalStatus);
+
+    /// <summary>
+    /// Replaces legacy <c>btnNewSubmittedBy</c> / <c>btnNewProject</c> / <c>btnNewContact</c> —
+    /// saves the part-edited submission, then opens the maintenance page for that field's value
+    /// list with a return link back to this form.
+    /// </summary>
+    public IActionResult OnPostManagePickList(string field)
+    {
+        TempData[DraftKey] = System.Text.Json.JsonSerializer.Serialize(new EditDraft(
+            ProjectContractCode, ContactName, SpeciesId, BatchDateStr, BatchTypeField,
+            Fixation, SafeToHandle, IsPreCassetted, Comments, OtherSubmittedBy,
+            OtherSubmittedArea, Status, StatusComments, OriginalStatus));
+
+        var returnUrl = Url.Page("/Batches/EditBatch");
+
+        return field switch
+        {
+            "submittedBy" => RedirectToPage("/Admin/UserMaintenance", new { returnUrl }),
+            "project"     => RedirectToPage("/Admin/PickListUserArea", new { tableId = LookupProjects, returnUrl }),
+            "pathologist" => RedirectToPage("/Admin/PickListUserArea", new { tableId = LookupContacts, returnUrl }),
+            _             => RedirectToPage("/Batches/EditBatch"),
+        };
+    }
+
+    private void RestoreDraft()
+    {
+        if (TempData[DraftKey] is not string json) return;
+
+        EditDraft? draft;
+        try { draft = System.Text.Json.JsonSerializer.Deserialize<EditDraft>(json); }
+        catch (System.Text.Json.JsonException) { return; }
+        if (draft is null) return;
+
+        ProjectContractCode = draft.ProjectContractCode;
+        ContactName         = draft.ContactName;
+        SpeciesId           = draft.SpeciesId;
+        BatchDateStr        = draft.BatchDateStr;
+        BatchTypeField      = draft.BatchTypeField;
+        Fixation            = draft.Fixation;
+        SafeToHandle        = draft.SafeToHandle;
+        IsPreCassetted      = draft.IsPreCassetted;
+        Comments            = draft.Comments;
+        OtherSubmittedBy    = draft.OtherSubmittedBy;
+        OtherSubmittedArea  = draft.OtherSubmittedArea;
+        Status              = draft.Status;
+        StatusComments      = draft.StatusComments;
+        OriginalStatus      = draft.OriginalStatus;
     }
 
     public async Task<IActionResult> OnPostAsync()
