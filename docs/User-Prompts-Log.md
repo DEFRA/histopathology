@@ -1019,8 +1019,6 @@ Added `IsViewMode` computed property to `BatchBlockSummaryModel` that checks `Se
 
 ## Prompt 56 -  Entrat Id integration 
 
-<<<<<<< HEAD
-
 ## Prompt - Enter Quality Data
 
 In the navigation menu, there is a link labeled "Enter Quality Data" that points to the BatchesForDispatch workflow. Please confirm whether "Quality Data" refers to QC Notes or if it represents a different business process/entity.
@@ -1377,5 +1375,148 @@ Recommendations and required changes to achieve full parity and GDS compliance.
 ## Prompt 88 — Document issues and fixes for 27 Aug 2026 10:47 PM – 11:50 PM
 
 > alos need to dcoument the issues and fixes which has done during yesterday that 27 aug 2026 10:47 PM - 11.50 PM
-=======
->>>>>>> 351607732625fba3ca3dad48fbba1c32f021a658
+
+---
+
+## Prompt 89 — Compare legacy Receive Submission page and close the function gap
+
+> Please compare the Receive Submission page in the legacy system (found in the HistopathologySystem folder) with the Receive Submission page in the current system. Please close the function gap and ensure all features in the legacy version are present in the current version. When the user selects a submission they are brought to a form page, please ensure this form page includeds everything from legacy aswell.
+
+---
+
+## Prompt 90 — SQL query to verify Receive Submission page data
+
+> can you give me an SQL querey so I can check all the content is appearing correctly on the recieve submissions page
+
+---
+
+## Prompt 91 — Simplify the verification query
+
+> just give me a simple query that presents everything on the recieve submissions page in the on the same page
+
+---
+
+## Prompt 92 — Clarify which page the query should target
+
+> I am refering to the table displaying all submissions the user can select, not the submission form itself
+
+---
+
+## Prompt 93 — User-sensitive data audit query
+
+> Which user sensative data will we have stored in the SQL database, provide a query so I can look at any if found
+
+---
+
+## Prompt 94 — Create a PR description
+
+> create a PR description for this branch
+
+---
+
+## Prompt 95 — Shorten the PR description
+
+> make it smaller
+
+---
+
+## Prompt 96 — Merge develop into feature branch and check for conflicts
+
+> Can you pull the up to date 'develop' branch into this branch and look for conflicts
+
+---
+
+## Prompt 97 — Recommendation for resolving the major conflicts
+
+> What would be your recommendation for resolving the major conflicts?
+
+---
+
+## Prompt 98 — Perform the merge and resolve conflicts locally
+
+> Pull the develop branch into this branch, resolve the marge conflicts within this branch. So we can test it without touching the 'develop' branch
+
+---
+
+## Prompt 99 — Cancel the in-progress merge
+
+> cancel any mergre that was started
+
+---
+
+## Prompt 100 — Resolve the simple conflicts first
+
+> Start by resolving the simple to fix conflicts
+
+---
+
+## Prompt 101 — Local Entra ID login bypass for development
+
+> Currently when I run this system I am ment with a blockked access screen by Microsoft Entra. Can we bypass this screen as it's not requried for local development. However I only want this to be a local bypass as I don't want to include this skip in the branch merge
+
+---
+
+## Prompt 102 — Bypass loads home page but no user/nav visible
+
+> It works now. Can you give a brief summary to how the Entra block was bypassed and the system was loaded
+
+---
+
+## Prompt 103 — Summary of branch additions (excluding Entra bypass)
+
+> Create a summary to describe the main additions this branch added to the develop branch (don't include anything about the entra loging bypass). Keep it brief
+
+---
+
+## Prompt 104 — Resolve current build errors
+
+> Please resolve the current build errors.
+
+---
+
+## Prompt 105 — "Received" option missing on Receive Submission form
+
+> The recieved selection button is missing from the recieve submittions form for the ReceiveBatch page
+
+---
+
+## Prompt 106 — Latest change removed home page navigation
+
+> The recieved selection button is missing from the recieve submittions form for the ReceiveBatch page (follow-up: "This latest change has removed all the navigation buttons from the home page, please restore these features")
+
+---
+
+## Prompt 107 — Revert the ReceiveBatch label fix
+
+> revert all changes after and including the changes made after I requested for this change "The recieved selection button is missing from the recieve submittions form for the ReceiveBatch page"
+
+---
+
+## Prompt 108 — Reapply the ReceiveBatch label fix
+
+> reapply the fix
+
+---
+
+## Prompt 109 — Entra bypass broken after ReceiveBatch fix
+
+> these changes break the entra login skip. so the login sequnce does not load the system correctly. Please review what you changed to find the cause of this. I can no longer see which user is loged in and the page navigation links are missing on the homepage
+
+---
+
+## Prompt 110 — Review Copilot PR review comment on UpdateAsync error handling
+
+> Co-Pilot github has mentioned this, please give your thoughts on the UpdateAsync/dead error-handling-branch comment on ReceiveBatchModel.OnPostSaveAsync
+
+---
+
+## Prompt 111 — Apply the UpdateAsync fix
+
+> apply this fix
+
+---
+
+## Prompt 112 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session
+
+> Please update the details run-log-v2.md (what fix applied) and session-metrics.md (duration), User-Prompts-Log.md (prompt) file for this session
+

@@ -94,6 +94,11 @@ public class ReceiveBatchModel : HistoPageModel
         Batch = await _batches.GetByIdAsync(Session.BatchID.Value);
         if (Batch is null) return RedirectToPage("/Batches/BatchesNotReceived");
 
+        // Clears the one-shot pointer OnPostEditSubmission left behind, otherwise this page's
+        // own BackLinkPage/Cancel would target itself on every visit after an Edit Submission trip.
+        if (Session.ReturnPage == "/Batches/ReceiveBatch")
+            Session.ReturnPage = string.Empty;
+
         Session.BatchType = Batch.BatchType;
         await LoadLookupsAsync();
 
@@ -128,6 +133,15 @@ public class ReceiveBatchModel : HistoPageModel
 
         await LoadLookupsAsync();
         HasRepeatBlocks = (await _blocks.GetByBatchAsync(Batch.ID)).Any(b => b.RepeatBlock);
+
+        // Not started has no receipt details — clear any stale/disabled-field values before
+        // validating or saving, regardless of what was posted (defence in depth vs. client JS).
+        if (Status == BatchStatus.Submitted)
+        {
+            DateReceived     = null;
+            TimeReceived     = null;
+            ReceivedByUserId = null;
+        }
 
         if (!ValidateData())
             return Page();
@@ -189,10 +203,17 @@ public class ReceiveBatchModel : HistoPageModel
             return Page();
         }
 
-        return RedirectToPage("/Batches/BatchesNotReceived");
+        return RedirectToPage("/Batches/PrintSubmission");
     }
 
     public IActionResult OnPostCancel() => RedirectToPage(BackLinkPage);
+
+    /// <summary>Legacy source: <c>btnEditSubmission_Click</c> — records where to return once editing finishes.</summary>
+    public IActionResult OnPostEditSubmission()
+    {
+        Session.ReturnPage = "/Batches/ReceiveBatch";
+        return RedirectToPage("/Batches/EditBatch");
+    }
 
     // ── Private helpers ─────────────────────────────────────────────────────
 

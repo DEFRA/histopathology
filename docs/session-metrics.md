@@ -83,10 +83,11 @@
 | 71 | 2026-08-24 | `Identity-migration` | — | — | **40 min** | Run Entra id integration agents |
 | 72 | 2026-08-24 | `Identity-migration` | — | — | **10 min** | SAML config validation |
 | 73 | 2026-08-24 | `gds-ui` | — | — | **15 min** | Access denied and There is a problem with the service pages implmentation - An unhandled exception occurred while processing the request. |
-<<<<<<< HEAD
 | 74 | 2026-08-27 | `GitHub Copilot` | — | — | **~330 min (5h 30m)** | Run #87 — TSE/NON-TSE submission workflow GDS redesign (docs/TSE-NonTSE-Submission-Workflow-Redesign.md) + route-based state/access-guard rollout (Phase 0–2) + BatchAccessDecision unit tests + per-block tissue/pre-booked-ref/bulk-block additions + New Submission Create/Edit flow fixes (AddSubmission Sender Ref search + Sample Blocks redirect + BatchSubmissionID resilience, Cassetted submission-type default fix, BatchDetails native date input) + BatchDetails button-visibility/journey gating (IsViewMode/CanPrint) and redundant task-list cleanup. Duration is a complexity-based estimate — no exact start/end timestamps captured. See sub-task breakdown below. |
 | 75 | 2026-08-27 | `GitHub Copilot` | 22:47 | 23:50 | **~63 min (1h 03m)** | Run #88 — Submission scenario gating (Add/Edit/Copy sample per journey), `BlockDetails`→`SubmissionDetailsBlock` consolidation, `BatchBlockSummary` animal-list merge fix, and two `AddAnimal` stored-procedure bugs fixed (`PMDate` DBNull `dbType`, `AddAnimal` too-many-arguments parameter mismatch vs real SP). Duration per user-reported start/end time. |
 | 76 | 2026-08-28 | `GitHub Copilot` | — | — | **~25 min** | Run #89 — Submission-journey navigation verification (all 4 journeys' back/cancel targets confirmed correct) + GDS button-alignment fixes across 4 files (`EditBatch` Samples link into button-group, `SubmissionDetailsBlock` missing `data-module`, `AddSubmission` Add sample/Cancel/Check-historical-data button-groups, `BatchBlockSummary` Add sample/Done button-groups). Duration is a complexity-based estimate. Build: 0 errors. |
+| 77 | 2026-09-01 | `GitHub Copilot` | — | — | **~120 min (2h 00m)** | Run #90 — ReceiveBatch legacy-parity rebuild (status choice, date/time/received-by, post-fixation checkboxes, rejection reason, repeat-blocks indicator, read-only view mode) + `Batch`/`BatchRepository`/`BatchService` post-fixation extensions + `develop` merge into feature branch (58 commits ahead, 8 conflicting files resolved) + post-merge type-mismatch fix (`SubmittedArea`/`OtherSubmittedArea` int?→string?). Duration is a complexity-based estimate. Build: 0 errors. Tests: 144 passed, 1 skipped. |
+| 78 | 2026-09-02 | `GitHub Copilot` | — | — | **~45 min** | Run #91 — `LogError` argument-order build error fix; ReceiveBatch "Received" radio missing `<label>`/`aria-controls` typo fix (reverted and reapplied per user request); Copilot PR review comment addressed (`ReceiveBatchModel.OnPostSaveAsync` dead error-handling branch — `UpdateAsync` rethrows rather than returning `false`; fixed with `try/catch` + corrected doc comments); local dev-only Entra ID auth bypass investigated and fixed across several iterations (uncommitted, not part of this branch's merge). Build: 0 errors. Tests: 144 passed, 1 skipped. |
 
 ---
 
@@ -106,8 +107,6 @@
 | 10 | **~15 min** | `BatchDetails.cshtml(.cs)` | Submission date changed from free-text input to native `type="date"` component |
 | 11 | **~40 min** | `BatchDetails.cshtml(.cs)` | Investigated and fixed button visibility across Create/View Submission journeys (`IsViewMode`/`CanPrint`); removed redundant QC notes button and duplicate Samples task-list row/link |
 
-=======
->>>>>>> 351607732625fba3ca3dad48fbba1c32f021a658
 ---
 
 ## Run #85 Sub-task Breakdown (2026-08-19)

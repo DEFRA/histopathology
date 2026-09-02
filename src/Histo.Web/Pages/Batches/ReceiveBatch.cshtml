@@ -147,14 +147,12 @@ else
                         </div>
                         <div class="govuk-radios__item">
                             <input class="govuk-radios__input" type="radio" id="status-received" name="Status"
-                                   value="@BatchStatus.Received" checked="@(Model.Status == BatchStatus.Received)"
-                                   aria-controls="receipt-details" />
+                                   value="@BatchStatus.Received" checked="@(Model.Status == BatchStatus.Received)" />
                             <label class="govuk-label govuk-radios__label" for="status-received">Received</label>
                         </div>
                         <div class="govuk-radios__item">
                             <input class="govuk-radios__input" type="radio" id="status-rejected" name="Status"
-                                   value="@BatchStatus.Rejected" checked="@(Model.Status == BatchStatus.Rejected)"
-                                   aria-controls="receipt-details" />
+                                   value="@BatchStatus.Rejected" checked="@(Model.Status == BatchStatus.Rejected)" />
                             <label class="govuk-label govuk-radios__label" for="status-rejected">Rejected</label>
                         </div>
                         @{
@@ -190,15 +188,16 @@ else
                                     }
                                 </select>
                             </div>
-
-                            <div class="govuk-form-group">
-                                <label class="govuk-label" for="Reason">Reason</label>
-                                <div class="govuk-hint">Required if the submission is being rejected.</div>
-                                <textarea class="govuk-textarea" id="Reason" name="Reason" rows="4">@Model.Reason</textarea>
-                            </div>
                         </div>
                     </div>
                 </fieldset>
+            </div>
+
+            @* Notes stays enabled regardless of submission status — unlike the receipt-details above. *@
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="Reason">Notes</label>
+                <div class="govuk-hint">Required if the submission is being rejected.</div>
+                <textarea class="govuk-textarea" id="Reason" name="Reason" rows="4">@Model.Reason</textarea>
             </div>
 
             <div class="govuk-form-group">
@@ -232,9 +231,52 @@ else
 
             <div class="govuk-button-group">
                 <button type="submit" class="govuk-button" data-module="govuk-button">Done</button>
-                <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">View submission details</a>
-                <a href="@Url.Page(Model.BackLinkPage)" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+                <button type="submit" asp-page-handler="EditSubmission" class="govuk-button govuk-button--secondary" data-module="govuk-button">Edit submission</button>
+                <button type="submit" asp-page-handler="Cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</button>
             </div>
         </form>
+
+        <script>
+            (function () {
+                var today = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(DateTime.Today.ToString("yyyy-MM-dd")));
+                var currentUserId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Session.UserID.ToString()));
+                var dateReceived = document.getElementById('DateReceived');
+                var receivedBy = document.getElementById('ReceivedByUserId');
+                var timeReceived = document.getElementById('TimeReceived');
+                var receiptFields = [dateReceived, receivedBy, timeReceived];
+                var receiptDetails = document.getElementById('receipt-details');
+                var receivedRadio = document.getElementById('status-received');
+                var rejectedRadio = document.getElementById('status-rejected');
+                var statusRadios = document.querySelectorAll('input[name="Status"]');
+
+                // Reveal is handled here rather than via native govuk-radios aria-controls, because
+                // Received and Rejected share one target and the native script only tracks the last one.
+                function applyStatus(statusValue) {
+                    var isReceivedOrRejected = statusValue === '@BatchStatus.Received' || statusValue === '@BatchStatus.Rejected';
+                    receiptDetails.classList.toggle('govuk-radios__conditional--hidden', !isReceivedOrRejected);
+                    receivedRadio.setAttribute('aria-expanded', String(isReceivedOrRejected));
+                    rejectedRadio.setAttribute('aria-expanded', String(isReceivedOrRejected));
+                    receiptFields.forEach(function (field) { field.disabled = !isReceivedOrRejected; });
+                    if (isReceivedOrRejected) {
+                        if (!dateReceived.value) dateReceived.value = today;
+                        if (!receivedBy.value) receivedBy.value = currentUserId;
+                    } else {
+                        dateReceived.value = '';
+                        receivedBy.value = '';
+                        timeReceived.value = '';
+                    }
+                }
+
+                // Deliberately no aria-controls attribute here: govuk-frontend's own radios
+                // script re-scans for it on every page load and reintroduces the shared-target
+                // bug (see comment above) the moment it finds one, even if added dynamically.
+                statusRadios.forEach(function (radio) {
+                    radio.addEventListener('change', function () { applyStatus(radio.value); });
+                });
+
+                var checkedStatus = document.querySelector('input[name="Status"]:checked');
+                if (checkedStatus) applyStatus(checkedStatus.value);
+            })();
+        </script>
     }
 }
