@@ -252,9 +252,15 @@ else
                 // Reveal is handled here rather than via native govuk-radios aria-controls, because
                 // Received and Rejected share one target and the native script only tracks the last one.
                 function applyStatus(statusValue) {
-var isReceivedOrRejected = statusValue === '@BatchStatus.Received' || statusValue === '@BatchStatus.Rejected';
-receiptDetails.classList.toggle('govuk-radios__conditional--hidden', !isReceivedOrRejected);
-receiptFields.forEach(function (field) { field.disabled = !isReceivedOrRejected; });
+                    var isReceivedOrRejected = statusValue === '@BatchStatus.Received' || statusValue === '@BatchStatus.Rejected';
+
+                    receiptDetails.classList.toggle('govuk-radios__conditional--hidden', !isReceivedOrRejected);
+                    receiptDetails.setAttribute('aria-hidden', (!isReceivedOrRejected).toString());
+
+                    receivedRadio.setAttribute('aria-expanded', (statusValue === '@BatchStatus.Received').toString());
+                    rejectedRadio.setAttribute('aria-expanded', (statusValue === '@BatchStatus.Rejected').toString());
+
+                    receiptFields.forEach(function (field) { field.disabled = !isReceivedOrRejected; });
                     if (isReceivedOrRejected) {
                         if (!dateReceived.value) dateReceived.value = today;
                         if (!receivedBy.value) receivedBy.value = currentUserId;
