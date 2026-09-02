@@ -148,7 +148,8 @@ else
                         <div class="govuk-radios__item">
                             <input class="govuk-radios__input" type="radio" id="status-received" name="Status"
                                    value="@BatchStatus.Received" checked="@(Model.Status == BatchStatus.Received)"
-                                   data-aria-controls="receipt-details" />
+                                   aria-controls="receipt-details" />
+                            <label class="govuk-label govuk-radios__label" for="status-received">Received</label>
                         </div>
                         <div class="govuk-radios__item">
                             <input class="govuk-radios__input" type="radio" id="status-rejected" name="Status"
@@ -215,7 +216,7 @@ else
                         }
                         <div class="govuk-checkboxes__item">
                             <input class="govuk-checkboxes__input" type="checkbox" id="postfix-other" name="SelectedPostFixationCodes"
-                                   value="Other" data-aria-controls="postfix-other-conditional"
+                                   value="Other" aria-controls="postfix-other-conditional"
                                    checked="@Model.SelectedPostFixationCodes.Contains("Other")" />
                             <label class="govuk-label govuk-checkboxes__label" for="postfix-other">Other</label>
                         </div>

@@ -327,7 +327,7 @@ public sealed class BatchService : IBatchService
         try { return await _batches.GetPostFixationCodesAsync(batchId, ct); }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get post-fixation codes for batch {BatchId}.", batchId);
+            _logger.LogError("Failed to get post-fixation codes for batch {BatchId}.", ex, batchId);
             return [];
         }
     }
