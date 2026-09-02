@@ -1,37 +1,240 @@
 @page
 @model Histo.Web.Pages.Batches.ReceiveBatchModel
+@using Histo.Core.Domain
 @{
-    ViewData["Title"] = "Receive batch";
-    ViewData["PageTitle"] = "Receive batch";
+    ViewData["Title"] = "Receive submission";
+    ViewData["PageTitle"] = "Receive submission";
 }
 
 @section BeforeHeading {
-    <a asp-page="/Batches/BatchesNotReceived" class="govuk-back-link">Back</a>
+    <a href="@Url.Page(Model.BackLinkPage)" class="govuk-back-link">Back</a>
 }
 
-@if (!string.IsNullOrEmpty(Model.Error))
+@if (Model.Batch is null)
 {
-    <div class="govuk-error-summary" data-module="govuk-error-summary">
-        <div role="alert">
-            <h2 class="govuk-error-summary__title">There is a problem</h2>
-            <div class="govuk-error-summary__body">
-                <ul class="govuk-list govuk-error-summary__list">
-                    <li>@Model.Error</li>
-                </ul>
-            </div>
-        </div>
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <strong class="govuk-warning-text__text">
+            <span class="govuk-visually-hidden">Warning</span>
+            Submission not found.
+        </strong>
     </div>
 }
-
-@if (Model.Batch is not null)
+else
 {
-    <p class="govuk-body">Confirm receipt of submission <strong>@Model.Batch.ID</strong>
-        @if (!string.IsNullOrWhiteSpace(Model.Batch.ProjectContractCode))
-        {
-            <span> — project @Model.Batch.ProjectContractCode</span>
-        }?</p>
-    <form method="post">
-        <button type="submit" class="govuk-button" data-module="govuk-button">Confirm receipt</button>
-        <a asp-page="/Batches/BatchesNotReceived" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
-    </form>
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="govuk-error-summary" data-module="govuk-error-summary">
+            <div role="alert">
+                <h2 class="govuk-error-summary__title">There is a problem</h2>
+                <div class="govuk-error-summary__body">
+                    <ul class="govuk-list govuk-error-summary__list">
+                        <li>@Model.Error</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* Batch summary — mirrors legacy Batch.ascx control shown at the top of ReceiveBatch.aspx. *@
+    <dl class="govuk-summary-list govuk-!-margin-bottom-6">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submission number</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.ID</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Entered by</dt>
+            <dd class="govuk-summary-list__value">@(Model.EnteredByName ?? "Not recorded")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Entered area</dt>
+            <dd class="govuk-summary-list__value">@(Model.EnteredAreaName ?? "Not recorded")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submitted by</dt>
+            <dd class="govuk-summary-list__value">@(Model.SubmittedByName ?? "Not recorded")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submitted area</dt>
+            <dd class="govuk-summary-list__value">@(Model.SubmittedAreaName ?? "Not recorded")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Project or contract code</dt>
+            <dd class="govuk-summary-list__value">@Model.ProjectName</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Pathologist</dt>
+            <dd class="govuk-summary-list__value">@Model.PathologistName</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Species</dt>
+            <dd class="govuk-summary-list__value">@Model.SpeciesName</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submission date</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.BatchDate?.ToShortDateString()</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Contains repeat blocks?</dt>
+            <dd class="govuk-summary-list__value">@(Model.HasRepeatBlocks ? "Yes" : "No")</dd>
+        </div>
+    </dl>
+
+    @if (Model.IsReadOnly)
+    {
+        @* View-only mode — reached via SearchSubmissions "View receipt" for a submission that has
+           already been actioned. Mirrors legacy SessionVars.SV_ViewSubmission = True. *@
+        <dl class="govuk-summary-list">
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">Submission status</dt>
+                <dd class="govuk-summary-list__value">@BatchStatus.DisplayName(Model.Batch.Status)</dd>
+            </div>
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">Date received/rejected</dt>
+                <dd class="govuk-summary-list__value">@(Model.DateReceived?.ToShortDateString() ?? "Not recorded")</dd>
+            </div>
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">Received/Rejected by</dt>
+                <dd class="govuk-summary-list__value">@(Model.Users.FirstOrDefault(u => u.UserID == Model.ReceivedByUserId)?.Name ?? "Not recorded")</dd>
+            </div>
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">Time received/rejected</dt>
+                <dd class="govuk-summary-list__value">@(Model.TimeReceivedOptions.FirstOrDefault(o => o.Code == Model.TimeReceived)?.Name ?? "Not recorded")</dd>
+            </div>
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">Post fixation</dt>
+                <dd class="govuk-summary-list__value">
+                    @if (Model.SelectedPostFixationCodes.Count == 0)
+                    {
+                        <span class="govuk-hint">None recorded</span>
+                    }
+                    else
+                    {
+                        @string.Join(", ", Model.SelectedPostFixationCodes.Select(c =>
+                            c == "Other" ? "Other" : Model.PostFixationOptions.FirstOrDefault(o => o.Code == c)?.Name ?? c))
+                    }
+                </dd>
+            </div>
+            @if (Model.SelectedPostFixationCodes.Contains("Other"))
+            {
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">Post fixation (other)</dt>
+                    <dd class="govuk-summary-list__value">@Model.PostFixationOther</dd>
+                </div>
+            }
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">Reason</dt>
+                <dd class="govuk-summary-list__value">@(Model.Reason ?? "Not recorded")</dd>
+            </div>
+        </dl>
+
+        <div class="govuk-button-group govuk-!-margin-top-6">
+            <a href="@Url.Page(Model.BackLinkPage)" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back</a>
+        </div>
+    }
+    else
+    {
+        <form method="post" asp-page-handler="Save">
+
+            <div class="govuk-form-group">
+                <fieldset class="govuk-fieldset">
+                    <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Submission status</legend>
+                    <div class="govuk-radios" data-module="govuk-radios">
+                        <div class="govuk-radios__item">
+                            <input class="govuk-radios__input" type="radio" id="status-submitted" name="Status"
+                                   value="@BatchStatus.Submitted" checked="@(Model.Status == BatchStatus.Submitted)" />
+                            <label class="govuk-label govuk-radios__label" for="status-submitted">Not started</label>
+                        </div>
+                        <div class="govuk-radios__item">
+                            <input class="govuk-radios__input" type="radio" id="status-received" name="Status"
+                                   value="@BatchStatus.Received" checked="@(Model.Status == BatchStatus.Received)"
+                                   aria-controls="receipt-details" />
+                            <label class="govuk-label govuk-radios__label" for="status-received">Received</label>
+                        </div>
+                        <div class="govuk-radios__item">
+                            <input class="govuk-radios__input" type="radio" id="status-rejected" name="Status"
+                                   value="@BatchStatus.Rejected" checked="@(Model.Status == BatchStatus.Rejected)"
+                                   aria-controls="receipt-details" />
+                            <label class="govuk-label govuk-radios__label" for="status-rejected">Rejected</label>
+                        </div>
+                        @{
+                            var receiptHidden = Model.Status is not (BatchStatus.Received or BatchStatus.Rejected);
+                        }
+                        <div class="govuk-radios__conditional @(receiptHidden ? "govuk-radios__conditional--hidden" : "")" id="receipt-details">
+
+                            @* Receipt details — required when status is Received or Rejected. *@
+                            <div class="govuk-form-group">
+                                <label class="govuk-label" for="DateReceived">Date received/rejected</label>
+                                <input class="govuk-input govuk-input--width-10" id="DateReceived" name="DateReceived" type="date"
+                                       value="@Model.DateReceived?.ToString("yyyy-MM-dd")" />
+                            </div>
+
+                            <div class="govuk-form-group">
+                                <label class="govuk-label" for="ReceivedByUserId">Received/Rejected by</label>
+                                <select class="govuk-select" id="ReceivedByUserId" asp-for="ReceivedByUserId">
+                                    <option value="">Select a user</option>
+                                    @foreach (var u in Model.Users)
+                                    {
+                                        <option value="@u.UserID" selected="@(Model.ReceivedByUserId == u.UserID)">@u.Name</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="govuk-form-group">
+                                <label class="govuk-label" for="TimeReceived">Time received/rejected</label>
+                                <select class="govuk-select" id="TimeReceived" asp-for="TimeReceived">
+                                    <option value="">Select a time</option>
+                                    @foreach (var t in Model.TimeReceivedOptions)
+                                    {
+                                        <option value="@t.Code" selected="@(Model.TimeReceived == t.Code)">@t.Name</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="govuk-form-group">
+                                <label class="govuk-label" for="Reason">Reason</label>
+                                <div class="govuk-hint">Required if the submission is being rejected.</div>
+                                <textarea class="govuk-textarea" id="Reason" name="Reason" rows="4">@Model.Reason</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </fieldset>
+            </div>
+
+            <div class="govuk-form-group">
+                <fieldset class="govuk-fieldset">
+                    <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Post fixations</legend>
+                    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                        @foreach (var p in Model.PostFixationOptions)
+                        {
+                            var checkboxId = $"postfix-{p.Code}";
+                            <div class="govuk-checkboxes__item">
+                                <input class="govuk-checkboxes__input" type="checkbox" id="@checkboxId" name="SelectedPostFixationCodes"
+                                       value="@p.Code" checked="@Model.SelectedPostFixationCodes.Contains(p.Code ?? string.Empty)" />
+                                <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@p.Name</label>
+                            </div>
+                        }
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" type="checkbox" id="postfix-other" name="SelectedPostFixationCodes"
+                                   value="Other" aria-controls="postfix-other-conditional"
+                                   checked="@Model.SelectedPostFixationCodes.Contains("Other")" />
+                            <label class="govuk-label govuk-checkboxes__label" for="postfix-other">Other</label>
+                        </div>
+                        <div class="govuk-checkboxes__conditional @(Model.SelectedPostFixationCodes.Contains("Other") ? "" : "govuk-checkboxes__conditional--hidden")" id="postfix-other-conditional">
+                            <div class="govuk-form-group">
+                                <label class="govuk-label" for="PostFixationOther">Give details</label>
+                                <textarea class="govuk-textarea" id="PostFixationOther" name="PostFixationOther" rows="3">@Model.PostFixationOther</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </fieldset>
+            </div>
+
+            <div class="govuk-button-group">
+                <button type="submit" class="govuk-button" data-module="govuk-button">Done</button>
+                <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">View submission details</a>
+                <a href="@Url.Page(Model.BackLinkPage)" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+            </div>
+        </form>
+    }
 }

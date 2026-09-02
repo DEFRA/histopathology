@@ -105,7 +105,7 @@ public sealed class BatchService : IBatchService
 
     /// <summary>
     /// Updates the editable batch header fields (CustomerRef, Comments, IsPreCassetted).
-    /// Returns <see langword="false"/> and logs on failure.
+    /// Logs and rethrows on failure — callers must catch (see EditBatch/ReceiveBatch page models).
     /// </summary>
     public async Task<bool> UpdateAsync(Batch batch, int userId, CancellationToken ct = default)
     {
@@ -319,5 +319,31 @@ public sealed class BatchService : IBatchService
     {
         try { await _batches.SaveSubmittedAsAsync(batchId, code, userId, ct); }
         catch (Exception ex) { _logger.LogError("Failed to save SubmittedAs for batch {BatchId}.", ex, batchId); }
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<string>> GetPostFixationCodesAsync(int batchId, CancellationToken ct = default)
+    {
+        try { return await _batches.GetPostFixationCodesAsync(batchId, ct); }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get post-fixation codes for batch {BatchId}.", ex, batchId);
+            return [];
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> SavePostFixationCodesAsync(int batchId, IReadOnlyList<string> codes, int userId, CancellationToken ct = default)
+    {
+        try
+        {
+            await _batches.SavePostFixationCodesAsync(batchId, codes, userId, ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to save post-fixation codes for batch {BatchId}.", ex, batchId);
+            return false;
+        }
     }
 }

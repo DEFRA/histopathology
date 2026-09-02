@@ -121,8 +121,6 @@ public sealed class Batch
     /// </summary>
     public bool? SafeToHandle { get; init; }
 
-    // ---- Additional fields mapped from GetBatchDetails SP ----
-
     /// <summary>Flag set when all tissues have been assigned to blocks.</summary>
     public bool AllTissuesAssigned { get; init; }
 
@@ -132,14 +130,26 @@ public sealed class Batch
     /// <summary>Whether the batch is blocked (all blocks assigned).</summary>
     public bool IsBlocked { get; init; }
 
-    /// <summary>Additional post-fixation information. Legacy source: <c>tblBatch.PostFixationOther</c>.</summary>
-    public string? PostFixationOther { get; init; }
-
-    /// <summary>Time the batch was received (stored as int in legacy). Legacy source: <c>tblBatch.TimeReceived</c>.</summary>
+    /// <summary>
+    /// Time-of-day code the submission was received/rejected (foreign key to LOOKUP_TIME_RECEIVED = 3).
+    /// Legacy source: <c>tblBatch.TimeReceived</c>, set on <c>ReceiveBatch.aspx</c> (<c>ddlTimeReceived</c>).
+    /// Resolved to a description via <c>ILookupService.GetLookupDataAsync(3)</c> in the view layer.
+    /// </summary>
     public string? TimeReceived { get; init; }
 
-    /// <summary>User ID who received this batch. Legacy source: <c>tblBatch.ReceivedBy</c>.</summary>
+    /// <summary>
+    /// ID of the user who received/rejected this submission.
+    /// Legacy source: <c>tblBatch.ReceivedBy</c>, set on <c>ReceiveBatch.aspx</c> (<c>ddlReceivedBy</c>).
+    /// Resolved to a display name via <c>GetAllUsersAsync</c> in the view layer.
+    /// </summary>
     public int? ReceivedBy { get; init; }
+
+    /// <summary>
+    /// Free-text detail entered when "Other" is ticked in the post-fixation checkbox list.
+    /// Legacy source: <c>tblBatch.PostFixationOther</c>, set on <c>ReceiveBatch.aspx</c>
+    /// (<c>mtxtPostFixationOther</c>).
+    /// </summary>
+    public string? PostFixationOther { get; init; }
 }
 
 /// <summary>
