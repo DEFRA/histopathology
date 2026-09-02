@@ -22,7 +22,7 @@ public interface IBatchService
     /// <summary>Creates a new batch. Returns the new ID, or 0 on failure.</summary>
     Task<int> AddAsync(Batch batch, int userId, CancellationToken ct = default);
 
-    /// <summary>Updates the editable batch header fields. Returns <see langword="false"/> on failure.</summary>
+    /// <summary>Updates the editable batch header fields. Returns <see langword="true"/> on success; rethrows on failure (callers must catch).</summary>
     Task<bool> UpdateAsync(Batch batch, int userId, CancellationToken ct = default);
 
     /// <summary>Creates a new batch header copied from an existing one. Returns the new ID, or 0 on failure.</summary>

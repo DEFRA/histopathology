@@ -171,7 +171,13 @@ public class ReceiveBatchModel : HistoPageModel
             AllTissuesAssigned  = Batch.AllTissuesAssigned,
         };
 
-        if (!await _batches.UpdateAsync(updated, Session.UserID))
+        // UpdateAsync rethrows on failure (see BatchService.UpdateAsync) rather than returning
+        // false — matches the try/catch pattern already used by EditBatch.cshtml.cs.
+        try
+        {
+            await _batches.UpdateAsync(updated, Session.UserID);
+        }
+        catch (Exception)
         {
             Error = "Could not save the receipt details. It may have been modified by another user.";
             return Page();

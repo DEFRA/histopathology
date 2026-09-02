@@ -105,7 +105,7 @@ public sealed class BatchService : IBatchService
 
     /// <summary>
     /// Updates the editable batch header fields (CustomerRef, Comments, IsPreCassetted).
-    /// Returns <see langword="false"/> and logs on failure.
+    /// Logs and rethrows on failure — callers must catch (see EditBatch/ReceiveBatch page models).
     /// </summary>
     public async Task<bool> UpdateAsync(Batch batch, int userId, CancellationToken ct = default)
     {
