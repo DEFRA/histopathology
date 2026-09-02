@@ -68,4 +68,19 @@ public sealed class BlockTestService : IBlockTestService
             throw;
         }
     }
+
+    /// <inheritdoc/>
+    public async Task SaveTestSelectionsAsync(int batchId, int blockId,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        int userId, CancellationToken ct = default)
+    {
+        try
+        {
+            await _repo.SaveTestSelectionsAsync(batchId, blockId, histologyCodes, antibodyCodes, stainCodes, userId, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to save test selections for block {BlockId}.", ex, blockId);
+        }
+    }
 }

@@ -32,4 +32,15 @@ public interface IBlockTestRepository
     Task SaveTCCodesAsync(int batchId, int testId, string testType,
         IReadOnlyList<TcCode> existing, IReadOnlyList<string> selected,
         int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Delta-saves Histology/Antibodies/Stain test-type selections for a single block.
+    /// Deletes removed codes via <c>DeleteBlockHistology</c>/<c>DeleteBlockAntibodies</c>/
+    /// <c>DeleteBlockStain</c>; inserts added codes via <c>AddBlockHistology</c>/
+    /// <c>AddBlockAntibodies</c>/<c>AddBlockStain</c> — all confirmed existing in
+    /// legacy <c>clsCheckBoxData.vb::UpdateBlockTablesDetails</c>. No new stored procedures.
+    /// </summary>
+    Task SaveTestSelectionsAsync(int batchId, int blockId,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        int userId, CancellationToken ct = default);
 }

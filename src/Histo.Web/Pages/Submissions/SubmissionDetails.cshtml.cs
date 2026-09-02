@@ -46,8 +46,9 @@ public class SubmissionDetailsModel : HistoPageModel
         BatchId ??= Session.BatchID;
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
+        if (Animal is null) return Page();
 
-        PMDate = Animal!.PMDate;
+        PMDate = Animal.PMDate;
         HistologyRef = Animal.HistologyRef;
         Tissues = await _submissions.GetTissuesBySubmissionAsync(Animal.BatchSubmissionID);
         return Page();
@@ -60,6 +61,7 @@ public class SubmissionDetailsModel : HistoPageModel
 
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
+        if (Animal is null) return RedirectToPage("/Submissions/SampleSummary", new { batchId = BatchId });
 
         var updated = new Animal
         {
@@ -85,6 +87,7 @@ public class SubmissionDetailsModel : HistoPageModel
     {
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
+        if (Animal is null) return RedirectToPage("/Submissions/SampleSummary", new { batchId = BatchId });
 
         var tissue = new Tissue
         {
@@ -117,8 +120,19 @@ public class SubmissionDetailsModel : HistoPageModel
         if (AnimalId is null or <= 0) return RedirectToPage("/Submissions/SampleSummary", new { batchId = BatchId });
         Session.AnimalID = AnimalId;
 
-        var animals = await _submissions.GetAnimalsByBatchAsync(BatchId.Value);
-        Animal = animals.FirstOrDefault(a => a.ID == AnimalId);
-        return Animal is null ? RedirectToPage("/Submissions/SampleSummary", new { batchId = BatchId }) : null;
+        // Mirrors SampleSummaryModel/SubmissionDetailsBlockModel: a "Wet Tissue" batch can still
+        // have animals recorded only in the block-animal table — check both before giving up.
+        var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(BatchId.Value);
+        Animal = blockAnimals.FirstOrDefault(a => a.ID == AnimalId);
+        if (Animal is null)
+        {
+            var animals = await _submissions.GetAnimalsByBatchAsync(BatchId.Value);
+            Animal = animals.FirstOrDefault(a => a.ID == AnimalId);
+        }
+
+        // Deliberately does NOT redirect when the animal cannot be resolved — bouncing back to
+        // SampleSummary is indistinguishable from "the button did nothing". Leaving Animal null
+        // renders the view's "Sample not found" branch so the failure is visible to the user.
+        return null;
     }
 }
