@@ -201,4 +201,44 @@ public sealed class BlockTestRepository : IBlockTestRepository
                 new { TestID = testId, Code = code, UserID = userId, BatchID = batchId },
                 commandType: System.Data.CommandType.StoredProcedure);
     }
+
+    /// <inheritdoc/>
+    public async Task SaveTestSelectionsAsync(int batchId, int blockId,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        int userId, CancellationToken ct = default)
+    {
+        var current = (await GetByBatchAsync(batchId, ct)).Where(t => t.BlockID == blockId).ToList();
+
+        using var conn = _db.CreateConnection();
+        await ApplyBlockTestDeltaAsync(conn, batchId, blockId, userId,
+            current.Where(t => t.TestType == BlockTestType.Histology).ToList(), histologyCodes, "AddBlockHistology", "DeleteBlockHistology");
+        await ApplyBlockTestDeltaAsync(conn, batchId, blockId, userId,
+            current.Where(t => t.TestType == BlockTestType.Antibodies).ToList(), antibodyCodes, "AddBlockAntibodies", "DeleteBlockAntibodies");
+        await ApplyBlockTestDeltaAsync(conn, batchId, blockId, userId,
+            current.Where(t => t.TestType == BlockTestType.Stain).ToList(), stainCodes, "AddBlockStain", "DeleteBlockStain");
+    }
+
+    /// <summary>Mirrors BatchRepository.ApplyTestSelectionDeltaAsync, scoped to one block.</summary>
+    private static async Task ApplyBlockTestDeltaAsync(
+        System.Data.IDbConnection conn, int batchId, int blockId, int userId,
+        IReadOnlyList<BlockTest> current, IReadOnlyList<string> newCodes, string addSp, string deleteSp)
+    {
+        var currentSet = current.ToDictionary(t => t.Code, t => t.ID, StringComparer.OrdinalIgnoreCase);
+        var newSet = newCodes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var row in current)
+        {
+            if (!newSet.Contains(row.Code))
+                await conn.ExecuteAsync(deleteSp, new { ID = row.ID },
+                    commandType: System.Data.CommandType.StoredProcedure);
+        }
+
+        foreach (var code in newCodes.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (!currentSet.ContainsKey(code))
+                await conn.ExecuteAsync(addSp,
+                    new { BlockID = blockId, Code = code, Comment = (string?)null, UserID = userId, BatchID = batchId },
+                    commandType: System.Data.CommandType.StoredProcedure);
+        }
+    }
 }
