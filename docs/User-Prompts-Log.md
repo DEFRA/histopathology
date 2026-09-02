@@ -1565,3 +1565,53 @@ Updated D-1 in `Parity-Audit-Report.md` §13: severity downgraded Medium → Low
 
 Invoked `journal-updater` in Mode B (uncommitted Copilot Chat session — `git status --short` showed 18 modified/renamed files, no commits). Appended Run #18 to `run-log-v2.md` covering the full parity audit, nav-gap fixes, route rename, D-1 downgrade, and the Add-sample redirect regression + stale-build debugging; appended Session Metrics row #79 (complexity-based duration estimate — no exact timestamps captured this session); appended Prompts 103–111 to this file.
 
+---
+
+## Prompt 112 — Review the Create / Edit / View Submission workflow and validate Pick List Management integration (2026-09-02)
+
+> Review the New Submission/Edit Submission /  View Submission n workflow implemented using .NET 10, a modular monolith architecture, and GDS standards. Ensure all existing functionality is retained, even where the UI/UX has been optimized to align with GDS guidelines.
+> Also refer the legacy flow if needed
+>
+> Validate:
+>
+> - End-to-end navigation between pages.
+> - Button visibility, enable/disable states, and actions.
+> - Mandatory fields and validation rules.
+> - Conditional behaviour based on submission type.
+> - Sample, block, and tissue workflows.
+> - That no business functionality from the current process has been missed during the GDS redesign.
+>
+> Additional validation:
+>
+> - The fields "Submitted By", "Project or Contract Code", and "Pathologist" now include a new button/link that should navigate users directly to the relevant Pick List Management page.
+> - Verify the button is available in both Create Submission and Edit Submission screens.
+> - Verify navigation to the correct Pick List Management section for the selected field.
+> - Verify users can return and continue their submission without data loss after managing pick list values.
+>
+> Workflow to validate:
+>
+> - Home → Create New TSE Submission / Create New Non-TSE Submission (Create / Edit /  View sumbssion)
+> - Submission Type → Pre Cassetted Tissue, Stained Section, Unstained Section, Wax Block, Wet Tissue
+> - Submission Details → Samples, Cancel, Finish
+> - Sample Summary → Add, Edit, Delete, Copy, Done
+> - Add Sample → Sender Ref entry/search
+> - Block Flow → Sample Blocks and Block Details
+> - Wet Tissue Flow → Sample Details
+>
+> Confirm all navigation paths, button states, validation rules, business processes, and new Pick List Management integrations behave as expected and remain functionally equivalent to the existing system.
+
+Analysed the legacy flow via two parallel `Explore` subagents (`BatchDetails.aspx`/`Home.aspx`; `BatchSummary.aspx`/`BatchBlockSummary.aspx`/`AddSample.aspx`/`AddSubmission.aspx`/`SearchSender.aspx`) and compared against the migrated Razor Pages. The Pick List Management buttons did not exist at all — `PickListUserArea.cshtml.cs` explicitly documented them as "out of scope for this change" — so they were implemented on both Create Submission (`BatchDetails?mode=create`) and Edit Submission (`EditBatch`), routing Project → `PickListUserArea/19`, Pathologist → `PickListUserArea/18`, and Submitted by → `UserMaintenance`. Data-loss-free return implemented by posting the form, serialising all entered values to `TempData`, and restoring them on return; `ReturnUrl` (guarded by `Url.IsLocalUrl`) added to `PickListUserArea`, `UserMaintenance`, `AddUser` and `EditUser`. Nine parity issues were reported but not fixed — most notably Copy sample being inverted, the missing "at least one sample" Finish gate, and `SubmissionDetailsBlock` having no View Submission read-only gate.
+
+**Build:** 0 errors, 4 pre-existing warnings. **Tests:** 145 passed, 0 failed.
+
+**Files changed:** `Batches/BatchDetails.cshtml(.cs)`, `Batches/EditBatch.cshtml(.cs)`, `Admin/PickListUserArea.cshtml(.cs)`, `Admin/UserMaintenance.cshtml(.cs)`, `Admin/AddUser.cshtml(.cs)`, `Admin/EditUser.cshtml(.cs)`.
+
+---
+
+## Prompt 113 — Run the journal updater for this session (2026-09-02)
+
+> Can you run the selected agent and update run-log-v2, session metrics and user prompts log
+
+Ran `journal-updater` in Mode A (committed session — `git status --short` clean; commit `91deb3f` "Implement return URL handling in user and batch management forms" contains all 12 changed files). Appended Run Log row #19 and Open Issues ISS-R20 … ISS-R28 to `run-log-v2.md`, plus a session section covering what was implemented, what was reviewed and confirmed correct, and what was raised. Appended Agent Run Timing row #80 and a full session block to `session-metrics.md`. Appended Prompts 112–113 to this file. Nothing was committed.
+
+
