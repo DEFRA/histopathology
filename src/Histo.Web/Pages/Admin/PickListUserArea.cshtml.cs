@@ -16,10 +16,10 @@ namespace Histo.Web.Pages.Admin;
 /// with a "select a table" drop-down and no area filtering; this page is locked to a single
 /// table (passed in via the route) and filters rows to one user area (<c>LookupData.GetUserAreaData</c>).
 ///
-/// Note: the current migrated <c>Batches/BatchDetails</c> page does not yet have "New
-/// Project"/"New Contact" buttons to invoke this page (that page is a simplified read-only
-/// summary) — wiring those buttons up is out of scope for this change. This page is reachable
-/// directly, e.g. <c>/Admin/PickListUserArea/19?userArea=HISTO</c> for Projects.
+/// Invoked from the "Manage project / contract codes" and "Manage pathologists" links on
+/// <c>Batches/BatchDetails</c> (create mode) and <c>Batches/EditBatch</c>, which pass a
+/// <see cref="ReturnUrl"/> so the user can resume the in-progress submission afterwards.
+/// Also reachable directly, e.g. <c>/Admin/PickListUserArea/19?userArea=HISTO</c> for Projects.
 /// </summary>
 public class PickListUserAreaModel : HistoPageModel
 {
@@ -31,6 +31,15 @@ public class PickListUserAreaModel : HistoPageModel
     [BindProperty(SupportsGet = true)] public int TableId { get; set; }
     [BindProperty(SupportsGet = true)] public string? UserArea { get; set; }
     [BindProperty(SupportsGet = true)] public int? ItemId { get; set; }
+
+    /// <summary>
+    /// Page the user came from (e.g. the in-progress Create/Edit Submission form). Carried through
+    /// add/edit round-trips so the "Return to submission" button can send the user back.
+    /// </summary>
+    [BindProperty(SupportsGet = true)] public string? ReturnUrl { get; set; }
+
+    /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
+    public string? SafeReturnUrl => !string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : null;
 
     [BindProperty] public string Description { get; set; } = string.Empty;
     [BindProperty] public bool Active { get; set; } = true;
@@ -96,7 +105,7 @@ public class PickListUserAreaModel : HistoPageModel
         TempData["StatusMessage"] = ItemId is int
             ? $"'{Description.Trim()}' was updated."
             : $"'{Description.Trim()}' was added.";
-        return RedirectToPage("/Admin/PickListUserArea", new { tableId = TableId, userArea = UserArea });
+        return RedirectToPage("/Admin/PickListUserArea", new { tableId = TableId, userArea = UserArea, returnUrl = SafeReturnUrl });
     }
 
     private void Validate()
