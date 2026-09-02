@@ -8,9 +8,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-
 namespace Histo.Web.Pages;
 
 /// <summary>
@@ -41,46 +38,6 @@ public abstract class HistoPageModel : PageModel
         PageHandlerExecutingContext context,
         PageHandlerExecutionDelegate next)
     {
-
-        // LOCAL-DEV-ONLY (uncommitted): skips Entra ID sign-in entirely.
-        // Enabled only via appsettings.Development.json's "DevAuthBypass" flag (gitignored).
-        // Fully hardcoded — no DB/IUserService lookup — so it never depends on GetUsers'
-        // SP column shape or a matching row actually existing.
-        if (context.HttpContext.RequestServices.GetRequiredService<IConfiguration>().GetValue<bool>("DevAuthBypass"))
-        {
-            // Re-signs in whenever the GroupName claim is missing/empty — covers both the
-            // "never signed in" case AND a stale cookie from an earlier real SAML attempt
-            // that authenticated but never got app claims (e.g. email didn't match tblUser).
-            if (string.IsNullOrEmpty(User.FindFirst(AppClaimTypes.GroupName)?.Value))
-            {
-                // Bakes the same claims AuthController's ACS handler would, so _Layout.cshtml's
-                // User.Identity.IsAuthenticated checks (nav, user context) behave identically.
-                // GroupName = "Histopathology User" grants area-unrestricted access (IsHistoUser)
-                // and shows nearly all nav links — change to "Maintenance" for the admin-only pages.
-                var identity = new System.Security.Claims.ClaimsIdentity("saml2");
-                identity.AddClaim(new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "Silambarasan Duraiswamy"));
-                identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.GroupName, "Maintenance"));
-                identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.UserDbId, "243"));
-                identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.GroupId, "3"));
-                identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.UserArea, "Histopath"));
-                identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.UserAreaId, "5"));
-                var principal = new System.Security.Claims.ClaimsPrincipal(identity);
-                await context.HttpContext.SignInAsync("saml2", principal);
-                context.HttpContext.User = principal;
-                Session.PopulateFromClaims(principal);
-            }
-            // Session (server-side, in-memory) is wiped independently of the auth cookie on
-            // every app restart — re-populate whenever it's empty, even if the cookie/claims
-            // were already valid, otherwise nav/user-context (which read Session, not claims
-            // directly) stay blank until the browser's auth cookie itself expires.
-            else if (string.IsNullOrEmpty(Session.GroupName))
-            {
-                Session.PopulateFromClaims(User);
-            }
-            await next();
-            return;
-        }
-
         // Gate 1 — Authentication: redirect to Entra ID via SAML if not signed in.
         if (User.Identity?.IsAuthenticated != true)
         {
