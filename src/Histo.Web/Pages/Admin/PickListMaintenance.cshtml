@@ -12,12 +12,13 @@
 <table class="govuk-table">
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
-            <th scope="col" class="govuk-table__header">Pick list name</th>
+            @{ ViewData["Label"] = "Pick list name"; ViewData["Column"] = "TableName"; }
+            <partial name="_SortableHeader" />
             <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
         </tr>
     </thead>
     <tbody class="govuk-table__body">
-        @foreach (var l in Model.Lookups.Where(l => l.TableName != "User Area"))
+        @foreach (var l in Model.PagedEntries)
         {
             <tr class="govuk-table__row">
                 <td class="govuk-table__cell">@l.TableName</td>
@@ -26,9 +27,10 @@
                 </td>
             </tr>
         }
-        @if (!Model.Lookups.Any())
+        @if (!Model.PagedEntries.Any())
         {
             <tr class="govuk-table__row"><td colspan="2" class="govuk-table__cell">No editable pick lists found.</td></tr>
         }
     </tbody>
 </table>
+<partial name="_Pagination" />

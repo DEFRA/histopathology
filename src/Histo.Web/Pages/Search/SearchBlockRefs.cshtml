@@ -42,13 +42,16 @@
         <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <th scope="col" class="govuk-table__header">Used block refs</th>
-                <th scope="col" class="govuk-table__header">Unused block refs</th>
-                <th scope="col" class="govuk-table__header">Pre booked block refs</th>
+                @{ ViewData["Label"] = "Used block refs"; ViewData["Column"] = "UsedBlockRefs"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Unused block refs"; ViewData["Column"] = "UnusedBlockRefs"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Pre booked block refs"; ViewData["Column"] = "PreBookedBlockRefs"; }
+                <partial name="_SortableHeader" />
             </tr>
         </thead>
         <tbody class="govuk-table__body">
-            @foreach (var r in Model.Results)
+            @foreach (var r in Model.PagedResults)
             {
                 <tr class="govuk-table__row">
                     <td class="govuk-table__cell">@r.UsedBlockRefs</td>
@@ -58,6 +61,7 @@
             }
         </tbody>
     </table>
+    <partial name="_Pagination" />
     }
     else if (Model.SenderRef is not null || Model.HistologyRef is not null)
     {
