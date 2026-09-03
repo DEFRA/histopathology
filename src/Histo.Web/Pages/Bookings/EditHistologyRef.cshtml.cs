@@ -14,6 +14,11 @@ namespace Histo.Web.Pages.Bookings;
 /// individual sample's Sender Ref / Histology Ref via <c>clsAnimal.UpdateAnimalSenderRef</c>
 /// / <c>UpdateAnimalHistologyRef</c>) is a different workflow, now implemented
 /// separately at <see cref="Histo.Web.Pages.Admin.EditAnimalRefModel"/> (ISS-022).
+///
+/// Known gap: legacy's grid of current counters and "Number Required" quantity
+/// booking (increment-by-N with per-type upper-bound checks) require reading the
+/// current counter value, for which no repository method exists — this page only
+/// supports setting the counter to an absolute value the caller already knows.
 /// </summary>
 public class EditHistologyRefModel : HistoPageModel
 {
