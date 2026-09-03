@@ -6,7 +6,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Admin/UserMaintenance" class="govuk-back-link">Back</a>
+    <a asp-page="/Admin/UserMaintenance" asp-route-returnUrl="@Model.SafeReturnUrl" class="govuk-back-link">Back</a>
 }
 
 @if (Model.Errors.Count > 0)
@@ -27,6 +27,7 @@
 }
 
 <form method="post">
+    <input type="hidden" asp-for="ReturnUrl" />
     <div class="govuk-form-group">
         <label class="govuk-label" for="NtLogin">NT login</label>
         <input class="govuk-input" asp-for="NtLogin" spellcheck="false" />

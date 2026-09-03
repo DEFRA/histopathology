@@ -102,7 +102,7 @@ flowchart TD
 ### Step-by-step target journey
 1. **New submission** (`Cassetted`) — select submission type only.
 2. **Submission details** (`BatchDetails`, create mode) — batch header fields.
-3. **Sample summary** (`BatchBlockSummary`) — task-list-style view of every sample in the batch; Add sample / Edit sample / Copy sample / Delete sample from here.
+3. **Sample summary** (`SampleSummary`) — task-list-style view of every sample in the batch; Add sample / Edit sample / Copy sample / Delete sample from here.
 4. **Add sample** — one page, Sender Ref (typed or pre-filled), Neuropath flag, with an inline "Check historical data for this sender ref" link.
 5. **Sample blocks** — one consolidated page per sample: add/edit/delete blocks, assign tissue, inline "Check used block refs" panel, all without leaving the page.
 6. **Assign blocks** (whole-batch view) — the same consolidated page, scoped to the whole batch instead of one sample, for the lab-workflow "assign blocks" step.
@@ -129,11 +129,11 @@ flowchart TD
 | Consolidate `BlockDetails.cshtml` + `SubmissionDetailsBlock.cshtml` | **Done** | `SubmissionDetailsBlock.cshtml` now supports an optional `AnimalId` — animal-scoped (full add/edit/delete/copy) when supplied, whole-batch overview (former `BlockDetails` behaviour, improved with a Sender Ref column) when omitted. `Blocks/BlockDetails.cshtml(.cs)` deleted; all callers repointed. |
 | Inline "Check used block refs" panel | **Done** | Present on `SubmissionDetailsBlock.cshtml` as an expandable `govuk-details` panel, pre-filled with the current sample's Sender Ref — no navigation to `/Search/SearchBlockRefs` needed for the common case. |
 | Consolidate `AddSubmission.cshtml` + `AddSample.cshtml` | **Done** | Both were near-duplicate "add a sample by Sender Ref" screens. `AddSample.cshtml(.cs)` deleted; `AddSubmission.cshtml.cs` now also accepts an optional `senderRef` query parameter (for the "Copy sample"/"Add to batch" pre-fill use cases) and gained the "Check historical data for this sender ref" link that only `AddSample` previously had. |
-| Remove native `confirm()` dialogs | **Done** | Replaced with inline `govuk-warning-text` confirmation panels on `SubmissionDetailsBlock`/`BatchBlockSummary`. |
-| Remove auto-submitting checkbox | **Done** | "Bypass sort" on `BatchBlockSummary` now requires an explicit "Apply" button. |
+| Remove native `confirm()` dialogs | **Done** | Replaced with inline `govuk-warning-text` confirmation panels on `SubmissionDetailsBlock`/`SampleSummary`/`SubmissionDetails`. |
+| Remove auto-submitting checkbox | **Done** | "Bypass sort" on `SampleSummary` now requires an explicit "Apply" button. |
 | Convert `viewImportedDatas.aspx` popup to a standalone page | **Done** | `Search/ViewImportedData.cshtml` is a normal page; linked from `AddSubmission.cshtml` with the Sender Ref pre-filled via the "Check historical data for this sender ref" link. |
-| Route/query-based state instead of session-only | **Partially done** | `BatchId`/`AnimalId` are now route/query parameters (with session fallback) on `BatchBlockSummary`, `SubmissionDetailsBlock`, `BatchDetails`, `AddSubmission`. Some downstream pages (Copy blocks/samples) still rely on session state as their only source. |
-| Task-list overview for the whole submission | **Not started** | `BatchDetails`/`BatchBlockSummary` currently split "submission details" and "samples" across two pages with button-based navigation rather than a single GDS task-list component. |
+| Route/query-based state instead of session-only | **Partially done** | `BatchId`/`AnimalId` are now route/query parameters (with session fallback) on `SampleSummary`, `SubmissionDetailsBlock`, `SubmissionDetails`, `BatchDetails`, `AddSubmission`. Some downstream pages (Copy blocks/samples) still rely on session state as their only source. |
+| Task-list overview for the whole submission | **Not started** | `BatchDetails`/`SampleSummary` currently split "submission details" and "samples" across two pages with button-based navigation rather than a single GDS task-list component. |
 
 ---
 

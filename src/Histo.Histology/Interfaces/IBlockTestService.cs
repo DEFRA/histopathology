@@ -18,4 +18,9 @@ public interface IBlockTestService
     Task SaveTCCodesAsync(int batchId, int testId, string testType,
         IReadOnlyList<TcCode> existing, IReadOnlyList<string> selected,
         int userId, CancellationToken ct = default);
+
+    /// <summary>Delta-saves Histology/Antibodies/Stain test-type selections for a single block.</summary>
+    Task SaveTestSelectionsAsync(int batchId, int blockId,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        int userId, CancellationToken ct = default);
 }

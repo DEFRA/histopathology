@@ -10,14 +10,17 @@ public static class BatchAccessDecision
 {
     /// <summary>
     /// Returns <see langword="true"/> when the caller may access a batch belonging to
-    /// <paramref name="batchUserAreaCode"/>. Histo users (lab staff) see every area;
-    /// all other roles are restricted to their own <paramref name="callerUserAreaId"/>.
-    /// A <see langword="null"/> <paramref name="batchUserAreaCode"/> (batch not found) is
-    /// allowed through — the caller's own not-found handling applies instead.
+    /// <paramref name="batchUserAreaCode"/>. Legacy <c>CheckPermissions()</c> grants both
+    /// "Histopathology User" and "Maintenance" unrestricted, area-agnostic access on every
+    /// page (confirmed across every legacy code-behind's <c>CheckPermissions()</c> — only
+    /// "Customer" is ever redirected away); only Customer-equivalent roles are restricted to
+    /// their own <paramref name="callerUserAreaId"/>. A <see langword="null"/>
+    /// <paramref name="batchUserAreaCode"/> (batch not found) is allowed through — the
+    /// caller's own not-found handling applies instead.
     /// </summary>
-    public static bool IsAllowed(bool isHistoUser, int? batchUserAreaCode, int callerUserAreaId)
+    public static bool IsAllowed(bool isAreaUnrestricted, int? batchUserAreaCode, int callerUserAreaId)
     {
-        if (isHistoUser) return true;
+        if (isAreaUnrestricted) return true;
         if (batchUserAreaCode is null) return true;
         return batchUserAreaCode.Value == callerUserAreaId;
     }

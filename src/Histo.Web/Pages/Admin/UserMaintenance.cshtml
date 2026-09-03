@@ -6,7 +6,22 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Index" class="govuk-back-link">Back</a>
+    @if (Model.SafeReturnUrl is not null)
+    {
+        <a href="@Model.SafeReturnUrl" class="govuk-back-link">Back to submission</a>
+    }
+    else
+    {
+        <a asp-page="/Index" class="govuk-back-link">Back</a>
+    }
+}
+
+@if (Model.SafeReturnUrl is not null)
+{
+    <div class="govuk-inset-text">
+        Users added or changed here appear immediately in the "Submitted by" list on the submission you were completing.
+        Select <strong>Return to submission</strong> when you are finished — nothing you have already entered will be lost.
+    </div>
 }
 
 @if (!string.IsNullOrEmpty(Model.StatusMessage))
@@ -35,6 +50,7 @@
 }
 
 <form method="get" class="govuk-form-group">
+    <input type="hidden" name="ReturnUrl" value="@Model.SafeReturnUrl" />
     <div class="govuk-checkboxes govuk-checkboxes--small">
         <div class="govuk-checkboxes__item">
             <input class="govuk-checkboxes__input" type="checkbox" id="ShowDeactivated" name="ShowDeactivated" value="true" @(Model.ShowDeactivated ? "checked" : "") onchange="this.form.submit()" />
@@ -45,7 +61,7 @@
 </form>
 
 <p class="govuk-body">
-    <a asp-page="/Admin/AddUser" class="govuk-button" data-module="govuk-button">Add user</a>
+    <a asp-page="/Admin/AddUser" asp-route-returnUrl="@Model.SafeReturnUrl" class="govuk-button" data-module="govuk-button">Add user</a>
 </p>
 
 <table class="govuk-table">
@@ -71,7 +87,7 @@
                 <td class="govuk-table__cell">@u.Email</td>
                 <td class="govuk-table__cell">@(u.Active ? "Yes" : "No")</td>
                 <td class="govuk-table__cell">
-                    <a class="govuk-link" asp-page="/Admin/EditUser" asp-route-userId="@u.UserID">Change<span class="govuk-visually-hidden"> @u.Name</span></a>
+                    <a class="govuk-link" asp-page="/Admin/EditUser" asp-route-userId="@u.UserID" asp-route-returnUrl="@Model.SafeReturnUrl">Change<span class="govuk-visually-hidden"> @u.Name</span></a>
                 </td>
             </tr>
         }
@@ -82,3 +98,7 @@
     </tbody>
 </table>
 
+@if (Model.SafeReturnUrl is not null)
+{
+    <a href="@Model.SafeReturnUrl" class="govuk-button govuk-button--secondary" data-module="govuk-button">Return to submission</a>
+}

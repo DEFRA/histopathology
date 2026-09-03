@@ -27,6 +27,16 @@ public class UserMaintenanceModel : HistoPageModel
     [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
     public bool ShowDeactivated { get; set; } = true;
 
+    /// <summary>
+    /// Page the user came from (e.g. the in-progress Create/Edit Submission form), so the
+    /// "Return to submission" button can send them back without losing entered data.
+    /// </summary>
+    [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
+    public string? ReturnUrl { get; set; }
+
+    /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
+    public string? SafeReturnUrl => !string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : null;
+
     public IReadOnlyList<User> Users { get; private set; } = [];
     public string? StatusMessage { get; private set; }
     public string? ErrorMessage { get; private set; }

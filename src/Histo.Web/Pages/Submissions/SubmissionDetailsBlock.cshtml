@@ -6,7 +6,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" class="govuk-back-link">Back</a>
+    <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-back-link">Back</a>
 }
 
 @if (Model.AnimalId is null)
@@ -14,7 +14,10 @@
     @* Batch-wide overview — consolidates the former Blocks/BlockDetails.cshtml. Reached from
        BatchDetails' "Assign blocks" button; each row links into the animal-scoped view below
        to add/edit blocks for that specific sample. *@
-    <a asp-page="/Blocks/CopySamples" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy samples</a>
+    @if (!Model.IsViewMode)
+    {
+        <a asp-page="/Blocks/CopySamples" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy samples</a>
+    }
 
     @if (Model.ConfirmDeleteBlockId is int confirmBatchBlockId)
     {
@@ -68,8 +71,11 @@
                         <td class="govuk-table__cell">
                             <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@b.AnimalID"
                                class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button">Manage sample</a>
-                            <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-ConfirmDeleteBlockId="@b.ID"
-                               class="govuk-button govuk-button--warning govuk-!-margin-bottom-0" data-module="govuk-button">Delete</a>
+                            @if (!Model.IsViewMode)
+                            {
+                                <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-ConfirmDeleteBlockId="@b.ID"
+                                   class="govuk-button govuk-button--warning govuk-!-margin-bottom-0" data-module="govuk-button">Delete</a>
+                            }
                         </td>
                     </tr>
                 }
@@ -79,13 +85,13 @@
                 }
             </tbody>
         </table>
-        @if (Model.Blocks.Any())
+        @if (Model.Blocks.Any() && !Model.IsViewMode)
         {
             <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy selected blocks</button>
         }
     </form>
 
-    <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to samples</a>
+    <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to samples</a>
 }
 else if (Model.Animal is null)
 {
@@ -123,7 +129,14 @@ else
         <input type="hidden" asp-for="AnimalId" />
         <div class="govuk-form-group">
             <label class="govuk-label" for="PMDate">PM date</label>
-            <input class="govuk-input" asp-for="PMDate" />
+            @if (Model.IsViewMode)
+            {
+                <input class="govuk-input" asp-for="PMDate" readonly disabled />
+            }
+            else
+            {
+                <input class="govuk-input" asp-for="PMDate" />
+            }
         </div>
         <div class="govuk-form-group">
             <label class="govuk-label" for="HistologyRef">Histology reference</label>
@@ -131,10 +144,41 @@ else
             {
                 <div class="govuk-hint">Mandatory for pre-cassetted submissions.</div>
             }
-            <input class="govuk-input" asp-for="HistologyRef" />
+            @if (Model.IsViewMode)
+            {
+                <input class="govuk-input" asp-for="HistologyRef" readonly disabled />
+            }
+            else
+            {
+                <input class="govuk-input" asp-for="HistologyRef" />
+            }
         </div>
-        <button type="submit" class="govuk-button" data-module="govuk-button">Save details</button>
+        @if (!Model.IsViewMode)
+        {
+            <button type="submit" class="govuk-button" data-module="govuk-button">Save details</button>
+        }
     </form>
+
+    @* "Or Pick" — assigns the next unused histology ref for a type, replacing legacy's
+       AutoPostBack dropdown with an explicit button per WCAG 3.2.2 (On Input). *@
+    @if (!Model.IsViewMode)
+    {
+        <form method="post" asp-page-handler="GetNextHistologyRef" class="govuk-!-margin-bottom-6">
+            <input type="hidden" asp-for="BatchId" />
+            <input type="hidden" asp-for="AnimalId" />
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="HistologyRefType">Or pick a histology reference type</label>
+                <select class="govuk-select" asp-for="HistologyRefType">
+                    <option value="">-- Select --</option>
+                    @foreach (var t in Histo.Web.Pages.Submissions.SubmissionDetailsBlockModel.HistologyRefTypeOptions)
+                    {
+                        <option value="@t.Value">@t.Label</option>
+                    }
+                </select>
+            </div>
+            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Get next ref</button>
+        </form>
+    }
 
     <h2 class="govuk-heading-m">Blocks</h2>
 
@@ -179,60 +223,149 @@ else
         </div>
     </details>
 
-    @* "Add block" — restores the missing add action for this sample's blocks. *@
-    <form method="post" asp-page-handler="AddBlock" class="govuk-!-margin-bottom-6">
-        <input type="hidden" asp-for="BatchId" />
-        <input type="hidden" asp-for="AnimalId" />
-        <div class="govuk-form-group">
-            <label class="govuk-label" for="NewBlockRef">Block ref</label>
-            @if (Model.IsPreCassetted)
+    @* "Add block" / "Edit block" — restores the missing add/edit actions for this sample's blocks. *@
+    @if (!Model.IsViewMode)
+    {
+        <h2 class="govuk-heading-m">@(Model.IsEditingBlock ? "Edit block" : "Add block")</h2>
+        <form method="post" asp-page-handler="@(Model.IsEditingBlock ? "EditBlock" : "AddBlock")" class="govuk-!-margin-bottom-6">
+            <input type="hidden" asp-for="BatchId" />
+            <input type="hidden" asp-for="AnimalId" />
+            @if (Model.IsEditingBlock)
             {
-                <div class="govuk-hint">Pre-cassetted submission — select one of the pre-booked block references.</div>
-                <select class="govuk-select" asp-for="NewBlockRef">
-                    <option value="">-- Select --</option>
-                    @foreach (var pb in Model.PreBookedBlockRefs)
-                    {
-                        <option value="@pb.BlockRef">@pb.BlockRef</option>
-                    }
-                </select>
+                <input type="hidden" asp-for="EditBlockId" />
             }
-            else
-            {
-                <input class="govuk-input" asp-for="NewBlockRef" />
-            }
-        </div>
-        <div class="govuk-form-group">
-            <label class="govuk-label" for="NewCustomerRef">Customer reference</label>
-            <input class="govuk-input" asp-for="NewCustomerRef" />
-        </div>
-        @if (!Model.IsPreCassetted)
-        {
             <div class="govuk-form-group">
-                <label class="govuk-label" for="NewNumberOfBlocks">Number of blocks</label>
-                <div class="govuk-hint">Creates this many identical blocks, with auto-incrementing block refs.</div>
-                <input class="govuk-input govuk-input--width-3" asp-for="NewNumberOfBlocks" />
+                <label class="govuk-label" for="NewBlockRef">Block ref</label>
+                @if (Model.IsPreCassetted && !Model.IsEditingBlock)
+                {
+                    <div class="govuk-hint">Pre-cassetted submission — select one of the pre-booked block references.</div>
+                    <select class="govuk-select" asp-for="NewBlockRef">
+                        <option value="">-- Select --</option>
+                        @foreach (var pb in Model.PreBookedBlockRefs)
+                        {
+                            <option value="@pb.BlockRef">@pb.BlockRef</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <input class="govuk-input" asp-for="NewBlockRef" />
+                }
             </div>
-        }
-        <div class="govuk-form-group">
-            <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-                <div class="govuk-checkboxes__item">
-                    <input class="govuk-checkboxes__input" asp-for="NewRepeatBlock" type="checkbox" />
-                    <label class="govuk-label govuk-checkboxes__label" for="NewRepeatBlock">Additional request (repeat block)</label>
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="NewCustomerRef">Customer reference</label>
+                <input class="govuk-input" asp-for="NewCustomerRef" />
+            </div>
+            @if (!Model.IsPreCassetted && !Model.IsEditingBlock)
+            {
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="NewNumberOfBlocks">Number of blocks</label>
+                    <div class="govuk-hint">Creates this many identical blocks, with auto-incrementing block refs.</div>
+                    <input class="govuk-input govuk-input--width-3" asp-for="NewNumberOfBlocks" />
+                </div>
+            }
+            <div class="govuk-form-group">
+                <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                    <div class="govuk-checkboxes__item">
+                        <input class="govuk-checkboxes__input" asp-for="NewRepeatBlock" type="checkbox" />
+                        <label class="govuk-label govuk-checkboxes__label" for="NewRepeatBlock">Additional request (repeat block)</label>
+                    </div>
                 </div>
             </div>
-        </div>
-        <button type="submit" class="govuk-button" data-module="govuk-button">Add block</button>
-    </form>
+            <div class="govuk-button-group">
+                <button type="submit" class="govuk-button" data-module="govuk-button">@(Model.IsEditingBlock ? "Save block" : "Add block")</button>
+                @if (Model.IsEditingBlock)
+                {
+                    <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+                }
+            </div>
+        </form>
+    }
 
-    @* Per-block histology/antibodies/special stain test assignment already exists in the QC
-       worklist — linked here rather than duplicated, since this page cannot safely create the
-       initial test rows itself without confirmed stored procedure support (see chat summary). *@
-    <p class="govuk-body">
-        <a asp-page="/QC/QualityData" class="govuk-link">Manage histology, antibody and stain tests for this submission's blocks</a>
-    </p>
+    @* Per-block Histology/Antibodies/Stain test selection — uses only existing
+       Add/Edit/DeleteBlock{Histology,Antibodies,Stain} stored procedures. *@
+    @if (Model.Blocks.Any())
+    {
+        <h2 class="govuk-heading-m">Block tests</h2>
+        @foreach (var b in Model.Blocks)
+        {
+            var histCodes = Model.HistologyCodesByBlockId.GetValueOrDefault(b.ID, []);
+            var abCodes = Model.AntibodyCodesByBlockId.GetValueOrDefault(b.ID, []);
+            var stainCodes = Model.StainCodesByBlockId.GetValueOrDefault(b.ID, []);
+            <details class="govuk-details">
+                <summary class="govuk-details__summary">
+                    <span class="govuk-details__summary-text">Manage tests for block @b.BlockRef</span>
+                </summary>
+                <div class="govuk-details__text">
+                    @if (Model.IsViewMode)
+                    {
+                        <p class="govuk-body">
+                            Histology: @(histCodes.Any() ? string.Join(", ", histCodes) : "None") ·
+                            Antibodies: @(abCodes.Any() ? string.Join(", ", abCodes) : "None") ·
+                            Special stain: @(stainCodes.Any() ? string.Join(", ", stainCodes) : "None")
+                        </p>
+                    }
+                    else
+                    {
+                        <form method="post" asp-page-handler="SaveBlockTests">
+                            <input type="hidden" asp-for="BatchId" />
+                            <input type="hidden" asp-for="AnimalId" />
+                            <input type="hidden" name="TestBlockId" value="@b.ID" />
+                            <div class="govuk-form-group">
+                                <fieldset class="govuk-fieldset">
+                                    <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Histology</legend>
+                                    <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                                        @foreach (var opt in Model.HistologyOptions)
+                                        {
+                                            <div class="govuk-checkboxes__item">
+                                                <input class="govuk-checkboxes__input" type="checkbox" name="SelectedHistologyCodes"
+                                                       id="hist-@(b.ID)-@opt.Code" value="@opt.Code" checked="@histCodes.Contains(opt.Code ?? "")" />
+                                                <label class="govuk-label govuk-checkboxes__label" for="hist-@(b.ID)-@opt.Code">@opt.Name</label>
+                                            </div>
+                                        }
+                                    </div>
+                                </fieldset>
+                            </div>
+                            <div class="govuk-form-group">
+                                <fieldset class="govuk-fieldset">
+                                    <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Antibodies</legend>
+                                    <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                                        @foreach (var opt in Model.AntibodyOptions)
+                                        {
+                                            <div class="govuk-checkboxes__item">
+                                                <input class="govuk-checkboxes__input" type="checkbox" name="SelectedAntibodyCodes"
+                                                       id="ab-@(b.ID)-@opt.Code" value="@opt.Code" checked="@abCodes.Contains(opt.Code ?? "")" />
+                                                <label class="govuk-label govuk-checkboxes__label" for="ab-@(b.ID)-@opt.Code">@opt.Name</label>
+                                            </div>
+                                        }
+                                    </div>
+                                </fieldset>
+                            </div>
+                            <div class="govuk-form-group">
+                                <fieldset class="govuk-fieldset">
+                                    <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Special stain</legend>
+                                    <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                                        @foreach (var opt in Model.StainOptions)
+                                        {
+                                            <div class="govuk-checkboxes__item">
+                                                <input class="govuk-checkboxes__input" type="checkbox" name="SelectedStainCodes"
+                                                       id="stain-@(b.ID)-@opt.Code" value="@opt.Code" checked="@stainCodes.Contains(opt.Code ?? "")" />
+                                                <label class="govuk-label govuk-checkboxes__label" for="stain-@(b.ID)-@opt.Code">@opt.Name</label>
+                                            </div>
+                                        }
+                                    </div>
+                                </fieldset>
+                            </div>
+                            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Save tests</button>
+                        </form>
+                    }
+                </div>
+            </details>
+        }
+    }
 
     @* Inline GOV.UK confirmation panel — replaces the browser confirm() dialog for Delete. *@
-    @if (Model.ConfirmDeleteBlockId is int confirmBlockId)
+    @if (!Model.IsViewMode && Model.ConfirmDeleteBlockId is int confirmBlockId)
     {
         var confirmBlock = Model.Blocks.FirstOrDefault(b => b.ID == confirmBlockId);
         <div class="govuk-warning-text">
@@ -294,8 +427,11 @@ else
                                         {
                                             <li>
                                                 @t.NoPieces x @t.TissueCode @(string.IsNullOrWhiteSpace(t.Comment) ? "" : $"({t.Comment})")
-                                                <button type="submit" asp-page-handler="DeleteTissue" name="tissueId" value="@t.ID"
-                                                        class="govuk-button govuk-button--warning govuk-!-margin-bottom-0" formmethod="post">Delete</button>
+                                                @if (!Model.IsViewMode)
+                                                {
+                                                    <button type="submit" asp-page-handler="DeleteTissue" name="tissueId" value="@t.ID"
+                                                            class="govuk-button govuk-button--warning govuk-!-margin-bottom-0" formmethod="post">Delete</button>
+                                                }
                                             </li>
                                         }
                                     </ul>
@@ -303,9 +439,14 @@ else
                             </details>
                         </td>
                         <td class="govuk-table__cell">
-                            @* "Delete" — links to the inline confirmation panel above instead of a browser confirm() dialog. *@
-                            <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-ConfirmDeleteBlockId="@b.ID"
-                               class="govuk-button govuk-button--warning govuk-!-margin-bottom-0">Delete</a>
+                            @if (!Model.IsViewMode)
+                            {
+                                <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-EditBlockId="@b.ID"
+                                   class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Edit</a>
+                                @* "Delete" — links to the inline confirmation panel above instead of a browser confirm() dialog. *@
+                                <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-ConfirmDeleteBlockId="@b.ID"
+                                   class="govuk-button govuk-button--warning govuk-!-margin-bottom-0">Delete</a>
+                            }
                         </td>
                     </tr>
                 }
@@ -315,14 +456,14 @@ else
                 }
             </tbody>
         </table>
-        @if (Model.Blocks.Any())
+        @if (Model.Blocks.Any() && !Model.IsViewMode)
         {
             <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy selected blocks</button>
         }
     </form>
 
     @* "Add tissue" — restores per-block tissue assignment missing from the migrated page. *@
-    @if (Model.Blocks.Any())
+    @if (Model.Blocks.Any() && !Model.IsViewMode)
     {
         <h2 class="govuk-heading-m">Add tissue to a block</h2>
         <form method="post" asp-page-handler="AddTissue">
@@ -359,5 +500,5 @@ else
         </form>
     }
 
-    <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to samples</a>
+    <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to samples</a>
 }

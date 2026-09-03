@@ -57,6 +57,11 @@
                 <option value="@p.ID" selected="@(Model.ProjectContractCode == p.ID.ToString())">@p.Name</option>
             }
         </select>
+        @* Replaces legacy btnNewProject — opens the Projects pick list (LOOKUP_PROJECTS = 19). *@
+        <button type="submit" asp-page-handler="ManagePickList" name="field" value="project" formnovalidate
+                class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+            Manage project / contract codes
+        </button>
     </div>
 
     @* Pathologist *@
@@ -69,6 +74,11 @@
                 <option value="@c.ID" selected="@(Model.ContactName == c.ID.ToString())">@c.Name</option>
             }
         </select>
+        @* Replaces legacy btnNewContact — opens the Contacts pick list (LOOKUP_CONTACTS = 18). *@
+        <button type="submit" asp-page-handler="ManagePickList" name="field" value="pathologist" formnovalidate
+                class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+            Manage pathologists
+        </button>
     </div>
 
     @* Species *@
@@ -132,6 +142,12 @@
                 <option value="@u.UserID" selected="@(Model.OtherSubmittedBy == u.UserID)">@u.Name</option>
             }
         </select>
+        @* Replaces legacy btnNewSubmittedBy — the "Submitted by" list is user-backed, so it is
+           maintained on User maintenance rather than a lookup table. *@
+        <button type="submit" asp-page-handler="ManagePickList" name="field" value="submittedBy" formnovalidate
+                class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+            Manage submitted by list
+        </button>
     </div>
 
     <div class="govuk-form-group">
@@ -178,8 +194,10 @@
 </form>
 
 @* "Samples" — this page only edits submission header fields; sample/animal/block details
-   (Add sample, Edit sample, Copy sample, Delete sample) are on BatchBlockSummary, matching
+   (Add sample, Edit sample, Copy sample, Delete sample) are on SampleSummary, matching
    the same "Samples" entry point already used from BatchDetails.cshtml. *@
 <div class="govuk-button-group">
-    <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples</a>
+    <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples</a>
+    @* Legacy EditBatch.aspx btnSamplesOnHold — the only entry point to the on-hold list. *@
+    <a asp-page="/Batches/SubmissionsOnHold" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples on hold</a>
 </div>

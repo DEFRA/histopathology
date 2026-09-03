@@ -29,6 +29,12 @@ public class AddUserModel : HistoPageModel
     [BindProperty] public int AreaCode { get; set; }
     [BindProperty] public bool Active { get; set; } = true;
 
+    /// <summary>Submission page to resume after the detour into user maintenance.</summary>
+    [BindProperty(SupportsGet = true)] public string? ReturnUrl { get; set; }
+
+    /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
+    public string? SafeReturnUrl => !string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : null;
+
     public IReadOnlyList<LookupItem> Groups { get; private set; } = [];
     public IReadOnlyList<LookupItem> Areas { get; private set; } = [];
     public List<string> Errors { get; } = [];
@@ -68,7 +74,7 @@ public class AddUserModel : HistoPageModel
         }
 
         TempData["StatusMessage"] = $"User '{user.Name}' was added.";
-        return RedirectToPage("/Admin/UserMaintenance");
+        return RedirectToPage("/Admin/UserMaintenance", new { returnUrl = SafeReturnUrl });
     }
 
     private void Validate()

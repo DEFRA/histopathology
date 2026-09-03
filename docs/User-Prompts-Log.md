@@ -1019,7 +1019,6 @@ Added `IsViewMode` computed property to `BatchBlockSummaryModel` that checks `Se
 
 ## Prompt 56 -  Entrat Id integration 
 
-<<<<<<< HEAD
 
 ## Prompt - Enter Quality Data
 
@@ -1377,5 +1376,258 @@ Recommendations and required changes to achieve full parity and GDS compliance.
 ## Prompt 88 — Document issues and fixes for 27 Aug 2026 10:47 PM – 11:50 PM
 
 > alos need to dcoument the issues and fixes which has done during yesterday that 27 aug 2026 10:47 PM - 11.50 PM
-=======
->>>>>>> 351607732625fba3ca3dad48fbba1c32f021a658
+
+---
+
+## Prompt 89 — Skip Entra ID locally; dev-only auth bypass via config (2026-09-01)
+
+> I have Entra id implementaiton in this applicaiton, I can't use entra id from local so that how skip entra id locally to test fucntinlity locally
+
+---
+
+## Prompt 90 — Provide email to bypass sign-in and show user details in app (2026-09-01)
+
+> Can we skip authentication itself i can give my email to show the user details in applicaiton
+
+---
+
+## Prompt 91 — What is user-secrets? (2026-09-01)
+
+> what is user-secrets ?
+
+---
+
+## Prompt 92 — Alternative to user-secrets: comment out login code? (2026-09-01)
+
+> is there any other way comment the login code ?
+
+---
+
+## Prompt 93 — Hardcode bypass email in config instead of user-secrets (2026-09-01)
+
+> can we hardcode this value instead of user-secrets
+> "DevAuth:BypassUserEmail" "your.email@apha.gov.uk"
+
+---
+
+## Prompt 94 — Store bypass email in appsettings.Development.json (not committed) (2026-09-01)
+
+> i will not commit this changes
+> appsettings.Development.json
+
+---
+
+## Prompt 95 — Access denied after bypass — no matching tblUser row (2026-09-01)
+
+> i made this changes but getting below page ?
+>
+> # Access denied
+> You signed in as **Silambarasan.Duraiswamy@defra.gov.uk**, but that account is not set up in the Histopathology System.
+> Your account may not have been created yet, or it may have been deactivated.
+> Contact your system administrator to request access or reactivate your account.
+
+---
+
+## Prompt 96 — Dev bypass code in HistoPageModel not working (2026-09-01)
+
+> Why this piece of code is not working ?
+> `// LOCAL-DEV-ONLY (uncommitted): skips Entra ID sign-in entirely. // Enabled only via appsettings.Development.json's "DevAuthBypass" flag (gitignored).`
+
+---
+
+## Prompt 97 — Nav menu and home page links not visible (2026-09-01)
+
+> i could not see navigation menue and home page links
+
+---
+
+## Prompt 98 — Apply dev bypass to HistoPageModel.cs (2026-09-01)
+
+> can you  implement the same in HistoPageModel.cs file
+
+---
+
+## Prompt 99 — Empty page shown after HistoPageModel bypass applied (2026-09-01)
+
+> i can see empty page now
+
+---
+
+## Prompt 100 — Review and validate TSE submission flow across all submission types (2026-09-01)
+
+> **Review and validate the new TSE submission flow against the legacy implementation.**
+>
+> **Legacy submission flow:**
+> Home Page → Create New TSE Submission → Submission Type → Submission Details → Sample Summary → Finish
+>
+> **Submission Types:**
+> - Pre-Cassetted Tissue
+> - Stained Section
+> - Unstained Section
+> - Wax Block
+> - Wet Tissue
+>
+> 1. **BatchBlockSummary.cshtml** — Verify existing functionality, identify missing or regressed functionality for Wax Block and Wet Tissue.
+> 2. **UI Alignment** — Review Apply and Add Sample controls alignment; fix inconsistencies.
+> 3. **Edit Sample Functionality** — Investigate why Edit Sample is not responding.
+> 4. **Navigation Validation** — End-to-end navigation for all submission types, particularly Wax Block and Wet Tissue.
+
+---
+
+## Prompt 101 — Analysis of Add/Edit sample, Add block, per submission type for all journeys (2026-09-01)
+
+> can you aslo do anlaysis on the add sample / add block / edit block etc and also consider the below submission type for create and Edit, view submission, copy
+>
+> **Submission Types:**
+> - Pre-Cassetted Tissue
+> - Stained Section
+> - Unstained Section
+> - Wax Block
+> - Wet Tissue
+
+---
+
+## Prompt 102 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-01)
+
+> Can you read the prompt and and fix, gap from the afer 4 PM in this session and why it's not fixed as part migraiton, add these details into, run-log-v2.md  session-metrics  User-Prompts-Log.md
+
+---
+
+## Prompt 103 — Module-to-Page Mapping navigation audit (2026-09-01)
+
+> Is there any naviagtion link that required for any other module to align with below ?
+> Module-to-Page Mapping
+
+Found and fixed 2 orphaned pages with zero inbound links: `Batches/SubmissionsOnHold` (legacy `EditBatch.aspx` "Put Samples On Hold" button was the only entry point and was not carried across) — restored via a "Samples on hold" button on `EditBatch.cshtml`; `Bookings/EditHistologyRef` (histology-ref counter maintenance, orphaned from `BookingMenu`) — restored via an "Edit next histology ref" link. Flagged the Module-to-Page Mapping table in `Migration-Plan.md` as stale (still listing consolidated/superseded legacy page names) but did not refresh it in this turn.
+
+---
+
+## Prompt 104 — Is the BatchSummary/BatchBlockSummary consolidation GDS-acceptable? (2026-09-01)
+
+> is below consolidation is good approach as per GDS ?, batch summary merged into batch block summary will that acceptable as per GDS ?
+
+Compared both legacy pages directly — identical action set (Add/Edit/Delete/Copy Sample, Done, Bypass sort), differing only in the Edit-sample navigation target and a Tissue Details column. Confirmed the merge is GDS-sound (avoids two near-duplicate screens forked purely on a persistence-layer distinction), but flagged 3 issues: the surviving route name `BatchBlockSummary` is meaningless for Wet Tissue submissions; inline histology-ref grid editing was silently dropped; grid paging was silently dropped. Recommended: keep the merge, rename the route, log the two capability drops in the parity register.
+
+---
+
+## Prompt 105 — Confirm paging is out of scope; proceed with the route-rename recommendation (2026-09-01)
+
+> Pagin is planned separatly so can go with recommendation ?
+
+Proceeded with the route rename recommendation. `BatchBlockSummary` → `SampleSummary`: `git mv` on both files, `BatchBlockSummaryModel` → `SampleSummaryModel`, all `asp-page`/`RedirectToPage` references across 9 dependent files updated, a permanent redirect registered in `Program.cs` for the legacy path (preserving query string), and `Parity-Audit-Report.md` §13 / `Migration-Plan.md` / `TSE-NonTSE-Submission-Workflow-Redesign.md` updated to the new name. Registered D-1 through D-7 accepted-consolidation deviations in a new `Parity-Audit-Report.md` §13. Build: 0 errors. Tests: 144 pass, 1 skipped.
+
+---
+
+## Prompt 106 — How does the user know whether a submission is Wet Tissue or Wax Block on this page? (2026-09-01)
+
+> How user will come to know that wheather it BatchBlockSummary
+
+Confirmed via grep that no page ever set `ViewData["BatchNo"]` — the caption slot in `_Layout.cshtml` was unused everywhere, and `SampleSummary`'s `IsWetTissue` flag (already computed for internal routing) was never surfaced to the user. Proposed setting `ViewData["BatchNo"]` from `Model.IsWetTissue` to render "Wet Tissue" / "Wax Block / Cassetted" as a caption above the heading.
+
+---
+
+## Prompt 107 — Implement the submission-type caption (2026-09-01)
+
+> implement this
+
+Added `ViewData["BatchNo"] = Model.IsWetTissue ? "Wet Tissue" : "Wax Block / Cassetted";` to `SampleSummary.cshtml`. Build: 0 errors, 0 warnings.
+
+---
+
+## Prompt 108 — Add sample on Wax Block still redirects to AddSubmission list, not Add block screen — fix not working (2026-09-01)
+
+> I have slected Wax Block eventhough i'm seeing samply summary page with add sample button, it take me to add submision which wrong, u said that you fixed below code but it's not working this kind of wasting my token
+> `var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId.Value); return submittedAsCode == "4" ? RedirectToPage(...) : RedirectToPage(...);`
+
+Re-verified the fix was still present in `AddSubmission.cshtml.cs` (confirmed, unchanged). Root cause of the "not working" report: an earlier build attempt had failed to copy the compiled `.exe` because a running `Histo.Web` process (PID 7384) held it locked (`MSB3027` in the build log); the user's live test was hitting that already-running, pre-fix instance. Also identified that the verification step used afterward (`dotnet test`) does not rebuild `Histo.Web` at all, giving a false "all good" signal. Confirmed the locking process had since exited, rebuilt `Histo.Web` cleanly (0 errors), and asked the user to restart their running instance and retest.
+
+---
+
+## Prompt 109 — Should we implement inline histology-ref grid editing (D-1) and add a PM date field to Add sample? (2026-09-01)
+
+> what is suggestin on the below should we impmment the histology ref editing, also one PM date filed also should be on add sample wet tissue / wax block ?
+
+Checked legacy source directly for both: (1) PM Date — confirmed `AddSubmission.aspx.vb`/`AddSample.aspx.vb` call the 4-argument `clsAnimal.NewRecord` overload, which never touches `PMDate`; PM Date is legacy-only ever captured later on `SubmissionDetails.aspx`/`SubmissionDetailsBlock.aspx`, exactly where the migrated app already places it — recommended **not** adding it to Add sample, as that would add scope legacy never had. (2) D-1 inline grid editing — recommended **not** replicating the legacy editable-grid pattern (no GOV.UK Design System equivalent; violates "one thing per page"); the existing one-click "Edit sample" link to a dedicated field is the correct GDS replacement, especially now that the Add-sample redirect fix (Prompt 108's underlying fix) lands users there directly.
+
+---
+
+## Prompt 110 — Update the D-1 parity register entry (2026-09-01)
+
+> update the Want me to update the D-1 entry in Parity-Audit-Report.md §13 to reflect this,
+
+Updated D-1 in `Parity-Audit-Report.md` §13: severity downgraded Medium → Low, disposition changed from "Needs user validation" to "Resolved by design (2026-09-01)", with rationale tying it to the GDS anti-pattern assessment and the Add-sample redirect fix.
+
+---
+
+## Prompt 111 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-01)
+
+> can you add the fix and gap duration in Session Metrics run-log-v2.md User-Prompts-Log.md journal-updater.agent.md
+
+Invoked `journal-updater` in Mode B (uncommitted Copilot Chat session — `git status --short` showed 18 modified/renamed files, no commits). Appended Run #18 to `run-log-v2.md` covering the full parity audit, nav-gap fixes, route rename, D-1 downgrade, and the Add-sample redirect regression + stale-build debugging; appended Session Metrics row #79 (complexity-based duration estimate — no exact timestamps captured this session); appended Prompts 103–111 to this file.
+
+---
+
+## Prompt 112 — Review the Create / Edit / View Submission workflow and validate Pick List Management integration (2026-09-02)
+
+> Review the New Submission/Edit Submission /  View Submission n workflow implemented using .NET 10, a modular monolith architecture, and GDS standards. Ensure all existing functionality is retained, even where the UI/UX has been optimized to align with GDS guidelines.
+> Also refer the legacy flow if needed
+>
+> Validate:
+>
+> - End-to-end navigation between pages.
+> - Button visibility, enable/disable states, and actions.
+> - Mandatory fields and validation rules.
+> - Conditional behaviour based on submission type.
+> - Sample, block, and tissue workflows.
+> - That no business functionality from the current process has been missed during the GDS redesign.
+>
+> Additional validation:
+>
+> - The fields "Submitted By", "Project or Contract Code", and "Pathologist" now include a new button/link that should navigate users directly to the relevant Pick List Management page.
+> - Verify the button is available in both Create Submission and Edit Submission screens.
+> - Verify navigation to the correct Pick List Management section for the selected field.
+> - Verify users can return and continue their submission without data loss after managing pick list values.
+>
+> Workflow to validate:
+>
+> - Home → Create New TSE Submission / Create New Non-TSE Submission (Create / Edit /  View sumbssion)
+> - Submission Type → Pre Cassetted Tissue, Stained Section, Unstained Section, Wax Block, Wet Tissue
+> - Submission Details → Samples, Cancel, Finish
+> - Sample Summary → Add, Edit, Delete, Copy, Done
+> - Add Sample → Sender Ref entry/search
+> - Block Flow → Sample Blocks and Block Details
+> - Wet Tissue Flow → Sample Details
+>
+> Confirm all navigation paths, button states, validation rules, business processes, and new Pick List Management integrations behave as expected and remain functionally equivalent to the existing system.
+
+Analysed the legacy flow via two parallel `Explore` subagents (`BatchDetails.aspx`/`Home.aspx`; `BatchSummary.aspx`/`BatchBlockSummary.aspx`/`AddSample.aspx`/`AddSubmission.aspx`/`SearchSender.aspx`) and compared against the migrated Razor Pages. The Pick List Management buttons did not exist at all — `PickListUserArea.cshtml.cs` explicitly documented them as "out of scope for this change" — so they were implemented on both Create Submission (`BatchDetails?mode=create`) and Edit Submission (`EditBatch`), routing Project → `PickListUserArea/19`, Pathologist → `PickListUserArea/18`, and Submitted by → `UserMaintenance`. Data-loss-free return implemented by posting the form, serialising all entered values to `TempData`, and restoring them on return; `ReturnUrl` (guarded by `Url.IsLocalUrl`) added to `PickListUserArea`, `UserMaintenance`, `AddUser` and `EditUser`. Nine parity issues were reported but not fixed — most notably Copy sample being inverted, the missing "at least one sample" Finish gate, and `SubmissionDetailsBlock` having no View Submission read-only gate.
+
+**Build:** 0 errors, 4 pre-existing warnings. **Tests:** 145 passed, 0 failed.
+
+**Files changed:** `Batches/BatchDetails.cshtml(.cs)`, `Batches/EditBatch.cshtml(.cs)`, `Admin/PickListUserArea.cshtml(.cs)`, `Admin/UserMaintenance.cshtml(.cs)`, `Admin/AddUser.cshtml(.cs)`, `Admin/EditUser.cshtml(.cs)`.
+
+---
+
+## Prompt 113 — Run the journal updater for this session (2026-09-02)
+
+> Can you run the selected agent and update run-log-v2, session metrics and user prompts log
+
+Ran `journal-updater` in Mode A (committed session — `git status --short` clean; commit `91deb3f` "Implement return URL handling in user and batch management forms" contains all 12 changed files). Appended Run Log row #19 and Open Issues ISS-R20 … ISS-R28 to `run-log-v2.md`, plus a session section covering what was implemented, what was reviewed and confirmed correct, and what was raised. Appended Agent Run Timing row #80 and a full session block to `session-metrics.md`. Appended Prompts 112–113 to this file. Nothing was committed.
+
+---
+
+## Prompt 114 — Fix Wet Tissue Edit sample "does nothing" using a browser Network tab trace (2026-09-02)
+
+> as per below flow can you check if we bring BatchBlockSummary.cshtml file code base separatly will this issue would be solved, if so can you impmmente flow view submission, create submission, edit submission
+>
+> still facing same issue... this page was there before, because i asked merge these fucntionality BatchBlockSummary.cshtml may be casuing the issue... bring that page back and impmmente flow
+>
+> [Network tab trace showing: POST /Submissions/SampleSummary?handler=Select → 302; GET /Submissions/SubmissionDetails?batchId=29398&animalId=91478 → 302; GET /Submissions/SampleSummary?batchId=29398 → 200]
+
+User suspected the earlier `BatchBlockSummary` → `SampleSummary` rename had caused the regression and asked to recreate the old file. Proved via `git log --oneline --follow` that `SampleSummary.cshtml` **is** `BatchBlockSummary.cshtml` renamed with history preserved (`git mv`, commit `618b54b`), so recreating it would be a functionally identical no-op and would not fix anything. The user then supplied a browser Network tab trace, which pinpointed the real defect: `SampleSummary`'s POST-to-Select correctly routes to `SubmissionDetails` for this Wet Tissue batch (routing itself was correct), but the `GET` to `SubmissionDetails` returned 302 instead of 200 — silently bouncing back to `SampleSummary`, indistinguishable from the button doing nothing. Root cause: `SubmissionDetailsModel.LoadAnimalAsync` only checked the plain `GetAnimalsByBatchAsync` table and silently redirected on a miss — the identical bug class already fixed in `SubmissionDetailsBlockModel` earlier this session but never ported to this twin page for Wet Tissue submissions. Fixed by merging in `GetBlockAnimalsByBatchAsync` (matching `SampleSummary`/`SubmissionDetailsBlock`) and removing the silent redirect so the view's dormant "Sample not found" branch renders instead of bouncing; added null guards to `OnGetAsync`, `OnPostSaveDetailsAsync`, `OnPostAddTissueAsync`.
+
+**Build:** 0 errors, 3 pre-existing warnings. **Tests:** 145 passed, 1 skipped, 0 failed.
+
+**Files changed:** [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs).
+
+

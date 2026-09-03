@@ -83,11 +83,15 @@
 | 71 | 2026-08-24 | `Identity-migration` | — | — | **40 min** | Run Entra id integration agents |
 | 72 | 2026-08-24 | `Identity-migration` | — | — | **10 min** | SAML config validation |
 | 73 | 2026-08-24 | `gds-ui` | — | — | **15 min** | Access denied and There is a problem with the service pages implmentation - An unhandled exception occurred while processing the request. |
-<<<<<<< HEAD
 | 74 | 2026-08-27 | `GitHub Copilot` | — | — | **~330 min (5h 30m)** | Run #87 — TSE/NON-TSE submission workflow GDS redesign (docs/TSE-NonTSE-Submission-Workflow-Redesign.md) + route-based state/access-guard rollout (Phase 0–2) + BatchAccessDecision unit tests + per-block tissue/pre-booked-ref/bulk-block additions + New Submission Create/Edit flow fixes (AddSubmission Sender Ref search + Sample Blocks redirect + BatchSubmissionID resilience, Cassetted submission-type default fix, BatchDetails native date input) + BatchDetails button-visibility/journey gating (IsViewMode/CanPrint) and redundant task-list cleanup. Duration is a complexity-based estimate — no exact start/end timestamps captured. See sub-task breakdown below. |
 | 75 | 2026-08-27 | `GitHub Copilot` | 22:47 | 23:50 | **~63 min (1h 03m)** | Run #88 — Submission scenario gating (Add/Edit/Copy sample per journey), `BlockDetails`→`SubmissionDetailsBlock` consolidation, `BatchBlockSummary` animal-list merge fix, and two `AddAnimal` stored-procedure bugs fixed (`PMDate` DBNull `dbType`, `AddAnimal` too-many-arguments parameter mismatch vs real SP). Duration per user-reported start/end time. |
 | 76 | 2026-08-28 | `GitHub Copilot` | — | — | **~25 min** | Run #89 — Submission-journey navigation verification (all 4 journeys' back/cancel targets confirmed correct) + GDS button-alignment fixes across 4 files (`EditBatch` Samples link into button-group, `SubmissionDetailsBlock` missing `data-module`, `AddSubmission` Add sample/Cancel/Check-historical-data button-groups, `BatchBlockSummary` Add sample/Done button-groups). Duration is a complexity-based estimate. Build: 0 errors. |
-
+| 77 | 2026-08-28 | `GitHub Copilot` | 14:01 | 16:27 | **~146 min (2h 26m)** | Run #90 — Live Dev deployment debugging of the Entra ID SAML 2.0 sign-in chain: (1) added `UseForwardedHeaders()`; (2) diagnosed the fix wasn't deployed (feature branch unmerged), merged via PR; (3) added `PostConfigure<CookieAuthenticationOptions>("saml2", ...)` forcing a relative redirect on `OnRedirectToLogin`/`OnRedirectToAccessDenied` after the proxy still didn't yield the correct `Request.Host`; (4) fixed `IDX10214: Audience validation failed` by populating `saml2Config.AllowedAudienceUris`; also fixed `_Layout.cshtml` nav/user-context chrome rendering for anonymous requests. Confirmed via Log stream: SAML assertion now validates successfully end-to-end. Remaining blocker (infra, not code): `HistologyDb` SQL connection unreachable in Dev. Build: 0 errors. |
+| 78 | 2026-09-01 | `GitHub Copilot` | 12:15 | 19:07 | **~60 min** | Run #91 — Dev-only auth bypass in `HistoPageModel` (hardcoded principal, `DevAuthBypass` config flag, remove `SignInAsync`, make bypass unconditional to fix empty-session panel bug); submission-type routing analysis across all 5 types (Wet Tissue/Pre-Cassetted/Wax Block/Stained/Unstained) for Create/Edit/View/Copy journeys: fixed `OnPostSelect` to route Wet Tissue to `SubmissionDetails`; added `BatchId` route to `SubmissionDetails` back-links; added view-mode guards to `SubmissionDetails`; restored Edit sample visibility in View mode. Build: 0 errors. Duration estimated from session timestamps. |
+| 79 | 2026-09-01 | `GitHub Copilot` | — | — | **~170 min (complexity-based estimate)** | Run #92 — Full TSE/Non-TSE parity audit (Create/View/Edit/Copy across all 5 submission types) surfacing and fixing 2 defects (Wet Tissue Edit-sample POST routing, `SearchSubmissions` Edit-gating inversion); logged 7 accepted-consolidation deviations D-1–D-7 in `Parity-Audit-Report.md` §13; Module-to-Page Mapping nav audit restoring 2 orphaned pages (`SubmissionsOnHold`, `Bookings/EditHistologyRef`) and refreshing the mapping table in `Migration-Plan.md`; GDS route rename `BatchBlockSummary`→`SampleSummary` (301 redirect + `BatchNo` caption for submission-type visibility); D-1 disposition downgraded to "Resolved by design" (GDS anti-pattern rationale); Add-sample post-submit redirect regression fixed (`AddSubmission` now routes straight into `SubmissionDetailsBlock`/`SubmissionDetails` per legacy `SV_AddSampleNextPage` behaviour, closing an extra-click gap on every sample add); diagnosed and resolved a stale-build false-negative during user retest (`dotnet test` does not rebuild `Histo.Web`; a locked prior `.exe` was serving pre-fix code). Build: 0 errors, 0 warnings. Tests: 144 pass, 1 skipped. |
+| 74 | 2026-09-02 | `gds-ui` | — | — | **2 min** | Access denied shows the navigation and context that has fixed |
+| 80 | 2026-09-02 | `GitHub Copilot` | — | 17:20 | **~90 min (complexity-based estimate)** | Run #19 — Create / Edit / View Submission workflow review vs legacy + Pick List Management integration. Single-commit session (`91deb3f` at 17:20:49), so start time is not derivable from git; estimate based on scope (6 legacy pages analysed via 2 parallel Explore subagents, 12 files changed across 6 Razor Pages). Build 0 errors; `dotnet test` 145 passed / 0 failed. Nine parity issues raised (ISS-R20 … ISS-R28) |
+| 81 | 2026-09-02 | `GitHub Copilot` | — | 19:26 | **~20 min (complexity-based estimate)** | Run #20 — Wet Tissue Edit sample silent-redirect bug. User supplied a browser Network tab trace proving `GET /Submissions/SubmissionDetails` itself 302'd instead of rendering. Root cause: `SubmissionDetailsModel.LoadAnimalAsync` only checked the plain animal table and silently redirected to `SampleSummary` on a miss — same defect class already fixed in `SubmissionDetailsBlockModel` but never ported to this twin page. Fixed via block-animal-table merge + removed the silent redirect (view's dormant "Sample not found" branch now reachable) + null guards on 3 handlers. Commit `b5daeb2`. Build 0 errors, 3 pre-existing warnings; `dotnet test` 145 passed / 0 failed, 1 skipped. |
 ---
 
 ## Run #87 sub-task breakdown (2026-08-27)
@@ -106,8 +110,6 @@
 | 10 | **~15 min** | `BatchDetails.cshtml(.cs)` | Submission date changed from free-text input to native `type="date"` component |
 | 11 | **~40 min** | `BatchDetails.cshtml(.cs)` | Investigated and fixed button visibility across Create/View Submission journeys (`IsViewMode`/`CanPrint`); removed redundant QC notes button and duplicate Samples task-list row/link |
 
-=======
->>>>>>> 351607732625fba3ca3dad48fbba1c32f021a658
 ---
 
 ## Run #85 Sub-task Breakdown (2026-08-19)
@@ -267,3 +269,49 @@ Write-Host "Elapsed duration  : $elapsed minutes"
 ### Outstanding items
 
 - None raised this session � all 13 issues resolved in-session.
+---
+
+## Session 2026-09-02 — Create / Edit / View Submission review + Pick List Management integration
+
+| Metric | Value |
+|---|---|
+| Date | 2026-09-02 |
+| Duration | **~90 min** (complexity-based estimate — single-commit session, start time not derivable from git) |
+| Agent | GitHub Copilot (Chat) |
+| Mode | A (committed) — commit `91deb3f` |
+| Build result | 0 errors, 4 pre-existing warnings |
+| Test result | 145 passed, 0 failed |
+| Files changed | 12 (6 Razor Pages + page models) |
+| Subagents used | 2 × `Explore` (parallel legacy analysis) |
+
+### Work completed
+
+| Area | Change |
+|---|---|
+| BatchDetails (create mode) | Three "Manage …" pick-list buttons added beside Submitted by, Project / contract code and Pathologist |
+| BatchDetails page model | `OnPostManagePickList` + `CreateDraft` save/restore so no entered data is lost on the detour |
+| EditBatch | Same three buttons + `EditDraft` save/restore across all editable header, status and comment fields |
+| PickListUserArea | `ReturnUrl` support, "Return to submission" button, guidance inset, hard-coded `Done` dead-end removed |
+| UserMaintenance | `ReturnUrl` support, "Return to submission" button, `returnUrl` on Add user / Change links |
+| AddUser / EditUser | `ReturnUrl` passthrough on form and redirects |
+| Security | All return URLs validated with `Url.IsLocalUrl` (open-redirect prevention) |
+
+### Review coverage (no change required)
+
+Navigation Home → Cassetted → BatchDetails create → SampleSummary → AddSubmission → SubmissionDetails / SubmissionDetailsBlock; mandatory-field set vs `ValidateMandatoryFields()`; histology / antibody / stain conditional rules vs `CheckHistology()`; TSE / Non-TSE option filtering vs `HideOptions()`; Sample Summary Add / Edit / Delete / Copy / Done and Bypass sort; Wet Tissue vs block routing; `CanModifySamples` status gating.
+
+### Outstanding items
+
+Nine issues raised — ISS-R20 … ISS-R28 in `run-log-v2.md`:
+
+| ID | Severity | Summary |
+|---|---|---|
+| ISS-R20 | High | Copy sample inverted — pre-fills Sender Ref, copies no tissues or blocks |
+| ISS-R21 | Medium | Submission-date rule reversed (`max=today` vs legacy "today or later") |
+| ISS-R22 | High | "At least one Block/Sample" Finish gate missing |
+| ISS-R23 | High | `SubmissionDetailsBlock` has no View Submission read-only gate |
+| ISS-R24 | Medium | Contacts / Projects no longer filtered by user area |
+| ISS-R25 | Medium | Histology-ref format, year, duplicate and next-available validation lost |
+| ISS-R26 | High | Add sample missing duplicate check, format validation, mouse-number range, file upload, TSE Daybook lookup, pre-booked block validation |
+| ISS-R27 | Low | `SafeToHandle` 2-state vs 3-state; `SampleSameProjects` no UI; no Cancel confirmation; PM date unvalidated |
+| ISS-R28 | High | Wet Tissue `SubmittedAs == "4"` unverified against `luSubmittedAs` |
