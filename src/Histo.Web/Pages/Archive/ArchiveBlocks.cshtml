@@ -12,13 +12,16 @@
 <table class="govuk-table">
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
-            <th scope="col" class="govuk-table__header">Block ref</th>
-            <th scope="col" class="govuk-table__header">Customer ref</th>
-            <th scope="col" class="govuk-table__header">Status</th>
+            @{ ViewData["Label"] = "Block ref"; ViewData["Column"] = "BlockRef"; }
+            <partial name="_SortableHeader" />
+            @{ ViewData["Label"] = "Customer ref"; ViewData["Column"] = "CustomerRef"; }
+            <partial name="_SortableHeader" />
+            @{ ViewData["Label"] = "Status"; ViewData["Column"] = "Status"; }
+            <partial name="_SortableHeader" />
         </tr>
     </thead>
     <tbody class="govuk-table__body">
-        @foreach (var b in Model.Blocks)
+        @foreach (var b in Model.PagedEntries)
         {
             <tr class="govuk-table__row">
                 <td class="govuk-table__cell">@b.BlockRef</td>
@@ -32,4 +35,5 @@
         }
     </tbody>
 </table>
+<partial name="_Pagination" />
 <a asp-page="/Archive/ArchiveMenu" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back</a>

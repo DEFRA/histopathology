@@ -12,17 +12,23 @@
 <table class="govuk-table">
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
-            <th scope="col" class="govuk-table__header">Batch ID</th>
-            <th scope="col" class="govuk-table__header">Project</th>
-            <th scope="col" class="govuk-table__header">Pathologist</th>
-            <th scope="col" class="govuk-table__header">Species</th>
-            <th scope="col" class="govuk-table__header">Customer ref</th>
-            <th scope="col" class="govuk-table__header">Completed date</th>
+            @{ ViewData["Label"] = "Batch ID"; ViewData["Column"] = "ID"; }
+            <partial name="_SortableHeader" />
+            @{ ViewData["Label"] = "Project"; ViewData["Column"] = "ProjectDescription"; }
+            <partial name="_SortableHeader" />
+            @{ ViewData["Label"] = "Pathologist"; ViewData["Column"] = "ContactDescription"; }
+            <partial name="_SortableHeader" />
+            @{ ViewData["Label"] = "Species"; ViewData["Column"] = "Species"; }
+            <partial name="_SortableHeader" />
+            @{ ViewData["Label"] = "Customer ref"; ViewData["Column"] = "OtherSubmittedBy"; }
+            <partial name="_SortableHeader" />
+            @{ ViewData["Label"] = "Completed date"; ViewData["Column"] = "CompletedDate"; }
+            <partial name="_SortableHeader" />
             <th scope="col" class="govuk-table__header">Actions</th>
         </tr>
     </thead>
     <tbody class="govuk-table__body">
-        @foreach (var b in Model.Batches)
+        @foreach (var b in Model.PagedEntries)
         {
             <tr class="govuk-table__row">
                 <td class="govuk-table__cell">@b.ID</td>
@@ -48,3 +54,4 @@
         }
     </tbody>
 </table>
+<partial name="_Pagination" />

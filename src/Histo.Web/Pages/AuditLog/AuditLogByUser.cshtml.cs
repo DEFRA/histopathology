@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Histo.Web.Pages.AuditLog;
 
 /// <summary>Replaces <c>AuditLogByUser.aspx</c>.</summary>
-public class AuditLogByUserModel : HistoPageModel
+public class AuditLogByUserModel : GridPageModel
 {
     private readonly IAuditLogService _auditLog;
     private readonly IUserService _users;
@@ -28,11 +28,26 @@ public class AuditLogByUserModel : HistoPageModel
     public IReadOnlyList<AuditLogEntry> Results { get; private set; } = [];
     public List<string> Errors { get; } = [];
 
+    public int TotalCount => Results.Count;
+
+    public IReadOnlyList<AuditLogEntry> PagedEntries =>
+        (SortColumn switch
+        {
+            "FieldName" => SortDesc ? Results.OrderByDescending(e => e.FieldName) : Results.OrderBy(e => e.FieldName),
+            "UserName"  => SortDesc ? Results.OrderByDescending(e => e.UserName)  : Results.OrderBy(e => e.UserName),
+            "TableName" => SortDesc ? Results.OrderByDescending(e => e.TableName) : Results.OrderBy(e => e.TableName),
+            _           => SortDesc ? Results.OrderByDescending(e => e.ChangedAt) : Results.OrderBy(e => e.ChangedAt),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
+
     public async Task OnGetAsync()
     {
         ViewData["Title"] = "Audit log by user";
         ViewData["PageTitle"] = "Audit log — by user";
         Users = await _users.GetAllUsersAsync();
+        PopulateGridViewData(TotalCount);
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -46,9 +61,14 @@ public class AuditLogByUserModel : HistoPageModel
         if (!EndDate.HasValue)    Errors.Add("Enter an end date.");
         if (StartDate.HasValue && EndDate.HasValue && StartDate.Value.Date > EndDate.Value.Date)
             Errors.Add("The end date must be the same as or after the start date.");
-        if (Errors.Count > 0) return Page();
+        if (Errors.Count > 0)
+        {
+            PopulateGridViewData(TotalCount);
+            return Page();
+        }
 
         Results = await _auditLog.GetByUserAsync(UserID, StartDate, EndDate);
+        PopulateGridViewData(TotalCount);
         return Page();
     }
 

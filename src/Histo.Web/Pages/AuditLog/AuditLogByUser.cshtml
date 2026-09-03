@@ -69,10 +69,14 @@
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <th scope="col" class="govuk-table__header">Table</th>
-                <th scope="col" class="govuk-table__header">Field</th>
-                <th scope="col" class="govuk-table__header">Date/Time</th>
-                <th scope="col" class="govuk-table__header">User</th>
+                @{ ViewData["Label"] = "Table"; ViewData["Column"] = "TableName"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Field"; ViewData["Column"] = "FieldName"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Date/Time"; ViewData["Column"] = "ChangedAt"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "User"; ViewData["Column"] = "UserName"; }
+                <partial name="_SortableHeader" />
                 <th scope="col" class="govuk-table__header">Before</th>
                 <th scope="col" class="govuk-table__header">After</th>
                 <th scope="col" class="govuk-table__header">Reason</th>
@@ -80,7 +84,7 @@
             </tr>
         </thead>
         <tbody class="govuk-table__body">
-            @foreach (var e in Model.Results)
+            @foreach (var e in Model.PagedEntries)
             {
                 <tr class="govuk-table__row">
                     <td class="govuk-table__cell">@e.TableName</td>
@@ -95,6 +99,7 @@
             }
         </tbody>
     </table>
+    <partial name="_Pagination" />
 }
 else
 {

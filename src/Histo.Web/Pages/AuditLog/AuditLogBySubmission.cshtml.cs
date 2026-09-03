@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Histo.Web.Pages.AuditLog;
 
 /// <summary>Replaces <c>AuditLogBySubmission.aspx</c>.</summary>
-public class AuditLogBySubmissionModel : HistoPageModel
+public class AuditLogBySubmissionModel : GridPageModel
 {
     private readonly IAuditLogService _auditLog;
 
@@ -20,12 +20,27 @@ public class AuditLogBySubmissionModel : HistoPageModel
     public IReadOnlyList<AuditLogEntry> Results { get; private set; } = [];
     public List<string> Errors { get; } = [];
 
+    public int TotalCount => Results.Count;
+
+    public IReadOnlyList<AuditLogEntry> PagedEntries =>
+        (SortColumn switch
+        {
+            "FieldName" => SortDesc ? Results.OrderByDescending(e => e.FieldName) : Results.OrderBy(e => e.FieldName),
+            "UserName"  => SortDesc ? Results.OrderByDescending(e => e.UserName)  : Results.OrderBy(e => e.UserName),
+            "TableName" => SortDesc ? Results.OrderByDescending(e => e.TableName) : Results.OrderBy(e => e.TableName),
+            _           => SortDesc ? Results.OrderByDescending(e => e.ChangedAt) : Results.OrderBy(e => e.ChangedAt),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
+
     public void OnGet()
     {
         ViewData["Title"] = "Audit log by submission";
         ViewData["PageTitle"] = "Audit log — by submission";
         // Pre-populate from session if navigated from a batch context
         if (Session.BatchID.HasValue) SubmissionID = Session.BatchID.Value;
+        PopulateGridViewData(TotalCount);
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -34,9 +49,14 @@ public class AuditLogBySubmissionModel : HistoPageModel
         ViewData["PageTitle"] = "Audit log — by submission";
 
         if (SubmissionID <= 0) Errors.Add("Enter a submission number.");
-        if (Errors.Count > 0) return Page();
+        if (Errors.Count > 0)
+        {
+            PopulateGridViewData(TotalCount);
+            return Page();
+        }
 
         Results = await _auditLog.GetBySubmissionAsync(SubmissionID, StartDate, EndDate);
+        PopulateGridViewData(TotalCount);
         return Page();
     }
 

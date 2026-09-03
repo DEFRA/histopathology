@@ -67,17 +67,23 @@
 <table class="govuk-table">
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
-            <th scope="col" class="govuk-table__header">Name</th>
-            <th scope="col" class="govuk-table__header">NT Login</th>
-            <th scope="col" class="govuk-table__header">Group</th>
-            <th scope="col" class="govuk-table__header">Area</th>
-            <th scope="col" class="govuk-table__header">Email</th>
-            <th scope="col" class="govuk-table__header">Active</th>
+            @{ ViewData["Label"] = "Name"; ViewData["Column"] = "Name"; }
+            <partial name="_SortableHeader" />
+            @{ ViewData["Label"] = "NT Login"; ViewData["Column"] = "NtLogin"; }
+            <partial name="_SortableHeader" />
+            @{ ViewData["Label"] = "Group"; ViewData["Column"] = "Group"; }
+            <partial name="_SortableHeader" />
+            @{ ViewData["Label"] = "Area"; ViewData["Column"] = "Area"; }
+            <partial name="_SortableHeader" />
+            @{ ViewData["Label"] = "Email"; ViewData["Column"] = "Email"; }
+            <partial name="_SortableHeader" />
+            @{ ViewData["Label"] = "Active"; ViewData["Column"] = "Active"; }
+            <partial name="_SortableHeader" />
             <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
         </tr>
     </thead>
     <tbody class="govuk-table__body">
-        @foreach (var u in Model.Users)
+        @foreach (var u in Model.PagedEntries)
         {
             <tr class="govuk-table__row">
                 <td class="govuk-table__cell">@u.Name</td>
@@ -97,6 +103,7 @@
         }
     </tbody>
 </table>
+<partial name="_Pagination" />
 
 @if (Model.SafeReturnUrl is not null)
 {

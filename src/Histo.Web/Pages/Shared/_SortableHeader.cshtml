@@ -1,0 +1,36 @@
+@*
+    Shared GDS/MOJ-pattern sortable column header.
+
+    Usage (set before rendering, once per header, inside the <tr>):
+        @{
+            ViewData["Label"] = "Submission Number";
+            ViewData["Column"] = "SubmissionNumber";
+        }
+        <partial name="_SortableHeader" />
+
+    Requires ViewData["SortColumn"], ViewData["SortDesc"] and ViewData["SortBase"]
+    to have been set on the page before the table (see GridPageModel.PopulateGridViewData).
+*@
+@{
+    var label  = ViewData["Label"]?.ToString() ?? string.Empty;
+    var column = ViewData["Column"]?.ToString() ?? string.Empty;
+
+    var currentSortColumn = ViewData["SortColumn"]?.ToString() ?? string.Empty;
+    var currentSortDesc   = ViewData["SortDesc"] as bool? ?? false;
+    var sortBase          = ViewData["SortBase"]?.ToString() ?? string.Empty;
+
+    var isActive  = !string.IsNullOrEmpty(column) && string.Equals(currentSortColumn, column, StringComparison.OrdinalIgnoreCase);
+    var nextDesc  = isActive && !currentSortDesc;
+    var ariaSort  = isActive ? (currentSortDesc ? "descending" : "ascending") : "none";
+    var separator = string.IsNullOrEmpty(sortBase) ? string.Empty : "&";
+    var href      = $"?{sortBase}{separator}SortColumn={Uri.EscapeDataString(column)}&SortDesc={(nextDesc ? "true" : "false")}";
+}
+<th scope="col" class="govuk-table__header" aria-sort="@ariaSort">
+    <a class="govuk-link govuk-link--no-visited-state" href="@href">
+        @label
+        @if (isActive)
+        {
+            <span aria-hidden="true">@(currentSortDesc ? " ▼" : " ▲")</span>
+        }
+    </a>
+</th>

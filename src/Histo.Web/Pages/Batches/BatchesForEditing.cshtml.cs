@@ -9,7 +9,7 @@ namespace Histo.Web.Pages.Batches;
 /// Lists all batches available for editing — replaces <c>BatchesForEditing.aspx</c>.
 /// Legacy source: <c>clsBatch.GetBatchesWithStatus(0)</c> where status 0 returns all batches.
 /// </summary>
-public class BatchesForEditingModel : HistoPageModel
+public class BatchesForEditingModel : GridPageModel
 {
     private readonly IBatchService _batches;
 
@@ -17,6 +17,22 @@ public class BatchesForEditingModel : HistoPageModel
         : base(session) => _batches = batches;
 
     public IReadOnlyList<BatchListResult> Batches { get; private set; } = [];
+
+    public int TotalCount => Batches.Count;
+
+    public IReadOnlyList<BatchListResult> PagedEntries =>
+        (SortColumn switch
+        {
+            "ProjectDescription" => SortDesc ? Batches.OrderByDescending(b => b.ProjectDescription) : Batches.OrderBy(b => b.ProjectDescription),
+            "ContactDescription" => SortDesc ? Batches.OrderByDescending(b => b.ContactDescription) : Batches.OrderBy(b => b.ContactDescription),
+            "Species"            => SortDesc ? Batches.OrderByDescending(b => b.Species)            : Batches.OrderBy(b => b.Species),
+            "BatchDate"          => SortDesc ? Batches.OrderByDescending(b => b.BatchDate)           : Batches.OrderBy(b => b.BatchDate),
+            "Status"             => SortDesc ? Batches.OrderByDescending(b => b.Status)              : Batches.OrderBy(b => b.Status),
+            _                    => SortDesc ? Batches.OrderByDescending(b => b.ID)                  : Batches.OrderBy(b => b.ID),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
 
     /// <summary>Quick-Go: direct navigation by submission number.</summary>
     [BindProperty]
@@ -31,6 +47,7 @@ public class BatchesForEditingModel : HistoPageModel
         ViewData["PageTitle"] = "Submissions available for editing";
         // ISS-044: use GetAllBatchesAsync (maps to GetAllBatches SP) — legacy showed all statuses
         Batches = await _batches.GetAllBatchesAsync();
+        PopulateGridViewData(TotalCount);
     }
 
     public IActionResult OnPostSelect(int batchId)
@@ -47,6 +64,7 @@ public class BatchesForEditingModel : HistoPageModel
         ViewData["Title"] = "Submissions available for editing";
         ViewData["PageTitle"] = "Submissions available for editing";
         Batches = await _batches.GetAllBatchesAsync();
+        PopulateGridViewData(TotalCount);
 
         if (!QuickGoId.HasValue || QuickGoId.Value <= 0)
         {

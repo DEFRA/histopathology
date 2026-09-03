@@ -21,7 +21,7 @@ namespace Histo.Web.Pages.Admin;
 /// <see cref="ReturnUrl"/> so the user can resume the in-progress submission afterwards.
 /// Also reachable directly, e.g. <c>/Admin/PickListUserArea/19?userArea=HISTO</c> for Projects.
 /// </summary>
-public class PickListUserAreaModel : HistoPageModel
+public class PickListUserAreaModel : GridPageModel
 {
     private readonly ILookupService _lookups;
 
@@ -49,6 +49,18 @@ public class PickListUserAreaModel : HistoPageModel
     public List<string> Errors { get; } = [];
     public string? StatusMessage { get; private set; }
 
+    public int TotalCount => Items.Count;
+
+    public IReadOnlyList<LookupItem> PagedEntries =>
+        (SortColumn switch
+        {
+            "Active" => SortDesc ? Items.OrderByDescending(i => i.Active) : Items.OrderBy(i => i.Active),
+            _        => SortDesc ? Items.OrderByDescending(i => i.Name)   : Items.OrderBy(i => i.Name),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
+
     private string EffectiveArea => string.IsNullOrEmpty(UserArea) ? Session.UserArea : UserArea;
 
     public async Task OnGetAsync()
@@ -72,6 +84,8 @@ public class PickListUserAreaModel : HistoPageModel
         {
             Active = true;
         }
+
+        PopulateGridViewData(TotalCount);
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -82,7 +96,11 @@ public class PickListUserAreaModel : HistoPageModel
         await LoadItemsAsync();
 
         Validate();
-        if (Errors.Count > 0) return Page();
+        if (Errors.Count > 0)
+        {
+            PopulateGridViewData(TotalCount);
+            return Page();
+        }
 
         bool ok;
         if (ItemId is int id)
@@ -99,6 +117,7 @@ public class PickListUserAreaModel : HistoPageModel
         if (!ok)
         {
             Errors.Add("Failed to save the pick list item. Please try again.");
+            PopulateGridViewData(TotalCount);
             return Page();
         }
 

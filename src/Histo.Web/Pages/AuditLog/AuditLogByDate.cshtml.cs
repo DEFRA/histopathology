@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Histo.Web.Pages.AuditLog;
 
 /// <summary>Replaces <c>AuditLogByDate.aspx</c>.</summary>
-public class AuditLogByDateModel : HistoPageModel
+public class AuditLogByDateModel : GridPageModel
 {
     private readonly IAuditLogService _auditLog;
 
@@ -21,10 +21,25 @@ public class AuditLogByDateModel : HistoPageModel
     public bool Searched { get; private set; }
     public List<string> Errors { get; } = [];
 
+    public int TotalCount => Results.Count;
+
+    public IReadOnlyList<AuditLogEntry> PagedEntries =>
+        (SortColumn switch
+        {
+            "FieldName" => SortDesc ? Results.OrderByDescending(e => e.FieldName) : Results.OrderBy(e => e.FieldName),
+            "UserName"  => SortDesc ? Results.OrderByDescending(e => e.UserName)  : Results.OrderBy(e => e.UserName),
+            "TableName" => SortDesc ? Results.OrderByDescending(e => e.TableName) : Results.OrderBy(e => e.TableName),
+            _           => SortDesc ? Results.OrderByDescending(e => e.ChangedAt) : Results.OrderBy(e => e.ChangedAt),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
+
     public void OnGet()
     {
         ViewData["Title"] = "Audit log by date";
         ViewData["PageTitle"] = "Audit log — search by date";
+        PopulateGridViewData(TotalCount);
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -36,10 +51,15 @@ public class AuditLogByDateModel : HistoPageModel
         if (!EndDate.HasValue)   Errors.Add("Enter an end date.");
         if (StartDate.HasValue && EndDate.HasValue && StartDate.Value.Date > EndDate.Value.Date)
             Errors.Add("The end date must be the same as or after the start date.");
-        if (Errors.Count > 0) return Page();
+        if (Errors.Count > 0)
+        {
+            PopulateGridViewData(TotalCount);
+            return Page();
+        }
 
         Searched = true;
         Results = await _auditLog.GetByDateAsync(StartDate!.Value, EndDate!.Value);
+        PopulateGridViewData(TotalCount);
         return Page();
     }
 

@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Histo.Web.Pages.Search;
 
 /// <summary>Replaces <c>SearchBlockRefs.aspx</c>.</summary>
-public class SearchBlockRefsModel : HistoPageModel
+public class SearchBlockRefsModel : GridPageModel
 {
     private readonly IBlockService _blocks;
 
@@ -19,10 +19,24 @@ public class SearchBlockRefsModel : HistoPageModel
     public string? ErrorMessage { get; private set; }
     public IReadOnlyList<BlockRefRangeHelpers.BlockRefRangeRow> Results { get; private set; } = [];
 
+    public int TotalCount => Results.Count;
+
+    public IReadOnlyList<BlockRefRangeHelpers.BlockRefRangeRow> PagedResults =>
+        (SortColumn switch
+        {
+            "UnusedBlockRefs"    => SortDesc ? Results.OrderByDescending(r => r.UnusedBlockRefs)    : Results.OrderBy(r => r.UnusedBlockRefs),
+            "PreBookedBlockRefs" => SortDesc ? Results.OrderByDescending(r => r.PreBookedBlockRefs) : Results.OrderBy(r => r.PreBookedBlockRefs),
+            _                    => SortDesc ? Results.OrderByDescending(r => r.UsedBlockRefs)      : Results.OrderBy(r => r.UsedBlockRefs),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
+
     public void OnGet()
     {
         ViewData["Title"] = "Search block refs";
         ViewData["PageTitle"] = "Search block refs";
+        PopulateGridViewData(TotalCount);
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -36,6 +50,7 @@ public class SearchBlockRefsModel : HistoPageModel
         if (hasSenderRef == hasHistologyRef)
         {
             ErrorMessage = "Enter either the Sender Ref or the Histology Ref, not both.";
+            PopulateGridViewData(TotalCount);
             return Page();
         }
 
@@ -46,6 +61,7 @@ public class SearchBlockRefsModel : HistoPageModel
         Results = BlockRefRangeHelpers.ComputeRanges(
             usedBlocks.Select(b => (b.BlockRef, b.Status)).ToList());
 
+        PopulateGridViewData(TotalCount);
         return Page();
     }
 }

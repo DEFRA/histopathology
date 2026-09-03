@@ -16,7 +16,7 @@ namespace Histo.Web.Pages.Search;
 /// tables — see <see cref="TissueArchiveInfo"/>, <see cref="BlockArchiveInfo"/>
 /// and <see cref="SlideArchiveInfo"/> for details of what was not reproduced.
 /// </summary>
-public class SearchArchiveLocationModel : HistoPageModel
+public class SearchArchiveLocationModel : GridPageModel
 {
     private readonly ISubmissionService _submissions;
     private readonly IBlockService _blocks;
@@ -42,10 +42,59 @@ public class SearchArchiveLocationModel : HistoPageModel
     public IReadOnlyList<BlockArchiveInfo> BlockResults { get; private set; } = [];
     public IReadOnlyList<SlideArchiveInfo> SlideResults { get; private set; } = [];
 
+    public int TotalCount => ArchiveType switch
+    {
+        "Block" => BlockResults.Count,
+        "Slide" => SlideResults.Count,
+        _       => TissueResults.Count,
+    };
+
+    public IReadOnlyList<BlockArchiveInfo> PagedBlockResults =>
+        (SortColumn switch
+        {
+            "BlockRef"         => SortDesc ? BlockResults.OrderByDescending(r => r.BlockRef)         : BlockResults.OrderBy(r => r.BlockRef),
+            "ArchiveLocation"  => SortDesc ? BlockResults.OrderByDescending(r => r.ArchiveLocation)  : BlockResults.OrderBy(r => r.ArchiveLocation),
+            "ArchivedDate"     => SortDesc ? BlockResults.OrderByDescending(r => r.ArchivedDate)     : BlockResults.OrderBy(r => r.ArchivedDate),
+            "TissueDescription" => SortDesc ? BlockResults.OrderByDescending(r => r.TissueDescription) : BlockResults.OrderBy(r => r.TissueDescription),
+            "NoPieces"         => SortDesc ? BlockResults.OrderByDescending(r => r.NoPieces)         : BlockResults.OrderBy(r => r.NoPieces),
+            _                  => SortDesc ? BlockResults.OrderByDescending(r => r.ID)               : BlockResults.OrderBy(r => r.ID),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
+
+    public IReadOnlyList<SlideArchiveInfo> PagedSlideResults =>
+        (SortColumn switch
+        {
+            "BlockRef"         => SortDesc ? SlideResults.OrderByDescending(r => r.BlockRef)         : SlideResults.OrderBy(r => r.BlockRef),
+            "ArchiveLocation"  => SortDesc ? SlideResults.OrderByDescending(r => r.ArchiveLocation)  : SlideResults.OrderBy(r => r.ArchiveLocation),
+            "ArchivedDate"     => SortDesc ? SlideResults.OrderByDescending(r => r.ArchivedDate)     : SlideResults.OrderBy(r => r.ArchivedDate),
+            "Description"      => SortDesc ? SlideResults.OrderByDescending(r => r.Description)      : SlideResults.OrderBy(r => r.Description),
+            "TissueDescription" => SortDesc ? SlideResults.OrderByDescending(r => r.TissueDescription) : SlideResults.OrderBy(r => r.TissueDescription),
+            _                  => SortDesc ? SlideResults.OrderByDescending(r => r.BatchID)          : SlideResults.OrderBy(r => r.BatchID),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
+
+    public IReadOnlyList<TissueArchiveInfo> PagedTissueResults =>
+        (SortColumn switch
+        {
+            "TissueDescription" => SortDesc ? TissueResults.OrderByDescending(r => r.TissueDescription) : TissueResults.OrderBy(r => r.TissueDescription),
+            "ArchiveLocation"   => SortDesc ? TissueResults.OrderByDescending(r => r.ArchiveLocation)    : TissueResults.OrderBy(r => r.ArchiveLocation),
+            "ArchivedDate"      => SortDesc ? TissueResults.OrderByDescending(r => r.ArchivedDate)       : TissueResults.OrderBy(r => r.ArchivedDate),
+            "NoPieces"          => SortDesc ? TissueResults.OrderByDescending(r => r.NoPieces)           : TissueResults.OrderBy(r => r.NoPieces),
+            _                   => SortDesc ? TissueResults.OrderByDescending(r => r.BatchID)            : TissueResults.OrderBy(r => r.BatchID),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
+
     public void OnGet()
     {
         ViewData["Title"] = "Search Archive Location";
         ViewData["PageTitle"] = "Search Archive Location";
+        PopulateGridViewData(TotalCount);
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -59,6 +108,7 @@ public class SearchArchiveLocationModel : HistoPageModel
         if (hasSenderRef == hasHistologyRef)
         {
             ErrorMessage = "Enter either the Sender Ref or the Histology Ref, not both.";
+            PopulateGridViewData(TotalCount);
             return Page();
         }
 
@@ -77,6 +127,7 @@ public class SearchArchiveLocationModel : HistoPageModel
                 break;
         }
 
+        PopulateGridViewData(TotalCount);
         return Page();
     }
 

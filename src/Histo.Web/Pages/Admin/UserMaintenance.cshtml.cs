@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace Histo.Web.Pages.Admin;
 
 /// <summary>Replaces <c>UserMaintenance.aspx</c>.</summary>
-public class UserMaintenanceModel : HistoPageModel
+public class UserMaintenanceModel : GridPageModel
 {
     private readonly IUserService _users;
     private readonly ILookupService _lookups;
@@ -41,6 +41,22 @@ public class UserMaintenanceModel : HistoPageModel
     public string? StatusMessage { get; private set; }
     public string? ErrorMessage { get; private set; }
     public int TotalFromDb { get; private set; }
+
+    public int TotalCount => Users.Count;
+
+    public IReadOnlyList<User> PagedEntries =>
+        (SortColumn switch
+        {
+            "NtLogin" => SortDesc ? Users.OrderByDescending(u => u.NtLogin) : Users.OrderBy(u => u.NtLogin),
+            "Group"   => SortDesc ? Users.OrderByDescending(u => ResolveGroupName(u)) : Users.OrderBy(u => ResolveGroupName(u)),
+            "Area"    => SortDesc ? Users.OrderByDescending(u => ResolveAreaName(u))  : Users.OrderBy(u => ResolveAreaName(u)),
+            "Email"   => SortDesc ? Users.OrderByDescending(u => u.Email)   : Users.OrderBy(u => u.Email),
+            "Active"  => SortDesc ? Users.OrderByDescending(u => u.Active) : Users.OrderBy(u => u.Active),
+            _         => SortDesc ? Users.OrderByDescending(u => u.Name)   : Users.OrderBy(u => u.Name),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
 
     /// <summary>
     /// Group code → display name fallback map. Populated from <c>GetluUserGroup</c>
@@ -80,6 +96,8 @@ public class UserMaintenanceModel : HistoPageModel
         {
             ErrorMessage = $"{ex.GetType().Name}: {ex.Message}";
         }
+
+        PopulateGridViewData(TotalCount);
     }
 
     /// <summary>
