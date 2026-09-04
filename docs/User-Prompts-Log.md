@@ -1905,4 +1905,54 @@ Implemented all of the documented gaps. While researching the "Use the entire ti
 
 **Files changed:** [src/Histo.Submissions/Repositories/SubmissionRepository.cs](../src/Histo.Submissions/Repositories/SubmissionRepository.cs), [src/Histo.Submissions/Services/SubmissionService.cs](../src/Histo.Submissions/Services/SubmissionService.cs), [src/Histo.Submissions/Interfaces/ISubmissionRepository.cs](../src/Histo.Submissions/Interfaces/ISubmissionRepository.cs), [src/Histo.Submissions/Interfaces/ISubmissionService.cs](../src/Histo.Submissions/Interfaces/ISubmissionService.cs), [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs), [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml), [src/Histo.Web/Pages/Blocks/CopyBlocks.cshtml.cs](../src/Histo.Web/Pages/Blocks/CopyBlocks.cshtml.cs), [src/Histo.Web/Pages/Blocks/CopySamples.cshtml.cs](../src/Histo.Web/Pages/Blocks/CopySamples.cshtml.cs), [src/Histo.Web/Pages/Batches/CopyBatch.cshtml.cs](../src/Histo.Web/Pages/Batches/CopyBatch.cshtml.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs).
 
+---
+
+## Prompt 124 — SubmissionDetails.cshtml PM Date/Tissue Details load/Edit/Delete/Add parity (2026-09-04)
+
+> Requirement: Address SubmissionDetails.cshtml Issues and Ensure GDS-Compliant Functionality — (1) PM Date should be a proper date field matching legacy behaviour; (2) Tissue Details data not loading; (3) Tissue Details should support Edit and Delete; (4) Add Tissue functionality not working. Full review of data loading, Add/Edit/Delete, validation, database updates, workflow, and accessibility.
+
+Fixed PM Date from plain text to a native `type="date"` input via a new shared `DateFormatHelpers` (legacy stores dates as dd/MM/yyyy per `CalendarDate.ascx.vb::FormattedDate`; a date input requires yyyy-MM-dd). Built Edit tissue from scratch (`UpdateTissueAsync` existed at every layer but had zero callers anywhere in the app). Root-caused "Add tissue not working" to `AddTissueAsync` passing a `@UserID` parameter that the real `AddTissue`/`AddBlockTissue` SPs don't accept (confirmed via `clsTissue.vb`'s `AddInsertParam` list). Fixed Tissue Code from free text to a proper lookup-backed select, and the grid to show resolved tissue names.
+
+**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
+
+**Files changed:** [src/Histo.Core/Domain/DateFormatHelpers.cs](../src/Histo.Core/Domain/DateFormatHelpers.cs) (new), [src/Histo.Submissions/Repositories/SubmissionRepository.cs](../src/Histo.Submissions/Repositories/SubmissionRepository.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml).
+
+---
+
+## Prompt 125 — PM date reuse question + token-consumption concern (2026-09-04)
+
+> PM date being used other place, did you used exisitng reference, going for don' take it as new implmentaiton
+>
+> still it's not loading and see the newwork logs it's say not found ... i turned agent mode
+
+Confirmed no pre-existing shared date-conversion utility existed (each page duplicated its own inline `dd/MM/yyyy` parsing) — `DateFormatHelpers` consolidates that convention rather than inventing a new one; applied the same helper to `SubmissionDetailsBlock.cshtml.cs`'s identical `PMDate` field. User then reported tissues still not loading with live network-log evidence (200 OK but empty grid) and raised a token-consumption concern; terminal/edit tools were briefly disabled and re-enabled mid-conversation. First diagnosis attempt (patch `BatchSubmissionID` from `GetAnimalsByBatchAsync`) was applied once tools were back on.
+
+**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
+
+**Files changed:** [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml).
+
+---
+
+## Prompt 126 — Still not loading; validate before querying the DB again (2026-09-04)
+
+> still it's not loading and see the newwork logs it's say not found ... why are you running will it be usefull, can you skipp this if itnot required ... Then go for it
+
+Explained why a targeted `sqlcmd` check was needed (rule out "no data exists" vs "code bug" before another speculative patch) and, once approved, ran it. Found the real root cause: `GetBatchAnimal` (backing `GetAnimalsByBatchAsync`, the fallback my first patch trusted) also never returns a `BatchSubmissionID` column — confirmed via `sp_helptext`. Animal 53042 also has `BatchSubmission` rows under two different batches (30407 and 9804), so a naive global lookup would be ambiguous. Fixed by resolving via the already-existing, already-fixed `GetSubmissionsByBatchAsync` (batch-scoped `AnimalID`→`ID`), and added the missing `AnimalID` property to the `BatchSubmission` model (a real SP column that was being silently discarded). Verified live: batch 30407/animal 53042 → `BatchSubmissionID` 65912, which has 1 real tissue row.
+
+**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
+
+**Files changed:** [src/Histo.Submissions/Models/BatchSubmission.cs](../src/Histo.Submissions/Models/BatchSubmission.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs).
+
+---
+
+## Prompt 127 — Edit/Delete button variance, Add tissue pre-filled, Save tissue not working (2026-09-04)
+
+> I could see edit link and delete button, why this variance ? also when edit it's editable field, but there add tissue section also getting loaded the values. Save tissue is not working. also check if i add new tissue it should also save
+
+Made Edit a button matching Delete's style. Fixed the Add-tissue form being silently pre-filled with the row being edited — Edit and Add shared the same bind properties; split into dedicated `EditTissueCode`/`EditNoPieces`/`EditComment`. Root-caused "Save tissue not working" to `UpdateTissueAsync` missing the `@BatchSubmissionID`/`@BlockID` keyfield parameter that `EditTissue`/`EditBlockTissue` require (confirmed via `clsTissue.vb`'s `AddUpdateParam(sKeyField, ...)` — the same class of parameter-list omission as the earlier Add-tissue bug, just on the Update side this time).
+
+**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
+
+**Files changed:** [src/Histo.Submissions/Repositories/SubmissionRepository.cs](../src/Histo.Submissions/Repositories/SubmissionRepository.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml).
+
 

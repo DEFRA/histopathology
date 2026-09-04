@@ -132,11 +132,11 @@ else
             <label class="govuk-label" for="PMDate">PM date</label>
             @if (Model.IsViewMode)
             {
-                <input class="govuk-input" asp-for="PMDate" readonly disabled />
+                <input class="govuk-input govuk-input--width-10" type="date" asp-for="PMDate" readonly disabled />
             }
             else
             {
-                <input class="govuk-input" asp-for="PMDate" />
+                <input class="govuk-input govuk-input--width-10" type="date" asp-for="PMDate" />
             }
         </div>
         <div class="govuk-form-group">

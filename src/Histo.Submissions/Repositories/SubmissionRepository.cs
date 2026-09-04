@@ -289,7 +289,9 @@ public sealed class SubmissionRepository : ISubmissionRepository
         parameters.Add("TissueCode", tissue.TissueCode);
         parameters.Add("NoPieces", tissue.NoPieces);
         parameters.Add("Comment", (object?)tissue.Comment ?? DBNull.Value, dbType: System.Data.DbType.String);
-        parameters.Add("UserID", userId);
+        // Legacy source: clsTissue.vb::UpdateTissueDetails — AddInsertParam list is
+        // {keyField, TissueCode, NoPieces, Comment} only. No @UserID parameter on
+        // AddTissue/AddBlockTissue (UserID is only an AddUpdateParam, used by Edit/Delete).
 
         await conn.ExecuteAsync(procName, parameters,
             commandType: System.Data.CommandType.StoredProcedure);
@@ -300,23 +302,27 @@ public sealed class SubmissionRepository : ISubmissionRepository
     public async Task UpdateTissueAsync(Tissue tissue, int userId, CancellationToken ct = default)
     {
         var procName = tissue.Owner == TissueOwner.Submission ? "EditTissue" : "EditBlockTissue";
+        var keyParam = tissue.Owner == TissueOwner.Submission ? "BatchSubmissionID" : "BlockID";
 
         using var conn = _db.CreateConnection();
-        await conn.ExecuteAsync(
-            procName,
-            new
-            {
-                tissue.ID,
-                tissue.TissueCode,
-                tissue.NoPieces,
-                Comment = (object?)tissue.Comment ?? DBNull.Value,
-                ArchiveLocation = (object?)tissue.ArchiveLocation ?? DBNull.Value,
-                ArchivedDate = (object?)tissue.ArchivedDate ?? DBNull.Value,
-                ArchiveComment = (object?)tissue.ArchiveComment ?? DBNull.Value,
-                tissue.RowStamp,
-                UserID = userId,
-            },
-            commandType: System.Data.CommandType.StoredProcedure);
+        var parameters = new DynamicParameters();
+        parameters.Add("ID", tissue.ID);
+        parameters.Add(keyParam, tissue.OwnerID);
+        parameters.Add("TissueCode", tissue.TissueCode);
+        parameters.Add("NoPieces", tissue.NoPieces);
+        parameters.Add("Comment", (object?)tissue.Comment ?? DBNull.Value, dbType: System.Data.DbType.String);
+        parameters.Add("UserID", userId);
+        parameters.Add("RowStamp", tissue.RowStamp);
+        // Legacy source: clsTissue.vb::UpdateTissueDetails — Archive* AddUpdateParams are only
+        // registered when sKeyField = "BatchSubmissionID" (EditBlockTissue has no Archive params).
+        if (tissue.Owner == TissueOwner.Submission)
+        {
+            parameters.Add("ArchiveLocation", (object?)tissue.ArchiveLocation ?? DBNull.Value, dbType: System.Data.DbType.String);
+            parameters.Add("ArchivedDate", (object?)tissue.ArchivedDate ?? DBNull.Value, dbType: System.Data.DbType.DateTime);
+            parameters.Add("ArchiveComment", (object?)tissue.ArchiveComment ?? DBNull.Value, dbType: System.Data.DbType.String);
+        }
+
+        await conn.ExecuteAsync(procName, parameters, commandType: System.Data.CommandType.StoredProcedure);
     }
 
     /// <inheritdoc/>

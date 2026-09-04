@@ -143,7 +143,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
 
         if (Animal is null) return Page();
 
-        PMDate = Animal.PMDate;
+        PMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
         HistologyRef = Animal.HistologyRef;
 
         var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
@@ -179,7 +179,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
             HistoRefSet = !string.IsNullOrWhiteSpace(HistologyRef),
             HistologyRef = HistologyRef,
             OnHold = Animal.OnHold,
-            PMDate = PMDate,
+            PMDate = DateFormatHelpers.ToLegacyDate(PMDate),
             PMDateSet = !string.IsNullOrWhiteSpace(PMDate),
             IsPGNumber = Animal.IsPGNumber,
             BookedHistologyRef = Animal.BookedHistologyRef,
@@ -220,7 +220,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
             var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
             Blocks = allBlocks.Where(b => b.AnimalID == Animal!.ID).ToList();
             await LoadSupportingDataAsync();
-            PMDate = Animal.PMDate;
+            PMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
             HistologyRef = Animal.HistologyRef;
             return Page();
         }
@@ -244,7 +244,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         Blocks = allBlocks.Where(b => b.AnimalID == Animal.ID).ToList();
         await LoadSupportingDataAsync();
 
-        PMDate = Animal.PMDate;
+        PMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
         if (HistologyRefType is > 0)
         {
             var unused = await _histologyRefs.GetUnusedRefsAsync(HistologyRefType.Value);

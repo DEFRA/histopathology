@@ -1,3 +1,6 @@
+using Histo.Administration.Interfaces;
+using Histo.Administration.Models;
+using Histo.Core.Domain;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -11,10 +14,17 @@ namespace Histo.Web.Pages.Submissions;
 /// </summary>
 public class SubmissionDetailsModel : HistoPageModel
 {
-    private readonly ISubmissionService _submissions;
+    private const int LookupTissueCode = 9;
 
-    public SubmissionDetailsModel(ISessionService session, ISubmissionService submissions)
-        : base(session) => _submissions = submissions;
+    private readonly ISubmissionService _submissions;
+    private readonly ILookupService _lookups;
+
+    public SubmissionDetailsModel(ISessionService session, ISubmissionService submissions, ILookupService lookups)
+        : base(session)
+    {
+        _submissions = submissions;
+        _lookups = lookups;
+    }
 
     /// <summary>Batch ID from the URL (route/query). Needed for back-link and view-mode awareness.</summary>
     [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
@@ -25,15 +35,28 @@ public class SubmissionDetailsModel : HistoPageModel
     /// <summary>Tissue awaiting delete confirmation — drives the inline GOV.UK confirmation panel.</summary>
     [BindProperty(SupportsGet = true)] public int? ConfirmDeleteTissueId { get; set; }
 
+    /// <summary>Tissue currently shown in its inline edit row.</summary>
+    [BindProperty(SupportsGet = true)] public int? EditTissueId { get; set; }
+
     [BindProperty] public string? PMDate { get; set; }
     [BindProperty] public string? HistologyRef { get; set; }
 
+    [BindProperty] public int TissueId { get; set; }
     [BindProperty] public string TissueCode { get; set; } = string.Empty;
     [BindProperty] public short NoPieces { get; set; } = 1;
     [BindProperty] public string? Comment { get; set; }
 
+    /// <summary>Inline edit-row fields — separate from <see cref="TissueCode"/>/<see cref="NoPieces"/>/<see cref="Comment"/> above (the Add tissue form) so editing a row doesn't pre-fill Add tissue.</summary>
+    [BindProperty] public string EditTissueCode { get; set; } = string.Empty;
+    [BindProperty] public short EditNoPieces { get; set; } = 1;
+    [BindProperty] public string? EditComment { get; set; }
+
     public Animal? Animal { get; private set; }
     public IReadOnlyList<Tissue> Tissues { get; private set; } = [];
+    public IReadOnlyList<LookupItem> TissueOptions { get; private set; } = [];
+
+    /// <summary>Resolves a tissue code to its description, matching legacy's GetListType(TissueCode, LOOKUP_TISSUE_CODE).</summary>
+    public string TissueName(string code) => TissueOptions.FirstOrDefault(o => o.Code == code)?.Name ?? code;
 
     /// <summary>Mirrors <see cref="SampleSummaryModel.IsViewMode"/> — hides edit/delete/add in View Submission journey.</summary>
     public bool IsViewMode => Session.IsViewSubmissionMode;
@@ -48,9 +71,23 @@ public class SubmissionDetailsModel : HistoPageModel
         if (redirect is not null) return redirect;
         if (Animal is null) return Page();
 
-        PMDate = Animal.PMDate;
+        PMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
         HistologyRef = Animal.HistologyRef;
         Tissues = await _submissions.GetTissuesBySubmissionAsync(BatchId ?? 0, Animal.BatchSubmissionID);
+        TissueOptions = await _lookups.GetLookupDataAsync(LookupTissueCode);
+
+        if (EditTissueId is > 0)
+        {
+            var editing = Tissues.FirstOrDefault(t => t.ID == EditTissueId);
+            if (editing is not null)
+            {
+                TissueId = editing.ID;
+                EditTissueCode = editing.TissueCode;
+                EditNoPieces = editing.NoPieces;
+                EditComment = editing.Comment;
+            }
+        }
+
         return Page();
     }
 
@@ -72,7 +109,7 @@ public class SubmissionDetailsModel : HistoPageModel
             HistoRefSet = !string.IsNullOrWhiteSpace(HistologyRef),
             HistologyRef = HistologyRef,
             OnHold = Animal.OnHold,
-            PMDate = PMDate,
+            PMDate = DateFormatHelpers.ToLegacyDate(PMDate),
             PMDateSet = !string.IsNullOrWhiteSpace(PMDate),
             IsPGNumber = Animal.IsPGNumber,
             BookedHistologyRef = Animal.BookedHistologyRef,
@@ -89,15 +126,46 @@ public class SubmissionDetailsModel : HistoPageModel
         if (redirect is not null) return redirect;
         if (Animal is null) return RedirectToPage("/Submissions/SampleSummary", new { batchId = BatchId });
 
-        var tissue = new Tissue
+        if (!string.IsNullOrWhiteSpace(TissueCode))
         {
-            OwnerID = Animal!.BatchSubmissionID,
+            var tissue = new Tissue
+            {
+                OwnerID = Animal!.BatchSubmissionID,
+                Owner = TissueOwner.Submission,
+                TissueCode = TissueCode,
+                NoPieces = NoPieces,
+                Comment = Comment,
+            };
+            await _submissions.AddTissueAsync(tissue, Session.UserID);
+        }
+        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
+    }
+
+    public async Task<IActionResult> OnPostUpdateTissueAsync()
+    {
+        var redirect = await LoadAnimalAsync();
+        if (redirect is not null) return redirect;
+        if (Animal is null || TissueId <= 0) return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
+
+        var existing = (await _submissions.GetTissuesBySubmissionAsync(BatchId ?? 0, Animal.BatchSubmissionID))
+            .FirstOrDefault(t => t.ID == TissueId);
+        if (existing is null || string.IsNullOrWhiteSpace(EditTissueCode))
+            return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
+
+        var updated = new Tissue
+        {
+            ID = TissueId,
+            OwnerID = existing.OwnerID,
             Owner = TissueOwner.Submission,
-            TissueCode = TissueCode,
-            NoPieces = NoPieces,
-            Comment = Comment,
+            TissueCode = EditTissueCode,
+            NoPieces = EditNoPieces,
+            Comment = EditComment,
+            ArchiveLocation = existing.ArchiveLocation,
+            ArchivedDate = existing.ArchivedDate,
+            ArchiveComment = existing.ArchiveComment,
+            RowStamp = existing.RowStamp,
         };
-        await _submissions.AddTissueAsync(tissue, Session.UserID);
+        await _submissions.UpdateTissueAsync(updated, Session.UserID);
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
     }
 
@@ -128,6 +196,18 @@ public class SubmissionDetailsModel : HistoPageModel
         {
             var animals = await _submissions.GetAnimalsByBatchAsync(BatchId.Value);
             Animal = animals.FirstOrDefault(a => a.ID == AnimalId);
+        }
+
+        // Neither GetBatchAnimal nor GetBatchBlockAnimal return a BatchSubmissionID column, so
+        // it's always 0 from either source above — resolve the real value from the already
+        // batch-scoped, already-fixed GetSubmissionsByBatchAsync (an animal can have
+        // BatchSubmission rows under other batches too, so this must be scoped to this batch).
+        if (Animal is not null)
+        {
+            var submissions = await _submissions.GetSubmissionsByBatchAsync(BatchId.Value);
+            var realSubmissionId = submissions.FirstOrDefault(s => s.AnimalID == AnimalId)?.ID;
+            if (realSubmissionId is > 0)
+                Animal.BatchSubmissionID = realSubmissionId.Value;
         }
 
         // Deliberately does NOT redirect when the animal cannot be resolved — bouncing back to
