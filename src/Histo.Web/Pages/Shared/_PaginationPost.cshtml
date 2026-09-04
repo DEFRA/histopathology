@@ -1,0 +1,77 @@
+@*
+    POST-variant of _Pagination for grids whose filter criteria are bound via
+    [BindProperty] on a POST handler (e.g. ViewSubmissions), rather than the query
+    string. Submits the page's existing hidden carrier form instead of navigating
+    via a GET link, so POST-bound filter values are not lost when paging.
+
+    Usage (render immediately after </table>):
+        @{ ViewData["FormId"] = "view-action-form"; ViewData["Handler"] = "Search"; }
+        <partial name="_PaginationPost" />
+
+    Requires ViewData["CurrentPage"], ViewData["TotalPages"] (plus ViewData["SortColumn"]/
+    ["SortDesc"] if the grid is also sortable) to have been set on the page before the table.
+*@
+@{
+    var currentPage = ViewData["CurrentPage"] as int? ?? 1;
+    var totalPages  = ViewData["TotalPages"] as int? ?? 1;
+    var sortColumn  = ViewData["SortColumn"]?.ToString();
+    var sortDesc    = ViewData["SortDesc"] as bool? ?? false;
+    var formId      = ViewData["FormId"]?.ToString() ?? string.Empty;
+    var handler     = ViewData["Handler"]?.ToString() ?? string.Empty;
+
+    string BuildAction(int page)
+    {
+        var parts = new List<string> { $"handler={Uri.EscapeDataString(handler)}" };
+        if (!string.IsNullOrEmpty(sortColumn))
+        {
+            parts.Add($"SortColumn={Uri.EscapeDataString(sortColumn)}");
+            parts.Add($"SortDesc={(sortDesc ? "true" : "false")}");
+        }
+        parts.Add($"PageNumber={page}");
+        return "?" + string.Join("&", parts);
+    }
+}
+@if (totalPages > 1)
+{
+    <nav class="govuk-pagination" aria-label="Pagination">
+        @if (currentPage > 1)
+        {
+            <div class="govuk-pagination__prev">
+                <button type="submit" form="@formId" formaction="@BuildAction(currentPage - 1)" class="app-link-button govuk-pagination__link" rel="prev">
+                    <svg class="govuk-pagination__icon govuk-pagination__icon--prev" xmlns="http://www.w3.org/2000/svg" height="13" width="15" aria-hidden="true" focusable="false" viewBox="0 0 15 13">
+                        <path d="m6.5938-0.0078125-6.6157 6.5947 6.6157 6.6183 1.4142-1.4142-4.2005-4.2021 4.2005-4.2005-1.4142-1.4142z"></path>
+                    </svg>
+                    <span class="govuk-pagination__link-title">Previous</span>
+                </button>
+            </div>
+        }
+        <ul class="govuk-pagination__list">
+            @for (var p = 1; p <= totalPages; p++)
+            {
+                if (p == currentPage)
+                {
+                    <li class="govuk-pagination__item govuk-pagination__item--current">
+                        <button type="submit" form="@formId" formaction="@BuildAction(p)" class="app-link-button govuk-pagination__link" aria-label="Page @p" aria-current="page">@p</button>
+                    </li>
+                }
+                else
+                {
+                    <li class="govuk-pagination__item">
+                        <button type="submit" form="@formId" formaction="@BuildAction(p)" class="app-link-button govuk-pagination__link" aria-label="Page @p">@p</button>
+                    </li>
+                }
+            }
+        </ul>
+        @if (currentPage < totalPages)
+        {
+            <div class="govuk-pagination__next">
+                <button type="submit" form="@formId" formaction="@BuildAction(currentPage + 1)" class="app-link-button govuk-pagination__link" rel="next">
+                    <span class="govuk-pagination__link-title">Next</span>
+                    <svg class="govuk-pagination__icon govuk-pagination__icon--next" xmlns="http://www.w3.org/2000/svg" height="13" width="15" aria-hidden="true" focusable="false" viewBox="0 0 15 13">
+                        <path d="m8.107-0.0078125-1.4142 1.4142 4.2005 4.2005-4.2005 4.2021 1.4142 1.4142 6.6157-6.6183-6.6157-6.5947z"></path>
+                    </svg>
+                </button>
+            </div>
+        }
+    </nav>
+}

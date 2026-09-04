@@ -13,13 +13,16 @@ public interface IBlockRepository
 {
     /// <summary>
     /// Returns all blocks for a batch.
-    /// Maps to <c>GetBatchBlocksByID</c> stored procedure (table index 6 in the DataSet).
+    /// Maps to <c>GetBatchBlockDetails</c> stored procedure (@ID = BatchID) — confirmed against
+    /// the database directly; the similarly-named <c>GetBatchBlocksByID</c> is a different,
+    /// 10-result-set procedure used by <see cref="Histo.Histology.Repositories.BlockTestRepository"/>.
     /// </summary>
     Task<IReadOnlyList<Block>> GetByBatchAsync(int batchId, CancellationToken ct = default);
 
     /// <summary>
     /// Returns pre-booked (unassigned) blocks for an animal.
-    /// Maps to <c>GetPreBookedBlocksByAnimalID</c> stored procedure.
+    /// Maps to <c>GetAnimalPreBookedBlocks</c> stored procedure (@AnimalID) — confirmed against
+    /// the database directly.
     /// </summary>
     Task<IReadOnlyList<Block>> GetPreBookedByAnimalAsync(int animalId, CancellationToken ct = default);
 

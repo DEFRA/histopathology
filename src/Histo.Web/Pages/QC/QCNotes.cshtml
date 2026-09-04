@@ -35,16 +35,21 @@ else
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <th scope="col" class="govuk-table__header">QC note ref</th>
-                <th scope="col" class="govuk-table__header">Submission No</th>
-                <th scope="col" class="govuk-table__header">Stain ref</th>
-                <th scope="col" class="govuk-table__header">Project</th>
-                <th scope="col" class="govuk-table__header">Species</th>
+                @{ ViewData["Label"] = "QC note ref"; ViewData["Column"] = "QCNoteRef"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Submission No"; ViewData["Column"] = "SubmissionNo"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Stain ref"; ViewData["Column"] = "StainRef"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Project"; ViewData["Column"] = "Project"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Species"; ViewData["Column"] = "Species"; }
+                <partial name="_SortableHeader" />
                 <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
             </tr>
         </thead>
         <tbody class="govuk-table__body">
-            @foreach (var n in Model.Notes)
+            @foreach (var n in Model.PagedEntries)
             {
                 <tr class="govuk-table__row">
                     <td class="govuk-table__cell">@n.QCNoteRef</td>
@@ -63,6 +68,7 @@ else
             }
         </tbody>
     </table>
+    <partial name="_Pagination" />
 }
 else
 {

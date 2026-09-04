@@ -67,6 +67,21 @@ public class ValidationHelperTests
         => Assert.False(ValidationHelpers.IsBatchPreCassetted(code));
 
     // =========================================================================
+    // IsWetTissueDescription
+    // =========================================================================
+
+    [Theory]
+    [InlineData("Wet Tissue", true)]
+    [InlineData("wet tissue", true)]  // case-insensitive
+    [InlineData(" Wet Tissue ", true)] // trimmed
+    [InlineData("Wax Block", false)]
+    [InlineData("Pre Cassetted Tissue", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void IsWetTissueDescription_ComparesDescriptionNotCode(string? description, bool expected)
+        => Assert.Equal(expected, ValidationHelpers.IsWetTissueDescription(description));
+
+    // =========================================================================
     // ValidateHistoRef — format validation
     // =========================================================================
 

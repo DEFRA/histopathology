@@ -46,11 +46,11 @@ else
             <label class="govuk-label" for="HistologyRef">Histology reference</label>
             @if (Model.IsViewMode)
             {
-                <input class="govuk-input" asp-for="HistologyRef" readonly disabled />
+                <input class="govuk-input govuk-input--width-20" asp-for="HistologyRef" readonly disabled />
             }
             else
             {
-                <input class="govuk-input" asp-for="HistologyRef" />
+                <input class="govuk-input govuk-input--width-20" asp-for="HistologyRef" />
             }
         </div>
         @if (!Model.IsViewMode)

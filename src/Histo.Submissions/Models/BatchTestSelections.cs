@@ -60,6 +60,12 @@ public sealed class BatchTestSelections
 /// </summary>
 public static class HistologyCode
 {
+    /// <summary>EO.</summary>
+    public const string EO = "1";
+
+    /// <summary>H&amp;E.</summary>
+    public const string HAndE = "2";
+
     /// <summary>Special Stain — selecting this requires at least one stain to be chosen.</summary>
     public const string SpecialStain = "3";
 
@@ -71,4 +77,7 @@ public static class HistologyCode
 
     /// <summary>IHC-Other — selecting this requires at least one antibody to be chosen. NonTSE only.</summary>
     public const string IhcOther = "6";
+
+    /// <summary>Archive — set when the block has been flagged for archiving. Not user-selectable on the block Tests form.</summary>
+    public const string Archive = "7";
 }

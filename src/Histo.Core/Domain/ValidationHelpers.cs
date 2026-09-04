@@ -95,4 +95,18 @@ public static partial class ValidationHelpers
     /// </summary>
     public static bool IsBatchPreCassetted(string? submittedAsCode)
         => submittedAsCode == "5";
+
+    /// <summary>
+    /// Returns <see langword="true"/> when the resolved "Submitted As" lookup description
+    /// is "Wet Tissue" — the Block Types vs. Tissue Type split that decides whether Add sample
+    /// routes to Sample Blocks (SubmissionDetailsBlock) or Sample Details (SubmissionDetails).
+    ///
+    /// Legacy source: Cassetted.aspx.vb, <c>btnYes_Click</c> —
+    /// <c>chkblSubmittedAs.SelectedItem.Text.ToString() = "Wet Tissue"</c>. Unlike
+    /// <see cref="IsBatchPreCassetted"/>, legacy never hardcodes a hardcoded numeric code for
+    /// Wet Tissue — it compares the lookup item's *Description*, not its Code, so callers must
+    /// resolve the code to a description via LOOKUP_SUBMITTEDAS (table 11) first.
+    /// </summary>
+    public static bool IsWetTissueDescription(string? submittedAsDescription)
+        => string.Equals(submittedAsDescription?.Trim(), "Wet Tissue", StringComparison.OrdinalIgnoreCase);
 }

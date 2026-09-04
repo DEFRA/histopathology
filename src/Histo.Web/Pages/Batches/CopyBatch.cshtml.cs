@@ -175,7 +175,7 @@ public class CopyBatchModel : HistoPageModel
             var newSubmissionId = await _submissions.CopySubmissionAsync(submission, newBatchId, userId);
             if (newSubmissionId <= 0) continue;
 
-            var tissues = await _submissions.GetTissuesBySubmissionAsync(submission.ID);
+            var tissues = await _submissions.GetTissuesBySubmissionAsync(SourceBatchId, submission.ID);
             foreach (var tissue in tissues)
                 await _submissions.CopyTissueAsync(tissue, newSubmissionId, userId);
 

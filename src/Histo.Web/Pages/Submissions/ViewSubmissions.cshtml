@@ -149,25 +149,33 @@
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
                     <th scope="col" class="govuk-table__header govuk-table__header--numeric">Select</th>
-                    <th scope="col" class="govuk-table__header">Sub. Number</th>
-                    <th scope="col" class="govuk-table__header">Project Code</th>
-                    <th scope="col" class="govuk-table__header">Pathologist</th>
-                    <th scope="col" class="govuk-table__header">Species</th>
-                    <th scope="col" class="govuk-table__header">Date Submitted</th>
-                    <th scope="col" class="govuk-table__header">Date Received / Rejected</th>
-                    <th scope="col" class="govuk-table__header">Date Completed</th>
+                    @{ ViewData["Label"] = "Sub. Number"; ViewData["Column"] = "ID"; ViewData["FormId"] = "view-action-form"; ViewData["Handler"] = "Search"; }
+                    <partial name="_SortableHeaderPost" />
+                    @{ ViewData["Label"] = "Project Code"; ViewData["Column"] = "ProjectDescription"; }
+                    <partial name="_SortableHeaderPost" />
+                    @{ ViewData["Label"] = "Pathologist"; ViewData["Column"] = "ContactDescription"; }
+                    <partial name="_SortableHeaderPost" />
+                    @{ ViewData["Label"] = "Species"; ViewData["Column"] = "Species"; }
+                    <partial name="_SortableHeaderPost" />
+                    @{ ViewData["Label"] = "Date Submitted"; ViewData["Column"] = "BatchDate"; }
+                    <partial name="_SortableHeaderPost" />
+                    @{ ViewData["Label"] = "Date Received / Rejected"; ViewData["Column"] = "DateReceived"; }
+                    <partial name="_SortableHeaderPost" />
+                    @{ ViewData["Label"] = "Date Completed"; ViewData["Column"] = "DateCompleted"; }
+                    <partial name="_SortableHeaderPost" />
                     <th scope="col" class="govuk-table__header">Customer Received Date</th>
-                    <th scope="col" class="govuk-table__header">Status</th>
+                    @{ ViewData["Label"] = "Status"; ViewData["Column"] = "Status"; }
+                    <partial name="_SortableHeaderPost" />
                 </tr>
             </thead>
             <tbody class="govuk-table__body">
-                @foreach (var r in Model.Results)
+                @foreach (var r in Model.PagedResults)
                 {
                     var isSelected = r.ID == Model.SelectedBatchId;
                     <tr class="govuk-table__row" @(isSelected ? "style=background-color:#bbd4ea" : "")>
                         <td class="govuk-table__cell govuk-table__cell--numeric">
                             <button form="view-action-form"
-                                    formaction="?handler=Select"
+                                    formaction="?handler=Select&SortColumn=@Model.SortColumn&SortDesc=@Model.SortDesc&PageNumber=@Model.PageNumber"
                                     type="submit"
                                     name="SelectedBatchId"
                                     value="@r.ID"
@@ -189,6 +197,7 @@
                 }
             </tbody>
         </table>
+        <partial name="_PaginationPost" />
 
         @* Export to CSV — mirrors legacy lbExportExcel (all result rows). *@
         <button form="view-action-form"

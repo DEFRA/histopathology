@@ -218,14 +218,30 @@ public sealed class SubmissionRepository : ISubmissionRepository
     // -----------------------------------------------------------------------
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<Tissue>> GetTissuesBySubmissionAsync(int submissionId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<Tissue>> GetTissuesBySubmissionAsync(int batchId, int submissionId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<Tissue>(
-            "GetTissuesBySubmissionID",
-            new { ID = submissionId },
+        var rows = await conn.QueryAsync<dynamic>(
+            "GetBatchTissues",
+            new { ID = batchId },
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+        return rows
+            .Select(r => (IDictionary<string, object>)r)
+            .Where(d => d.TryGetValue("BatchSubmissionID", out var bsid) && Convert.ToInt32(bsid) == submissionId)
+            .Select(d => new Tissue
+            {
+                ID = d.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0,
+                OwnerID = submissionId,
+                Owner = TissueOwner.Submission,
+                TissueCode = d.TryGetValue("TissueCode", out var tc) ? Convert.ToString(tc) ?? "" : "",
+                NoPieces = d.TryGetValue("NoPieces", out var np) ? Convert.ToInt16(np) : (short)0,
+                Comment = d.TryGetValue("Comment", out var cm) && cm is not DBNull ? Convert.ToString(cm) : null,
+                ArchiveLocation = d.TryGetValue("ArchiveLocation", out var al) && al is not DBNull ? Convert.ToString(al) : null,
+                ArchivedDate = d.TryGetValue("ArchivedDate", out var ad) && ad is not DBNull && DateTime.TryParse(Convert.ToString(ad), out var adv) ? adv : null,
+                ArchiveComment = d.TryGetValue("ArchiveComment", out var ac) && ac is not DBNull ? Convert.ToString(ac) : null,
+                RowStamp = d.TryGetValue("RowStamp", out var rs) ? rs as byte[] : null,
+            })
+            .ToList();
     }
 
     /// <inheritdoc/>
@@ -304,28 +320,33 @@ public sealed class SubmissionRepository : ISubmissionRepository
     }
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<Tissue>> GetTissuesByBlockAsync(int blockId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<Tissue>> GetTissuesByBatchAsync(int batchId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<Tissue>(
-            "GetTissuesByBlockID",
-            new { ID = blockId },
+        var rows = await conn.QueryAsync<dynamic>(
+            "GetBatchBlockTissues",
+            new { ID = batchId },
             commandType: System.Data.CommandType.StoredProcedure);
+        return rows
+            .Select(r => (IDictionary<string, object>)r)
+            .Select(d => new Tissue
+            {
+                ID = d.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0,
+                OwnerID = d.TryGetValue("BlockID", out var bid) ? Convert.ToInt32(bid) : 0,
+                Owner = TissueOwner.Block,
+                TissueCode = d.TryGetValue("TissueCode", out var tc) ? Convert.ToString(tc) ?? "" : "",
+                NoPieces = d.TryGetValue("NoPieces", out var np) ? Convert.ToInt16(np) : (short)0,
+                Comment = d.TryGetValue("Comment", out var cm) && cm is not DBNull ? Convert.ToString(cm) : null,
+                RowStamp = d.TryGetValue("RowStamp", out var rs) ? rs as byte[] : null,
+            })
+            .ToList();
+    }
 
-        // Owner is not a DB column — these are always block-owned tissues.
-        return rows.Select(t => new Tissue
-        {
-            ID = t.ID,
-            OwnerID = blockId,
-            Owner = TissueOwner.Block,
-            TissueCode = t.TissueCode,
-            NoPieces = t.NoPieces,
-            Comment = t.Comment,
-            ArchiveLocation = t.ArchiveLocation,
-            ArchivedDate = t.ArchivedDate,
-            ArchiveComment = t.ArchiveComment,
-            RowStamp = t.RowStamp,
-        }).ToList();
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<Tissue>> GetTissuesByBlockAsync(int batchId, int blockId, CancellationToken ct = default)
+    {
+        var all = await GetTissuesByBatchAsync(batchId, ct);
+        return all.Where(t => t.OwnerID == blockId).ToList();
     }
 
     // -----------------------------------------------------------------------

@@ -11,29 +11,20 @@ using Microsoft.AspNetCore.Mvc;
 namespace Histo.Web.Pages.Submissions;
 
 /// <summary>
-/// Replaces <c>SubmissionDetailsBlock.aspx</c> — block summary for a batch submission's samples
-/// (cassetted workflow). Consolidates the previously separate batch-wide
-/// <c>Pages/Blocks/BlockDetails.cshtml</c> into a single page: when <see cref="AnimalId"/> is
-/// supplied (reached from SampleSummary's "Edit sample"), it shows the full add/edit/delete/copy
-/// view for that one sample's blocks; when omitted (reached from BatchDetails' "Assign blocks"), it
-/// shows a read/delete/copy overview of every block in the batch, each row linking into the
-/// animal-scoped view to add/edit blocks for that specific sample.
+/// Replaces <c>SubmissionDetailsBlock.aspx</c> — block summary grid for a batch submission's
+/// sample (cassetted workflow). When <see cref="AnimalId"/> is supplied (reached from
+/// SampleSummary's "Edit sample"), shows the header (Sender ref/PM date/Histology ref) and the
+/// block grid for that one sample; when omitted (reached from BatchDetails' "Assign blocks"),
+/// shows a read/delete/copy overview of every block in the batch.
 ///
-/// SIMPLIFIED: the legacy page renders a hierarchical block/tissue grid with per-block
-/// test-assignment checkboxes (EO, H&amp;E, H&amp;E BSE, IHC Prp, IHC Other, Special Stain).
-/// Per-block Histology/Antibodies/Stain test selection, block editing, and the Histology Ref
-/// Type "or Pick" dropdown are now reproduced below using only existing stored procedures
-/// (<c>AddBlock</c>/<c>EditBlock</c>; <c>Add/Edit/DeleteBlock{Histology,Antibodies,Stain}</c>;
-/// <c>GetUnusedRefsAsync</c>) — no new stored procedures were required.
-/// Per-block tissue assignment IS reproduced below — <see cref="ISubmissionService"/> already exposes
-/// <c>TissueOwner.Block</c> tissue CRUD, it was simply not wired into this page's original migration.
+/// Block creation/editing (ref, customer ref, tissues, per-block test selection) lives on the
+/// dedicated <see cref="Histo.Web.Pages.Blocks.BlockDetailsModel"/> page — restoring the legacy
+/// split between this grid and <c>BlockDetails.aspx</c> after an earlier consolidation onto this
+/// page made it too cluttered to use.
 /// </summary>
 public class SubmissionDetailsBlockModel : HistoPageModel
 {
     private const int LookupTissueCode = 9;
-    private const int LookupTseAntibodies = 4;
-    private const int LookupNonTseAntibodies = 5;
-    private const int LookupSpecialStain = 6;
 
     /// <summary>Legacy source: Common.vb::HistologyRefType enum — fixed, not database-driven.</summary>
     public static readonly IReadOnlyList<(int Value, string Label)> HistologyRefTypeOptions =
@@ -83,59 +74,43 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     [BindProperty] public string? PMDate { get; set; }
     [BindProperty] public string? HistologyRef { get; set; }
 
-    [BindProperty] public string? NewBlockRef { get; set; }
-    [BindProperty] public string? NewCustomerRef { get; set; }
-    [BindProperty] public bool NewRepeatBlock { get; set; }
-
-    /// <summary>Number of identical blocks to create in one submit — restores the legacy "Number of blocks" bulk-create field.</summary>
-    [BindProperty] public int NewNumberOfBlocks { get; set; } = 1;
-
-    [BindProperty] public int NewTissueBlockId { get; set; }
-    [BindProperty] public string NewTissueCode { get; set; } = string.Empty;
-    [BindProperty] public short NewTissueNoPieces { get; set; } = 1;
-    [BindProperty] public string? NewTissueComment { get; set; }
-
-    /// <summary>Block awaiting delete confirmation — drives the inline GOV.UK confirmation panel (replaces browser confirm()).</summary>
-    [BindProperty(SupportsGet = true)] public int? ConfirmDeleteBlockId { get; set; }
+    /// <summary>Blocks awaiting delete confirmation — drives the inline GOV.UK confirmation panel (replaces browser confirm()).</summary>
+    [BindProperty(SupportsGet = true)] public List<int> ConfirmDeleteBlockIds { get; set; } = [];
 
     /// <summary>Set when the user has requested the inline "Check used block refs" lookup for this sample.</summary>
     [BindProperty(SupportsGet = true)] public bool ShowUsedRefs { get; set; }
 
-    /// <summary>Block being edited — pre-fills the Add/Edit block form and switches its submit handler.</summary>
-    [BindProperty(SupportsGet = true)] public int? EditBlockId { get; set; }
-
-    public bool IsEditingBlock => EditBlockId is > 0;
-
     /// <summary>Histology Ref Type selected from the "or Pick" dropdown — legacy Common.vb::HistologyRefType.</summary>
     [BindProperty] public int? HistologyRefType { get; set; }
-
-    /// <summary>Block whose test selections are being saved by the per-row "Manage tests" form.</summary>
-    [BindProperty] public int TestBlockId { get; set; }
-    [BindProperty] public List<string> SelectedHistologyCodes { get; set; } = [];
-    [BindProperty] public List<string> SelectedAntibodyCodes { get; set; } = [];
-    [BindProperty] public List<string> SelectedStainCodes { get; set; } = [];
 
     public Animal? Animal { get; private set; }
     public Batch? Batch { get; private set; }
     public IReadOnlyList<Block> Blocks { get; private set; } = [];
     public IReadOnlyList<BlockRefRangeHelpers.BlockRefRangeRow> UsedBlockRefResults { get; private set; } = [];
 
-    /// <summary>Unused pre-booked block refs for this sample — populated only for pre-cassetted submissions.</summary>
-    public IReadOnlyList<Block> PreBookedBlockRefs { get; private set; } = [];
-
     /// <summary>True for pre-cassetted submissions, where the block ref must come from the pre-booked list and histology ref is mandatory.</summary>
     public bool IsPreCassetted => Batch?.IsPreCassetted == true;
 
-    public IReadOnlyList<LookupItem> TissueOptions { get; private set; } = [];
+    /// <summary>True for TSE submissions — shows H&amp;E (BSE)/IHC Prp grid columns instead of IHC Other, matching legacy HideColumns.</summary>
+    public bool IsTse => Batch?.BatchType != BatchTypeConstants.NonTse;
+
     public IReadOnlyDictionary<int, IReadOnlyList<Tissue>> TissuesByBlockId { get; private set; } =
         new Dictionary<int, IReadOnlyList<Tissue>>();
 
+    /// <summary>
+    /// Legacy source: clsBatchSummary.vb::CreateAnimalSummaryData — ALL 7 of the grid's boolean
+    /// indicator columns (EO/H&amp;E/Special Stain/IHC-PrP/H&amp;E(BSE)/IHC-Other/Archive) are read
+    /// from BLOCK_HISTOLOGY child rows (luHistology codes 1-7), confirmed against the database
+    /// directly — none of them come from the Antibodies or Stain test-type tables.
+    /// </summary>
     public IReadOnlyList<LookupItem> HistologyOptions { get; private set; } = [];
-    public IReadOnlyList<LookupItem> AntibodyOptions { get; private set; } = [];
-    public IReadOnlyList<LookupItem> StainOptions { get; private set; } = [];
     public IReadOnlyDictionary<int, IReadOnlyList<string>> HistologyCodesByBlockId { get; private set; } = new Dictionary<int, IReadOnlyList<string>>();
-    public IReadOnlyDictionary<int, IReadOnlyList<string>> AntibodyCodesByBlockId { get; private set; } = new Dictionary<int, IReadOnlyList<string>>();
-    public IReadOnlyDictionary<int, IReadOnlyList<string>> StainCodesByBlockId { get; private set; } = new Dictionary<int, IReadOnlyList<string>>();
+
+    /// <summary>Tissue-code → description lookup, used to render Tissue Details the same way as legacy's LookupDescription().</summary>
+    public IReadOnlyList<LookupItem> TissueOptions { get; private set; } = [];
+
+    /// <summary>Resolves a tissue code to its description, matching legacy's LookupDescription(dtTissuesList, TissueCode).</summary>
+    public string TissueName(string code) => TissueOptions.FirstOrDefault(o => o.Code == code)?.Name ?? code;
 
     /// <summary>Sender ref keyed by AnimalID — used only in batch-wide mode (no <see cref="AnimalId"/>) to label each row.</summary>
     public IReadOnlyDictionary<int, string> SenderRefsByAnimalId { get; private set; } = new Dictionary<int, string>();
@@ -143,7 +118,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     public string? ErrorMessage { get; private set; }
 
     /// <summary>Mirrors SampleSummaryModel/SubmissionDetailsModel — hides all block mutation actions
-    /// (Add/Edit/Delete/Copy block, Add/Delete tissue, Save details) in the View Submission journey.
+    /// (Add/Edit/Delete/Copy block, Save details) in the View Submission journey.
     /// Legacy source: SubmissionDetailsBlock.aspx.vb::DisableEnableControls (SV_ViewSubmission branch).</summary>
     public bool IsViewMode => Session.IsViewSubmissionMode;
 
@@ -175,17 +150,6 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         Blocks = allBlocks.Where(b => b.AnimalID == Animal.ID).ToList();
 
         await LoadSupportingDataAsync();
-
-        if (EditBlockId is > 0)
-        {
-            var editing = Blocks.FirstOrDefault(b => b.ID == EditBlockId);
-            if (editing is not null)
-            {
-                NewBlockRef = editing.BlockRef;
-                NewCustomerRef = editing.CustomerRef;
-                NewRepeatBlock = editing.RepeatBlock;
-            }
-        }
 
         if (ShowUsedRefs)
         {
@@ -226,106 +190,42 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
     }
 
-    /// <summary>Adds a new block for this sample -- restores the "Add block" action missing from the migrated page.</summary>
-    public async Task<IActionResult> OnPostAddBlockAsync()
+    /// <summary>
+    /// Deletes the checked blocks. Legacy source: <c>SubmissionDetailsBlock.aspx.vb</c>::
+    /// <c>btnDeleteBlock_Click</c> — reads every checked <c>cbSelected</c> row and deletes each.
+    /// </summary>
+    public async Task<IActionResult> OnPostDeleteAsync(List<int>? blockIds)
+    {
+        if (blockIds is not null)
+            foreach (var id in blockIds)
+                await _blocks.DeleteBlockAsync(id, Session.UserID);
+
+        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
+    }
+
+    /// <summary>
+    /// Requires exactly one checked block, then redirects to the dedicated Block Details page.
+    /// Legacy source: <c>SubmissionDetailsBlock.aspx.vb</c>::<c>btnEditBlock_Click</c> →
+    /// <c>BlockDetails.aspx</c>.
+    /// </summary>
+    public async Task<IActionResult> OnPostEditBlockSelectAsync(List<int>? blockIds)
     {
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
         if (Animal is null) return RedirectToPage("/Submissions/SampleSummary", new { batchId = BatchId });
-        await LoadSupportingDataAsync();
 
-        if (IsPreCassetted && !PreBookedBlockRefs.Any(b => b.BlockRef == NewBlockRef))
+        if (blockIds is null || blockIds.Count != 1)
         {
-            ErrorMessage = "Select one of the pre-booked block references for this pre-cassetted submission.";
-            var allBlocksForError = await _blocks.GetByBatchAsync(BatchId ?? 0);
-            Blocks = allBlocksForError.Where(b => b.AnimalID == Animal!.ID).ToList();
+            ErrorMessage = "Select exactly one block to edit.";
+            var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
+            Blocks = allBlocks.Where(b => b.AnimalID == Animal!.ID).ToList();
+            await LoadSupportingDataAsync();
+            PMDate = Animal.PMDate;
+            HistologyRef = Animal.HistologyRef;
             return Page();
         }
 
-        // Pre-cassetted block refs must each be selected individually from the pre-booked list.
-        if (IsPreCassetted) NewNumberOfBlocks = 1;
-
-        if (!string.IsNullOrWhiteSpace(NewBlockRef))
-        {
-            var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
-            var existingOrders = allBlocks.Select(b => b.Order).ToList();
-            var existingRefs = allBlocks.Select(b => b.BlockRef).ToList();
-            var count = Math.Max(1, NewNumberOfBlocks);
-
-            // First block uses the entered/selected ref; further blocks (only offered when not
-            // pre-cassetted, since pre-booked refs must be selected individually) auto-increment,
-            // restoring the legacy "Number of blocks" bulk-create field.
-            var blockRef = NewBlockRef;
-            for (var i = 0; i < count; i++)
-            {
-                await _blocks.AddBlockAsync(
-                    BatchId ?? 0, Animal!.ID, blockRef, existingOrders, Session.UserID,
-                    NewCustomerRef, comment: null, repeatBlock: NewRepeatBlock);
-
-                existingRefs.Add(blockRef);
-                existingOrders.Add(BlockHelpers.ComputeNextOrder(existingOrders));
-                blockRef = BlockHelpers.ComputeNextBlockRef(existingRefs);
-            }
-        }
-
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
-    }
-
-    public async Task<IActionResult> OnPostDeleteAsync(int blockId)
-    {
-        await _blocks.DeleteBlockAsync(blockId, Session.UserID);
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
-    }
-
-    /// <summary>
-    /// Saves changes to an existing block's ref/customer ref/repeat flag.
-    /// Legacy source: SubmissionDetailsBlock.aspx.vb::btnEditBlock_Click → BlockDetails.aspx.
-    /// Uses the already-existing <see cref="IBlockService.UpdateBlockAsync"/> (EditBlock SP) —
-    /// no new stored procedure required.
-    /// </summary>
-    public async Task<IActionResult> OnPostEditBlockAsync()
-    {
-        var redirect = await LoadAnimalAsync();
-        if (redirect is not null) return redirect;
-        if (Animal is null) return RedirectToPage("/Submissions/SampleSummary", new { batchId = BatchId });
-
-        var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
-        var existing = allBlocks.FirstOrDefault(b => b.ID == EditBlockId);
-        if (existing is null || string.IsNullOrWhiteSpace(NewBlockRef))
-            return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
-
-        var updated = new Block
-        {
-            ID = existing.ID,
-            BatchID = existing.BatchID,
-            AnimalID = existing.AnimalID,
-            BlockRef = NewBlockRef,
-            CustomerRef = NewCustomerRef,
-            Comment = existing.Comment,
-            RepeatBlock = NewRepeatBlock,
-            Status = existing.Status,
-            Order = existing.Order,
-            RowStamp = existing.RowStamp,
-        };
-        await _blocks.UpdateBlockAsync(updated, Session.UserID);
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
-    }
-
-    /// <summary>
-    /// Delta-saves this block's Histology/Antibodies/Stain test-type selections.
-    /// Uses only the existing Add/Edit/DeleteBlock{Histology,Antibodies,Stain} stored procedures
-    /// (confirmed in legacy clsCheckBoxData.vb) — no new stored procedure required.
-    /// </summary>
-    public async Task<IActionResult> OnPostSaveBlockTestsAsync()
-    {
-        var redirect = await LoadAnimalAsync();
-        if (redirect is not null) return redirect;
-        if (Animal is null || TestBlockId <= 0) return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
-
-        await _blockTests.SaveTestSelectionsAsync(
-            BatchId ?? 0, TestBlockId, SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes, Session.UserID);
-
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
+        return RedirectToPage("/Blocks/BlockDetails", new { batchId = BatchId, animalId = AnimalId, blockId = blockIds[0] });
     }
 
     /// <summary>
@@ -352,35 +252,6 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         }
 
         return Page();
-    }
-
-    /// <summary>Adds a tissue to a specific block — restores per-block tissue assignment missing from the migrated page.</summary>
-    public async Task<IActionResult> OnPostAddTissueAsync()
-    {
-        var redirect = await LoadAnimalAsync();
-        if (redirect is not null) return redirect;
-        if (Animal is null) return RedirectToPage("/Submissions/SampleSummary", new { batchId = BatchId });
-
-        if (NewTissueBlockId > 0 && !string.IsNullOrWhiteSpace(NewTissueCode))
-        {
-            var tissue = new Tissue
-            {
-                OwnerID = NewTissueBlockId,
-                Owner = TissueOwner.Block,
-                TissueCode = NewTissueCode,
-                NoPieces = NewTissueNoPieces,
-                Comment = NewTissueComment,
-            };
-            await _submissions.AddTissueAsync(tissue, Session.UserID);
-        }
-
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
-    }
-
-    public async Task<IActionResult> OnPostDeleteTissueAsync(int tissueId)
-    {
-        await _submissions.DeleteTissueAsync(tissueId, TissueOwner.Block, Session.UserID);
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
     }
 
     /// <summary>
@@ -438,14 +309,20 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         // batches — the animal may only exist in the block-animal table (BATCH_BLOCK_ANIMAL).
         var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(batchId.Value);
         Animal = blockAnimals.FirstOrDefault(a => a.ID == AnimalId);
+        IReadOnlyList<Animal> plainAnimals = [];
         if (Animal is null)
         {
-            var animals = await _submissions.GetAnimalsByBatchAsync(batchId.Value);
-            Animal = animals.FirstOrDefault(a => a.ID == AnimalId);
+            plainAnimals = await _submissions.GetAnimalsByBatchAsync(batchId.Value);
+            Animal = plainAnimals.FirstOrDefault(a => a.ID == AnimalId);
         }
 
         if (Animal is null)
-            _logger.LogWarning("SubmissionDetailsBlock: animal {AnimalId} not found in batch {BatchId} (blockAnimals={BlockCount}).", AnimalId, batchId, blockAnimals.Count);
+            _logger.LogWarning(
+                "SubmissionDetailsBlock: animal {AnimalId} not found in batch {BatchId}. " +
+                "blockAnimals returned {BlockCount} row(s) [{BlockIds}]; plain GetAnimalsByBatchAsync returned {PlainCount} row(s) [{PlainIds}].",
+                AnimalId, batchId,
+                blockAnimals.Count, string.Join(",", blockAnimals.Select(a => a.ID)),
+                plainAnimals.Count, string.Join(",", plainAnimals.Select(a => a.ID)));
 
         // Deliberately does NOT redirect when the animal cannot be resolved: bouncing back to
         // SampleSummary is indistinguishable from "the button did nothing". Leaving Animal null
@@ -453,41 +330,30 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         return null;
     }
 
-    /// <summary>Loads the batch (for the pre-cassetted flag), pre-booked block refs, tissue pick-list, and per-block tissues.</summary>
+    /// <summary>Loads the batch (for the pre-cassetted flag), per-block tissues, the tissue-code lookup, and per-block Histology test-selection indicators.</summary>
     private async Task LoadSupportingDataAsync()
     {
         Batch = await _batches.GetByIdAsync(BatchId ?? 0);
-        PreBookedBlockRefs = await _blocks.GetPreBookedByAnimalAsync(Animal!.ID);
         TissueOptions = await _lookups.GetLookupDataAsync(LookupTissueCode);
 
+        var allTissues = await _submissions.GetTissuesByBatchAsync(BatchId ?? 0);
         var tissuesByBlockId = new Dictionary<int, IReadOnlyList<Tissue>>();
         foreach (var block in Blocks)
-            tissuesByBlockId[block.ID] = await _submissions.GetTissuesByBlockAsync(block.ID);
+            tissuesByBlockId[block.ID] = allTissues.Where(t => t.OwnerID == block.ID).ToList();
         TissuesByBlockId = tissuesByBlockId;
 
-        // Per-block Histology/Antibodies/Stain test selection — mirrors BatchDetailsModel's
-        // batch-level equivalent, scoped down to this sample's blocks.
-        // Wrapped: this reads a 10-result-set SP, and a shape mismatch must not take the whole page down.
+        // All 7 grid indicator columns (Archive/EO/H&E/H&E-BSE/IHC-PrP/IHC-Other/Special Stain)
+        // are Histology test-type codes — see the HistologyOptions doc comment. Wrapped because
+        // this reads a 10-result-set SP and a shape mismatch must not take the whole page down.
         try
         {
-            var antibodyTableId = Batch?.BatchType == BatchTypeConstants.NonTse ? LookupNonTseAntibodies : LookupTseAntibodies;
             HistologyOptions = await _lookups.GetHistologyTypesAsync();
-            AntibodyOptions = await _lookups.GetLookupDataAsync(antibodyTableId);
-            StainOptions = await _lookups.GetLookupDataAsync(LookupSpecialStain);
 
             var allTests = await _blockTests.GetByBatchAsync(BatchId ?? 0);
             var histologyByBlock = new Dictionary<int, IReadOnlyList<string>>();
-            var antibodyByBlock = new Dictionary<int, IReadOnlyList<string>>();
-            var stainByBlock = new Dictionary<int, IReadOnlyList<string>>();
             foreach (var block in Blocks)
-            {
                 histologyByBlock[block.ID] = allTests.Where(t => t.BlockID == block.ID && t.TestType == BlockTestType.Histology).Select(t => t.Code).ToList();
-                antibodyByBlock[block.ID] = allTests.Where(t => t.BlockID == block.ID && t.TestType == BlockTestType.Antibodies).Select(t => t.Code).ToList();
-                stainByBlock[block.ID] = allTests.Where(t => t.BlockID == block.ID && t.TestType == BlockTestType.Stain).Select(t => t.Code).ToList();
-            }
             HistologyCodesByBlockId = histologyByBlock;
-            AntibodyCodesByBlockId = antibodyByBlock;
-            StainCodesByBlockId = stainByBlock;
         }
         catch (Exception ex)
         {

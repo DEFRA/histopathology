@@ -50,7 +50,7 @@ public class SubmissionDetailsModel : HistoPageModel
 
         PMDate = Animal.PMDate;
         HistologyRef = Animal.HistologyRef;
-        Tissues = await _submissions.GetTissuesBySubmissionAsync(Animal.BatchSubmissionID);
+        Tissues = await _submissions.GetTissuesBySubmissionAsync(BatchId ?? 0, Animal.BatchSubmissionID);
         return Page();
     }
 

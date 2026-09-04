@@ -181,9 +181,9 @@ public sealed class SubmissionService : ISubmissionService
     // -----------------------------------------------------------------------
 
     /// <summary>Returns tissues for a submission.</summary>
-    public async Task<IReadOnlyList<Tissue>> GetTissuesBySubmissionAsync(int submissionId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<Tissue>> GetTissuesBySubmissionAsync(int batchId, int submissionId, CancellationToken ct = default)
     {
-        try { return await _repo.GetTissuesBySubmissionAsync(submissionId, ct); }
+        try { return await _repo.GetTissuesBySubmissionAsync(batchId, submissionId, ct); }
         catch (Exception ex) { _logger.LogError("Failed to get tissues for submission {SubmissionId}.", ex, submissionId); return []; }
     }
 
@@ -193,10 +193,17 @@ public sealed class SubmissionService : ISubmissionService
         catch (Exception ex) { _logger.LogError("Failed to get submission tissues for batch {BatchId}.", ex, batchId); return []; }
     }
 
-    /// <summary>Returns tissues for a block.</summary>
-    public async Task<IReadOnlyList<Tissue>> GetTissuesByBlockAsync(int blockId, CancellationToken ct = default)
+    /// <summary>Returns all block-owned tissues for a batch.</summary>
+    public async Task<IReadOnlyList<Tissue>> GetTissuesByBatchAsync(int batchId, CancellationToken ct = default)
     {
-        try { return await _repo.GetTissuesByBlockAsync(blockId, ct); }
+        try { return await _repo.GetTissuesByBatchAsync(batchId, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to get block tissues for batch {BatchId}.", ex, batchId); return []; }
+    }
+
+    /// <summary>Returns tissues for a block.</summary>
+    public async Task<IReadOnlyList<Tissue>> GetTissuesByBlockAsync(int batchId, int blockId, CancellationToken ct = default)
+    {
+        try { return await _repo.GetTissuesByBlockAsync(batchId, blockId, ct); }
         catch (Exception ex) { _logger.LogError("Failed to get tissues for block {BlockId}.", ex, blockId); return []; }
     }
 

@@ -56,6 +56,42 @@ public class ViewSubmissionsModel : HistoPageModel
     [BindProperty] public DateTime? ReceivedDateFrom    { get; set; }
     [BindProperty] public DateTime? ReceivedDateTo      { get; set; }
 
+    // Sort/page state is bound the same way as the filter criteria above — [BindProperty]
+    // binds from route/query/form on any non-GET request, so these survive the POST-based
+    // sort/page buttons (see _SortableHeaderPost/_PaginationPost) without needing GridPageModel's
+    // GET-oriented SupportsGet mechanism, which this POST-only search page cannot use.
+    private const int PageSize = 10;
+    [BindProperty] public string? SortColumn { get; set; }
+    [BindProperty] public bool    SortDesc   { get; set; }
+    [BindProperty] public int     PageNumber { get; set; } = 1;
+
+    public IReadOnlyList<BatchSearchResult> PagedResults =>
+        (SortColumn switch
+        {
+            "ID"                 => SortDesc ? Results.OrderByDescending(r => r.ID)                  : Results.OrderBy(r => r.ID),
+            "ProjectDescription" => SortDesc ? Results.OrderByDescending(r => r.ProjectDescription) : Results.OrderBy(r => r.ProjectDescription),
+            "ContactDescription" => SortDesc ? Results.OrderByDescending(r => r.ContactDescription) : Results.OrderBy(r => r.ContactDescription),
+            "Species"            => SortDesc ? Results.OrderByDescending(r => r.Species)            : Results.OrderBy(r => r.Species),
+            "BatchDate"          => SortDesc ? Results.OrderByDescending(r => r.BatchDate)           : Results.OrderBy(r => r.BatchDate),
+            "DateReceived"       => SortDesc ? Results.OrderByDescending(r => r.DateReceived)        : Results.OrderBy(r => r.DateReceived),
+            "DateCompleted"      => SortDesc ? Results.OrderByDescending(r => r.DateCompleted)       : Results.OrderBy(r => r.DateCompleted),
+            "Status"             => SortDesc ? Results.OrderByDescending(r => r.Status)              : Results.OrderBy(r => r.Status),
+            _                    => SortDesc ? Results.OrderByDescending(r => r.ID)                  : Results.OrderBy(r => r.ID),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
+
+    private void PopulateGridViewData()
+    {
+        ViewData["SortColumn"]  = SortColumn;
+        ViewData["SortDesc"]    = SortDesc;
+        ViewData["CurrentPage"] = PageNumber < 1 ? 1 : PageNumber;
+        ViewData["TotalPages"]  = Results.Count == 0 ? 1 : (int)Math.Ceiling(Results.Count / (double)PageSize);
+        ViewData["FormId"]      = "view-action-form";
+        ViewData["Handler"]     = "Search";
+    }
+
     /// <summary>
     /// ID of the currently selected result row.
     /// Bound from the per-row Select button value via <see cref="OnPostSelectAsync"/>.
@@ -116,6 +152,7 @@ public class ViewSubmissionsModel : HistoPageModel
         SelectedBatchId = 0;
         Results  = await _batches.SearchAsync(BuildCriteria());
         Searched = true;
+        PopulateGridViewData();
         return Page();
     }
 
@@ -141,6 +178,7 @@ public class ViewSubmissionsModel : HistoPageModel
 
         Results  = await _batches.SearchAsync(BuildCriteria());
         Searched = true;
+        PopulateGridViewData();
         return Page();
     }
 

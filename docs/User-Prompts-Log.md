@@ -1770,4 +1770,139 @@ User suspected the earlier `BatchBlockSummary` → `SampleSummary` rename had ca
 
 **Files changed:** [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs).
 
+---
+
+## Prompt 115 — Verify the Block Types vs Wet Tissue navigation rule; resolves ISS-R28 (2026-09-04)
+
+> #### Submission Types
+>
+> The application must support the following submission types: Pre Cassetted Tissue, Stained Section, Unstained Section, Wax Block, Wet Tissue.
+>
+> #### Navigation Rules
+>
+> **Block Types** (Pre Cassetted Tissue, Stained Section, Unstained Section, Wax Block) — when a user selects any of these and adds a sample, navigate to **Sample Blocks**.
+>
+> **Tissue Type** (Wet Tissue) — when a user selects Wet Tissue and adds a sample, navigate to **Sample Details**.
+>
+> Ensure the navigation occurs immediately after the user adds a sample.
+
+Confirmed the stated rule was already implemented correctly (`SampleSummary.cshtml.cs`/`AddSubmission.cshtml.cs`), but reading the actual legacy source directly (`HistopathologySystem/HistopathologyLib/clsBatch.vb`, `HistopathologySystem/Common.vb`, `HistopathologySystem/Cassetted.aspx.vb`) rather than relying on prior docs revealed the underlying routing check was unsound: `Cassetted.aspx.vb::btnYes_Click` decides Wet Tissue by comparing the resolved lookup **description** (`chkblSubmittedAs.SelectedItem.Text.ToString() = "Wet Tissue"`), never a hardcoded numeric code — unlike `IsBatchPreCassetted`, which legitimately hardcodes `"5"` (confirmed directly in `Common.vb`). The migrated app's `submittedAsCode == "4"` guess for Wet Tissue (flagged unverified as ISS-R28) had no such confirmation and could have silently misrouted every Wet Tissue submission if the real database code differs. Fixed by adding `ValidationHelpers.IsWetTissueDescription` and resolving the code to its `LOOKUP_SUBMITTEDAS` (table 11) description via `ILookupService` before comparing, in both `SampleSummaryModel` and `AddSubmissionModel` (`ILookupService` newly injected). Closed out ISS-R28 in `run-log-v2.md` as Resolved.
+
+**Build:** 0 errors, 4 pre-existing warnings. **Tests:** 164 total, 163 passed, 1 skipped, 0 failed (+7 new `ValidationHelperTests` cases).
+
+**Files changed:** [src/Histo.Core/Domain/ValidationHelpers.cs](../src/Histo.Core/Domain/ValidationHelpers.cs), [src/Histo.Web/Pages/Submissions/SampleSummary.cshtml.cs](../src/Histo.Web/Pages/Submissions/SampleSummary.cshtml.cs), [src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs), [tests/Histo.Tests/Unit/ValidationHelperTests.cs](../tests/Histo.Tests/Unit/ValidationHelperTests.cs).
+
+---
+
+## Prompt 116 — Implement sorting and pagination like UserMaintenance.cshtml (2026-09-04)
+
+> Can implement the sorting and pagination reference like as implmented in UserMaintenance.csthml
+
+Converted `QualityDataModel` from `HistoPageModel` to `GridPageModel`, closing the groundwork half of ISS-R06 ("Pagination not implemented — needed for large batches"). Added a `PagedEntries` property sorting the already-filtered `Tests` list across all 7 columns (Histology ref, Block ref, Test, Result, Dispatched, Archived, On hold); view converted to `_SortableHeader`/`_Pagination` partials, matching `UserMaintenance.cshtml` exactly. Confirmed `EditQualityDataTest.cshtml` has no grid, so the pattern doesn't apply there.
+
+**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
+
+**Files changed:** [src/Histo.Web/Pages/QC/QualityData.cshtml.cs](../src/Histo.Web/Pages/QC/QualityData.cshtml.cs), [src/Histo.Web/Pages/QC/QualityData.cshtml](../src/Histo.Web/Pages/QC/QualityData.cshtml).
+
+---
+
+## Prompt 117 — Create submission auto-populate + grid sorting/pagination on 5 named pages (2026-09-04)
+
+> Implement the following changes in the submission workflow and related pages.
+>
+> **1. Create Submission (`BatchDetails.cshtml`)** — Submitted By must auto-populate with the logged-in user's email address; Submitted Area must auto-populate with the logged-in user's area; both must remain editable and must not be disabled in Create mode.
+>
+> **2. Grid Enhancements** — add sorting and pagination to `BatchesNotReceived.cshtml`, `ViewSubmissions.cshtml`, `BatchesForDispatch.cshtml`, `QCNotes.aspx`, `BatchesReceived`.
+
+`BatchDetails.cshtml.cs` Create mode now defaults "Submitted by" to `Session.UserID` and "Submitted area" to `Session.UserAreaID` on first visit only (not overriding a restored draft); both remain plain editable `<select>` dropdowns — no `disabled` attribute was present or added. "Submitted by" is a user-picker dropdown rather than a free-text box, so "populate with the user's email" is implemented as pre-selecting the matching user record.
+
+Grid audit against the `UserMaintenance.cshtml` reference: `BatchesNotReceived`, `BatchesForDispatch`, `BatchesReceived` already fully implemented sorting/pagination — verified, no changes needed. `QCNotes.cshtml(.cs)` converted to `GridPageModel` with sortable headers and pagination. `ViewSubmissions.cshtml(.cs)` is POST-driven (search criteria bound via `[BindProperty]`, not the query string) — the standard GET-based sort/page partials would have silently dropped every search filter, so two new POST-safe shared partials were created, `_SortableHeaderPost.cshtml` and `_PaginationPost.cshtml`, which submit the page's existing hidden carrier form instead of navigating via GET; added `SortColumn`/`SortDesc`/`PageNumber`/`PagedResults` to the model. Fixed a Razor `RZ1010` parse error found along the way (an inline `@{ }` block placed directly after `</table>`) by moving that `ViewData` assignment into the model's `PopulateGridViewData()`.
+
+**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
+
+**Files changed:** [src/Histo.Web/Pages/Batches/BatchDetails.cshtml.cs](../src/Histo.Web/Pages/Batches/BatchDetails.cshtml.cs), [src/Histo.Web/Pages/QC/QCNotes.cshtml.cs](../src/Histo.Web/Pages/QC/QCNotes.cshtml.cs), [src/Histo.Web/Pages/QC/QCNotes.cshtml](../src/Histo.Web/Pages/QC/QCNotes.cshtml), [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs), [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml), [src/Histo.Web/Pages/Shared/_SortableHeaderPost.cshtml](../src/Histo.Web/Pages/Shared/_SortableHeaderPost.cshtml), [src/Histo.Web/Pages/Shared/_PaginationPost.cshtml](../src/Histo.Web/Pages/Shared/_PaginationPost.cshtml).
+
+---
+
+## Prompt 118 — Sort/pagination colour mismatch, then sort icon still not appearing (2026-09-04)
+
+> still same issue colur of header and sortable is not align with other screen `UserMaintenance.cshtml`
+
+> why changes requried in .css file, still sorting icon not showing why this discrpency if the style is working another it should work all other pages
+
+**Colour mismatch:** GOV.UK Frontend's `govuk-link`/`govuk-pagination__link` colour and hover rules are written against the `:link`/`:visited` pseudo-classes, which only ever match real `<a href>` elements — applying those classes to the POST-based `<button>` controls in `_SortableHeaderPost.cshtml`/`_PaginationPost.cshtml` had no visual effect at all, so they rendered in the browser's default button colour instead of GOV.UK blue. Rewrote `.app-link-button` in `Styles.css` to state the link colour/hover/focus states directly instead of relying on `govuk-link`, and removed the now-pointless `govuk-link` classes from both partials.
+
+**Sort icon still not appearing — a real functional bug, not styling:** the hidden carrier form on `ViewSubmissions.cshtml` carried `SortColumn`/`SortDesc`/`PageNumber` as hidden inputs. ASP.NET Core's default value provider checks the **Form body before the Query string**, so the sort-header button's `formaction="?handler=Search&SortColumn=X&SortDesc=true"` query override was always shadowed by the stale hidden-field value — the sort never actually changed server-side, which is why the arrow never appeared (same bug class the page's own code had already documented and avoided for `SelectedBatchId`, just not extended to the new sort/page fields). Fixed by removing the three hidden inputs entirely and carrying current sort/page state on the Select button's own `formaction` instead, which has no competing hidden field.
+
+**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
+
+**Files changed:** [src/Histo.Web/wwwroot/css/Styles.css](../src/Histo.Web/wwwroot/css/Styles.css), [src/Histo.Web/Pages/Shared/_SortableHeaderPost.cshtml](../src/Histo.Web/Pages/Shared/_SortableHeaderPost.cshtml), [src/Histo.Web/Pages/Shared/_PaginationPost.cshtml](../src/Histo.Web/Pages/Shared/_PaginationPost.cshtml), [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml).
+
+---
+
+## Prompt 119 — Submission workflow issues: AddSubmission search, SearchSender picker, SampleSummary caption (2026-09-04)
+
+> Fix three issues in the submission workflow: (1) AddSubmission is not carrying through the Sender Ref search/select; (2) SearchSender's picker mode needs a second blank search before it shows results — it should search and show results straight away; (3) SampleSummary's submission type caption is showing the wrong label for some submission types.
+
+`AddSubmission.cshtml` — restored the Sender Ref search/select flow via the existing `SearchSender` picker, passing the selected value straight back into the form. `SearchSender.cshtml` — picker mode fixed with GET-binding so it auto-searches and shows results on first load instead of requiring a second blank search. `SampleSummary.cshtml` — the submission-type caption (`SubmittedAsDescription`) used a 2-way ternary collapsing all 4 distinct submission types into one generic label; corrected to the right per-type text.
+
+**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
+
+**Files changed:** [src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs), [src/Histo.Web/Pages/Submissions/SearchSender.cshtml.cs](../src/Histo.Web/Pages/Submissions/SearchSender.cshtml.cs), [src/Histo.Web/Pages/Submissions/SampleSummary.cshtml.cs](../src/Histo.Web/Pages/Submissions/SampleSummary.cshtml.cs).
+
+---
+
+## Prompt 120 — Access Denied regression (2026-09-04)
+
+> I'm getting Access Denied again for a scenario that used to work — can you check `CheckBatchAccessAsync`, I think a fix from earlier in the session got lost.
+
+Re-read the current file state fresh rather than assuming the earlier fix was still in place, and found `HistoPageModel.CheckBatchAccessAsync` had silently regressed to `Session.IsHistoUser` only — the `|| Session.IsMaintenance` condition added earlier in the session was no longer present, so Maintenance-role dev-bypass test users were denied access to batches outside their hardcoded dev-area. Restored `|| Session.IsMaintenance` to the unrestricted-access check passed into `BatchAccessDecision.IsAllowed`.
+
+**Build:** 0 errors.
+
+**Files changed:** [src/Histo.Web/Pages/HistoPageModel.cs](../src/Histo.Web/Pages/HistoPageModel.cs).
+
+---
+
+## Prompt 121 — Implement Legacy Submission Block Functionality in New Application (2026-09-04)
+
+> Re-implement the block management experience to closely match the legacy application. Separate block creation and editing functionality from the main page, similar to the legacy behavior where Add/Edit actions navigate to a dedicated Block Details page. Ensure the grid layout, columns, actions, and navigation flow match the legacy application. Header: Sender Ref, PM Date, Histology Ref. Grid columns: Block Ref, Tissue Details, Archive, EO, H&E, H&E(BSE), IHC Prp, Special Stain, Select. Actions: Add Block, Edit Block, Delete Block, Copy to Samples, Block Ref Search, Back, Done. Navigation: Add/Edit Block should go to a dedicated BlockDetails page. Verify that: Add Block, Edit Block, Delete Block, Copy to Samples, Block Ref Search, Back, Done functionality works identically to the legacy implementation.
+
+Re-read legacy `SubmissionDetailsBlock.aspx(.vb)`/`BlockDetails.aspx(.vb)` directly to confirm the exact fields, grid columns and navigation, reversing the Run #88 consolidation that the user reported had made the page cluttered. Trimmed `SubmissionDetailsBlock.cshtml(.cs)` back to a pure grid page — removed the inline Add/Edit-block form, tissue-add form and per-block test panels; added `ConfirmDeleteBlockIds` (multi-select delete/copy), `IsTse`/`HistologyCodeByName` helpers driving the read-only EO/H&E/H&E(BSE)/IHC Prp/IHC Other/Special Stain indicator columns (TSE vs Non-TSE column visibility matches legacy's `HideColumns` rule), and `OnPostEditBlockSelectAsync` (validates exactly one row selected before redirecting to Edit). Recreated `Blocks/BlockDetails.cshtml(.cs)` as the dedicated Add/Edit page (block ref or pre-booked ref, customer ref, number of blocks, repeat, tissues, Histology/Antibody/Special-stain test checkboxes), reached via "Add block"/"Edit block" and returning to the grid on Done. Added `Block.Archived` to back the grid's read-only Archive column, since no backing field existed for it at all.
+
+**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
+
+**Files changed:** [src/Histo.Histology/Models/Block.cs](../src/Histo.Histology/Models/Block.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml), [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs), [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml).
+
+---
+
+## Prompt 122 — Investigate and align SubmissionDetailsBlock/BlockDetails with legacy: histology-ref picker, blocks grid not loading, Add Block screen (2026-09-04)
+
+> Requirement: Investigate and Align SubmissionDetailsBlock Functionality with Legacy Application
+>
+> Issue 1: Histology Reference Controls Not Present in Legacy — verify whether the "Or pick a histology reference type" dropdown and "Get next ref" button exist in the legacy system; if not, assess whether they should be removed or redesigned.
+>
+> Issue 2: Blocks Grid Not Loading Data — `SubmissionDetailsBlock?BatchId=30406&AnimalId=96839` shows "No blocks found for this sample" even though data exists in the database. Investigate why block records are not being retrieved or displayed, verify the Tissue Details column renders properly and matches legacy.
+>
+> Issue 3: Add Block Screen Does Not Match Legacy — Block Ref is displayed as a dropdown (should behave like legacy, with default values populated as in the legacy system); tissue entry section and No Pieces functionality differ from legacy; "Use these tests for the next block?" checkbox, Comments field, and Details of other tests field need validation against legacy. Perform a full comparison between `BlockDetails.cshtml` and legacy `BlockDetails.aspx`, replicate legacy behaviour as closely as possible while maintaining GDS-compliant design.
+
+Read legacy `SubmissionDetailsBlock.aspx(.vb)`, `BlockDetails.aspx(.vb)` and `clsBatchSummary.vb` directly, and queried the real local database (`sqlcmd` against LocalDB) to confirm stored procedure names/columns rather than guessing. Confirmed Issue 1 is not a bug (legacy's `ddlHistologyType` AutoPostBack dropdown genuinely exists; the current explicit "Get next ref" button is a correct GDS redesign). Root-caused Issue 2 to `BlockRepository.GetByBatchAsync` calling a nonexistent stored procedure (`GetBlocksByBatchID`), silently swallowed by a catch-all, always returning an empty grid; fixed using the confirmed real `GetBatchBlockDetails`, verified live against the reported batch/animal. Also fixed the grid's Archive/IHC Prp/IHC Other/Special Stain columns (reading from the wrong test-type table) and Tissue Details (resolved name instead of raw code). Fixed Issue 3's Block Ref to always be free text with a legacy-matching default, and added the missing Comments field.
+
+**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
+
+**Files changed:** [src/Histo.Histology/Repositories/BlockRepository.cs](../src/Histo.Histology/Repositories/BlockRepository.cs), [src/Histo.Histology/Interfaces/IBlockRepository.cs](../src/Histo.Histology/Interfaces/IBlockRepository.cs), [src/Histo.Histology/Models/Block.cs](../src/Histo.Histology/Models/Block.cs), [src/Histo.Submissions/Models/BatchTestSelections.cs](../src/Histo.Submissions/Models/BatchTestSelections.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml), [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs), [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml).
+
+---
+
+## Prompt 123 — Why weren't the documented Issue 3 gaps implemented? (2026-09-04)
+
+> why it is not implmented ?
+> - **Not implemented** (documented as gaps, not attempted to avoid rushed/risky changes): the "Use the entire tissue list?" toggle, "Use these tests for the next block?"/"Next Block" carry-forward workflow, and several fine-grained validation rules (EO exclusivity, Special Stain/IHC requiring a sub-selection, "Additional Request" enable/disable by submission type, pre-booked-ref conflict checks).
+
+Implemented all of the documented gaps. While researching the "Use the entire tissue list?" toggle, discovered the same nonexistent-stored-procedure bug class independently broke tissue loading across the app: `GetTissuesByBlockAsync`/`GetTissuesBySubmissionAsync` called invented SPs (`GetTissuesByBlockID`/`GetTissuesBySubmissionID`) that never existed in the database (one doc comment admitted this was guessed) — fixed using the confirmed real `GetBatchBlockTissues`/`GetBatchTissues`, updating both methods to require a batchId and updating all 6 call sites (`BlockDetails`, `CopyBlocks`, `CopySamples`, `CopyBatch`, `SubmissionDetails`, `SubmissionDetailsBlock`). Implemented: Additional Request enable/disable by `luSubmittedAs` code (DB-confirmed 1/3/5 disabled, 2/4 enabled) with a duplicate-block-ref check; Histology test-selection validation (EO/Archive mutual exclusivity, Special Stain requires a stain, IHC requires an antibody, at least one Histology code required); "Use these tests for the next block?" checkbox + Next Block handler (saves current tests, creates the next block respecting pre-booked refs, copies tests forward if checked); "Use the entire tissue list?" toggle (defaults to tissues already used on the submission, link to show the full list).
+
+**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
+
+**Files changed:** [src/Histo.Submissions/Repositories/SubmissionRepository.cs](../src/Histo.Submissions/Repositories/SubmissionRepository.cs), [src/Histo.Submissions/Services/SubmissionService.cs](../src/Histo.Submissions/Services/SubmissionService.cs), [src/Histo.Submissions/Interfaces/ISubmissionRepository.cs](../src/Histo.Submissions/Interfaces/ISubmissionRepository.cs), [src/Histo.Submissions/Interfaces/ISubmissionService.cs](../src/Histo.Submissions/Interfaces/ISubmissionService.cs), [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs), [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml), [src/Histo.Web/Pages/Blocks/CopyBlocks.cshtml.cs](../src/Histo.Web/Pages/Blocks/CopyBlocks.cshtml.cs), [src/Histo.Web/Pages/Blocks/CopySamples.cshtml.cs](../src/Histo.Web/Pages/Blocks/CopySamples.cshtml.cs), [src/Histo.Web/Pages/Batches/CopyBatch.cshtml.cs](../src/Histo.Web/Pages/Batches/CopyBatch.cshtml.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs).
+
 

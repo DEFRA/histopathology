@@ -13,6 +13,37 @@
     align-self: center;
 }
 
+/* Resets native <button> chrome so POST-based sort/pagination controls (which must
+ * submit a form rather than navigate via <a href>) look identical to GOV.UK links.
+ * govuk-link's colour/hover rules are written against the :link/:visited pseudo-classes,
+ * which only ever match real <a href> elements — applying the govuk-link class to a
+ * <button> has no visual effect, so the link colours are restated here explicitly. */
+.app-link-button {
+    background: none;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    cursor: pointer;
+    color: #1d70b8;
+    text-decoration: underline;
+    text-decoration-thickness: max(1px, .0625rem);
+    text-underline-offset: .1578em;
+}
+
+.app-link-button:hover {
+    color: #003078;
+}
+
+.app-link-button:focus {
+    outline: 3px solid transparent;
+    color: #0b0c0c;
+    background-color: #ffdd00;
+    box-shadow: 0 -2px #ffdd00, 0 4px #0b0c0c;
+    text-decoration: none;
+}
+
+
 
 
 

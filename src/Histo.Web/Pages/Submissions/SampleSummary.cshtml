@@ -4,7 +4,7 @@
     ViewData["Title"] = "Sample summary";
     ViewData["PageTitle"] = "Sample summary";
     // Surfaces the submission type since this page no longer has a type-specific name/URL.
-    ViewData["BatchNo"] = Model.IsWetTissue ? "Wet Tissue" : "Wax Block / Cassetted";
+    ViewData["BatchNo"] = Model.SubmittedAsDescription ?? "Unknown submission type";
 }
 
 @section BeforeHeading {

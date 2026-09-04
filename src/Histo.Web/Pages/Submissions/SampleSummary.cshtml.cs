@@ -72,12 +72,17 @@ public class SampleSummaryModel : HistoPageModel
     public bool CanModifySamples => Batch?.Status is BatchStatus.Submitted or BatchStatus.Rejected;
 
     /// <summary>
-    /// Wet Tissue (SubmittedAs code "4") routes Edit sample to SubmissionDetails (tissue-only view);
-    /// all other types (Wax Block, Pre-Cassetted, Stained/Unstained Section) route to SubmissionDetailsBlock.
+    /// Wet Tissue routes Edit sample to SubmissionDetails (tissue-only view); all other types
+    /// (Wax Block, Pre-Cassetted, Stained/Unstained Section) route to SubmissionDetailsBlock.
+    /// Determined by resolving the batch's Submitted As code to its lookup description and
+    /// comparing to "Wet Tissue" — see <see cref="IsWetTissueCodeAsync"/>.
     /// Legacy source: <c>BatchSummary.aspx</c> vs <c>BatchBlockSummary.aspx</c> — separate pages per type;
     /// both consolidated here but the Edit navigation target differs by type.
     /// </summary>
     public bool IsWetTissue { get; private set; }
+
+    /// <summary>Resolved LOOKUP_SUBMITTEDAS description for this batch (e.g. "Pre Cassetted Tissue", "Wax Block", "Wet Tissue") — drives the page's type caption.</summary>
+    public string? SubmittedAsDescription { get; private set; }
 
     /// <summary>
     /// Mirrors legacy <c>SV_ViewSubmission</c>: true when reached via the View Submission journey
@@ -101,7 +106,8 @@ public class SampleSummaryModel : HistoPageModel
         var batchIdValue = batchId.Value;
         Batch = await _batches.GetByIdAsync(batchIdValue);
         var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchIdValue);
-        IsWetTissue = submittedAsCode == "4"; // LOOKUP_SUBMITTEDAS code 4 = Wet Tissue (Common.vb)
+        SubmittedAsDescription = await ResolveSubmittedAsDescriptionAsync(submittedAsCode);
+        IsWetTissue = ValidationHelpers.IsWetTissueDescription(SubmittedAsDescription);
         var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(batchIdValue);
         var allAnimals = await _submissions.GetAnimalsByBatchAsync(batchIdValue);
         // Merge rather than either/or: GetBlockAnimalsByBatchAsync only returns animals that
@@ -186,11 +192,19 @@ public class SampleSummaryModel : HistoPageModel
         // Re-resolve submission type server-side on POST.
         // Do not trust the hidden field from the view for routing decisions.
         var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId.Value);
-        var isWetTissue = submittedAsCode == "4";
+        var isWetTissue = ValidationHelpers.IsWetTissueDescription(await ResolveSubmittedAsDescriptionAsync(submittedAsCode));
 
         if (isWetTissue)
             return RedirectToPage("/Submissions/SubmissionDetails", new { batchId, animalId });
         return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId });
+    }
+
+    /// <summary>Resolves a raw "Submitted As" code to its LOOKUP_SUBMITTEDAS (table 11) description.</summary>
+    private async Task<string?> ResolveSubmittedAsDescriptionAsync(string? submittedAsCode)
+    {
+        if (string.IsNullOrEmpty(submittedAsCode)) return null;
+        var items = await _lookups.GetLookupDataAsync(11); // LOOKUP_SUBMITTEDAS
+        return items.FirstOrDefault(i => i.Code == submittedAsCode)?.Name;
     }
 
     /// <summary>

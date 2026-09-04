@@ -1,3 +1,5 @@
+using Histo.Administration.Interfaces;
+using Histo.Core.Domain;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -10,12 +12,14 @@ public class AddSubmissionModel : HistoPageModel
 {
     private readonly ISubmissionService _submissions;
     private readonly IBatchService _batches;
+    private readonly ILookupService _lookups;
 
-    public AddSubmissionModel(ISessionService session, ISubmissionService submissions, IBatchService batches)
+    public AddSubmissionModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups)
         : base(session)
     {
         _submissions = submissions;
         _batches = batches;
+        _lookups = lookups;
     }
 
     /// <summary>Batch ID from the URL (route/query). Falls back to <see cref="ISessionService.BatchID"/>.</summary>
@@ -90,8 +94,22 @@ public class AddSubmissionModel : HistoPageModel
         // Legacy AddSubmission.aspx::btnNext_Click continues straight into the per-sample detail
         // page (SubmissionDetailsBlock.aspx / SubmissionDetails.aspx) rather than back to the list.
         var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId.Value);
-        return submittedAsCode == "4"
+        var isWetTissue = await IsWetTissueCodeAsync(submittedAsCode);
+        return isWetTissue
             ? RedirectToPage("/Submissions/SubmissionDetails", new { batchId, animalId = newAnimalId })
             : RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = newAnimalId });
+    }
+
+    /// <summary>
+    /// Resolves a raw "Submitted As" code to its LOOKUP_SUBMITTEDAS (table 11) description and
+    /// compares it to "Wet Tissue", matching Cassetted.aspx.vb's actual (description-based, not
+    /// code-based) comparison. Replaces a previously hardcoded, unverified <c>code == "4"</c> guess.
+    /// </summary>
+    private async Task<bool> IsWetTissueCodeAsync(string? submittedAsCode)
+    {
+        if (string.IsNullOrEmpty(submittedAsCode)) return false;
+        var items = await _lookups.GetLookupDataAsync(11); // LOOKUP_SUBMITTEDAS
+        var match = items.FirstOrDefault(i => i.Code == submittedAsCode);
+        return ValidationHelpers.IsWetTissueDescription(match?.Name);
     }
 }

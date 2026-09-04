@@ -64,14 +64,16 @@ public abstract class HistoPageModel : PageModel
 
     /// <summary>
     /// Object-level access check for batch-scoped pages that accept a batch ID from the
-    /// URL (route/query) rather than only from session state. Histo users see every area;
-    /// other roles are restricted to their own <see cref="ISessionService.UserAreaID"/>.
-    /// Returns <see langword="null"/> when access is allowed, or a Forbid result otherwise.
+    /// URL (route/query) rather than only from session state. Histo users and Maintenance
+    /// (legacy <c>CheckPermissions()</c> grants both roles unrestricted, area-agnostic access
+    /// on every page) see every area; other roles are restricted to their own
+    /// <see cref="ISessionService.UserAreaID"/>. Returns <see langword="null"/> when access is
+    /// allowed, or a Forbid result otherwise.
     /// </summary>
     protected async Task<IActionResult?> CheckBatchAccessAsync(IBatchService batches, int batchId)
     {
         var batch = await batches.GetByIdAsync(batchId);
-        var allowed = BatchAccessDecision.IsAllowed(Session.IsHistoUser, batch?.UserAreaCode, Session.UserAreaID);
+        var allowed = BatchAccessDecision.IsAllowed(Session.IsHistoUser || Session.IsMaintenance, batch?.UserAreaCode, Session.UserAreaID);
         return allowed ? null : Forbid();
     }
 }
