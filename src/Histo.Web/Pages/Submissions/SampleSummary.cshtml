@@ -1,8 +1,10 @@
 @page
-@model Histo.Web.Pages.Submissions.BatchBlockSummaryModel
+@model Histo.Web.Pages.Submissions.SampleSummaryModel
 @{
     ViewData["Title"] = "Sample summary";
     ViewData["PageTitle"] = "Sample summary";
+    // Surfaces the submission type since this page no longer has a type-specific name/URL.
+    ViewData["BatchNo"] = Model.IsWetTissue ? "Wet Tissue" : "Wax Block / Cassetted";
 }
 
 @section BeforeHeading {
@@ -15,7 +17,7 @@
    auto-submitting on change, per WCAG 3.2.2 (On Input). *@
 <form method="post" asp-page-handler="ToggleByPassSort" class="govuk-!-margin-bottom-4">
     <input type="hidden" asp-for="BatchId" />
-    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+    <div class="govuk-checkboxes govuk-!-margin-bottom-2" data-module="govuk-checkboxes">
         <div class="govuk-checkboxes__item">
             <input class="govuk-checkboxes__input" id="byPassSort" type="checkbox"
                    name="byPassSort" @(Model.Batch?.ByPassSort == true ? "checked" : "") />
@@ -25,9 +27,7 @@
     <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Apply</button>
 </form>
 
-@* "Add sample" — legacy btnAddSubmission, only enabled while the batch is still Submitted/Rejected
-   (BatchSummary.aspx.vb / BatchBlockSummary.aspx.vb::EnableDisableButtons). Hidden for Received/InProgress/
-   Completed/OnHold batches, where the animal list is locked. *@
+@* "Add sample" — only enabled while the batch is still Submitted/Rejected. *@
 @if (Model.CanModifySamples && !Model.IsViewMode)
 {
     <div class="govuk-button-group">
@@ -50,7 +50,7 @@
         <input type="hidden" name="animalId" value="@confirmId" />
         <input type="hidden" asp-for="BatchId" />
         <button type="submit" class="govuk-button govuk-button--warning" data-module="govuk-button">Yes, delete sample</button>
-        <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
     </form>
 }
 
@@ -91,16 +91,14 @@
                     }
                 </td>
                 <td class="govuk-table__cell">
-                    @* "Edit sample" — gated by IsViewMode: disabled in the View Submission journey
-                       per legacy BatchBlockSummary.aspx.vb::EnableDisableButtons (SV_ViewSubmission=True). *@
-                    @if (!Model.IsViewMode)
-                    {
-                        <form method="post" asp-page-handler="Select" class="govuk-!-display-inline">
-                            <input type="hidden" name="animalId" value="@a.ID" />
-                            <input type="hidden" asp-for="BatchId" />
-                            <button type="submit" class="govuk-button govuk-!-margin-bottom-0">Edit sample</button>
-                        </form>
-                    }
+                    @* "Edit sample" — visible in both edit and view mode (legacy EnableDisableButtons
+                       kept Edit enabled in ViewSubmission mode); routes to SubmissionDetails (Wet Tissue)
+                       or SubmissionDetailsBlock (block types). *@
+                    <form method="post" asp-page-handler="Select" class="govuk-!-display-inline">
+                        <input type="hidden" name="animalId" value="@a.ID" />
+                        <input type="hidden" asp-for="BatchId" />
+                        <button type="submit" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button">Edit sample</button>
+                    </form>
                     @if (Model.CanModifySamples && !Model.IsViewMode)
                     {
                         @* "Copy sample" — replaces legacy btnCopySubmission_Click, which redirected to AddSample.aspx
@@ -110,7 +108,7 @@
                         <a asp-page="/Submissions/AddSubmission" asp-route-batchId="@Model.BatchId" asp-route-batchSubmissionId="@Model.BatchSubmissionId" asp-route-senderRef="@a.SenderRef"
                            class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Copy sample</a>
                         @* "Delete sample" — links to the inline confirmation panel above instead of a browser confirm() dialog. *@
-                        <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" asp-route-ConfirmDeleteAnimalId="@a.ID"
+                        <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" asp-route-ConfirmDeleteAnimalId="@a.ID"
                            class="govuk-button govuk-button--warning govuk-!-margin-bottom-0">Delete sample</a>
                     }
                 </td>

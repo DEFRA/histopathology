@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace Histo.Web.Pages.Admin;
 
 /// <summary>Replaces <c>UserMaintenance.aspx</c>.</summary>
-public class UserMaintenanceModel : HistoPageModel
+public class UserMaintenanceModel : GridPageModel
 {
     private readonly IUserService _users;
     private readonly ILookupService _lookups;
@@ -27,10 +27,36 @@ public class UserMaintenanceModel : HistoPageModel
     [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
     public bool ShowDeactivated { get; set; } = true;
 
+    /// <summary>
+    /// Page the user came from (e.g. the in-progress Create/Edit Submission form), so the
+    /// "Return to submission" button can send them back without losing entered data.
+    /// </summary>
+    [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
+    public string? ReturnUrl { get; set; }
+
+    /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
+    public string? SafeReturnUrl => !string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : null;
+
     public IReadOnlyList<User> Users { get; private set; } = [];
     public string? StatusMessage { get; private set; }
     public string? ErrorMessage { get; private set; }
     public int TotalFromDb { get; private set; }
+
+    public int TotalCount => Users.Count;
+
+    public IReadOnlyList<User> PagedEntries =>
+        (SortColumn switch
+        {
+            "NtLogin" => SortDesc ? Users.OrderByDescending(u => u.NtLogin) : Users.OrderBy(u => u.NtLogin),
+            "Group"   => SortDesc ? Users.OrderByDescending(u => ResolveGroupName(u)) : Users.OrderBy(u => ResolveGroupName(u)),
+            "Area"    => SortDesc ? Users.OrderByDescending(u => ResolveAreaName(u))  : Users.OrderBy(u => ResolveAreaName(u)),
+            "Email"   => SortDesc ? Users.OrderByDescending(u => u.Email)   : Users.OrderBy(u => u.Email),
+            "Active"  => SortDesc ? Users.OrderByDescending(u => u.Active) : Users.OrderBy(u => u.Active),
+            _         => SortDesc ? Users.OrderByDescending(u => u.Name)   : Users.OrderBy(u => u.Name),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
 
     /// <summary>
     /// Group code → display name fallback map. Populated from <c>GetluUserGroup</c>
@@ -70,6 +96,8 @@ public class UserMaintenanceModel : HistoPageModel
         {
             ErrorMessage = $"{ex.GetType().Name}: {ex.Message}";
         }
+
+        PopulateGridViewData(TotalCount);
     }
 
     /// <summary>

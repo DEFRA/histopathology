@@ -87,6 +87,12 @@
                     @if (Model.Create_OtherSubmittedBy == u.UserID) { <option value="@u.UserID" selected>@u.Name</option> } else { <option value="@u.UserID">@u.Name</option> }
                 }
             </select>
+            @* Replaces legacy btnNewSubmittedBy — the "Submitted by" list is user-backed, so it is
+               maintained on User maintenance rather than a lookup table. *@
+            <button type="submit" asp-page-handler="ManagePickList" name="field" value="submittedBy" formnovalidate
+                    class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+                Manage submitted by list
+            </button>
         </div>
 
         @* Submitted Area � required, legacy ddlUserArea rfvSubmittedArea *@
@@ -121,6 +127,11 @@
                     @if (Model.Create_ProjectContractCode == p.ID.ToString()) { <option value="@p.ID" selected>@p.Name</option> } else { <option value="@p.ID">@p.Name</option> }
                 }
             </select>
+            @* Replaces legacy btnNewProject — opens the Projects pick list (LOOKUP_PROJECTS = 19). *@
+            <button type="submit" asp-page-handler="ManagePickList" name="field" value="project" formnovalidate
+                    class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+                Manage project / contract codes
+            </button>
         </div>
 
         @* Pathologist � required, legacy ddlContactName rvfContact *@
@@ -138,6 +149,11 @@
                     @if (Model.Create_ContactName == c.ID.ToString()) { <option value="@c.ID" selected>@c.Name</option> } else { <option value="@c.ID">@c.Name</option> }
                 }
             </select>
+            @* Replaces legacy btnNewContact — opens the Contacts pick list (LOOKUP_CONTACTS = 18). *@
+            <button type="submit" asp-page-handler="ManagePickList" name="field" value="pathologist" formnovalidate
+                    class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+                Manage pathologists
+            </button>
         </div>
 
         @* Submission date � required, legacy ctlBatchDate *@
@@ -489,7 +505,7 @@
        list-page action panels, not from this read-only view page. *@
     <div class="govuk-button-group">
 
-        <a asp-page="/Submissions/BatchBlockSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button" data-module="govuk-button">
+        <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button" data-module="govuk-button">
             Samples
             @if (Model.CanModifySamples)
             {

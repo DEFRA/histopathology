@@ -1,0 +1,75 @@
+@*
+    Shared GOV.UK Design System pagination component.
+
+    Usage (render immediately after </table>):
+        <partial name="_Pagination" />
+
+    Requires ViewData["CurrentPage"], ViewData["TotalPages"] and ViewData["SortBase"]
+    (plus ViewData["SortColumn"]/["SortDesc"] if the grid is sortable) to have been
+    set on the page before the table (see GridPageModel.PopulateGridViewData).
+*@
+@{
+    var currentPage = ViewData["CurrentPage"] as int? ?? 1;
+    var totalPages  = ViewData["TotalPages"] as int? ?? 1;
+    var sortBase    = ViewData["SortBase"]?.ToString() ?? string.Empty;
+    var sortColumn  = ViewData["SortColumn"]?.ToString();
+    var sortDesc    = ViewData["SortDesc"] as bool? ?? false;
+
+    string BuildHref(int page)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(sortBase))
+            parts.Add(sortBase);
+        if (!string.IsNullOrEmpty(sortColumn))
+        {
+            parts.Add($"SortColumn={Uri.EscapeDataString(sortColumn)}");
+            parts.Add($"SortDesc={(sortDesc ? "true" : "false")}");
+        }
+        parts.Add($"PageNumber={page}");
+        return "?" + string.Join("&", parts);
+    }
+}
+@if (totalPages > 1)
+{
+    <nav class="govuk-pagination" aria-label="Pagination">
+        @if (currentPage > 1)
+        {
+            <div class="govuk-pagination__prev">
+                <a class="govuk-link govuk-pagination__link" href="@BuildHref(currentPage - 1)" rel="prev">
+                    <svg class="govuk-pagination__icon govuk-pagination__icon--prev" xmlns="http://www.w3.org/2000/svg" height="13" width="15" aria-hidden="true" focusable="false" viewBox="0 0 15 13">
+                        <path d="m6.5938-0.0078125-6.6157 6.5947 6.6157 6.6183 1.4142-1.4142-4.2005-4.2021 4.2005-4.2005-1.4142-1.4142z"></path>
+                    </svg>
+                    <span class="govuk-pagination__link-title">Previous</span>
+                </a>
+            </div>
+        }
+        <ul class="govuk-pagination__list">
+            @for (var p = 1; p <= totalPages; p++)
+            {
+                if (p == currentPage)
+                {
+                    <li class="govuk-pagination__item govuk-pagination__item--current">
+                        <a class="govuk-link govuk-pagination__link" href="@BuildHref(p)" aria-label="Page @p" aria-current="page">@p</a>
+                    </li>
+                }
+                else
+                {
+                    <li class="govuk-pagination__item">
+                        <a class="govuk-link govuk-pagination__link" href="@BuildHref(p)" aria-label="Page @p">@p</a>
+                    </li>
+                }
+            }
+        </ul>
+        @if (currentPage < totalPages)
+        {
+            <div class="govuk-pagination__next">
+                <a class="govuk-link govuk-pagination__link" href="@BuildHref(currentPage + 1)" rel="next">
+                    <span class="govuk-pagination__link-title">Next</span>
+                    <svg class="govuk-pagination__icon govuk-pagination__icon--next" xmlns="http://www.w3.org/2000/svg" height="13" width="15" aria-hidden="true" focusable="false" viewBox="0 0 15 13">
+                        <path d="m8.107-0.0078125-1.4142 1.4142 4.2005 4.2005-4.2005 4.2021 1.4142 1.4142 6.6157-6.6183-6.6157-6.5947z"></path>
+                    </svg>
+                </a>
+            </div>
+        }
+    </nav>
+}

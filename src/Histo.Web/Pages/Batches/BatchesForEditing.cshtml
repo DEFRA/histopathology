@@ -39,17 +39,23 @@ else
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <th scope="col" class="govuk-table__header">Submission Number</th>
-                <th scope="col" class="govuk-table__header">Project Code</th>
-                <th scope="col" class="govuk-table__header">Pathologist</th>
-                <th scope="col" class="govuk-table__header">Species</th>
-                <th scope="col" class="govuk-table__header">Submitted Date</th>
-                <th scope="col" class="govuk-table__header">Status</th>
+                @{ ViewData["Label"] = "Submission Number"; ViewData["Column"] = "ID"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Project Code"; ViewData["Column"] = "ProjectDescription"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Pathologist"; ViewData["Column"] = "ContactDescription"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Species"; ViewData["Column"] = "Species"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Submitted Date"; ViewData["Column"] = "BatchDate"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Status"; ViewData["Column"] = "Status"; }
+                <partial name="_SortableHeader" />
                 <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
             </tr>
         </thead>
         <tbody class="govuk-table__body">
-            @foreach (var b in Model.Batches)
+            @foreach (var b in Model.PagedEntries)
             {
                 <tr class="govuk-table__row">
                     <td class="govuk-table__cell">@b.ID</td>
@@ -68,4 +74,5 @@ else
             }
         </tbody>
     </table>
+    <partial name="_Pagination" />
 }

@@ -68,16 +68,22 @@
             <table class="govuk-table">
                 <thead class="govuk-table__head">
                     <tr class="govuk-table__row">
-                        <th scope="col" class="govuk-table__header">Submission number</th>
-                        <th scope="col" class="govuk-table__header">Block ref</th>
-                        <th scope="col" class="govuk-table__header">Archive location</th>
-                        <th scope="col" class="govuk-table__header">Archived date</th>
-                        <th scope="col" class="govuk-table__header">Tissue</th>
-                        <th scope="col" class="govuk-table__header">No pieces</th>
+                        @{ ViewData["Label"] = "Submission number"; ViewData["Column"] = "ID"; }
+                        <partial name="_SortableHeader" />
+                        @{ ViewData["Label"] = "Block ref"; ViewData["Column"] = "BlockRef"; }
+                        <partial name="_SortableHeader" />
+                        @{ ViewData["Label"] = "Archive location"; ViewData["Column"] = "ArchiveLocation"; }
+                        <partial name="_SortableHeader" />
+                        @{ ViewData["Label"] = "Archived date"; ViewData["Column"] = "ArchivedDate"; }
+                        <partial name="_SortableHeader" />
+                        @{ ViewData["Label"] = "Tissue"; ViewData["Column"] = "TissueDescription"; }
+                        <partial name="_SortableHeader" />
+                        @{ ViewData["Label"] = "No pieces"; ViewData["Column"] = "NoPieces"; }
+                        <partial name="_SortableHeader" />
                     </tr>
                 </thead>
                 <tbody class="govuk-table__body">
-                    @foreach (var r in Model.BlockResults)
+                    @foreach (var r in Model.PagedBlockResults)
                     {
                         <tr class="govuk-table__row">
                             <td class="govuk-table__cell">@r.ID</td>
@@ -90,6 +96,7 @@
                     }
                 </tbody>
             </table>
+            <partial name="_Pagination" />
         }
         else
         {
@@ -103,16 +110,22 @@
             <table class="govuk-table">
                 <thead class="govuk-table__head">
                     <tr class="govuk-table__row">
-                        <th scope="col" class="govuk-table__header">Submission number</th>
-                        <th scope="col" class="govuk-table__header">Block ref</th>
-                        <th scope="col" class="govuk-table__header">Archive location</th>
-                        <th scope="col" class="govuk-table__header">Archived date</th>
-                        <th scope="col" class="govuk-table__header">Slide</th>
-                        <th scope="col" class="govuk-table__header">Tissue</th>
+                        @{ ViewData["Label"] = "Submission number"; ViewData["Column"] = "BatchID"; }
+                        <partial name="_SortableHeader" />
+                        @{ ViewData["Label"] = "Block ref"; ViewData["Column"] = "BlockRef"; }
+                        <partial name="_SortableHeader" />
+                        @{ ViewData["Label"] = "Archive location"; ViewData["Column"] = "ArchiveLocation"; }
+                        <partial name="_SortableHeader" />
+                        @{ ViewData["Label"] = "Archived date"; ViewData["Column"] = "ArchivedDate"; }
+                        <partial name="_SortableHeader" />
+                        @{ ViewData["Label"] = "Slide"; ViewData["Column"] = "Description"; }
+                        <partial name="_SortableHeader" />
+                        @{ ViewData["Label"] = "Tissue"; ViewData["Column"] = "TissueDescription"; }
+                        <partial name="_SortableHeader" />
                     </tr>
                 </thead>
                 <tbody class="govuk-table__body">
-                    @foreach (var r in Model.SlideResults)
+                    @foreach (var r in Model.PagedSlideResults)
                     {
                         <tr class="govuk-table__row">
                             <td class="govuk-table__cell">@r.BatchID</td>
@@ -125,6 +138,7 @@
                     }
                 </tbody>
             </table>
+            <partial name="_Pagination" />
         }
         else
         {
@@ -138,15 +152,20 @@
             <table class="govuk-table">
                 <thead class="govuk-table__head">
                     <tr class="govuk-table__row">
-                        <th scope="col" class="govuk-table__header">Submission number</th>
-                        <th scope="col" class="govuk-table__header">Tissue</th>
-                        <th scope="col" class="govuk-table__header">Archive location</th>
-                        <th scope="col" class="govuk-table__header">Archived date</th>
-                        <th scope="col" class="govuk-table__header">No pieces</th>
+                        @{ ViewData["Label"] = "Submission number"; ViewData["Column"] = "BatchID"; }
+                        <partial name="_SortableHeader" />
+                        @{ ViewData["Label"] = "Tissue"; ViewData["Column"] = "TissueDescription"; }
+                        <partial name="_SortableHeader" />
+                        @{ ViewData["Label"] = "Archive location"; ViewData["Column"] = "ArchiveLocation"; }
+                        <partial name="_SortableHeader" />
+                        @{ ViewData["Label"] = "Archived date"; ViewData["Column"] = "ArchivedDate"; }
+                        <partial name="_SortableHeader" />
+                        @{ ViewData["Label"] = "No pieces"; ViewData["Column"] = "NoPieces"; }
+                        <partial name="_SortableHeader" />
                     </tr>
                 </thead>
                 <tbody class="govuk-table__body">
-                    @foreach (var r in Model.TissueResults)
+                    @foreach (var r in Model.PagedTissueResults)
                     {
                         <tr class="govuk-table__row">
                             <td class="govuk-table__cell">@r.BatchID</td>
@@ -158,6 +177,7 @@
                     }
                 </tbody>
             </table>
+            <partial name="_Pagination" />
         }
         else
         {

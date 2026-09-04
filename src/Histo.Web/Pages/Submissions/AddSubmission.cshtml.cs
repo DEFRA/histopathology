@@ -9,9 +9,14 @@ namespace Histo.Web.Pages.Submissions;
 public class AddSubmissionModel : HistoPageModel
 {
     private readonly ISubmissionService _submissions;
+    private readonly IBatchService _batches;
 
-    public AddSubmissionModel(ISessionService session, ISubmissionService submissions)
-        : base(session) => _submissions = submissions;
+    public AddSubmissionModel(ISessionService session, ISubmissionService submissions, IBatchService batches)
+        : base(session)
+    {
+        _submissions = submissions;
+        _batches = batches;
+    }
 
     /// <summary>Batch ID from the URL (route/query). Falls back to <see cref="ISessionService.BatchID"/>.</summary>
     [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
@@ -38,7 +43,7 @@ public class AddSubmissionModel : HistoPageModel
         }
 
         // Restore the sender ref chosen via the Search Sender picker (SearchSender.cshtml),
-        // or pre-fill from the "Copy sample" query parameter (BatchBlockSummary/SearchSample).
+        // or pre-fill from the "Copy sample" query parameter (SampleSummary/SearchSample).
         if (TempData.TryGetValue("SenderRefPicker_Selected", out var chosen) && chosen is string chosenRef)
             SenderRef = chosenRef;
         else if (!string.IsNullOrWhiteSpace(senderRef))
@@ -82,6 +87,11 @@ public class AddSubmissionModel : HistoPageModel
             return Page();
         }
 
-        return RedirectToPage("/Submissions/BatchBlockSummary", new { batchId });
+        // Legacy AddSubmission.aspx::btnNext_Click continues straight into the per-sample detail
+        // page (SubmissionDetailsBlock.aspx / SubmissionDetails.aspx) rather than back to the list.
+        var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId.Value);
+        return submittedAsCode == "4"
+            ? RedirectToPage("/Submissions/SubmissionDetails", new { batchId, animalId = newAnimalId })
+            : RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = newAnimalId });
     }
 }

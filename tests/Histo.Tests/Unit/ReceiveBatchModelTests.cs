@@ -212,7 +212,7 @@ public class ReceiveBatchModelTests
     [Theory]
     [InlineData(BatchStatus.Received)]
     [InlineData(BatchStatus.Rejected)]
-    public async Task OnPostSaveAsync_ValidReceiptDetails_SavesAndRedirectsToBatchesNotReceived(string status)
+    public async Task OnPostSaveAsync_ValidReceiptDetails_SavesAndRedirectsToPrintSubmission(string status)
     {
         _session.Object.BatchID = 1;
         _batches.Setup(b => b.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(MakeBatch());
@@ -227,7 +227,7 @@ public class ReceiveBatchModelTests
         var result = await sut.OnPostSaveAsync();
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
-        Assert.Equal("/Batches/BatchesNotReceived", redirect.PageName);
+        Assert.Equal("/Batches/PrintSubmission", redirect.PageName);
     }
 
     [Fact]
