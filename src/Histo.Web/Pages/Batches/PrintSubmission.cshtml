@@ -1,0 +1,42 @@
+@page
+@model Histo.Web.Pages.Batches.PrintSubmissionModel
+@using Histo.Core.Domain
+@{
+    ViewData["Title"] = "Print submission";
+    ViewData["PageTitle"] = "Print submission";
+}
+
+@if (Model.Batch is null)
+{
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <strong class="govuk-warning-text__text">
+            <span class="govuk-visually-hidden">Warning</span>
+            Submission not found.
+        </strong>
+    </div>
+}
+else
+{
+    <div class="govuk-panel govuk-panel--confirmation govuk-!-margin-bottom-6">
+        <h1 class="govuk-panel__title">Submission @BatchStatus.DisplayName(Model.Batch.Status).ToLowerInvariant()</h1>
+        <div class="govuk-panel__body">
+            Submission number<br><strong>@Model.Batch.ID</strong>
+        </div>
+    </div>
+
+    <div class="govuk-button-group">
+        <a href="@Url.Page("/Reports/HistologyReport")" class="govuk-button" data-module="govuk-button">Print submission</a>
+
+        @if (Model.HasNotes)
+        {
+            <a href="@Url.Page("/Reports/SubmissionNotes")" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission notes</a>
+        }
+        else
+        {
+            <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="No submission notes have been recorded">Print submission notes</button>
+        }
+
+        <a asp-page="/Batches/BatchesNotReceived" class="govuk-button govuk-button--secondary" data-module="govuk-button">Continue</a>
+    </div>
+}
