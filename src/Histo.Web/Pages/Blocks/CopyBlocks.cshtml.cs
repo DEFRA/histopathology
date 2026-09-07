@@ -10,7 +10,8 @@ namespace Histo.Web.Pages.Blocks;
 
 /// <summary>
 /// Replaces <c>CopyBlocks.aspx</c> — copies the block(s) selected on
-/// <see cref="Histo.Web.Pages.Submissions.SubmissionDetailsBlockModel"/> onto one
+/// <see cref="Histo.Web.Pages.Submissions.SubmissionDetailsBlockModel"/> (per-sample) or
+/// <see cref="Histo.Web.Pages.Batches.BatchBlocksModel"/> (batch-wide) onto one
 /// or more other samples in the same batch, duplicating each block's tissues.
 ///
 /// SIMPLIFIED: the legacy page also offered an "auto-generate histology ref"
@@ -52,7 +53,7 @@ public class CopyBlocksModel : HistoPageModel
         var blockIdsCsv = TempData.Peek("CopyBlockIds") as string;
         var batchId = BatchId ?? Session.BatchID;
         if (string.IsNullOrEmpty(blockIdsCsv) || batchId is null)
-            return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId });
+            return RedirectToPage("/Batches/BatchBlocks", new { batchId });
 
         var forbidden = await CheckBatchAccessAsync(_batches, batchId.Value);
         if (forbidden is not null) return forbidden;
@@ -61,7 +62,7 @@ public class CopyBlocksModel : HistoPageModel
         BatchId = batchId;
         BlockIds = ParseIds(blockIdsCsv);
         var loaded = await LoadDisplayDataAsync();
-        return loaded ? Page() : RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId });
+        return loaded ? Page() : RedirectToPage("/Batches/BatchBlocks", new { batchId });
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -71,7 +72,7 @@ public class CopyBlocksModel : HistoPageModel
 
         var batchId = BatchId ?? Session.BatchID;
         if (batchId is null || BlockIds.Count == 0)
-            return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId });
+            return RedirectToPage("/Batches/BatchBlocks", new { batchId });
 
         var forbidden = await CheckBatchAccessAsync(_batches, batchId.Value);
         if (forbidden is not null) return forbidden;
@@ -93,7 +94,7 @@ public class CopyBlocksModel : HistoPageModel
             await CopyBlocksToAnimalAsync(sourceBlocks, allBlocks, batchId.Value, targetAnimalId, userId);
 
         TempData["StatusMessage"] = $"Copied {sourceBlocks.Count} block(s) to {TargetAnimalIds.Count} sample(s).";
-        return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId = batchId.Value });
+        return RedirectToPage("/Batches/BatchBlocks", new { batchId = batchId.Value });
     }
 
     /// <summary>

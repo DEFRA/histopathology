@@ -1,8 +1,8 @@
 @page
 @model BatchesReceivedModel
 @{
-    ViewData["Title"] = "Batches received";
-    ViewData["PageTitle"] = "Batches received";
+    ViewData["Title"] = "Submissions received";
+    ViewData["PageTitle"] = "Submissions  received";
 }
 
 @section BeforeHeading {
@@ -26,19 +26,15 @@ else
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                @{ ViewData["Label"] = "Batch No"; ViewData["Column"] = "ID"; }
+                @{ ViewData["Label"] = "Submission number"; ViewData["Column"] = "ID"; }
                 <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Project"; ViewData["Column"] = "ProjectDescription"; }
+                @{ ViewData["Label"] = "Project code"; ViewData["Column"] = "ProjectDescription"; }
                 <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "Pathologist"; ViewData["Column"] = "ContactDescription"; }
                 <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "Species"; ViewData["Column"] = "Species"; }
                 <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Batch date"; ViewData["Column"] = "BatchDate"; }
-                <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Received date"; ViewData["Column"] = "ReceivedDate"; }
-                <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Customer ref"; ViewData["Column"] = "OtherSubmittedBy"; }
+                @{ ViewData["Label"] = "Submitted date"; ViewData["Column"] = "BatchDate"; }
                 <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "All tissues assigned"; ViewData["Column"] = "AllTissuesAssigned"; }
                 <partial name="_SortableHeader" />
@@ -54,8 +50,6 @@ else
                     <td class="govuk-table__cell">@b.ContactDescription</td>
                     <td class="govuk-table__cell">@b.Species</td>
                     <td class="govuk-table__cell">@b.BatchDate?.ToShortDateString()</td>
-                    <td class="govuk-table__cell">@b.ReceivedDate?.ToShortDateString()</td>
-                    <td class="govuk-table__cell">@b.OtherSubmittedBy</td>
                     <td class="govuk-table__cell">
                         @if (b.AllTissuesAssigned)
                         {
