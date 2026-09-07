@@ -76,7 +76,7 @@ else
             <label class="govuk-label" for="NewCustomerRef">Customer reference</label>
             <input class="govuk-input govuk-input--width-20" asp-for="NewCustomerRef" />
         </div>
-        @if (!Model.IsPreCassetted && !Model.IsEditMode)
+        @if (!Model.IsEditMode)
         {
             <div class="govuk-form-group">
                 <label class="govuk-label" for="NewNumberOfBlocks">Number of blocks</label>
@@ -140,7 +140,7 @@ else
                                     <div class="govuk-form-group">
                                         <label class="govuk-label" for="EditTissueCode">Tissue type</label>
                                         <select class="govuk-select" asp-for="EditTissueCode">
-                                            @foreach (var opt in Model.TissueOptions)
+                                            @foreach (var opt in Model.EditTissueOptions)
                                             {
                                                 <option value="@opt.Code">@opt.Name</option>
                                             }

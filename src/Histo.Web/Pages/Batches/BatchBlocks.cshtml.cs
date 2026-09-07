@@ -176,7 +176,7 @@ public class BatchBlocksModel : HistoPageModel
         if (redirect is not null) return redirect;
 
         var blocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
-        var animals = await _submissions.GetAnimalsByBatchAsync(BatchId ?? 0);
+        var animals = await GetAllAnimalsAsync();
         var allTissuesAssigned = animals.Count > 0 && animals.All(a => blocks.Any(b => b.AnimalID == a.ID));
 
         await _batches.CompleteBlockAssignmentAsync(BatchId ?? 0, allTissuesAssigned, Session.UserID);
@@ -187,10 +187,27 @@ public class BatchBlocksModel : HistoPageModel
     private async Task LoadGridAsync()
     {
         Blocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
-        var animals = await _submissions.GetAnimalsByBatchAsync(BatchId ?? 0);
+        var animals = await GetAllAnimalsAsync();
         SenderRefsByAnimalId = animals.ToDictionary(a => a.ID, a => a.SenderRef);
         HistologyRefsByAnimalId = animals.ToDictionary(a => a.ID, a => a.HistologyRef);
         await LoadSupportingDataAsync();
+    }
+
+    /// <summary>
+    /// Loads every animal in the batch, merging <c>GetBlockAnimalsByBatchAsync</c> (richer
+    /// SenderRef/HistologyRef for already-blocked samples) with the plain animal list (for
+    /// samples not yet block-assigned) — mirrors <c>SampleSummaryModel</c>'s identical merge,
+    /// needed because <c>GetAnimalsByBatchAsync</c> alone is incomplete for cassetted batches.
+    /// </summary>
+    private async Task<IReadOnlyList<Animal>> GetAllAnimalsAsync()
+    {
+        var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(BatchId ?? 0);
+        var allAnimals = await _submissions.GetAnimalsByBatchAsync(BatchId ?? 0);
+        if (blockAnimals.Count == 0) return allAnimals;
+
+        var seenIds = blockAnimals.Select(a => a.ID).ToHashSet();
+        var missing = allAnimals.Where(a => !seenIds.Contains(a.ID));
+        return [.. blockAnimals, .. missing];
     }
 
     /// <summary>Resolves/validates <see cref="BatchId"/>, applying the same area-access guard as every other batch page.</summary>

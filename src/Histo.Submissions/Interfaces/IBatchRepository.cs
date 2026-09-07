@@ -17,7 +17,12 @@ public interface IBatchRepository
     /// </summary>
     Task<Batch?> GetByIdAsync(int batchId, CancellationToken ct = default);
 
-    /// <summary>Returns all batches in Received status. Maps to <c>GetReceivedBatches</c>.</summary>
+    /// <summary>
+    /// Returns batches with status Received, ready to be assigned to blocks. Maps to
+    /// <c>GetBatchesToBeBlocked</c> (confirmed from <c>BatchesReceived.aspx.vb::InitialiseBatchesGrid</c>
+    /// — NOT <c>GetReceivedBatches</c>, which exists in <c>clsBatch.vb</c> but is never called by
+    /// any legacy page).
+    /// </summary>
     Task<IReadOnlyList<BatchListResult>> GetReceivedAsync(CancellationToken ct = default);
 
     /// <summary>Returns all batches in InProgress status. Maps to <c>GetInProgressBatches</c>.</summary>

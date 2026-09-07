@@ -143,11 +143,19 @@ public class ViewSubmissionsModel : HistoPageModel
 
     private async Task LoadLookupsAsync()
     {
-        Users       = await _users.GetAllUsersAsync();
-        Projects    = await _lookups.GetLookupDataAsync(LookupProjects);
-        Contacts    = await _lookups.GetLookupDataAsync(LookupContacts);
-        SpeciesList = await _lookups.GetSpeciesLookupAsync();
-        Fixations   = await _lookups.GetLookupDataAsync(LookupFixative);
+        var usersTask = _users.GetAllUsersAsync();
+        var projectsTask = _lookups.GetLookupDataAsync(LookupProjects);
+        var contactsTask = _lookups.GetLookupDataAsync(LookupContacts);
+        var speciesTask = _lookups.GetSpeciesLookupAsync();
+        var fixationsTask = _lookups.GetLookupDataAsync(LookupFixative);
+
+        await Task.WhenAll(usersTask, projectsTask, contactsTask, speciesTask, fixationsTask);
+
+        Users       = await usersTask;
+        Projects    = await projectsTask;
+        Contacts    = await contactsTask;
+        SpeciesList = await speciesTask;
+        Fixations   = await fixationsTask;
     }
 
     public async Task OnGetAsync()
@@ -161,9 +169,11 @@ public class ViewSubmissionsModel : HistoPageModel
     {
         ViewData["Title"] = "View submissions";
         ViewData["PageTitle"] = "View submissions";
-        await LoadLookupsAsync();
+        var lookupsTask = LoadLookupsAsync();
+        var resultsTask = _batches.SearchAsync(BuildCriteria());
+        await Task.WhenAll(lookupsTask, resultsTask);
         SelectedBatchId = 0;
-        Results  = await _batches.SearchAsync(BuildCriteria());
+        Results  = await resultsTask;
         Searched = true;
         PopulateGridViewData();
         return Page();
@@ -180,7 +190,9 @@ public class ViewSubmissionsModel : HistoPageModel
     {
         ViewData["Title"] = "View submissions";
         ViewData["PageTitle"] = "View submissions";
-        await LoadLookupsAsync();
+        var lookupsTask = LoadLookupsAsync();
+        var resultsTask = _batches.SearchAsync(BuildCriteria());
+        await Task.WhenAll(lookupsTask, resultsTask);
 
         if (SelectedBatchId > 0)
         {
@@ -189,7 +201,7 @@ public class ViewSubmissionsModel : HistoPageModel
             Session.IsViewSubmissionMode = true;
         }
 
-        Results  = await _batches.SearchAsync(BuildCriteria());
+        Results  = await resultsTask;
         Searched = true;
         PopulateGridViewData();
         return Page();

@@ -119,7 +119,7 @@ public sealed class BatchRepository : IBatchRepository
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<BatchListResult>(
-            "GetReceivedBatches",
+            "GetBatchesToBeBlocked",
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
