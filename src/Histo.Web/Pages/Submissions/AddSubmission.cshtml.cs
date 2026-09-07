@@ -95,9 +95,29 @@ public class AddSubmissionModel : HistoPageModel
         // page (SubmissionDetailsBlock.aspx / SubmissionDetails.aspx) rather than back to the list.
         var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId.Value);
         var isWetTissue = await IsWetTissueCodeAsync(submittedAsCode);
-        return isWetTissue
-            ? RedirectToPage("/Submissions/SubmissionDetails", new { batchId, animalId = newAnimalId })
-            : RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = newAnimalId });
+
+        if (isWetTissue)
+        {
+            // Wet Tissue tissues are owned by BatchSubmissionID (not BlockID — see SubmissionDetails),
+            // so each animal needs its own dedicated submission row linked via AnimalID. Legacy source:
+            // clsBatchSubmission.vb::NewRecord(dtBatchSubmission, id, batchId, animalId) overload — the
+            // SP genuinely accepts a real AnimalID once one is known. The submission reused above only
+            // exists to satisfy AddAnimalAsync's batchSubmissionId parameter (never actually sent to the
+            // SQL insert), so reusing the SAME shared submission for every animal left each new animal's
+            // real owning submission unresolvable (SubmissionDetailsModel.LoadAnimalAsync matches on
+            // AnimalID, which stayed the 0 placeholder), silently breaking Tissue Details add/edit/
+            // delete/display for every sample after the first.
+            var siblingSubmissions = await _submissions.GetSubmissionsByBatchAsync(batchId.Value);
+            var nextOrder = siblingSubmissions.Count > 0 ? siblingSubmissions.Max(s => s.Order) + 1 : 1;
+            var ownSubmissionId = await _submissions.AddSubmissionAsync(
+                new BatchSubmission { BatchID = batchId.Value, AnimalID = newAnimalId, SubmissionName = "Default", Order = nextOrder },
+                Session.UserID);
+            if (ownSubmissionId > 0) Session.BatchSubmissionID = ownSubmissionId;
+
+            return RedirectToPage("/Submissions/SubmissionDetails", new { batchId, animalId = newAnimalId });
+        }
+
+        return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = newAnimalId });
     }
 
     /// <summary>

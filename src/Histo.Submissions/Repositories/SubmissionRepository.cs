@@ -44,11 +44,13 @@ public sealed class SubmissionRepository : ISubmissionRepository
         var parameters = new DynamicParameters();
         // Legacy SP signature: ID (0 = new), BatchID, AnimalID, Order, OldID (out), NewID (out).
         // AnimalID is NOT NULL on the table; legacy's typed DataSet defaulted new rows to 0
-        // when no animal is known yet (the "default empty submission" case) — passing DBNull
-        // violates the NOT NULL constraint, so 0 is sent instead to match legacy behaviour.
+        // when no animal is known yet (the "default empty submission" case), but
+        // clsBatchSubmission.vb::NewRecord(dtBatchSubmission, id, batchId, animalId) shows the SP
+        // does accept a real AnimalID once one is known — pass submission.AnimalID (defaults to 0)
+        // rather than always hardcoding 0.
         parameters.Add("ID",        0,                      dbType: System.Data.DbType.Int32);
         parameters.Add("BatchID",   submission.BatchID,     dbType: System.Data.DbType.Int32);
-        parameters.Add("AnimalID",  0,                      dbType: System.Data.DbType.Int32);
+        parameters.Add("AnimalID",  submission.AnimalID,    dbType: System.Data.DbType.Int32);
         parameters.Add("Order",     submission.Order,       dbType: System.Data.DbType.Int32);
         parameters.Add("OldID",     dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
         parameters.Add("NewID",     dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);

@@ -1979,4 +1979,42 @@ Fetched the official GOV.UK Design System pagination documentation to confirm th
 
 **Files changed:** [src/Histo.Core/Domain/PaginationHelpers.cs](../src/Histo.Core/Domain/PaginationHelpers.cs), [src/Histo.Web/Pages/Shared/_Pagination.cshtml](../src/Histo.Web/Pages/Shared/_Pagination.cshtml), [src/Histo.Web/Pages/Shared/_PaginationPost.cshtml](../src/Histo.Web/Pages/Shared/_PaginationPost.cshtml), [src/Histo.Web/Pages/GridPageModel.cs](../src/Histo.Web/Pages/GridPageModel.cs), [tests/Histo.Tests/Unit/PaginationHelperTests.cs](../tests/Histo.Tests/Unit/PaginationHelperTests.cs).
 
+---
+
+## Prompt 130 — Validate Tissue Details functionality in Create Submission journey (Wet Tissue) (2026-09-07)
+
+> Requirement: Validate Tissue Details Functionality in the Create Submission Journey - Submission type is Wet Tissue. Background: The issues below have already been addressed for the Edit Submission journey. Please analyse the Create Submission flow, specifically within `SubmissionDetails.cshtml` and the Add Sample workflow, to determine whether the same issues exist there. Issue 1: Tissue Details Data Not Loading. Issue 2: Tissue Details Should Support Edit and Delete. Issue 3: Add Tissue Functionality Not Working. [Full requirement covered data loading, Add/Edit/Delete, validation, persistence, UI rendering, accessibility and GDS/legacy consistency.]
+
+Confirmed the Razor markup in `SubmissionDetails.cshtml` is fully shared between Create and Edit journeys — no UI gap. Root-caused via legacy `clsBatchSubmission.vb::NewRecord(dtBatchSubmission, iBatchSubmissionID, iBatchID, iAnimalID)` (confirms the real `AddBatchSubmission` SP accepts a per-animal `AnimalID`): `AddSubmissionModel.OnPostAsync` (Add Sample) reused one shared `BatchSubmission` row (hardcoded `AnimalID=0`) for every new animal instead of linking each new animal to its own submission, so `SubmissionDetailsModel.LoadAnimalAsync`'s AnimalID-matching resolution (fixed for the Edit journey in Run #29) never found a freshly-created animal's real submission — `BatchSubmissionID` stayed `0`, silently breaking Tissue Details load/Add/Edit/Delete for every new Wet Tissue sample. Pre-existing seeded/production animals worked fine because their submissions already had real `AnimalID` values. Fixed `SubmissionRepository.AddSubmissionAsync` (was hardcoding `AnimalID=0` regardless of the model's value) and `AddSubmissionModel.OnPostAsync` (now creates a dedicated new submission linked to the new animal for Wet Tissue batches). Cassetted/block batches unaffected (Tissue there is Block-owned, not Submission-owned) — left unchanged. Flagged the same bug class in `CopyBatch`'s `CopyAnimalAsync` path as a follow-up (fixed in Prompt 131 below).
+
+**Build:** 0 errors. **Tests:** 183 total, 182 passed, 1 skipped, 0 failed (unchanged).
+
+**Files changed:** [src/Histo.Submissions/Repositories/SubmissionRepository.cs](../src/Histo.Submissions/Repositories/SubmissionRepository.cs), [src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs).
+
+---
+
+## Prompt 131 — Fix the same class of bug in Copy Batch/Copy Samples' Wet Tissue flow (2026-09-07)
+
+> Can you fix this as well the same class of bug likely affects Copy Batch/Copy Samples' Wet Tissue flow (`CopyAnimalAsync`) —
+
+Confirmed `CopyBatchModel.OnPostAsync` had the identical root cause: it created the destination submission via `CopySubmissionAsync` BEFORE copying the animal via `CopyAnimalAsync`, so the new submission's `AnimalID` could never be linked to the copied animal (chicken-and-egg — `CopySubmissionAsync` didn't even accept an `AnimalID` parameter). Added an optional `animalId` parameter to `ISubmissionService.CopySubmissionAsync`/`SubmissionService.CopySubmissionAsync` (threaded into `BatchSubmission.AnimalID`, defaults to 0 for backward compatibility) and restructured `OnPostAsync` to copy the animal first (confirmed its `newBatchSubmissionId` parameter is inert at the SQL layer, same as the Add Sample fix, so a placeholder is safe), then create the destination submission linked to the real new animal ID, then copy tissues into that now-correctly-linked submission. Applies uniformly to both cassetted and non-cassetted copy paths — harmless for cassetted (Tissue there is Block-owned).
+
+**Build:** 0 errors. **Tests:** 183 total, 182 passed, 1 skipped, 0 failed (unchanged).
+
+**Files changed:** [src/Histo.Submissions/Interfaces/ISubmissionService.cs](../src/Histo.Submissions/Interfaces/ISubmissionService.cs), [src/Histo.Submissions/Services/SubmissionService.cs](../src/Histo.Submissions/Services/SubmissionService.cs), [src/Histo.Web/Pages/Batches/CopyBatch.cshtml.cs](../src/Histo.Web/Pages/Batches/CopyBatch.cshtml.cs).
+
+---
+
+## Prompt 130 — Validate Tissue Details functionality in the Create Submission journey (Wet Tissue) (2026-09-07)
+
+> Requirement: Validate Tissue Details Functionality in the Create Submission Journey - Submission type is Wet Tissue. Background: The issues below have already been addressed for the Edit Submission journey. Please analyse the Create Submission flow, specifically within `SubmissionDetails.cshtml` and the Add Sample workflow, to determine whether the same issues exist there. Issue 1: Tissue Details Data Not Loading. Issue 2: Tissue Details Should Support Edit and Delete. Issue 3: Add Tissue Functionality Not Working. [Full requirement covered data loading, Add/Edit/Delete, validation, persistence, UI rendering, accessibility/GDS compliance, and consistency with Edit Submission and legacy.]
+
+Confirmed the `SubmissionDetails.cshtml` markup is fully shared between the Create and Edit journeys (identical GDS-compliant Tissue Code/No. Pieces/Comment/Actions grid, inline confirmation panel, Add/Edit forms) — no UI gap. Root-caused a real backend bug instead: `AddSubmissionModel.OnPostAsync` (Add Sample) reused one shared `BatchSubmission` row (hardcoded `AnimalID=0` placeholder) for every new animal added to a batch, and never linked it to the real animal. Confirmed via legacy `clsBatchSubmission.vb::NewRecord(dtBatchSubmission, iBatchSubmissionID, iBatchID, iAnimalID)` that the real `AddBatchSubmission` SP genuinely accepts a per-animal `AnimalID` — each Wet Tissue sample needs its own dedicated submission row. Because `SubmissionDetailsModel.LoadAnimalAsync` (the Run #29 Edit-journey fix) resolves `Animal.BatchSubmissionID` by matching `submissions.FirstOrDefault(s => s.AnimalID == AnimalId)`, a freshly-created animal's owning submission never matched (its `AnimalID` was always the 0 placeholder), leaving `BatchSubmissionID` at 0 and silently breaking Tissue Details load/Add/Edit/Delete for every newly-added Wet Tissue sample — pre-existing seeded/production animals worked fine because their submissions already had real `AnimalID` values from historical data. Fixed `SubmissionRepository.AddSubmissionAsync` (was hardcoding `AnimalID=0` regardless of the model) and `AddSubmissionModel.OnPostAsync` (now creates a dedicated new submission linked to the new animal for Wet Tissue batches specifically; cassetted/block batches unaffected since their tissues are Block-owned, not Submission-owned).
+
+**Build:** 0 errors. **Tests:** 183 total, 182 passed, 1 skipped, 0 failed (unchanged from before this fix — no unit-testable pure logic extracted).
+
+**Files changed:** [src/Histo.Submissions/Repositories/SubmissionRepository.cs](../src/Histo.Submissions/Repositories/SubmissionRepository.cs), [src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs).
+
+**Follow-up flagged, not fixed:** the same class of bug likely affects the Copy Batch/Copy Samples Wet Tissue flow (`CopyAnimalAsync` in `CopyBatch.cshtml.cs`) — out of scope for this request.
+
 

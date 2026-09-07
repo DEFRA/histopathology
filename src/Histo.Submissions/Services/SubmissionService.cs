@@ -46,11 +46,12 @@ public sealed class SubmissionService : ISubmissionService
     /// Creates a copy of an existing batch submission (sample group) under a new
     /// batch. Used by the "Copy batch" workflow.
     /// </summary>
-    public async Task<int> CopySubmissionAsync(BatchSubmission source, int newBatchId, int userId, CancellationToken ct = default)
+    public async Task<int> CopySubmissionAsync(BatchSubmission source, int newBatchId, int userId, int animalId = 0, CancellationToken ct = default)
     {
         var submission = new BatchSubmission
         {
             BatchID        = newBatchId,
+            AnimalID       = animalId,
             SubmissionName = source.SubmissionName,
             Order          = source.Order,
         };

@@ -172,20 +172,29 @@ public class CopyBatchModel : HistoPageModel
 
         foreach (var submission in submissions)
         {
-            var newSubmissionId = await _submissions.CopySubmissionAsync(submission, newBatchId, userId);
-            if (newSubmissionId <= 0) continue;
-
             var tissues = await _submissions.GetTissuesBySubmissionAsync(SourceBatchId, submission.ID);
-            foreach (var tissue in tissues)
-                await _submissions.CopyTissueAsync(tissue, newSubmissionId, userId);
 
-            foreach (var animal in animals.Where(a =>
+            var matchedAnimals = animals.Where(a =>
                 a.BatchSubmissionID == submission.ID ||
-                (a.BatchSubmissionID == 0 && submission.ID == firstSubmId)))
+                (a.BatchSubmissionID == 0 && submission.ID == firstSubmId));
+
+            // Copy the animal BEFORE creating its destination submission and link the two via
+            // AnimalID — a submission whose AnimalID is never set can't be resolved later by
+            // SubmissionDetailsModel.LoadAnimalAsync, silently breaking Tissue Details on the
+            // copied batch (same root cause fixed in AddSubmissionModel.OnPostAsync).
+            foreach (var animal in matchedAnimals)
             {
                 var newSenderRef = newSenderRefs.GetValueOrDefault(animal.ID, animal.SenderRef);
                 if (string.IsNullOrWhiteSpace(newSenderRef)) newSenderRef = animal.SenderRef;
-                await _submissions.CopyAnimalAsync(animal, newSubmissionId, newSenderRef, userId);
+
+                var newAnimalId = await _submissions.CopyAnimalAsync(animal, newBatchSubmissionId: 0, newSenderRef, userId);
+                if (newAnimalId <= 0) continue;
+
+                var newSubmissionId = await _submissions.CopySubmissionAsync(submission, newBatchId, userId, newAnimalId);
+                if (newSubmissionId <= 0) continue;
+
+                foreach (var tissue in tissues)
+                    await _submissions.CopyTissueAsync(tissue, newSubmissionId, userId);
             }
         }
 
