@@ -12,6 +12,12 @@
     bool isHisto = group == "Histopathology User";
     bool isMaint = group == "Maintenance";
     bool isCustomer = group == "Customer" || (!isHisto && !isMaint);
+
+    // Context-sensitive help — deep-links into the relevant Help/Index.cshtml section for the
+    // page the user is currently on, instead of always opening at the top of the page.
+    var currentPage = ViewContext.RouteData.Values["page"] as string;
+    var helpAnchor = Histo.Core.Domain.HelpSectionMap.Resolve(currentPage);
+    var helpHref = "/Help/Index" + (helpAnchor is not null ? $"#{helpAnchor}" : "");
 }
 
 @* ── Links available to ALL groups ──────────────────────────────────── *@
@@ -68,7 +74,7 @@
 
 @* ── Help — available to all groups ─────────────────────────────────── *@
 <li class="govuk-service-navigation__item">
-    <a class="govuk-service-navigation__link" asp-page="/Help/Index"
+    <a class="govuk-service-navigation__link" href="@helpHref"
        target="_blank" rel="noreferrer noopener">Help</a>
 </li>
 

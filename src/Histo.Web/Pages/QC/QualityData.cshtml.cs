@@ -18,7 +18,7 @@ namespace Histo.Web.Pages.QC;
 /// save. This page edits one test at a time instead. See
 /// <see cref="Histo.Histology.Models.BlockTest"/> for further scope notes.
 /// </summary>
-public class QualityDataModel : HistoPageModel
+public class QualityDataModel : GridPageModel
 {
     private readonly IBlockTestService _tests;
     private readonly IBatchService _batches;
@@ -71,6 +71,21 @@ public class QualityDataModel : HistoPageModel
     public string GetTestName(BlockTest t) =>
         _testNameMap.TryGetValue($"{t.TestType}|{t.Code}", out var n) ? n : t.Code;
 
+    public IReadOnlyList<BlockTest> PagedEntries =>
+        (SortColumn switch
+        {
+            "BlockRef"    => SortDesc ? Tests.OrderByDescending(t => t.BlockRef)         : Tests.OrderBy(t => t.BlockRef),
+            "Test"        => SortDesc ? Tests.OrderByDescending(t => GetTestName(t))      : Tests.OrderBy(t => GetTestName(t)),
+            "Result"      => SortDesc ? Tests.OrderByDescending(t => t.Result)            : Tests.OrderBy(t => t.Result),
+            "Dispatched"  => SortDesc ? Tests.OrderByDescending(t => t.Dispatched)        : Tests.OrderBy(t => t.Dispatched),
+            "Archived"    => SortDesc ? Tests.OrderByDescending(t => t.Archived)          : Tests.OrderBy(t => t.Archived),
+            "OnHold"      => SortDesc ? Tests.OrderByDescending(t => t.OnHold)            : Tests.OrderBy(t => t.OnHold),
+            _             => SortDesc ? Tests.OrderByDescending(t => t.HistologyRef)      : Tests.OrderBy(t => t.HistologyRef),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
+
     public async Task<IActionResult> OnGetAsync()
     {
         ViewData["Title"] = "Quality data";
@@ -106,6 +121,7 @@ public class QualityDataModel : HistoPageModel
             filtered = filtered.Where(t => (t.TestDetails ?? t.Code) == FilterTest);
         Tests = filtered.ToList();
 
+        PopulateGridViewData(Tests.Count);
         return Page();
     }
 

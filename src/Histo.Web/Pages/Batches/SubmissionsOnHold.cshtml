@@ -1,57 +1,50 @@
 @page
 @model SubmissionsOnHoldModel
 @{
-    ViewData["Title"] = "Submissions on hold";
-    ViewData["PageTitle"] = "Submissions on hold";
+    ViewData["Title"] = "Samples on hold";
+    ViewData["PageTitle"] = "Samples on hold";
 }
 
 @section BeforeHeading {
-    <a asp-page="/Index" class="govuk-back-link">Back</a>
+    <a asp-page="/Batches/EditBatch" asp-route-BatchId="@Model.BatchId" class="govuk-back-link">Back</a>
 }
 
-@if (!Model.Batches.Any())
-{
-    <p class="govuk-body">No submissions currently on hold.</p>
-}
-else
-{
+<p class="govuk-body">Select which samples in this submission should be put on hold.</p>
+
+<form method="post" asp-page-handler="Save">
+    <input type="hidden" asp-for="BatchId" />
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                @{ ViewData["Label"] = "Batch No"; ViewData["Column"] = "ID"; }
-                <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Project"; ViewData["Column"] = "ProjectDescription"; }
-                <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Pathologist"; ViewData["Column"] = "ContactDescription"; }
-                <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Species"; ViewData["Column"] = "Species"; }
-                <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Batch date"; ViewData["Column"] = "SubmissionDate"; }
-                <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Customer ref"; ViewData["Column"] = "OtherSubmittedBy"; }
-                <partial name="_SortableHeader" />
-                <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
+                <th scope="col" class="govuk-table__header">Sender ref</th>
+                <th scope="col" class="govuk-table__header">Histology ref</th>
+                <th scope="col" class="govuk-table__header">On hold</th>
             </tr>
         </thead>
         <tbody class="govuk-table__body">
-            @foreach (var b in Model.PagedEntries)
+            @foreach (var a in Model.Animals)
             {
                 <tr class="govuk-table__row">
-                    <td class="govuk-table__cell">@b.ID</td>
-                    <td class="govuk-table__cell">@b.ProjectDescription</td>
-                    <td class="govuk-table__cell">@b.ContactDescription</td>
-                    <td class="govuk-table__cell">@b.Species</td>
-                    <td class="govuk-table__cell">@b.SubmissionDate</td>
-                    <td class="govuk-table__cell">@b.OtherSubmittedBy</td>
+                    <td class="govuk-table__cell">@a.SenderRef</td>
+                    <td class="govuk-table__cell">@a.HistologyRef</td>
                     <td class="govuk-table__cell">
-                        <form method="post">
-                            <input type="hidden" name="batchId" value="@b.ID" />
-                            <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-page-handler="Select">View</button>
-                        </form>
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" type="checkbox" name="OnHoldAnimalIds" value="@a.ID" checked="@a.OnHold" />
+                            <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">On hold for @a.SenderRef</span></label>
+                        </div>
                     </td>
                 </tr>
             }
+            @if (!Model.Animals.Any())
+            {
+                <tr class="govuk-table__row"><td colspan="3" class="govuk-table__cell">No samples found for this submission.</td></tr>
+            }
         </tbody>
     </table>
-    <partial name="_Pagination" />
-}
+
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
+        <button type="submit" formaction="?handler=Done" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</button>
+    </div>
+</form>
+

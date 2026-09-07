@@ -1,0 +1,41 @@
+@*
+    POST-variant of _SortableHeader for grids whose filter criteria are bound via
+    [BindProperty] on a POST handler (e.g. ViewSubmissions), rather than the query
+    string. Submits the page's existing hidden carrier form instead of navigating
+    via a GET link, so POST-bound filter values are not lost when the user sorts.
+
+    Usage (set before rendering, once per header, inside the <tr>):
+        @{
+            ViewData["Label"] = "Project Code";
+            ViewData["Column"] = "ProjectDescription";
+            ViewData["FormId"] = "view-action-form";
+            ViewData["Handler"] = "Search";
+        }
+        <partial name="_SortableHeaderPost" />
+
+    Requires ViewData["SortColumn"] and ViewData["SortDesc"] to have been set on
+    the page before the table.
+*@
+@{
+    var label   = ViewData["Label"]?.ToString() ?? string.Empty;
+    var column  = ViewData["Column"]?.ToString() ?? string.Empty;
+    var formId  = ViewData["FormId"]?.ToString() ?? string.Empty;
+    var handler = ViewData["Handler"]?.ToString() ?? string.Empty;
+
+    var currentSortColumn = ViewData["SortColumn"]?.ToString() ?? string.Empty;
+    var currentSortDesc   = ViewData["SortDesc"] as bool? ?? false;
+
+    var isActive    = !string.IsNullOrEmpty(column) && string.Equals(currentSortColumn, column, StringComparison.OrdinalIgnoreCase);
+    var nextDesc    = isActive && !currentSortDesc;
+    var ariaSort    = isActive ? (currentSortDesc ? "descending" : "ascending") : "none";
+    var formAction  = $"?handler={Uri.EscapeDataString(handler)}&SortColumn={Uri.EscapeDataString(column)}&SortDesc={(nextDesc ? "true" : "false")}";
+}
+<th scope="col" class="govuk-table__header" aria-sort="@ariaSort">
+    <button type="submit" form="@formId" formaction="@formAction" class="app-link-button">
+        @label
+        @if (isActive)
+        {
+            <span aria-hidden="true">@(currentSortDesc ? " ▼" : " ▲")</span>
+        }
+    </button>
+</th>

@@ -732,3 +732,23 @@
         <p class="govuk-body govuk-!-margin-top-4"><a class="govuk-link" href="#">Back to top</a></p>
     </section>
 }
+
+@section Scripts {
+    <script>
+        // Moves keyboard/screen-reader focus to the section targeted by the URL fragment —
+        // needed because scrolling to an anchor does not itself move focus, so context-sensitive
+        // Help links (and the in-page contents/"Back to top" links) would otherwise leave focus
+        // wherever it was before navigating. Runs on initial load and on every in-page anchor click.
+        (function () {
+            function focusHelpTarget(hash) {
+                if (!hash || hash.length < 2) return;
+                var target = document.getElementById(decodeURIComponent(hash.substring(1)));
+                if (!target) return;
+                if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
+                target.focus();
+            }
+            focusHelpTarget(window.location.hash);
+            window.addEventListener('hashchange', function () { focusHelpTarget(window.location.hash); });
+        })();
+    </script>
+}

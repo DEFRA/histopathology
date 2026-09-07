@@ -10,6 +10,7 @@ public sealed class BatchSubmission
 {
     public int ID { get; set; }
     public int BatchID { get; set; }
+    public int AnimalID { get; set; }
     public string SubmissionName { get; set; } = string.Empty;
     public int Order { get; set; }
     public byte[]? RowStamp { get; set; }

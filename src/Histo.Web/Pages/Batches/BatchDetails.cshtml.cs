@@ -304,7 +304,13 @@ public class BatchDetailsModel : HistoPageModel
         {
             await LoadCreateLookupsAsync();
             if (!RestoreCreateDraft())
+            {
                 Create_BatchDateStr = DateTime.Today.ToString("yyyy-MM-dd");
+                // Default Submitted by/area to the logged-in user — still a normal editable
+                // dropdown, just pre-selected rather than requiring the user to find themselves.
+                Create_OtherSubmittedBy   = Session.UserID;
+                Create_OtherSubmittedArea = Session.UserAreaID.ToString();
+            }
             // Resolve SubmittedAs name from TempData for display
             if (TempData.TryGetValue("CreateSubmittedAsId", out var saId))
             {

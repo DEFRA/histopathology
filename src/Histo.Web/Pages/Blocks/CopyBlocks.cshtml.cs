@@ -117,7 +117,7 @@ public class CopyBlocksModel : HistoPageModel
             refs.Add(BlockHelpers.ComputeNextBlockRef(refs));
             orders.Add(BlockHelpers.ComputeNextOrder(orders));
 
-            var tissues = await _submissions.GetTissuesByBlockAsync(sourceBlock.ID);
+            var tissues = await _submissions.GetTissuesByBlockAsync(sourceBlock.BatchID, sourceBlock.ID);
             foreach (var tissue in tissues)
                 await _submissions.CopyTissueAsync(tissue, newBlockId, userId);
         }

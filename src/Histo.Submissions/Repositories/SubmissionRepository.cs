@@ -44,11 +44,13 @@ public sealed class SubmissionRepository : ISubmissionRepository
         var parameters = new DynamicParameters();
         // Legacy SP signature: ID (0 = new), BatchID, AnimalID, Order, OldID (out), NewID (out).
         // AnimalID is NOT NULL on the table; legacy's typed DataSet defaulted new rows to 0
-        // when no animal is known yet (the "default empty submission" case) — passing DBNull
-        // violates the NOT NULL constraint, so 0 is sent instead to match legacy behaviour.
+        // when no animal is known yet (the "default empty submission" case), but
+        // clsBatchSubmission.vb::NewRecord(dtBatchSubmission, id, batchId, animalId) shows the SP
+        // does accept a real AnimalID once one is known — pass submission.AnimalID (defaults to 0)
+        // rather than always hardcoding 0.
         parameters.Add("ID",        0,                      dbType: System.Data.DbType.Int32);
         parameters.Add("BatchID",   submission.BatchID,     dbType: System.Data.DbType.Int32);
-        parameters.Add("AnimalID",  0,                      dbType: System.Data.DbType.Int32);
+        parameters.Add("AnimalID",  submission.AnimalID,    dbType: System.Data.DbType.Int32);
         parameters.Add("Order",     submission.Order,       dbType: System.Data.DbType.Int32);
         parameters.Add("OldID",     dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
         parameters.Add("NewID",     dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
@@ -218,14 +220,30 @@ public sealed class SubmissionRepository : ISubmissionRepository
     // -----------------------------------------------------------------------
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<Tissue>> GetTissuesBySubmissionAsync(int submissionId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<Tissue>> GetTissuesBySubmissionAsync(int batchId, int submissionId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<Tissue>(
-            "GetTissuesBySubmissionID",
-            new { ID = submissionId },
+        var rows = await conn.QueryAsync<dynamic>(
+            "GetBatchTissues",
+            new { ID = batchId },
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+        return rows
+            .Select(r => (IDictionary<string, object>)r)
+            .Where(d => d.TryGetValue("BatchSubmissionID", out var bsid) && Convert.ToInt32(bsid) == submissionId)
+            .Select(d => new Tissue
+            {
+                ID = d.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0,
+                OwnerID = submissionId,
+                Owner = TissueOwner.Submission,
+                TissueCode = d.TryGetValue("TissueCode", out var tc) ? Convert.ToString(tc) ?? "" : "",
+                NoPieces = d.TryGetValue("NoPieces", out var np) ? Convert.ToInt16(np) : (short)0,
+                Comment = d.TryGetValue("Comment", out var cm) && cm is not DBNull ? Convert.ToString(cm) : null,
+                ArchiveLocation = d.TryGetValue("ArchiveLocation", out var al) && al is not DBNull ? Convert.ToString(al) : null,
+                ArchivedDate = d.TryGetValue("ArchivedDate", out var ad) && ad is not DBNull && DateTime.TryParse(Convert.ToString(ad), out var adv) ? adv : null,
+                ArchiveComment = d.TryGetValue("ArchiveComment", out var ac) && ac is not DBNull ? Convert.ToString(ac) : null,
+                RowStamp = d.TryGetValue("RowStamp", out var rs) ? rs as byte[] : null,
+            })
+            .ToList();
     }
 
     /// <inheritdoc/>
@@ -273,7 +291,9 @@ public sealed class SubmissionRepository : ISubmissionRepository
         parameters.Add("TissueCode", tissue.TissueCode);
         parameters.Add("NoPieces", tissue.NoPieces);
         parameters.Add("Comment", (object?)tissue.Comment ?? DBNull.Value, dbType: System.Data.DbType.String);
-        parameters.Add("UserID", userId);
+        // Legacy source: clsTissue.vb::UpdateTissueDetails — AddInsertParam list is
+        // {keyField, TissueCode, NoPieces, Comment} only. No @UserID parameter on
+        // AddTissue/AddBlockTissue (UserID is only an AddUpdateParam, used by Edit/Delete).
 
         await conn.ExecuteAsync(procName, parameters,
             commandType: System.Data.CommandType.StoredProcedure);
@@ -284,48 +304,57 @@ public sealed class SubmissionRepository : ISubmissionRepository
     public async Task UpdateTissueAsync(Tissue tissue, int userId, CancellationToken ct = default)
     {
         var procName = tissue.Owner == TissueOwner.Submission ? "EditTissue" : "EditBlockTissue";
+        var keyParam = tissue.Owner == TissueOwner.Submission ? "BatchSubmissionID" : "BlockID";
 
         using var conn = _db.CreateConnection();
-        await conn.ExecuteAsync(
-            procName,
-            new
-            {
-                tissue.ID,
-                tissue.TissueCode,
-                tissue.NoPieces,
-                Comment = (object?)tissue.Comment ?? DBNull.Value,
-                ArchiveLocation = (object?)tissue.ArchiveLocation ?? DBNull.Value,
-                ArchivedDate = (object?)tissue.ArchivedDate ?? DBNull.Value,
-                ArchiveComment = (object?)tissue.ArchiveComment ?? DBNull.Value,
-                tissue.RowStamp,
-                UserID = userId,
-            },
-            commandType: System.Data.CommandType.StoredProcedure);
+        var parameters = new DynamicParameters();
+        parameters.Add("ID", tissue.ID);
+        parameters.Add(keyParam, tissue.OwnerID);
+        parameters.Add("TissueCode", tissue.TissueCode);
+        parameters.Add("NoPieces", tissue.NoPieces);
+        parameters.Add("Comment", (object?)tissue.Comment ?? DBNull.Value, dbType: System.Data.DbType.String);
+        parameters.Add("UserID", userId);
+        parameters.Add("RowStamp", tissue.RowStamp);
+        // Legacy source: clsTissue.vb::UpdateTissueDetails — Archive* AddUpdateParams are only
+        // registered when sKeyField = "BatchSubmissionID" (EditBlockTissue has no Archive params).
+        if (tissue.Owner == TissueOwner.Submission)
+        {
+            parameters.Add("ArchiveLocation", (object?)tissue.ArchiveLocation ?? DBNull.Value, dbType: System.Data.DbType.String);
+            parameters.Add("ArchivedDate", (object?)tissue.ArchivedDate ?? DBNull.Value, dbType: System.Data.DbType.DateTime);
+            parameters.Add("ArchiveComment", (object?)tissue.ArchiveComment ?? DBNull.Value, dbType: System.Data.DbType.String);
+        }
+
+        await conn.ExecuteAsync(procName, parameters, commandType: System.Data.CommandType.StoredProcedure);
     }
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<Tissue>> GetTissuesByBlockAsync(int blockId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<Tissue>> GetTissuesByBatchAsync(int batchId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<Tissue>(
-            "GetTissuesByBlockID",
-            new { ID = blockId },
+        var rows = await conn.QueryAsync<dynamic>(
+            "GetBatchBlockTissues",
+            new { ID = batchId },
             commandType: System.Data.CommandType.StoredProcedure);
+        return rows
+            .Select(r => (IDictionary<string, object>)r)
+            .Select(d => new Tissue
+            {
+                ID = d.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0,
+                OwnerID = d.TryGetValue("BlockID", out var bid) ? Convert.ToInt32(bid) : 0,
+                Owner = TissueOwner.Block,
+                TissueCode = d.TryGetValue("TissueCode", out var tc) ? Convert.ToString(tc) ?? "" : "",
+                NoPieces = d.TryGetValue("NoPieces", out var np) ? Convert.ToInt16(np) : (short)0,
+                Comment = d.TryGetValue("Comment", out var cm) && cm is not DBNull ? Convert.ToString(cm) : null,
+                RowStamp = d.TryGetValue("RowStamp", out var rs) ? rs as byte[] : null,
+            })
+            .ToList();
+    }
 
-        // Owner is not a DB column — these are always block-owned tissues.
-        return rows.Select(t => new Tissue
-        {
-            ID = t.ID,
-            OwnerID = blockId,
-            Owner = TissueOwner.Block,
-            TissueCode = t.TissueCode,
-            NoPieces = t.NoPieces,
-            Comment = t.Comment,
-            ArchiveLocation = t.ArchiveLocation,
-            ArchivedDate = t.ArchivedDate,
-            ArchiveComment = t.ArchiveComment,
-            RowStamp = t.RowStamp,
-        }).ToList();
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<Tissue>> GetTissuesByBlockAsync(int batchId, int blockId, CancellationToken ct = default)
+    {
+        var all = await GetTissuesByBatchAsync(batchId, ct);
+        return all.Where(t => t.OwnerID == blockId).ToList();
     }
 
     // -----------------------------------------------------------------------
