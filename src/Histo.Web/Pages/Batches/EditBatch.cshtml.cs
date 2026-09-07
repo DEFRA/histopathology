@@ -19,6 +19,7 @@ public class EditBatchModel : HistoPageModel
     private const int LookupProjects = 19;
     private const int LookupFixation = 10;
     private const int LookupUserArea = 13;
+    private const int LookupSubmittedAs = 11;
 
     private readonly IBatchService   _batches;
     private readonly ILookupService  _lookups;
@@ -55,6 +56,13 @@ public class EditBatchModel : HistoPageModel
     // ---- Read-only display ----
     public Batch?  Batch     { get; private set; }
     public string? SaveError { get; private set; }
+
+    /// <summary>Legacy: Batch.ascx lblEnteredByVal — read-only, resolved from Batch.SubmittedBy. Never editable on Edit Submission.</summary>
+    public string? EnteredByName { get; private set; }
+    /// <summary>Legacy: Batch.ascx lblEnteredAreaVal — read-only, resolved from Batch.SubmittedArea. Never editable on Edit Submission.</summary>
+    public string? EnteredAreaName { get; private set; }
+    /// <summary>Read-only, resolved from LOOKUP_SUBMITTEDAS (11). Fixed at creation — never editable on Edit Submission.</summary>
+    public string? SubmittedAsDescription { get; private set; }
 
     // Falls back to BatchesForEditing when no context is available (legacy SV_RedirectCancelPage)
     public string ReturnPage => string.IsNullOrWhiteSpace(Session.ReturnPage)
@@ -105,6 +113,7 @@ public class EditBatchModel : HistoPageModel
 
         Session.BatchType = Batch.BatchType;
         await LoadLookupsAsync();
+        await LoadDisplayFieldsAsync();
         return Page();
     }
 
@@ -189,6 +198,7 @@ public class EditBatchModel : HistoPageModel
         if (Batch?.RowStamp is null) return RedirectToPage("/Index");
 
         await LoadLookupsAsync();
+        await LoadDisplayFieldsAsync();
 
         // ---- Status transition validation ----
         if (Status == BatchStatus.Received && OriginalStatus != BatchStatus.Received)
@@ -284,5 +294,21 @@ public class EditBatchModel : HistoPageModel
         Fixations   = fixationTask.Result;
         UserAreas   = areaTask.Result;
         AllUsers    = [.. usersTask.Result];
+    }
+
+    /// <summary>Resolves the read-only Entered By/Entered Area/Submitted As fields — never editable, so never bound from the form.</summary>
+    private async Task LoadDisplayFieldsAsync()
+    {
+        if (Batch is null) return;
+
+        EnteredByName = AllUsers.FirstOrDefault(u => u.UserID == Batch.SubmittedBy)?.Name;
+        EnteredAreaName = UserAreas.FirstOrDefault(a => a.ID.ToString() == Batch.SubmittedArea)?.Name;
+
+        var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(Batch.ID);
+        if (!string.IsNullOrEmpty(submittedAsCode))
+        {
+            var submittedAsOptions = await _lookups.GetLookupDataAsync(LookupSubmittedAs);
+            SubmittedAsDescription = submittedAsOptions.FirstOrDefault(o => o.Code == submittedAsCode)?.Name;
+        }
     }
 }

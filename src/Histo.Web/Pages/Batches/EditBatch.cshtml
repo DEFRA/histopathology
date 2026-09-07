@@ -28,6 +28,24 @@
 <form method="post" asp-page="/Batches/EditBatch">
     <input type="hidden" asp-for="OriginalStatus" />
 
+    <h2 class="govuk-heading-m">Submission details</h2>
+
+    @* Read-only — fixed at submission creation, never editable here (legacy Batch.ascx / Edit Submission). *@
+    <dl class="govuk-summary-list govuk-!-margin-bottom-6">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Entered by</dt>
+            <dd class="govuk-summary-list__value">@(Model.EnteredByName ?? "Not recorded")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Entered area</dt>
+            <dd class="govuk-summary-list__value">@(Model.EnteredAreaName ?? "Not recorded")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submitted as</dt>
+            <dd class="govuk-summary-list__value">@(Model.SubmittedAsDescription ?? "Not recorded")</dd>
+        </div>
+    </dl>
+
     @* Submission category *@
     <div class="govuk-form-group">
         <fieldset class="govuk-fieldset">
@@ -151,15 +169,19 @@
     </div>
 
     <div class="govuk-form-group">
-        <label class="govuk-label" for="OtherSubmittedArea">Submitted area (external)</label>
-        <select class="govuk-select" asp-for="OtherSubmittedArea">
+        <label class="govuk-label" for="OtherSubmittedAreaDisplay">Submitted area (external)</label>
+        <select class="govuk-select" id="OtherSubmittedAreaDisplay" disabled>
             <option value="">-- None --</option>
             @foreach (var a in Model.UserAreas)
             {
                 <option value="@a.ID" selected="@(Model.OtherSubmittedArea == a.ID.ToString())">@a.Name</option>
             }
         </select>
+        <input type="hidden" asp-for="OtherSubmittedArea" />
     </div>
+
+    <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m" />
+    <h2 class="govuk-heading-m">Submission status</h2>
 
     @* Status *@
     <div class="govuk-form-group">
@@ -199,5 +221,5 @@
 <div class="govuk-button-group">
     <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples</a>
     @* Legacy EditBatch.aspx btnSamplesOnHold — the only entry point to the on-hold list. *@
-    <a asp-page="/Batches/SubmissionsOnHold" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples on hold</a>
+    <a asp-page="/Batches/SubmissionsOnHold" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples on hold</a>
 </div>

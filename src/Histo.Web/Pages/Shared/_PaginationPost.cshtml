@@ -1,3 +1,4 @@
+@using Histo.Core.Domain
 @*
     POST-variant of _Pagination for grids whose filter criteria are bound via
     [BindProperty] on a POST handler (e.g. ViewSubmissions), rather than the query
@@ -46,18 +47,22 @@
             </div>
         }
         <ul class="govuk-pagination__list">
-            @for (var p = 1; p <= totalPages; p++)
+            @foreach (var item in PaginationHelpers.BuildPageItems(currentPage, totalPages))
             {
-                if (p == currentPage)
+                if (item.IsEllipsis)
+                {
+                    <li class="govuk-pagination__item govuk-pagination__item--ellipses">&ctdot;</li>
+                }
+                else if (item.Page == currentPage)
                 {
                     <li class="govuk-pagination__item govuk-pagination__item--current">
-                        <button type="submit" form="@formId" formaction="@BuildAction(p)" class="app-link-button govuk-pagination__link" aria-label="Page @p" aria-current="page">@p</button>
+                        <button type="submit" form="@formId" formaction="@BuildAction(item.Page.Value)" class="app-link-button govuk-pagination__link" aria-label="Page @item.Page" aria-current="page">@item.Page</button>
                     </li>
                 }
                 else
                 {
                     <li class="govuk-pagination__item">
-                        <button type="submit" form="@formId" formaction="@BuildAction(p)" class="app-link-button govuk-pagination__link" aria-label="Page @p">@p</button>
+                        <button type="submit" form="@formId" formaction="@BuildAction(item.Page!.Value)" class="app-link-button govuk-pagination__link" aria-label="Page @item.Page">@item.Page</button>
                     </li>
                 }
             }

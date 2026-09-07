@@ -1955,4 +1955,28 @@ Made Edit a button matching Delete's style. Fixed the Add-tissue form being sile
 
 **Files changed:** [src/Histo.Submissions/Repositories/SubmissionRepository.cs](../src/Histo.Submissions/Repositories/SubmissionRepository.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml).
 
+---
+
+## Prompt 128 — Review and align Submission editing and Submission Status functionality with legacy (2026-09-07)
+
+> Requirement: Review and Align Submission Editing and Submission Status Functionality with Legacy Application — (1) Edit Submission should disable Entered By, Entered Area, Submitted Area, Submitted As, per legacy; (2) Submissions On Hold shows all on-hold submissions instead of only the samples selected during the current On Hold action; (3) assess whether combining Edit Submission and Edit Submission Status into one screen aligns with GDS, and recommend a simpler approach if needed.
+
+Confirmed via `Batch.ascx.vb`/`EditBatch.aspx.vb` that Entered By/Entered Area/Submitted As were entirely missing from `EditBatch.cshtml` (not just editable) — added them as read-only, and made Submitted area (external) read-only too (Submitted by (external) stays editable, matching the spec). Root-caused `SubmissionsOnHold.cshtml` against `SubmissionsOnHold.aspx.vb`: legacy shows every sample of the CURRENT batch with a per-sample On Hold checkbox (reached from `EditBatch.aspx`'s "Put Samples On Hold" button), not a system-wide on-hold report — rewrote the page to match, reusing `SampleSummary`'s `MergeAnimals` pattern. Confirmed via `EditBatch.aspx.vb` that legacy's `EditBatch.aspx` genuinely is "Edit Submission Status" (its "Edit Submission" button redirects to `BatchDetails.aspx`, legacy's real full-edit screen — there's no separate dedicated edit-fields page in legacy either). Assessed a literal two-page split as out of scope for this pass (would need a new true edit mode in `BatchDetails.cshtml` plus ~6 navigation call-site updates); added clear GDS section separation ("Submission details"/"Submission status" headings) on the single page instead per the user's own fallback option, and flagged the full split as a follow-up.
+
+**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
+
+**Files changed:** [src/Histo.Web/Pages/Batches/EditBatch.cshtml.cs](../src/Histo.Web/Pages/Batches/EditBatch.cshtml.cs), [src/Histo.Web/Pages/Batches/EditBatch.cshtml](../src/Histo.Web/Pages/Batches/EditBatch.cshtml), [src/Histo.Web/Pages/Batches/SubmissionsOnHold.cshtml.cs](../src/Histo.Web/Pages/Batches/SubmissionsOnHold.cshtml.cs), [src/Histo.Web/Pages/Batches/SubmissionsOnHold.cshtml](../src/Histo.Web/Pages/Batches/SubmissionsOnHold.cshtml).
+
+---
+
+## Prompt 129 — GDS pagination ellipsis truncation + other pagination issues (2026-09-07)
+
+> As per GDS pagincation it shold work like beow, in this applciation has larger screen it show all the page numbers in it shold be ellips, also other pagination issue and fix it. For smaller screens, show page numbers for: the current page, previous and next pages, first and last pages. For larger screens, show page numbers for: the current page, at least one page immediately before and after the current page, first and last pages. Use ellipses (…) to replace any skipped pages. For example: [1] 2 3 … 100 / 1 … 4 [5] 6 … 100 / 1 … 99 [100] etc.
+
+Fetched the official GOV.UK Design System pagination documentation to confirm the exact algorithm and worked examples rather than guessing. Both `_Pagination.cshtml` (GET-based) and `_PaginationPost.cshtml` (POST-based, used by `ViewSubmissions` and other `[BindProperty]`-bound grids) previously rendered every single page number with a naive `@for` loop — exactly the reported "all the page numbers" bug. Created `PaginationHelpers.BuildPageItems` in `Histo.Core.Domain` implementing the GDS truncation rule (current page, first, last, ±1 neighbour, ellipses for gaps of 2+ skipped pages), confirmed it produces the identical output to every worked example on the GDS page, and rewrote both partials to use it. **Other pagination issue** (proactively identified in the same area): `GridPageModel.PopulateGridViewData` did not clamp an out-of-range `PageNumber` (e.g. a stale link, or filtered-down results), silently rendering an empty grid instead of a valid page — fixed by clamping to `[1, totalPages]`. Added `PaginationHelperTests.cs` with cases matching the GDS worked examples plus an out-of-range-current-page edge case (also caught and fixed a bug in the helper itself where the raw unclamped `currentPage` was used to compute neighbours, which could compute an out-of-range page).
+
+**Build:** 0 errors. **Tests:** 183 total, 182 passed, 1 skipped, 0 failed (up from 171/170, 12 new pagination tests added).
+
+**Files changed:** [src/Histo.Core/Domain/PaginationHelpers.cs](../src/Histo.Core/Domain/PaginationHelpers.cs), [src/Histo.Web/Pages/Shared/_Pagination.cshtml](../src/Histo.Web/Pages/Shared/_Pagination.cshtml), [src/Histo.Web/Pages/Shared/_PaginationPost.cshtml](../src/Histo.Web/Pages/Shared/_PaginationPost.cshtml), [src/Histo.Web/Pages/GridPageModel.cs](../src/Histo.Web/Pages/GridPageModel.cs), [tests/Histo.Tests/Unit/PaginationHelperTests.cs](../tests/Histo.Tests/Unit/PaginationHelperTests.cs).
+
 

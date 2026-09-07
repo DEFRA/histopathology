@@ -1,3 +1,4 @@
+@using Histo.Core.Domain
 @*
     Shared GOV.UK Design System pagination component.
 
@@ -44,18 +45,22 @@
             </div>
         }
         <ul class="govuk-pagination__list">
-            @for (var p = 1; p <= totalPages; p++)
+            @foreach (var item in PaginationHelpers.BuildPageItems(currentPage, totalPages))
             {
-                if (p == currentPage)
+                if (item.IsEllipsis)
+                {
+                    <li class="govuk-pagination__item govuk-pagination__item--ellipses">&ctdot;</li>
+                }
+                else if (item.Page == currentPage)
                 {
                     <li class="govuk-pagination__item govuk-pagination__item--current">
-                        <a class="govuk-link govuk-pagination__link" href="@BuildHref(p)" aria-label="Page @p" aria-current="page">@p</a>
+                        <a class="govuk-link govuk-pagination__link" href="@BuildHref(item.Page.Value)" aria-label="Page @item.Page" aria-current="page">@item.Page</a>
                     </li>
                 }
                 else
                 {
                     <li class="govuk-pagination__item">
-                        <a class="govuk-link govuk-pagination__link" href="@BuildHref(p)" aria-label="Page @p">@p</a>
+                        <a class="govuk-link govuk-pagination__link" href="@BuildHref(item.Page!.Value)" aria-label="Page @item.Page">@item.Page</a>
                     </li>
                 }
             }
