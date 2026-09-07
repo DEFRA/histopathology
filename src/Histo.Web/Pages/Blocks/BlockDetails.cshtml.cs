@@ -65,6 +65,15 @@ public class BlockDetailsModel : HistoPageModel
     [BindProperty] public short NewTissueNoPieces { get; set; } = 1;
     [BindProperty] public string? NewTissueComment { get; set; }
 
+    /// <summary>Tissue currently shown in its inline edit row.</summary>
+    [BindProperty(SupportsGet = true)] public int? EditTissueId { get; set; }
+
+    [BindProperty] public int TissueId { get; set; }
+    /// <summary>Inline edit-row fields — separate from the Add-tissue fields above so editing a row doesn't pre-fill the Add form.</summary>
+    [BindProperty] public string EditTissueCode { get; set; } = string.Empty;
+    [BindProperty] public short EditNoPieces { get; set; } = 1;
+    [BindProperty] public string? EditComment { get; set; }
+
     /// <summary>Legacy: chkUseWholeTissueList. Unchecked (default) filters the tissue dropdown to
     /// codes already used on this submission; checked shows the full lookup list.</summary>
     [BindProperty(SupportsGet = true)] public bool UseWholeTissueList { get; set; }
@@ -241,6 +250,32 @@ public class BlockDetailsModel : HistoPageModel
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
     }
 
+    public async Task<IActionResult> OnPostUpdateTissueAsync()
+    {
+        var redirect = await LoadAnimalAsync();
+        if (redirect is not null) return redirect;
+        if (Animal is null || BlockId is not > 0 || TissueId <= 0)
+            return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
+
+        var existing = (await _submissions.GetTissuesByBlockAsync(BatchId ?? 0, BlockId.Value))
+            .FirstOrDefault(t => t.ID == TissueId);
+        if (existing is null || string.IsNullOrWhiteSpace(EditTissueCode))
+            return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
+
+        var updated = new Tissue
+        {
+            ID = TissueId,
+            OwnerID = existing.OwnerID,
+            Owner = TissueOwner.Block,
+            TissueCode = EditTissueCode,
+            NoPieces = EditNoPieces,
+            Comment = EditComment,
+            RowStamp = existing.RowStamp,
+        };
+        await _submissions.UpdateTissueAsync(updated, Session.UserID);
+        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
+    }
+
     /// <summary>Delta-saves this block's Histology/Antibodies/Stain test-type selections.</summary>
     public async Task<IActionResult> OnPostSaveTestsAsync()
     {
@@ -390,6 +425,18 @@ public class BlockDetailsModel : HistoPageModel
         NewComment = Block.Comment;
 
         Tissues = await _submissions.GetTissuesByBlockAsync(Block.BatchID, Block.ID);
+
+        if (EditTissueId is > 0)
+        {
+            var editing = Tissues.FirstOrDefault(t => t.ID == EditTissueId);
+            if (editing is not null)
+            {
+                TissueId = editing.ID;
+                EditTissueCode = editing.TissueCode;
+                EditNoPieces = editing.NoPieces;
+                EditComment = editing.Comment;
+            }
+        }
 
         var allTests = await _blockTests.GetByBatchAsync(BatchId ?? 0);
         ExistingHistologyCodes = allTests.Where(t => t.BlockID == Block.ID && t.TestType == BlockTestType.Histology).Select(t => t.Code).ToList();

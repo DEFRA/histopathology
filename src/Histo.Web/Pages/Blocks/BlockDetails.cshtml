@@ -51,6 +51,10 @@ else
             <dt class="govuk-summary-list__key">Sender ref</dt>
             <dd class="govuk-summary-list__value">@Model.Animal.SenderRef</dd>
         </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Histology reference</dt>
+            <dd class="govuk-summary-list__value">@(Model.Animal.HistologyRef ?? "Not recorded")</dd>
+        </div>
     </dl>
 
     <form method="post" asp-page-handler="Save">
@@ -124,20 +128,61 @@ else
             <tbody class="govuk-table__body">
                 @foreach (var t in Model.Tissues)
                 {
-                    <tr class="govuk-table__row">
-                        <td class="govuk-table__cell">@t.TissueCode</td>
-                        <td class="govuk-table__cell">@t.NoPieces</td>
-                        <td class="govuk-table__cell">@t.Comment</td>
-                        <td class="govuk-table__cell">
-                            <form method="post" asp-page-handler="DeleteTissue" class="govuk-!-display-inline">
-                                <input type="hidden" asp-for="BatchId" />
-                                <input type="hidden" asp-for="AnimalId" />
-                                <input type="hidden" asp-for="BlockId" />
-                                <input type="hidden" name="tissueId" value="@t.ID" />
-                                <button type="submit" class="govuk-button govuk-button--warning govuk-!-margin-bottom-0" data-module="govuk-button">Delete</button>
-                            </form>
-                        </td>
-                    </tr>
+                    @if (Model.EditTissueId == t.ID)
+                    {
+                        <tr class="govuk-table__row">
+                            <td class="govuk-table__cell" colspan="4">
+                                <form method="post" asp-page-handler="UpdateTissue">
+                                    <input type="hidden" asp-for="BatchId" />
+                                    <input type="hidden" asp-for="AnimalId" />
+                                    <input type="hidden" asp-for="BlockId" />
+                                    <input type="hidden" asp-for="TissueId" />
+                                    <div class="govuk-form-group">
+                                        <label class="govuk-label" for="EditTissueCode">Tissue type</label>
+                                        <select class="govuk-select" asp-for="EditTissueCode">
+                                            @foreach (var opt in Model.TissueOptions)
+                                            {
+                                                <option value="@opt.Code">@opt.Name</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="govuk-form-group">
+                                        <label class="govuk-label" for="EditNoPieces">Number of pieces</label>
+                                        <input class="govuk-input govuk-input--width-3" asp-for="EditNoPieces" />
+                                    </div>
+                                    <div class="govuk-form-group">
+                                        <label class="govuk-label" for="EditComment">Comment</label>
+                                        <input class="govuk-input" asp-for="EditComment" />
+                                    </div>
+                                    <div class="govuk-button-group">
+                                        <button type="submit" class="govuk-button" data-module="govuk-button">Save tissue</button>
+                                        <a asp-page="/Blocks/BlockDetails" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-BlockId="@Model.BlockId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+                                    </div>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        <tr class="govuk-table__row">
+                            <td class="govuk-table__cell">@t.TissueCode</td>
+                            <td class="govuk-table__cell">@t.NoPieces</td>
+                            <td class="govuk-table__cell">@t.Comment</td>
+                            <td class="govuk-table__cell">
+                                <div class="govuk-button-group govuk-!-margin-bottom-0">
+                                    <a asp-page="/Blocks/BlockDetails" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-BlockId="@Model.BlockId"
+                                       asp-route-EditTissueId="@t.ID" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Edit</a>
+                                    <form method="post" asp-page-handler="DeleteTissue" class="govuk-!-display-inline">
+                                        <input type="hidden" asp-for="BatchId" />
+                                        <input type="hidden" asp-for="AnimalId" />
+                                        <input type="hidden" asp-for="BlockId" />
+                                        <input type="hidden" name="tissueId" value="@t.ID" />
+                                        <button type="submit" class="govuk-button govuk-button--warning govuk-!-margin-bottom-0" data-module="govuk-button">Delete</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
                 }
                 @if (!Model.Tissues.Any())
                 {

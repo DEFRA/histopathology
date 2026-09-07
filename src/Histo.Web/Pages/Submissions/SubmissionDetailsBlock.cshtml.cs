@@ -71,9 +71,6 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     /// </summary>
     [BindProperty(SupportsGet = true)] public int? AnimalId { get; set; }
 
-    [BindProperty] public string? PMDate { get; set; }
-    [BindProperty] public string? HistologyRef { get; set; }
-
     /// <summary>Blocks awaiting delete confirmation — drives the inline GOV.UK confirmation panel (replaces browser confirm()).</summary>
     [BindProperty(SupportsGet = true)] public List<int> ConfirmDeleteBlockIds { get; set; } = [];
 
@@ -143,9 +140,6 @@ public class SubmissionDetailsBlockModel : HistoPageModel
 
         if (Animal is null) return Page();
 
-        PMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
-        HistologyRef = Animal.HistologyRef;
-
         var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
         Blocks = allBlocks.Where(b => b.AnimalID == Animal.ID).ToList();
 
@@ -159,35 +153,6 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         }
 
         return Page();
-    }
-
-    public async Task<IActionResult> OnPostSaveDetailsAsync()
-    {
-        ViewData["Title"] = "Sample Blocks";
-        ViewData["PageTitle"] = "Sample Blocks";
-
-        var redirect = await LoadAnimalAsync();
-        if (redirect is not null) return redirect;
-        if (Animal is null) return RedirectToPage("/Submissions/SampleSummary", new { batchId = BatchId });
-
-        var updated = new Animal
-        {
-            ID = Animal!.ID,
-            BatchSubmissionID = Animal.BatchSubmissionID,
-            SenderRef = Animal.SenderRef,
-            NextBlockRef = Animal.NextBlockRef,
-            HistoRefSet = !string.IsNullOrWhiteSpace(HistologyRef),
-            HistologyRef = HistologyRef,
-            OnHold = Animal.OnHold,
-            PMDate = DateFormatHelpers.ToLegacyDate(PMDate),
-            PMDateSet = !string.IsNullOrWhiteSpace(PMDate),
-            IsPGNumber = Animal.IsPGNumber,
-            BookedHistologyRef = Animal.BookedHistologyRef,
-            RowStamp = Animal.RowStamp,
-        };
-
-        await _submissions.UpdateAnimalAsync(updated, Session.UserID);
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
     }
 
     /// <summary>
@@ -220,8 +185,6 @@ public class SubmissionDetailsBlockModel : HistoPageModel
             var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
             Blocks = allBlocks.Where(b => b.AnimalID == Animal!.ID).ToList();
             await LoadSupportingDataAsync();
-            PMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
-            HistologyRef = Animal.HistologyRef;
             return Page();
         }
 
@@ -229,7 +192,9 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     }
 
     /// <summary>
-    /// "Or Pick" — assigns the next unused histology ref for the selected type.
+    /// "Or Pick" — assigns the next unused histology ref for the selected type and saves it
+    /// immediately (PM date/Histology ref are read-only display elsewhere on this page, so this
+    /// is now the only way to change the Histology ref here — there is no separate Save action).
     /// Legacy source: SubmissionDetailsBlock.aspx.vb::ddlHistologyType_SelectedIndexChanged.
     /// Uses the existing <see cref="IHistologyRefService.GetUnusedRefsAsync"/> — no new stored procedure.
     /// Explicit submit rather than AutoPostBack, per WCAG 3.2.2 (On Input).
@@ -240,16 +205,35 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         if (redirect is not null) return redirect;
         if (Animal is null) return RedirectToPage("/Submissions/SampleSummary", new { batchId = BatchId });
 
-        var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
-        Blocks = allBlocks.Where(b => b.AnimalID == Animal.ID).ToList();
-        await LoadSupportingDataAsync();
-
-        PMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
         if (HistologyRefType is > 0)
         {
             var unused = await _histologyRefs.GetUnusedRefsAsync(HistologyRefType.Value);
-            HistologyRef = unused.FirstOrDefault()?.Ref ?? HistologyRef;
+            var nextRef = unused.FirstOrDefault()?.Ref;
+            if (nextRef is not null)
+            {
+                var updated = new Animal
+                {
+                    ID = Animal.ID,
+                    BatchSubmissionID = Animal.BatchSubmissionID,
+                    SenderRef = Animal.SenderRef,
+                    NextBlockRef = Animal.NextBlockRef,
+                    HistoRefSet = true,
+                    HistologyRef = nextRef,
+                    OnHold = Animal.OnHold,
+                    PMDate = Animal.PMDate,
+                    PMDateSet = Animal.PMDateSet,
+                    IsPGNumber = Animal.IsPGNumber,
+                    BookedHistologyRef = Animal.BookedHistologyRef,
+                    RowStamp = Animal.RowStamp,
+                };
+                await _submissions.UpdateAnimalAsync(updated, Session.UserID);
+                Animal.HistologyRef = nextRef;
+            }
         }
+
+        var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
+        Blocks = allBlocks.Where(b => b.AnimalID == Animal.ID).ToList();
+        await LoadSupportingDataAsync();
 
         return Page();
     }

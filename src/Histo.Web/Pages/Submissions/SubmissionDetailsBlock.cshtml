@@ -118,50 +118,26 @@ else
         </div>
     }
 
+    @* PM date and Histology reference are read-only here — matching Sender ref's display and
+       GDS summary-list conventions. Histology reference is set only via "Get next ref" below
+       (there is no manual edit surface for either field on this page). *@
     <dl class="govuk-summary-list">
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Sender ref</dt>
             <dd class="govuk-summary-list__value">@Model.Animal.SenderRef</dd>
         </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">PM date</dt>
+            <dd class="govuk-summary-list__value">@(Model.Animal.PMDate ?? "Not recorded")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Histology reference</dt>
+            <dd class="govuk-summary-list__value">@(Model.Animal.HistologyRef ?? "Not recorded")</dd>
+        </div>
     </dl>
 
-    <form method="post" asp-page-handler="SaveDetails">
-        <input type="hidden" asp-for="BatchId" />
-        <input type="hidden" asp-for="AnimalId" />
-        <div class="govuk-form-group">
-            <label class="govuk-label" for="PMDate">PM date</label>
-            @if (Model.IsViewMode)
-            {
-                <input class="govuk-input govuk-input--width-10" type="date" asp-for="PMDate" readonly disabled />
-            }
-            else
-            {
-                <input class="govuk-input govuk-input--width-10" type="date" asp-for="PMDate" />
-            }
-        </div>
-        <div class="govuk-form-group">
-            <label class="govuk-label" for="HistologyRef">Histology reference</label>
-            @if (Model.IsPreCassetted)
-            {
-                <div class="govuk-hint">Mandatory for pre-cassetted submissions.</div>
-            }
-            @if (Model.IsViewMode)
-            {
-                <input class="govuk-input govuk-input--width-20" asp-for="HistologyRef" readonly disabled />
-            }
-            else
-            {
-                <input class="govuk-input govuk-input--width-20" asp-for="HistologyRef" />
-            }
-        </div>
-        @if (!Model.IsViewMode)
-        {
-            <button type="submit" class="govuk-button" data-module="govuk-button">Save details</button>
-        }
-    </form>
-
-    @* "Or Pick" — assigns the next unused histology ref for a type, replacing legacy's
-       AutoPostBack dropdown with an explicit button per WCAG 3.2.2 (On Input). *@
+    @* "Or Pick" — assigns the next unused histology ref for a type and saves it immediately,
+       replacing legacy's AutoPostBack dropdown with an explicit button per WCAG 3.2.2 (On Input). *@
     @if (!Model.IsViewMode)
     {
         <form method="post" asp-page-handler="GetNextHistologyRef" class="govuk-!-margin-bottom-6">
@@ -169,6 +145,10 @@ else
             <input type="hidden" asp-for="AnimalId" />
             <div class="govuk-form-group">
                 <label class="govuk-label" for="HistologyRefType">Or pick a histology reference type</label>
+                @if (Model.IsPreCassetted)
+                {
+                    <div class="govuk-hint">Mandatory for pre-cassetted submissions.</div>
+                }
                 <select class="govuk-select" asp-for="HistologyRefType">
                     <option value="">-- Select --</option>
                     @foreach (var t in Histo.Web.Pages.Submissions.SubmissionDetailsBlockModel.HistologyRefTypeOptions)
@@ -182,6 +162,7 @@ else
     }
 
     <h2 class="govuk-heading-m">Blocks</h2>
+
 
     @* "Block ref search" — inline lookup pre-filled with this sample's sender ref, replacing
        legacy's navigate-away to SearchBlockRefs.aspx. *@
