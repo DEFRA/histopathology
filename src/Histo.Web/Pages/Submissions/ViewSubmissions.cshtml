@@ -176,7 +176,7 @@
                     <tr class="govuk-table__row" @(isSelected ? "style=background-color:#bbd4ea" : "")>
                         <td class="govuk-table__cell govuk-table__cell--numeric">
                             <button form="view-action-form"
-                                    formaction="?handler=Select&SortColumn=@Model.SortColumn&SortDesc=@Model.SortDesc&PageNumber=@Model.PageNumber"
+                                    formaction="@Model.SelectFormAction"
                                     type="submit"
                                     name="SelectedBatchId"
                                     value="@r.ID"

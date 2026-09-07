@@ -83,15 +83,27 @@ public class ViewSubmissionsModel : HistoPageModel
         .Take(PageSize)
         .ToList();
 
+    /// <summary>
+    /// formaction for each row's Select button. SortColumn/PageNumber are POST-bound (user
+    /// controllable), so they're percent-encoded before being embedded in the query string —
+    /// otherwise a value containing '&amp;' could inject extra query parameters.
+    /// </summary>
+    public string SelectFormAction =>
+        $"?handler=Select&SortColumn={Uri.EscapeDataString(SortColumn ?? string.Empty)}&SortDesc={(SortDesc ? "true" : "false")}&PageNumber={PageNumber}";
+
     private void PopulateGridViewData()
     {
-        ViewData["SortColumn"]  = SortColumn;
-        ViewData["SortDesc"]    = SortDesc;
-        ViewData["CurrentPage"] = PageNumber < 1 ? 1 : PageNumber;
-        ViewData["TotalPages"]  = Results.Count == 0 ? 1 : (int)Math.Ceiling(Results.Count / (double)PageSize);
-        ViewData["FormId"]      = "view-action-form";
-        ViewData["Handler"]     = "Search";
+        var totalPages = Results.Count == 0 ? 1 : (int)Math.Ceiling(Results.Count / (double)PageSize);
+        if (PageNumber < 1) PageNumber = 1;
+        else if (PageNumber > totalPages) PageNumber = totalPages;
+        ViewData["SortColumn"] = SortColumn;
+        ViewData["SortDesc"] = SortDesc;
+        ViewData["CurrentPage"] = PageNumber;
+        ViewData["TotalPages"] = totalPages;
+        ViewData["FormId"] = "view-action-form";
+        ViewData["Handler"] = "Search";
     }
+
 
     /// <summary>
     /// ID of the currently selected result row.

@@ -19,7 +19,7 @@
             Sample not found.
         </strong>
     </div>
-    <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to samples</a>
+    <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to samples</a>
 }
 else if (Model.IsEditMode && Model.Block is null)
 {
@@ -165,7 +165,7 @@ else
                     else
                     {
                         <tr class="govuk-table__row">
-                            <td class="govuk-table__cell">@t.TissueCode</td>
+                            <td class="govuk-table__cell">@(Model.TissueOptions.FirstOrDefault(o => o.Code == t.TissueCode)?.Name ?? t.TissueCode)</td>
                             <td class="govuk-table__cell">@t.NoPieces</td>
                             <td class="govuk-table__cell">@t.Comment</td>
                             <td class="govuk-table__cell">
@@ -173,9 +173,9 @@ else
                                     <a asp-page="/Blocks/BlockDetails" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-BlockId="@Model.BlockId"
                                        asp-route-EditTissueId="@t.ID" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Edit</a>
                                     <form method="post" asp-page-handler="DeleteTissue" class="govuk-!-display-inline">
-                                        <input type="hidden" asp-for="BatchId" />
-                                        <input type="hidden" asp-for="AnimalId" />
-                                        <input type="hidden" asp-for="BlockId" />
+                                        <input type="hidden" name="BatchId" value="@Model.BatchId" />
+                                        <input type="hidden" name="AnimalId" value="@Model.AnimalId" />
+                                        <input type="hidden" name="BlockId" value="@Model.BlockId" />
                                         <input type="hidden" name="tissueId" value="@t.ID" />
                                         <button type="submit" class="govuk-button govuk-button--warning govuk-!-margin-bottom-0" data-module="govuk-button">Delete</button>
                                     </form>

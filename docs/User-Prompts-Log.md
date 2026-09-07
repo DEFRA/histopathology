@@ -2043,6 +2043,18 @@ Confirmed `Help/Index.cshtml` already had a `<section id="kebab-case">` anchor p
 
 ---
 
+## Prompt 135 — Fix PR review comment on ViewSubmissions.cshtml Select button formaction (2026-09-07)
+
+> Review comments on ViewSubmissions.cshtml line `formaction="?handler=Select&SortColumn=@Model.SortColumn&SortDesc=@Model.SortDesc&PageNumber=@Model.PageNumber"` — The Select button builds a query string using raw Model.SortColumn; because SortColumn is user-controllable via POST binding, this can produce malformed URLs and allow query-parameter injection (e.g. embedding '&' into SortColumn). Encode the value (or use asp-route* tag helpers) before putting it into formaction.
+
+Moved the formaction to a new `SelectFormAction` property on `ViewSubmissionsModel`, built with `Uri.EscapeDataString` on `SortColumn` — matching the existing `_SortableHeaderPost.cshtml`/`_PaginationPost.cshtml` encoding pattern. While rebuilding to verify, found and fixed two unrelated pre-existing regressions blocking compilation (from prior uncommitted/external edits, not this change): (1) placing the fix as an inline `@{ }` block directly after `</form>` inside a nested `@if {}` caused Razor error RZ1010 — resolved by moving the computation into the PageModel property instead (same fix pattern used in an earlier run); (2) `AddSubmissionModel.OnPostAsync` referenced a since-removed `IsNeuropath` bind property (`CS0103`) — the checkbox had been removed from `AddSubmission.cshtml` without updating the code-behind; fixed by deriving `isNeuropath` from `Session.UserArea == "Neuropath"`, matching legacy `AddSubmission.aspx.vb`'s actual derivation (a session user-area check, never a manual form control).
+
+**Build:** 0 errors. **Tests:** 191 total, 190 passed, 1 skipped, 0 failed (unchanged).
+
+**Files changed:** [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml), [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs), [src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs).
+
+---
+
 ## Prompt 130 — Validate Tissue Details functionality in the Create Submission journey (Wet Tissue) (2026-09-07)
 
 > Requirement: Validate Tissue Details Functionality in the Create Submission Journey - Submission type is Wet Tissue. Background: The issues below have already been addressed for the Edit Submission journey. Please analyse the Create Submission flow, specifically within `SubmissionDetails.cshtml` and the Add Sample workflow, to determine whether the same issues exist there. Issue 1: Tissue Details Data Not Loading. Issue 2: Tissue Details Should Support Edit and Delete. Issue 3: Add Tissue Functionality Not Working. [Full requirement covered data loading, Add/Edit/Delete, validation, persistence, UI rendering, accessibility/GDS compliance, and consistency with Edit Submission and legacy.]
