@@ -43,6 +43,20 @@
     text-decoration: none;
 }
 
+/* Aligns a <select> with its "Manage …" pick-list button on the same row (e.g. Project/
+ * Contract code, Pathologist, Submitted by (external) on EditBatch/BatchDetails) instead of
+ * the button stacking below on its own line. Wraps on narrow screens rather than overflowing. */
+.app-field-with-button {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 15px;
+}
+
+.app-field-with-button .govuk-select {
+    flex: 0 1 auto;
+}
+
 
 
 

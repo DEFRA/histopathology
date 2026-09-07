@@ -247,7 +247,10 @@ public class EditBatchModel : HistoPageModel
             IsPreCassetted      = IsPreCassetted,
             ByPassSort          = Batch.ByPassSort,
             RowStamp            = Batch.RowStamp,
-            BatchType           = BatchTypeField,
+            // Submission category is fixed at creation (legacy's Cassetted.aspx type-selection
+            // step is never re-shown on Edit) — always persist the original value regardless of
+            // what was posted, so a crafted request can't change it even though the UI disables it.
+            BatchType           = Batch.BatchType,
             ProjectContractCode = ProjectContractCode,
             ContactName         = ContactName,
             Species             = SpeciesId,
@@ -281,8 +284,12 @@ public class EditBatchModel : HistoPageModel
 
     private async Task LoadLookupsAsync()
     {
-        var projectsTask  = _lookups.GetLookupDataAsync(LookupProjects);
-        var contactsTask  = _lookups.GetLookupDataAsync(LookupContacts);
+        // includeInactive: true — an existing submission's saved Project/Pathologist may since have
+        // been deactivated; an active-only list would silently drop it from the <select>, causing
+        // the browser to default-select the first option instead (looks like "the wrong value is
+        // populated"). Matches the established pattern in EditLookupItem.cshtml.cs.
+        var projectsTask  = _lookups.GetLookupDataAsync(LookupProjects, includeInactive: true);
+        var contactsTask  = _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true);
         var speciesTask   = _lookups.GetSpeciesLookupAsync();
         var fixationTask  = _lookups.GetLookupDataAsync(LookupFixation);
         var areaTask      = _lookups.GetLookupDataAsync(LookupUserArea);

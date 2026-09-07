@@ -163,7 +163,8 @@
                     <partial name="_SortableHeaderPost" />
                     @{ ViewData["Label"] = "Date Completed"; ViewData["Column"] = "DateCompleted"; }
                     <partial name="_SortableHeaderPost" />
-                    <th scope="col" class="govuk-table__header">Customer Received Date</th>
+                    @{ ViewData["Label"] = "Customer Received Date"; ViewData["Column"] = "CustomerReceivedDate"; }
+                    <partial name="_SortableHeaderPost" />
                     @{ ViewData["Label"] = "Status"; ViewData["Column"] = "Status"; }
                     <partial name="_SortableHeaderPost" />
                 </tr>
