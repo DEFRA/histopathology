@@ -69,6 +69,9 @@ public interface IBatchRepository
     /// </summary>
     Task SetCustomerReceivedDateAsync(int batchId, DateTime? date, byte[] rowStamp, int userId, CancellationToken ct = default);
 
+    /// <summary>Sets IsBlocked/AllTissuesAssigned/Status(InProgress) without changing any other field. Legacy source: <c>BatchBlocks.aspx.vb::btSubmit_Click</c>.</summary>
+    Task CompleteBlockAssignmentAsync(int batchId, bool allTissuesAssigned, int userId, CancellationToken ct = default);
+
     /// <summary>
     /// Updates batch status. Maps to <c>EditBatchStatus</c>.
     /// Throws <see cref="BatchConcurrencyException"/> on rowstamp mismatch.

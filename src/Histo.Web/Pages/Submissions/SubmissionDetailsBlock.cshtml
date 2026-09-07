@@ -16,7 +16,10 @@
        to add/edit blocks for that specific sample. *@
     @if (!Model.IsViewMode)
     {
-        <a asp-page="/Blocks/CopySamples" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy samples</a>
+        <div class="govuk-button-group">
+            <a asp-page="/Submissions/AddSubmission" asp-route-BatchId="@Model.BatchId" class="govuk-button" data-module="govuk-button">Add sample</a>
+            <a asp-page="/Blocks/CopySamples" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy samples</a>
+        </div>
     }
 
     @if (Model.ConfirmDeleteBlockIds.FirstOrDefault() is int confirmBatchBlockId and > 0)
@@ -44,10 +47,22 @@
                 <tr class="govuk-table__row">
                     <th scope="col" class="govuk-table__header">Select</th>
                     <th scope="col" class="govuk-table__header">Sender ref</th>
+                    <th scope="col" class="govuk-table__header">Histology ref</th>
                     <th scope="col" class="govuk-table__header">Block ref</th>
-                    <th scope="col" class="govuk-table__header">Customer ref</th>
-                    <th scope="col" class="govuk-table__header">Comment</th>
-                    <th scope="col" class="govuk-table__header">Repeat</th>
+                    <th scope="col" class="govuk-table__header">Tissue details</th>
+                    <th scope="col" class="govuk-table__header">Archive</th>
+                    <th scope="col" class="govuk-table__header">EO</th>
+                    <th scope="col" class="govuk-table__header">H&amp;E</th>
+                    @if (Model.IsTse)
+                    {
+                        <th scope="col" class="govuk-table__header">H&amp;E (BSE)</th>
+                        <th scope="col" class="govuk-table__header">IHC Prp</th>
+                    }
+                    else
+                    {
+                        <th scope="col" class="govuk-table__header">IHC Other</th>
+                    }
+                    <th scope="col" class="govuk-table__header">Special stain</th>
                     <th scope="col" class="govuk-table__header">Status</th>
                     <th scope="col" class="govuk-table__header">Actions</th>
                 </tr>
@@ -55,6 +70,8 @@
             <tbody class="govuk-table__body">
                 @foreach (var b in Model.Blocks)
                 {
+                    var blockTissues = Model.TissuesByBlockId.TryGetValue(b.ID, out var bt) ? bt : (IReadOnlyList<Histo.Submissions.Models.Tissue>)[];
+                    var histCodes = Model.HistologyCodesByBlockId.GetValueOrDefault(b.ID, []);
                     <tr class="govuk-table__row">
                         <td class="govuk-table__cell">
                             <div class="govuk-checkboxes__item">
@@ -63,10 +80,57 @@
                             </div>
                         </td>
                         <td class="govuk-table__cell">@Model.SenderRefsByAnimalId.GetValueOrDefault(b.AnimalID, "—")</td>
+                        <td class="govuk-table__cell">@(Model.HistologyRefsByAnimalId.GetValueOrDefault(b.AnimalID) ?? "—")</td>
                         <td class="govuk-table__cell">@b.BlockRef</td>
-                        <td class="govuk-table__cell">@b.CustomerRef</td>
-                        <td class="govuk-table__cell">@b.Comment</td>
-                        <td class="govuk-table__cell">@(b.RepeatBlock ? "Yes" : "No")</td>
+                        <td class="govuk-table__cell">
+                            @if (blockTissues.Any())
+                            {
+                                <details class="govuk-details govuk-!-margin-bottom-0">
+                                    <summary class="govuk-details__summary">
+                                        <span class="govuk-details__summary-text">@blockTissues.Count tissue(s)</span>
+                                    </summary>
+                                    <div class="govuk-details__text">
+                                        <ul class="govuk-list">
+                                            @foreach (var t in blockTissues)
+                                            {
+                                                <li>@t.NoPieces x @Model.TissueName(t.TissueCode)</li>
+                                            }
+                                        </ul>
+                                    </div>
+                                </details>
+                            }
+                            else
+                            {
+                                <span>None</span>
+                            }
+                        </td>
+                        <td class="govuk-table__cell">
+                            <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.Archive)" aria-label="Archived" />
+                        </td>
+                        <td class="govuk-table__cell">
+                            <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.EO)" aria-label="EO" />
+                        </td>
+                        <td class="govuk-table__cell">
+                            <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.HAndE)" aria-label="H&amp;E" />
+                        </td>
+                        @if (Model.IsTse)
+                        {
+                            <td class="govuk-table__cell">
+                                <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.HeBse)" aria-label="H&amp;E (BSE)" />
+                            </td>
+                            <td class="govuk-table__cell">
+                                <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcPrp)" aria-label="IHC Prp" />
+                            </td>
+                        }
+                        else
+                        {
+                            <td class="govuk-table__cell">
+                                <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcOther)" aria-label="IHC Other" />
+                            </td>
+                        }
+                        <td class="govuk-table__cell">
+                            <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.SpecialStain)" aria-label="Special stain" />
+                        </td>
                         <td class="govuk-table__cell">@b.Status</td>
                         <td class="govuk-table__cell">
                             <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@b.AnimalID"
@@ -81,7 +145,7 @@
                 }
                 @if (!Model.Blocks.Any())
                 {
-                    <tr class="govuk-table__row"><td colspan="8" class="govuk-table__cell">No blocks found for this batch.</td></tr>
+                    <tr class="govuk-table__row"><td colspan="12" class="govuk-table__cell">No blocks found for this batch.</td></tr>
                 }
             </tbody>
         </table>
@@ -91,7 +155,16 @@
         }
     </form>
 
-    <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to samples</a>
+    <div class="govuk-button-group">
+        <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to samples</a>
+        @if (!Model.IsViewMode)
+        {
+            <form method="post" asp-page-handler="Done" class="govuk-!-display-inline">
+                <input type="hidden" asp-for="BatchId" />
+                <button type="submit" class="govuk-button" data-module="govuk-button">Done</button>
+            </form>
+        }
+    </div>
 }
 else if (Model.Animal is null)
 {

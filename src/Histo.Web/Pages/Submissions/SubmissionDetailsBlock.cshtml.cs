@@ -112,6 +112,9 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     /// <summary>Sender ref keyed by AnimalID — used only in batch-wide mode (no <see cref="AnimalId"/>) to label each row.</summary>
     public IReadOnlyDictionary<int, string> SenderRefsByAnimalId { get; private set; } = new Dictionary<int, string>();
 
+    /// <summary>Histology ref keyed by AnimalID — used only in batch-wide mode, matching legacy's grdBlockSummary "Histology Ref" column.</summary>
+    public IReadOnlyDictionary<int, string?> HistologyRefsByAnimalId { get; private set; } = new Dictionary<int, string?>();
+
     public string? ErrorMessage { get; private set; }
 
     /// <summary>Mirrors SampleSummaryModel/SubmissionDetailsModel — hides all block mutation actions
@@ -135,6 +138,8 @@ public class SubmissionDetailsBlockModel : HistoPageModel
             Blocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
             var animals = await _submissions.GetAnimalsByBatchAsync(BatchId ?? 0);
             SenderRefsByAnimalId = animals.ToDictionary(a => a.ID, a => a.SenderRef);
+            HistologyRefsByAnimalId = animals.ToDictionary(a => a.ID, a => a.HistologyRef);
+            await LoadSupportingDataAsync();
             return Page();
         }
 
@@ -166,6 +171,31 @@ public class SubmissionDetailsBlockModel : HistoPageModel
                 await _blocks.DeleteBlockAsync(id, Session.UserID);
 
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
+    }
+
+    /// <summary>
+    /// Batch-wide "Done" — legacy source: <c>BatchBlocks.aspx.vb::btSubmit_Click</c>. Marks the
+    /// batch blocked, transitions status to In progress, and records whether every sample has at
+    /// least one block (a simplified stand-in for legacy's per-tissue "green star" indicator, which
+    /// tracked at individual tissue-piece granularity). Legacy then redirects to
+    /// <c>FinalPrintBatch.aspx</c>; that report page is not yet migrated (deferred to the Reporting
+    /// phase per <c>docs/Migration-Plan.md</c>), so this redirects to Batches received instead,
+    /// matching legacy's own eventual post-print destination (<c>SV_RedirectAfterPrint</c>).
+    /// </summary>
+    public async Task<IActionResult> OnPostDoneAsync()
+    {
+        var batchId = BatchId ?? Session.BatchID;
+        if (batchId is null or <= 0) return RedirectToPage("/Index");
+
+        var forbidden = await CheckBatchAccessAsync(_batches, batchId.Value);
+        if (forbidden is not null) return forbidden;
+
+        var blocks = await _blocks.GetByBatchAsync(batchId.Value);
+        var animals = await _submissions.GetAnimalsByBatchAsync(batchId.Value);
+        var allTissuesAssigned = animals.Count > 0 && animals.All(a => blocks.Any(b => b.AnimalID == a.ID));
+
+        await _batches.CompleteBlockAssignmentAsync(batchId.Value, allTissuesAssigned, Session.UserID);
+        return RedirectToPage("/Batches/BatchesReceived");
     }
 
     /// <summary>
