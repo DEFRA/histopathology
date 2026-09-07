@@ -33,14 +33,6 @@
             Search for a previously used sender reference
         </a>
     </p>
-@*     <div class="govuk-form-group">
-        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-            <div class="govuk-checkboxes__item">
-                <input class="govuk-checkboxes__input" asp-for="IsNeuropath" type="checkbox" />
-                <label class="govuk-label govuk-checkboxes__label" for="IsNeuropath">Neuropath</label>
-            </div>
-        </div>
-    </div> *@
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Add sample</button>
         <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>

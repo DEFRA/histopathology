@@ -2031,6 +2031,18 @@ Confirmed `CopyBatchModel.OnPostAsync` had the identical root cause: it created 
 
 ---
 
+## Prompt 134 — Analyse and Fix Context-Sensitive Help Navigation (2026-09-07)
+
+> Requirement: Analyse and Fix Context-Sensitive Help Navigation. The application has a single Help page with multiple sections. When users click Help from a specific module (e.g. User Management), they're taken to the top of the Help page rather than the relevant section. Support deep linking using anchors/section IDs, maintain browser back/forward, ensure GDS/accessibility compliance, and verify the correct section is highlighted/focused on load.
+
+Confirmed `Help/Index.cshtml` already had a `<section id="kebab-case">` anchor per topic, each with a secondary legacy-page-name `id` on its `<h2>` (e.g. `id="UserMaintenance"`) — a ready-made map, but cross-referenced every entry against `docs/Functionality-Traceability-Matrix.md` since several legacy pages were renamed/consolidated during migration (e.g. `BatchSummary`+`BatchBlockSummary` → `SampleSummary`, `SamplesOnHold` → `SubmissionsOnHold`), so current page name doesn't always equal the legacy id. Added `Histo.Core.Domain.HelpSectionMap` (pure, unit-tested static dictionary keyed by current Razor Page path). `_NavPartial.cshtml`'s single global "Help" link now resolves `ViewContext.RouteData.Values["page"]` through the map and appends `#anchor` to the href when a mapping exists — a plain `<a href>` with no client-side routing, so browser back/forward and direct access to `Help/Index` both continue to work exactly as before. Added a small `@section Scripts` snippet to `Help/Index.cshtml` that sets `tabindex="-1"` and calls `.focus()` on the URL-fragment target on page load and on every `hashchange` (also benefits the page's own contents/"Back to top" links) — required because scrolling to an anchor does not itself move keyboard/screen-reader focus.
+
+**Build:** 0 errors. **Tests:** 191 total, 190 passed, 1 skipped, 0 failed (up from 183/182, 8 new tests).
+
+**Files changed:** [src/Histo.Core/Domain/HelpSectionMap.cs](../src/Histo.Core/Domain/HelpSectionMap.cs), [src/Histo.Web/Pages/Shared/_NavPartial.cshtml](../src/Histo.Web/Pages/Shared/_NavPartial.cshtml), [src/Histo.Web/Pages/Help/Index.cshtml](../src/Histo.Web/Pages/Help/Index.cshtml), [tests/Histo.Tests/Unit/HelpSectionMapTests.cs](../tests/Histo.Tests/Unit/HelpSectionMapTests.cs).
+
+---
+
 ## Prompt 130 — Validate Tissue Details functionality in the Create Submission journey (Wet Tissue) (2026-09-07)
 
 > Requirement: Validate Tissue Details Functionality in the Create Submission Journey - Submission type is Wet Tissue. Background: The issues below have already been addressed for the Edit Submission journey. Please analyse the Create Submission flow, specifically within `SubmissionDetails.cshtml` and the Add Sample workflow, to determine whether the same issues exist there. Issue 1: Tissue Details Data Not Loading. Issue 2: Tissue Details Should Support Edit and Delete. Issue 3: Add Tissue Functionality Not Working. [Full requirement covered data loading, Add/Edit/Delete, validation, persistence, UI rendering, accessibility/GDS compliance, and consistency with Edit Submission and legacy.]
