@@ -140,6 +140,15 @@ public class PickListUserAreaModel : GridPageModel
 
     private async Task LoadItemsAsync()
     {
-        Items = await _lookups.GetUserAreaDataAsync(TableId, EffectiveArea);
+        // Contacts (18) and Projects (19) are served by dedicated area-scoped stored
+        // procedures (GetContactsArea/GetProjectsArea) rather than the generic
+        // GetEditableLookupProcs-resolved select proc, which for these two tables
+        // takes no parameters and throws when a UserArea argument is supplied.
+        Items = TableId switch
+        {
+            18 => await _lookups.GetContactsByAreaAsync(EffectiveArea),
+            19 => await _lookups.GetProjectsByAreaAsync(EffectiveArea),
+            _  => await _lookups.GetUserAreaDataAsync(TableId, EffectiveArea),
+        };
     }
 }

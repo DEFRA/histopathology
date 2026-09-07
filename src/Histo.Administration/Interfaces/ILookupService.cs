@@ -14,6 +14,12 @@ public interface ILookupService
     /// <summary>Returns pick-list rows scoped to a specific user area.</summary>
     Task<IReadOnlyList<LookupItem>> GetUserAreaDataAsync(int tableId, string userArea, CancellationToken ct = default);
 
+    /// <summary>Returns contacts for a submitted area. Maps to <c>GetContactsArea</c>.</summary>
+    Task<IReadOnlyList<LookupItem>> GetContactsByAreaAsync(string area, CancellationToken ct = default);
+
+    /// <summary>Returns projects for a submitted area. Maps to <c>GetProjectsArea</c>.</summary>
+    Task<IReadOnlyList<LookupItem>> GetProjectsByAreaAsync(string area, CancellationToken ct = default);
+
     /// <summary>Returns all editable pick-list table descriptors.</summary>
     Task<IReadOnlyList<EditableLookup>> ListEditableLookupsAsync(CancellationToken ct = default);
 
