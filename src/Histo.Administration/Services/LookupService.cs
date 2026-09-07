@@ -59,34 +59,6 @@ public sealed class LookupService : ILookupService
         }
     }
 
-    /// <summary>Returns contacts for a submitted area. Maps to <c>GetContactsArea</c>.</summary>
-    public async Task<IReadOnlyList<LookupItem>> GetContactsByAreaAsync(string area, CancellationToken ct = default)
-    {
-        try
-        {
-            return await _lookups.GetContactsByAreaAsync(area, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Failed to get contacts for area {Area}.", ex, area);
-            return [];
-        }
-    }
-
-    /// <summary>Returns projects for a submitted area. Maps to <c>GetProjectsArea</c>.</summary>
-    public async Task<IReadOnlyList<LookupItem>> GetProjectsByAreaAsync(string area, CancellationToken ct = default)
-    {
-        try
-        {
-            return await _lookups.GetProjectsByAreaAsync(area, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Failed to get projects for area {Area}.", ex, area);
-            return [];
-        }
-    }
-
     /// <summary>Returns all editable pick-list table descriptors.</summary>
     public async Task<IReadOnlyList<EditableLookup>> ListEditableLookupsAsync(CancellationToken ct = default)
     {
