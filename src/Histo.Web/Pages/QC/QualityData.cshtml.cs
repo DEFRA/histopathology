@@ -54,6 +54,7 @@ public class QualityDataModel : GridPageModel
     // Resolved display names for batch summary header
     public string? ProjectName { get; private set; }
     public string? PathologistName { get; private set; }
+    public string? SpeciesName { get; private set; }
     public string? EnteredByName { get; private set; }
     public string? EnteredAreaName { get; private set; }
     public string? SubmittedByName { get; private set; }
@@ -108,7 +109,7 @@ public class QualityDataModel : GridPageModel
             .ToList()!;
 
         TestNames = allTests
-            .Select(t => t.TestDetails ?? t.Code)
+            .Select(GetTestName)
             .Where(n => !string.IsNullOrEmpty(n))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(n => n)
@@ -118,7 +119,7 @@ public class QualityDataModel : GridPageModel
         if (!string.IsNullOrEmpty(FilterHistologyRef))
             filtered = filtered.Where(t => t.HistologyRef == FilterHistologyRef);
         if (!string.IsNullOrEmpty(FilterTest))
-            filtered = filtered.Where(t => (t.TestDetails ?? t.Code) == FilterTest);
+            filtered = filtered.Where(t => string.Equals(GetTestName(t), FilterTest, StringComparison.OrdinalIgnoreCase));
         Tests = filtered.ToList();
 
         PopulateGridViewData(Tests.Count);
@@ -148,12 +149,13 @@ public class QualityDataModel : GridPageModel
 
     private async Task ResolveBatchSummaryAsync(Batch batch)
     {
-        var projectsTask  = _lookups.GetLookupDataAsync(LookupProjects);
-        var contactsTask  = _lookups.GetLookupDataAsync(LookupContacts);
+        var projectsTask  = _lookups.GetLookupDataAsync(LookupProjects, includeInactive: true);
+        var contactsTask  = _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true);
+        var speciesTask   = _lookups.GetSpeciesLookupAsync();
         var userAreasTask = _lookups.GetUserAreasAsync();
         var usersTask     = _users.GetAllUsersAsync();
 
-        await Task.WhenAll(projectsTask, contactsTask, userAreasTask, usersTask);
+        await Task.WhenAll(projectsTask, contactsTask, speciesTask, userAreasTask, usersTask);
 
         var projectsById = projectsTask.Result.ToDictionary(p => p.ID.ToString(), p => p.Name, StringComparer.OrdinalIgnoreCase);
         ProjectName = !string.IsNullOrWhiteSpace(batch.ProjectContractCode)
@@ -162,6 +164,10 @@ public class QualityDataModel : GridPageModel
         var contactsById = contactsTask.Result.ToDictionary(c => c.ID.ToString(), c => c.Name, StringComparer.OrdinalIgnoreCase);
         PathologistName = !string.IsNullOrWhiteSpace(batch.ContactName)
             && contactsById.TryGetValue(batch.ContactName, out var cn) ? cn : batch.ContactName;
+
+        var speciesById = speciesTask.Result.ToDictionary(s => s.ID.ToString(), s => s.Name, StringComparer.OrdinalIgnoreCase);
+        SpeciesName = !string.IsNullOrWhiteSpace(batch.Species)
+            && speciesById.TryGetValue(batch.Species, out var sn) ? sn : batch.Species;
 
         var userById = usersTask.Result.ToDictionary(u => u.UserID, u => u.Name);
         EnteredByName   = batch.SubmittedBy.HasValue      && userById.TryGetValue(batch.SubmittedBy.Value,      out var eb) ? eb : null;

@@ -43,26 +43,30 @@ public sealed class BlockRepository : IBlockRepository
 
         if (block.ID == 0)
         {
-            // Insert
+            // Insert — real AddBlock signature (confirmed against the database directly) has no
+            // @UserID and returns the new ID via @NewID output, not a RETURN value.
             var parameters = new DynamicParameters();
-            parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
+            parameters.Add("ID", 0);
             parameters.Add("BatchID",     block.BatchID);
             parameters.Add("AnimalID",    block.AnimalID);
             parameters.Add("BlockRef",    block.BlockRef);
             parameters.Add("CustomerRef", block.CustomerRef);
-            parameters.Add("Comment",     block.Comment);
             parameters.Add("RepeatBlock", block.RepeatBlock);
+            parameters.Add("Comment",     block.Comment);
             parameters.Add("Status",      block.Status);
             parameters.Add("Order",       block.Order);
-            parameters.Add("UserID",      userId);
+            parameters.Add("OldID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+            parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
             await conn.ExecuteAsync("AddBlock", parameters,
                 commandType: System.Data.CommandType.StoredProcedure);
-            return parameters.Get<int>("RETURN_VALUE");
+            return parameters.Get<int>("NewID");
         }
         else
         {
-            // Update
+            // Update — real EditBlock signature (confirmed against the database directly) has no
+            // @RowStamp (full-row replace, no optimistic concurrency) and requires the 3 archive
+            // columns on every call.
             await conn.ExecuteAsync(
                 "EditBlock",
                 new
@@ -72,12 +76,14 @@ public sealed class BlockRepository : IBlockRepository
                     block.AnimalID,
                     block.BlockRef,
                     block.CustomerRef,
-                    block.Comment,
                     block.RepeatBlock,
+                    ArchiveLocation = (object?)block.ArchiveLocation ?? DBNull.Value,
+                    ArchivedDate = (object?)block.ArchivedDate ?? DBNull.Value,
+                    ArchiveComment = (object?)block.ArchiveComment ?? DBNull.Value,
+                    block.Comment,
                     block.Status,
-                    block.Order,
-                    block.RowStamp,
                     UserID = userId,
+                    block.Order,
                 },
                 commandType: System.Data.CommandType.StoredProcedure);
             return block.ID;

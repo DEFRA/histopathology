@@ -5,7 +5,11 @@
     ViewData["PageTitle"] = "Archive";
 }
 
+@section BeforeHeading {
+    <a href="@Url.Page(Model.BackLinkPage)" class="govuk-back-link">Back</a>
+}
+
 <ul class="govuk-list govuk-list--spaced">
-    <li><a asp-page="/Archive/ArchiveBlocks" class="govuk-link">Archive blocks</a></li>
-    <li><a asp-page="/Archive/ArchiveTissues" class="govuk-link">Archive tissues</a></li>
+    <li><a asp-page="/Archive/ArchiveBlocks" asp-route-batchId="@Model.BatchId" class="govuk-link">Archive blocks</a></li>
+    <li><a asp-page="/Archive/ArchiveTissues" asp-route-batchId="@Model.BatchId" class="govuk-link">Archive tissues</a></li>
 </ul>
