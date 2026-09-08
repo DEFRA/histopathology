@@ -95,13 +95,23 @@ public sealed class BlockRepository : IBlockRepository
     }
 
     /// <inheritdoc/>
-    public async Task BookRefAsync(int blockId, string blockRef, int userId, CancellationToken ct = default)
+    public async Task CreatePreBookedBlockAsync(int animalId, string blockRef, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        await conn.ExecuteAsync(
-            "BookBlockRef",
-            new { ID = blockId, BlockRef = blockRef, UserID = userId },
-            commandType: System.Data.CommandType.StoredProcedure);
+        var parameters = new DynamicParameters();
+        parameters.Add("ID", 0);
+        parameters.Add("BatchID", dbType: System.Data.DbType.Int32, value: DBNull.Value);
+        parameters.Add("AnimalID", animalId);
+        parameters.Add("BlockRef", blockRef);
+        parameters.Add("CustomerRef", " ");
+        parameters.Add("RepeatBlock", false);
+        parameters.Add("Comment", " ");
+        parameters.Add("Status", BlockStatus.PreBooked);
+        parameters.Add("Order", dbType: System.Data.DbType.Int32, value: DBNull.Value);
+        parameters.Add("OldID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+        parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+
+        await conn.ExecuteAsync("AddBlock", parameters, commandType: System.Data.CommandType.StoredProcedure);
     }
 
     // -----------------------------------------------------------------------

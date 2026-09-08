@@ -5,20 +5,16 @@ using Microsoft.AspNetCore.Mvc;
 namespace Histo.Web.Pages.Bookings;
 
 /// <summary>
-/// Replaces the histology reference pool maintenance workflow from
-/// <c>HistopathologySystem/BookHistologyRef.aspx</c> (<c>clsHistology.UpdateHistologyRefs</c>,
-/// SP <c>EditHistologyRef</c>) — updates the "next histology ref" counter for a
-/// given histology type.
+/// Manual admin override of the "next histology ref" counter for a given histology type,
+/// setting it to an absolute value (looks up the current RowStamp itself via
+/// <see cref="IHistologyRefService.SetCounterAsync"/>). Not a legacy page — legacy's real
+/// increment-by-N range-booking workflow is now correctly implemented at
+/// <see cref="Histo.Web.Pages.Bookings.BookHistologyRefModel"/> (SP <c>EditHistologyRef</c>).
 ///
 /// Note: the legacy per-animal <c>EditHistologyRef.aspx</c> page (renaming an
 /// individual sample's Sender Ref / Histology Ref via <c>clsAnimal.UpdateAnimalSenderRef</c>
 /// / <c>UpdateAnimalHistologyRef</c>) is a different workflow, now implemented
 /// separately at <see cref="Histo.Web.Pages.Admin.EditAnimalRefModel"/> (ISS-022).
-///
-/// Known gap: legacy's grid of current counters and "Number Required" quantity
-/// booking (increment-by-N with per-type upper-bound checks) require reading the
-/// current counter value, for which no repository method exists — this page only
-/// supports setting the counter to an absolute value the caller already knows.
 /// </summary>
 public class EditHistologyRefModel : HistoPageModel
 {
@@ -56,7 +52,7 @@ public class EditHistologyRefModel : HistoPageModel
             return Page();
         }
 
-        var ok = await _refs.UpdateRefAsync(NewHistologyRef.Trim(), HistologyType, Session.UserID);
+        var ok = await _refs.SetCounterAsync(HistologyType, NewHistologyRef.Trim());
         if (!ok)
         {
             Error = "Failed to update the Histology Reference. Another user may have altered the record — please try again.";

@@ -9,34 +9,76 @@
     <a asp-page="/Bookings/BookingMenu" class="govuk-back-link">Back</a>
 }
 
-<table class="govuk-table">
-    <thead class="govuk-table__head">
-        <tr class="govuk-table__row">
-            <th scope="col" class="govuk-table__header">Block ref</th>
-            <th scope="col" class="govuk-table__header">Customer ref</th>
-            <th scope="col" class="govuk-table__header">Action</th>
-        </tr>
-    </thead>
-    <tbody class="govuk-table__body">
-        @foreach (var b in Model.PreBookedBlocks)
-        {
-            <tr class="govuk-table__row">
-                <td class="govuk-table__cell">@b.BlockRef</td>
-                <td class="govuk-table__cell">@b.CustomerRef</td>
-                <td class="govuk-table__cell">
-                    <form method="post">
-                        <input type="hidden" name="blockId" value="@b.ID" />
-                        <button type="submit" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button">Book</button>
-                    </form>
-                </td>
-            </tr>
-        }
-        @if (!Model.PreBookedBlocks.Any())
-        {
-            <tr class="govuk-table__row"><td colspan="3" class="govuk-table__cell">No pre-booked blocks found.</td></tr>
-        }
-    </tbody>
-</table>
-<a asp-page="/Bookings/BookingMenu" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back</a>
+<p class="govuk-body">
+    Use the following controls to book blocks for Sender Refs. Note that only PG numbers or MC
+    numbers can be used when booking a range of Sender Refs — both Sender Ref from and Sender Ref
+    to must be PG or MC numbers. If an alternative range is used, only the first Sender Ref in the
+    range will have blocks booked.
+</p>
 
-<p class="govuk-body"><a asp-page="/Search/SearchBlockRefs" class="govuk-link">Check Used Block Refs</a></p>
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list"><li>@Model.Error</li></ul>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="govuk-panel govuk-panel--confirmation govuk-!-margin-bottom-6">
+        <p class="govuk-panel__body">@Model.SuccessMessage</p>
+    </div>
+}
+
+@if (Model.ResultMessages.Count > 0)
+{
+    <div class="govuk-inset-text">
+        <ul class="govuk-list">
+            @foreach (var m in Model.ResultMessages)
+            {
+                <li>@m</li>
+            }
+        </ul>
+    </div>
+}
+
+<form method="post" asp-page="/Bookings/BookBlockRef">
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="SenderRefFrom">Sender Ref from</label>
+                <input class="govuk-input" id="SenderRefFrom" name="SenderRefFrom" type="text" value="@Model.SenderRefFrom" />
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="SenderRefTo">Sender Ref to</label>
+                <input class="govuk-input" id="SenderRefTo" name="SenderRefTo" type="text" value="@Model.SenderRefTo" />
+            </div>
+        </div>
+    </div>
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="BlockRefFrom">Block Ref from</label>
+                <div class="govuk-hint">Two or three digits, e.g. 01 or 100.</div>
+                <input class="govuk-input govuk-input--width-4" id="BlockRefFrom" name="BlockRefFrom" type="text" maxlength="3" value="@Model.BlockRefFrom" />
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="BlockRefTo">Block Ref to</label>
+                <input class="govuk-input govuk-input--width-4" id="BlockRefTo" name="BlockRefTo" type="text" maxlength="3" value="@Model.BlockRefTo" />
+            </div>
+        </div>
+    </div>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Book</button>
+    <a asp-page="/Bookings/BookingMenu" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
+</form>
+
+<p class="govuk-body"><a asp-page="/Search/SearchBlockRefs" class="govuk-link">Check used block refs</a></p>

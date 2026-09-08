@@ -25,18 +25,6 @@ public interface IHistologyRepository
     Task<IReadOnlyList<HistologyRef>> GetUsedRefsByBatchAsync(int batchId, CancellationToken ct = default);
 
     /// <summary>
-    /// Books (assigns) a histology reference to an animal record.
-    /// Maps to <c>BookHistologyRef</c> stored procedure.
-    /// </summary>
-    Task BookRefAsync(string histologyRef, int animalId, int userId, CancellationToken ct = default);
-
-    /// <summary>
-    /// Updates a histology reference record.
-    /// Maps to <c>EditHistologyRef</c> stored procedure.
-    /// </summary>
-    Task UpdateRefAsync(string histologyRef, int histologyType, int userId, CancellationToken ct = default);
-
-    /// <summary>
     /// Returns histology refs that were booked but not used (for search/reporting).
     /// Maps to <c>GetUnUsedBookedHistologyRefs</c> stored procedure.
     /// </summary>
@@ -49,4 +37,19 @@ public interface IHistologyRepository
     /// <c>GetUnUsedHistologyRefsTable</c>. Used by SearchUnUsedHistologyRefs.aspx.
     /// </summary>
     Task<IReadOnlyList<HistologyRef>> GetAllUnusedRefsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the current "next histology ref" counter for every histology type.
+    /// Maps to the (parameterless) <c>GetHistologyRefs</c> stored procedure — confirmed
+    /// against the database directly. Legacy source: clsHistology.vb::GetHistologyRefsTable.
+    /// </summary>
+    Task<IReadOnlyList<HistologyRefCounter>> GetCountersAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Overwrites a type's "next histology ref" counter. Maps to <c>EditHistologyRef</c>
+    /// stored procedure (real params confirmed against the database: <c>@Type</c>,
+    /// <c>@NextHistologyRef</c>, <c>@RowStamp</c> — there is no <c>@UserID</c> param).
+    /// Legacy source: clsHistology.vb::UpdateHistologyRefRow.
+    /// </summary>
+    Task UpdateCounterAsync(int histologyType, string newNextHistologyRef, byte[]? rowStamp, CancellationToken ct = default);
 }
