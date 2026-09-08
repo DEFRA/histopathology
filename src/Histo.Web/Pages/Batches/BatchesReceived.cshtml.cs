@@ -89,6 +89,7 @@ public class BatchesReceivedModel : GridPageModel
         }
 
         Session.BatchID = QuickGoId.Value;
+        Session.IsViewSubmissionMode = false;
         return RedirectToPage("/Batches/BatchBlocks");
     }
 }
