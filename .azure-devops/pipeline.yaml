@@ -129,7 +129,7 @@ stages:
     - name: tenantId
       value: '770a2450-0227-4c62-90c7-4e38537f1102'
     - name: appId
-      value: '3fade19d-06ed-4b1c-8f2c-fff3c22b5955'
+      value: '2f7f564e-38a4-4cc7-aa92-0ee8c8cfc974'
     - name: sqlServer
       value: 'tstcdeinfsq1401.database.windows.net,1433'
     - name: dbName
