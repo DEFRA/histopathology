@@ -71,6 +71,13 @@ stages:
       and(succeeded(),
           eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
           ne(variables['Build.Reason'], 'PullRequest'))
+    variables:
+    - name: appName
+      value: 'DEVCDEWEBAW1401'
+    - name: tenantId
+      value: '770a2450-0227-4c62-90c7-4e38537f1102'
+    - name: appId
+      value: '89060d89-195d-47f4-a900-2f66fba81a75'      
     jobs:
       - deployment: deploy_dev
         environment: 'dev'
@@ -87,10 +94,15 @@ stages:
                   inputs:
                     azureSubscription: 'AZR-CDE-DEV1'
                     appType: 'webAppLinux'
-                    appName: 'DEVCDEWEBAW1401'
+                    appName: '$(appName)'
                     package: '$(Pipeline.Workspace)/drop/*.zip'
                     runtimeStack: 'DOTNETCORE|10.0'
                     deploymentMethod: 'zipDeploy'
+                    appSettings: >-
+                      -Saml2__SPEntityId "https://dev-cde.azure.defra.cloud"
+                      -Saml2__PublicOrigin "https://dev-cde.azure.defra.cloud"
+                      -Saml2__IdPEntityId "https://sts.windows.net/$(tenantId)/"
+                      -Saml2__IdPMetadataUrl "https://login.microsoftonline.com/$(tenantId)/federationmetadata/2007-06/federationmetadata.xml?appid=$(appId)"
 
   - stage: TST
     displayName: TST
@@ -99,6 +111,13 @@ stages:
       and(succeeded(),
           eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
           ne(variables['Build.Reason'], 'PullRequest'))
+    variables:
+    - name: appName
+      value: 'TSTCDEWEBAW1401'
+    - name: tenantId
+      value: '770a2450-0227-4c62-90c7-4e38537f1102'
+    - name: appId
+      value: '3fade19d-06ed-4b1c-8f2c-fff3c22b5955'      
     jobs:
       - deployment: deploy_tst
         environment: 'test'
@@ -115,7 +134,12 @@ stages:
                   inputs:
                     azureSubscription: 'AZR-CDE-TST1'
                     appType: 'webAppLinux'
-                    appName: 'TSTCDEWEBAW1401'
+                    appName: '$(appName)'
                     package: '$(Pipeline.Workspace)/drop/*.zip'
                     runtimeStack: 'DOTNETCORE|10.0'
                     deploymentMethod: 'zipDeploy'
+                    appSettings: >-
+                      -Saml2__SPEntityId "https://tst-cde.azure.defra.cloud"
+                      -Saml2__PublicOrigin "https://tst-cde.azure.defra.cloud"
+                      -Saml2__IdPEntityId "https://sts.windows.net/$(tenantId)/"
+                      -Saml2__IdPMetadataUrl "https://login.microsoftonline.com/$(tenantId)/federationmetadata/2007-06/federationmetadata.xml?appid=$(appId)"
