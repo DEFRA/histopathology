@@ -11,6 +11,20 @@
     <a asp-page="/Batches/BatchDetails" asp-route-BatchId="@Model.BatchId" class="govuk-back-link">Back</a>
 }
 
+@if (!string.IsNullOrEmpty(Model.SaveError))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.SaveError</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
 @* "Bypass sort" — legacy chkByPassSort: when checked, animals display in block-insertion order
    instead of the default SenderRef / HistologyRef ascending order. Placed above the table to
    match legacy BatchBlockSummary.aspx layout. An explicit Apply button is used instead of
@@ -105,7 +119,7 @@
                            with the source animal's data pre-filled. AddSample.cshtml was consolidated into
                            AddSubmission.cshtml (both were near-duplicate "add a sample by Sender Ref" screens) —
                            copying passes the source Sender Ref as a query parameter to pre-fill the Add sample form. *@
-                        <a asp-page="/Submissions/AddSubmission" asp-route-batchId="@Model.BatchId" asp-route-batchSubmissionId="@Model.BatchSubmissionId" asp-route-senderRef="@a.SenderRef"
+                        <a asp-page="/Submissions/AddSubmission" asp-route-batchId="@Model.BatchId" asp-route-batchSubmissionId="@Model.BatchSubmissionId" asp-route-senderRef="@a.SenderRef" asp-route-sourceAnimalId="@a.ID"
                            class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Copy sample</a>
                         @* "Delete sample" — links to the inline confirmation panel above instead of a browser confirm() dialog. *@
                         <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" asp-route-ConfirmDeleteAnimalId="@a.ID"

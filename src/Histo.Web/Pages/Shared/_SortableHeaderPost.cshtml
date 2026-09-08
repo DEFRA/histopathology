@@ -28,7 +28,10 @@
     var isActive    = !string.IsNullOrEmpty(column) && string.Equals(currentSortColumn, column, StringComparison.OrdinalIgnoreCase);
     var nextDesc    = isActive && !currentSortDesc;
     var ariaSort    = isActive ? (currentSortDesc ? "descending" : "ascending") : "none";
-    var formAction  = $"?handler={Uri.EscapeDataString(handler)}&SortColumn={Uri.EscapeDataString(column)}&SortDesc={(nextDesc ? "true" : "false")}";
+    // Omit "handler=" entirely when unset — an empty handler value doesn't match the
+    // default OnPost method's null handler name and would 400 instead of falling through to it.
+    var handlerPart = string.IsNullOrEmpty(handler) ? string.Empty : $"handler={Uri.EscapeDataString(handler)}&";
+    var formAction  = $"?{handlerPart}SortColumn={Uri.EscapeDataString(column)}&SortDesc={(nextDesc ? "true" : "false")}";
 }
 <th scope="col" class="govuk-table__header" aria-sort="@ariaSort">
     <button type="submit" form="@formId" formaction="@formAction" class="app-link-button">

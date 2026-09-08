@@ -196,10 +196,14 @@
             </select>
         </div>
 
-        @* Is it adequately fixed? � legacy ddlSafeToHandle rfvSafeToHandle *@
-        <div class="govuk-form-group">
+        @* Is it adequately fixed? — legacy ddlSafeToHandle rfvSafeToHandle *@
+        <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_SafeToHandle") ? "govuk-form-group--error" : "")">
             <fieldset class="govuk-fieldset">
                 <legend class="govuk-fieldset__legend">Is it adequately fixed?</legend>
+                @if (Model.Errors.TryGetValue("Create_SafeToHandle", out var safeErr))
+                {
+                    <p id="Create_SafeToHandle-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @safeErr</p>
+                }
                 <div class="govuk-checkboxes" data-module="govuk-checkboxes">
                     <div class="govuk-checkboxes__item">
                         <input class="govuk-checkboxes__input" asp-for="Create_SafeToHandle" type="checkbox" id="Create_SafeToHandle" />
@@ -306,13 +310,27 @@
     @* Show/hide antibody and stain sections when histology checkboxes change *@
     <script>
     (function () {
+        var archiveCode = '@Histo.Submissions.Models.HistologyCode.Archive';
+        var checkboxes  = document.querySelectorAll('#create-histology-checkboxes input[type=checkbox]');
+
+        function enforceArchiveExclusivity(changed) {
+            if (changed.value === archiveCode && changed.checked) {
+                checkboxes.forEach(function (cb) { if (cb !== changed) cb.checked = false; });
+            } else if (changed.value !== archiveCode && changed.checked) {
+                checkboxes.forEach(function (cb) { if (cb.value === archiveCode) cb.checked = false; });
+            }
+        }
+
         function syncTestSections() {
             var codes = Array.from(document.querySelectorAll('#create-histology-checkboxes input:checked')).map(function(cb){ return cb.value; });
                 var ihc   = ['@Histo.Submissions.Models.HistologyCode.IhcPrp','@Histo.Submissions.Models.HistologyCode.IhcOther'];
             document.getElementById('create-antibodies-section').style.display = codes.some(function(c){ return ihc.indexOf(c) >= 0; }) ? '' : 'none';
                 document.getElementById('create-stains-section').style.display     = codes.indexOf('@Histo.Submissions.Models.HistologyCode.SpecialStain') >= 0 ? '' : 'none';
         }
-        document.getElementById('create-histology-checkboxes').addEventListener('change', syncTestSections);
+        document.getElementById('create-histology-checkboxes').addEventListener('change', function (e) {
+            enforceArchiveExclusivity(e.target);
+            syncTestSections();
+        });
     })();
     </script>
 }
@@ -513,11 +531,6 @@
             }
         </a>
 
-        @* Assign blocks — Received or InProgress only. *@
-        @if (Model.CanAssignBlocks)
-        {
-            <a asp-page="/Batches/BatchBlocks" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Assign blocks</a>
-        }
 
         @* Date returned � Completed status only. *@
         @if (Model.CanDateReturned)
@@ -536,7 +549,7 @@
         }
 
         <a href="@Url.Page(Model.BackLinkPage)" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
-        <a asp-page="/Index" class="govuk-button govuk-button--secondary" data-module="govuk-button">Finish</a>
+        <a asp-page="/Submissions/ViewSubmissions" class="govuk-button govuk-button--secondary" data-module="govuk-button">Finish</a>
 
     </div>
 }
