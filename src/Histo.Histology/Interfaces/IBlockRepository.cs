@@ -40,10 +40,13 @@ public interface IBlockRepository
     Task DeleteAsync(int blockId, int userId, CancellationToken ct = default);
 
     /// <summary>
-    /// Books a block reference for pre-cassetting.
-    /// Maps to <c>BookBlockRef</c> stored procedure.
+    /// Creates a new pre-booked block placeholder for an animal, ahead of any batch existing.
+    /// Maps to <c>AddBlock</c> with <c>BatchID = NULL</c> and <c>Status = BlockStatus.PreBooked</c> —
+    /// confirmed against the database directly; there is no separate <c>BookBlockRef</c> stored
+    /// procedure (that name does not exist in the database).
+    /// Legacy source: clsBlock.vb::CreatePreBookedBlock.
     /// </summary>
-    Task BookRefAsync(int blockId, string blockRef, int userId, CancellationToken ct = default);
+    Task CreatePreBookedBlockAsync(int animalId, string blockRef, CancellationToken ct = default);
 
     // -----------------------------------------------------------------------
     // Search (read-only)

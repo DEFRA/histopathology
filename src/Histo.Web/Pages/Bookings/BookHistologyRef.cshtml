@@ -1,13 +1,15 @@
 @page
 @model Histo.Web.Pages.Bookings.BookHistologyRefModel
 @{
-    ViewData["Title"] = "Book Non-PG histology ref";
-    ViewData["PageTitle"] = "Book Non-PG histology ref";
+    ViewData["Title"] = "Block book histology refs";
+    ViewData["PageTitle"] = "Block book histology refs";
 }
 
 @section BeforeHeading {
     <a asp-page="/Bookings/BookingMenu" class="govuk-back-link">Back</a>
 }
+
+<p class="govuk-body">Select the type of Histology number required from the list, enter the number required and select "Book".</p>
 
 @if (!string.IsNullOrEmpty(Model.Error))
 {
@@ -15,27 +17,55 @@
         <div role="alert">
             <h2 class="govuk-error-summary__title">There is a problem</h2>
             <div class="govuk-error-summary__body">
-                <ul class="govuk-list govuk-error-summary__list">
-                    <li>@Model.Error</li>
-                </ul>
+                <ul class="govuk-list govuk-error-summary__list"><li>@Model.Error</li></ul>
             </div>
         </div>
     </div>
 }
 
-<form method="post">
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="govuk-panel govuk-panel--confirmation govuk-!-margin-bottom-6">
+        <p class="govuk-panel__body">@Model.SuccessMessage</p>
+    </div>
+}
+
+<h2 class="govuk-heading-m">Current database histology refs</h2>
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">Description</th>
+            <th scope="col" class="govuk-table__header">Next histology ref</th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @foreach (var c in Model.Counters)
+        {
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">@c.Description</td>
+                <td class="govuk-table__cell">@c.NextHistologyRef</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<form method="post" asp-page="/Bookings/BookHistologyRef">
     <div class="govuk-form-group">
-        <label class="govuk-label" for="histoRef">Select reference</label>
-        <select name="histoRef" id="histoRef" class="govuk-select" required>
+        <label class="govuk-label" for="HistologyType">Histology Ref Range Type</label>
+        <select name="HistologyType" id="HistologyType" class="govuk-select" required>
             <option value="">-- Select --</option>
-            @foreach (var r in Model.AvailableRefs)
+            @foreach (var c in Model.Counters)
             {
-                <option value="@r.Ref">@r.Ref</option>
+                <option value="@c.Type" selected="@(Model.HistologyType == c.Type)">@c.Description</option>
             }
         </select>
     </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="NumberToBook">Number required</label>
+        <input class="govuk-input govuk-input--width-4" id="NumberToBook" name="NumberToBook" type="number" min="1" step="1" value="@Model.NumberToBook" required />
+    </div>
     <button type="submit" class="govuk-button" data-module="govuk-button">Book</button>
-    <a asp-page="/Submissions/SampleSummary" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    <a asp-page="/Bookings/BookingMenu" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
 </form>
 
-<p class="govuk-body"><a asp-page="/Search/SearchBlockRefs" class="govuk-link">Check Used Block Refs</a></p>
+<p class="govuk-body"><a asp-page="/Search/SearchBlockRefs" class="govuk-link">Check used block refs</a></p>
