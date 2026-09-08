@@ -6,7 +6,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Bookings/BookingMenu" class="govuk-back-link">Back</a>
+    <a asp-page="/Index" class="govuk-back-link">Back</a>
 }
 
 <p class="govuk-body">Use this page to correct the "next histology reference" counter for a histology type. Please use this with extreme care.</p>
@@ -49,7 +49,7 @@
         <input class="govuk-input" id="NewHistologyRef" name="NewHistologyRef" type="text" value="@Model.NewHistologyRef" />
     </div>
     <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
-    <a asp-page="/Bookings/BookingMenu" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
+    <a asp-page="/Index" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
 </form>
 
 <p class="govuk-body"><a asp-page="/Search/SearchBlockRefs" class="govuk-link">Check Used Block Refs</a></p>

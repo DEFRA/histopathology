@@ -39,6 +39,13 @@ public sealed class BlockTest
     public bool Dispatched { get; init; }
     public DateTime? DispatchedDate { get; init; }
     public string? DispatchedBy { get; init; }
+
+    /// <summary>User ID of the QC editor who last saved this row — overwritten with the current user on every save (legacy: QualityData.aspx.vb .Item("EnteredBy") = current session user).</summary>
+    public int? EnteredBy { get; init; }
+
+    /// <summary>Pass-through column, not editable via the QC screen — round-tripped unchanged on save.</summary>
+    public string? PremiumCharge { get; init; }
+
     public string? DispatchedTo { get; init; }
     public string? Comment { get; init; }
     public string? RemedialAction { get; init; }
