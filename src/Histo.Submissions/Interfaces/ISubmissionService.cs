@@ -11,7 +11,8 @@ public interface ISubmissionService
     // Submissions
     Task<IReadOnlyList<BatchSubmission>> GetSubmissionsByBatchAsync(int batchId, CancellationToken ct = default);
     Task<int> AddSubmissionAsync(BatchSubmission submission, int userId, CancellationToken ct = default);
-    Task<int> CopySubmissionAsync(BatchSubmission source, int newBatchId, int userId, CancellationToken ct = default);
+    /// <summary>Copies a submission under a new batch. Pass <paramref name="animalId"/> once the destination animal is known so the copy is correctly linked (see AddSubmissionModel.OnPostAsync fix) — defaults to the unlinked placeholder used for submissions with no known animal yet.</summary>
+    Task<int> CopySubmissionAsync(BatchSubmission source, int newBatchId, int userId, int animalId = 0, CancellationToken ct = default);
 
     // Animals
     Task<IReadOnlyList<Animal>> GetAnimalsByBatchAsync(int batchId, CancellationToken ct = default);
@@ -35,10 +36,14 @@ public interface ISubmissionService
     Task UpdateAnimalHistologyRefAsync(string senderRef, string? newHistologyRef, int userId, CancellationToken ct = default);
 
     // Tissues
-    Task<IReadOnlyList<Tissue>> GetTissuesBySubmissionAsync(int submissionId, CancellationToken ct = default);
+    /// <summary>Returns tissues for one batch submission. Filters the batch-wide result of <c>GetBatchTissues</c> by BatchSubmissionID.</summary>
+    Task<IReadOnlyList<Tissue>> GetTissuesBySubmissionAsync(int batchId, int submissionId, CancellationToken ct = default);
     /// <summary>Returns all submission-level tissues for a batch. Each tissue's OwnerID = BatchSubmissionID.</summary>
     Task<IReadOnlyList<Tissue>> GetBatchSubmissionTissuesAsync(int batchId, CancellationToken ct = default);
-    Task<IReadOnlyList<Tissue>> GetTissuesByBlockAsync(int blockId, CancellationToken ct = default);
+    /// <summary>Returns all block-owned tissues for a batch, keyed by BlockID — one SP call for every block in the batch.</summary>
+    Task<IReadOnlyList<Tissue>> GetTissuesByBatchAsync(int batchId, CancellationToken ct = default);
+    /// <summary>Returns tissues for one block. Filters the batch-wide result of <c>GetBatchBlockTissues</c> by BlockID.</summary>
+    Task<IReadOnlyList<Tissue>> GetTissuesByBlockAsync(int batchId, int blockId, CancellationToken ct = default);
     Task<int> AddTissueAsync(Tissue tissue, int userId, CancellationToken ct = default);
     Task<int> CopyTissueAsync(Tissue source, int newOwnerId, int userId, CancellationToken ct = default);
     Task<bool> UpdateTissueAsync(Tissue tissue, int userId, CancellationToken ct = default);

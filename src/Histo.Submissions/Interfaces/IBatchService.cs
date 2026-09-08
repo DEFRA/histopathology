@@ -53,6 +53,14 @@ public interface IBatchService
     /// </summary>
     Task<bool> SetCustomerReceivedDateAsync(int batchId, DateTime? date, byte[] rowStamp, int userId, CancellationToken ct = default);
 
+    /// <summary>
+    /// "Done" on the batch-wide block-assignment overview: marks the batch as blocked (has had
+    /// blocks created), records whether every sample's tissues have been assigned to a block, and
+    /// transitions status to In progress. Returns <see langword="false"/> on failure.
+    /// Legacy source: <c>BatchBlocks.aspx.vb::btSubmit_Click</c>.
+    /// </summary>
+    Task<bool> CompleteBlockAssignmentAsync(int batchId, bool allTissuesAssigned, int userId, CancellationToken ct = default);
+
     // -----------------------------------------------------------------------
     // Batch-level test type selections (Histology / Antibodies / Special Stains)
     // -----------------------------------------------------------------------

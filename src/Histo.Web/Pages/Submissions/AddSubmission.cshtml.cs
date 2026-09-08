@@ -1,3 +1,5 @@
+using Histo.Administration.Interfaces;
+using Histo.Core.Domain;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -10,12 +12,14 @@ public class AddSubmissionModel : HistoPageModel
 {
     private readonly ISubmissionService _submissions;
     private readonly IBatchService _batches;
+    private readonly ILookupService _lookups;
 
-    public AddSubmissionModel(ISessionService session, ISubmissionService submissions, IBatchService batches)
+    public AddSubmissionModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups)
         : base(session)
     {
         _submissions = submissions;
         _batches = batches;
+        _lookups = lookups;
     }
 
     /// <summary>Batch ID from the URL (route/query). Falls back to <see cref="ISessionService.BatchID"/>.</summary>
@@ -25,7 +29,6 @@ public class AddSubmissionModel : HistoPageModel
     [BindProperty(SupportsGet = true)] public int? BatchSubmissionId { get; set; }
 
     [BindProperty] public string SenderRef   { get; set; } = string.Empty;
-    [BindProperty] public bool   IsNeuropath { get; set; }
 
     public string? ModelError { get; private set; }
 
@@ -78,7 +81,10 @@ public class AddSubmissionModel : HistoPageModel
 
         Session.BatchSubmissionID = submissionId;
 
-        var newAnimalId = await _submissions.AddAnimalAsync(submissionId.Value, SenderRef, IsNeuropath, Session.UserID);
+        // Legacy source: AddSubmission.aspx.vb — bNeuropath is derived from the user's area
+        // (SV_HeaderUserArea = "Neuropath"), never from a manual form control.
+        var isNeuropath = Session.UserArea == "Neuropath";
+        var newAnimalId = await _submissions.AddAnimalAsync(submissionId.Value, SenderRef, isNeuropath, Session.UserID);
         if (newAnimalId <= 0)
         {
             // AddAnimalAsync swallows the underlying SQL exception and returns 0 on failure —
@@ -90,8 +96,42 @@ public class AddSubmissionModel : HistoPageModel
         // Legacy AddSubmission.aspx::btnNext_Click continues straight into the per-sample detail
         // page (SubmissionDetailsBlock.aspx / SubmissionDetails.aspx) rather than back to the list.
         var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId.Value);
-        return submittedAsCode == "4"
-            ? RedirectToPage("/Submissions/SubmissionDetails", new { batchId, animalId = newAnimalId })
-            : RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = newAnimalId });
+        var isWetTissue = await IsWetTissueCodeAsync(submittedAsCode);
+
+        if (isWetTissue)
+        {
+            // Wet Tissue tissues are owned by BatchSubmissionID (not BlockID — see SubmissionDetails),
+            // so each animal needs its own dedicated submission row linked via AnimalID. Legacy source:
+            // clsBatchSubmission.vb::NewRecord(dtBatchSubmission, id, batchId, animalId) overload — the
+            // SP genuinely accepts a real AnimalID once one is known. The submission reused above only
+            // exists to satisfy AddAnimalAsync's batchSubmissionId parameter (never actually sent to the
+            // SQL insert), so reusing the SAME shared submission for every animal left each new animal's
+            // real owning submission unresolvable (SubmissionDetailsModel.LoadAnimalAsync matches on
+            // AnimalID, which stayed the 0 placeholder), silently breaking Tissue Details add/edit/
+            // delete/display for every sample after the first.
+            var siblingSubmissions = await _submissions.GetSubmissionsByBatchAsync(batchId.Value);
+            var nextOrder = siblingSubmissions.Count > 0 ? siblingSubmissions.Max(s => s.Order) + 1 : 1;
+            var ownSubmissionId = await _submissions.AddSubmissionAsync(
+                new BatchSubmission { BatchID = batchId.Value, AnimalID = newAnimalId, SubmissionName = "Default", Order = nextOrder },
+                Session.UserID);
+            if (ownSubmissionId > 0) Session.BatchSubmissionID = ownSubmissionId;
+
+            return RedirectToPage("/Submissions/SubmissionDetails", new { batchId, animalId = newAnimalId });
+        }
+
+        return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = newAnimalId });
+    }
+
+    /// <summary>
+    /// Resolves a raw "Submitted As" code to its LOOKUP_SUBMITTEDAS (table 11) description and
+    /// compares it to "Wet Tissue", matching Cassetted.aspx.vb's actual (description-based, not
+    /// code-based) comparison. Replaces a previously hardcoded, unverified <c>code == "4"</c> guess.
+    /// </summary>
+    private async Task<bool> IsWetTissueCodeAsync(string? submittedAsCode)
+    {
+        if (string.IsNullOrEmpty(submittedAsCode)) return false;
+        var items = await _lookups.GetLookupDataAsync(11); // LOOKUP_SUBMITTEDAS
+        var match = items.FirstOrDefault(i => i.Code == submittedAsCode);
+        return ValidationHelpers.IsWetTissueDescription(match?.Name);
     }
 }

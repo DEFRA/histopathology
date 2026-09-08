@@ -103,9 +103,12 @@ public interface ISubmissionRepository
 
     /// <summary>
     /// Returns all tissues for a batch submission (not block tissues).
-    /// Maps to BATCH_TISSUES_TABLE (index 7) in <c>GetBatchSubmissionDetailsByBatchID</c>.
+    /// Maps to <c>GetBatchTissues</c> (@ID = batchId, confirmed against the database — the
+    /// batch's submission-level tissues, each row carrying its own BatchSubmissionID), filtered
+    /// to the requested submission. <c>GetTissuesBySubmissionID</c> does not exist in the
+    /// database — do not reintroduce a call to it.
     /// </summary>
-    Task<IReadOnlyList<Tissue>> GetTissuesBySubmissionAsync(int submissionId, CancellationToken ct = default);
+    Task<IReadOnlyList<Tissue>> GetTissuesBySubmissionAsync(int batchId, int submissionId, CancellationToken ct = default);
 
     /// <summary>
     /// Returns all submission-level tissues for a batch by reading BATCH_TISSUES_TABLE
@@ -122,16 +125,19 @@ public interface ISubmissionRepository
     Task UpdateTissueAsync(Tissue tissue, int userId, CancellationToken ct = default);
 
     /// <summary>
-    /// Returns all tissues for a block.
-    /// Maps to <c>GetTissuesByBlockID</c> — a new stored procedure mirroring the
-    /// existing <c>GetTissuesBySubmissionID</c> pattern. The legacy application
-    /// never queried block tissues in isolation (they were always loaded as part
-    /// of the whole-batch DataSet via <c>GetBatchBlocksByID</c> and filtered
-    /// in-memory by BlockID) — this method is added to support the "Copy blocks"
-    /// and "Copy samples" workflows, which need a single block's tissues without
-    /// loading the entire batch.
+    /// Returns all block-owned tissues for every block in a batch in one round-trip.
+    /// Maps to <c>GetBatchBlockTissues</c> (@ID = batchId, confirmed against the database).
     /// </summary>
-    Task<IReadOnlyList<Tissue>> GetTissuesByBlockAsync(int blockId, CancellationToken ct = default);
+    Task<IReadOnlyList<Tissue>> GetTissuesByBatchAsync(int batchId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns all tissues for one block, filtered from <see cref="GetTissuesByBatchAsync"/>.
+    /// There is no per-block stored procedure in the database — <c>GetTissuesByBlockID</c> does
+    /// not exist; the legacy application never queried block tissues in isolation either (they
+    /// were always loaded as part of the whole-batch DataSet via <c>GetBatchBlocksByID</c> and
+    /// filtered in-memory by BlockID, the same pattern followed here).
+    /// </summary>
+    Task<IReadOnlyList<Tissue>> GetTissuesByBlockAsync(int batchId, int blockId, CancellationToken ct = default);
 
     /// <summary>Deletes a tissue record. Maps to <c>DeleteTissue</c> or <c>DeleteBlockTissue</c>.</summary>
     Task DeleteTissueAsync(int tissueId, TissueOwner owner, int userId, CancellationToken ct = default);

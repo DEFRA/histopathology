@@ -56,6 +56,55 @@ public class ViewSubmissionsModel : HistoPageModel
     [BindProperty] public DateTime? ReceivedDateFrom    { get; set; }
     [BindProperty] public DateTime? ReceivedDateTo      { get; set; }
 
+    // Sort/page state is bound the same way as the filter criteria above — [BindProperty]
+    // binds from route/query/form on any non-GET request, so these survive the POST-based
+    // sort/page buttons (see _SortableHeaderPost/_PaginationPost) without needing GridPageModel's
+    // GET-oriented SupportsGet mechanism, which this POST-only search page cannot use.
+    private const int PageSize = 10;
+    [BindProperty] public string? SortColumn { get; set; }
+    [BindProperty] public bool    SortDesc   { get; set; }
+    [BindProperty] public int     PageNumber { get; set; } = 1;
+
+    public IReadOnlyList<BatchSearchResult> PagedResults =>
+        (SortColumn switch
+        {
+            "ID"                 => SortDesc ? Results.OrderByDescending(r => r.ID)                  : Results.OrderBy(r => r.ID),
+            "ProjectDescription" => SortDesc ? Results.OrderByDescending(r => r.ProjectDescription) : Results.OrderBy(r => r.ProjectDescription),
+            "ContactDescription" => SortDesc ? Results.OrderByDescending(r => r.ContactDescription) : Results.OrderBy(r => r.ContactDescription),
+            "Species"            => SortDesc ? Results.OrderByDescending(r => r.Species)            : Results.OrderBy(r => r.Species),
+            "BatchDate"          => SortDesc ? Results.OrderByDescending(r => r.BatchDate)           : Results.OrderBy(r => r.BatchDate),
+            "DateReceived"       => SortDesc ? Results.OrderByDescending(r => r.DateReceived)        : Results.OrderBy(r => r.DateReceived),
+            "DateCompleted"      => SortDesc ? Results.OrderByDescending(r => r.DateCompleted)       : Results.OrderBy(r => r.DateCompleted),
+            "CustomerReceivedDate" => SortDesc ? Results.OrderByDescending(r => r.CustomerReceivedDate) : Results.OrderBy(r => r.CustomerReceivedDate),
+            "Status"             => SortDesc ? Results.OrderByDescending(r => r.Status)              : Results.OrderBy(r => r.Status),
+            _                    => SortDesc ? Results.OrderByDescending(r => r.ID)                  : Results.OrderBy(r => r.ID),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
+
+    /// <summary>
+    /// formaction for each row's Select button. SortColumn/PageNumber are POST-bound (user
+    /// controllable), so they're percent-encoded before being embedded in the query string —
+    /// otherwise a value containing '&amp;' could inject extra query parameters.
+    /// </summary>
+    public string SelectFormAction =>
+        $"?handler=Select&SortColumn={Uri.EscapeDataString(SortColumn ?? string.Empty)}&SortDesc={(SortDesc ? "true" : "false")}&PageNumber={PageNumber}";
+
+    private void PopulateGridViewData()
+    {
+        var totalPages = Results.Count == 0 ? 1 : (int)Math.Ceiling(Results.Count / (double)PageSize);
+        if (PageNumber < 1) PageNumber = 1;
+        else if (PageNumber > totalPages) PageNumber = totalPages;
+        ViewData["SortColumn"] = SortColumn;
+        ViewData["SortDesc"] = SortDesc;
+        ViewData["CurrentPage"] = PageNumber;
+        ViewData["TotalPages"] = totalPages;
+        ViewData["FormId"] = "view-action-form";
+        ViewData["Handler"] = "Search";
+    }
+
+
     /// <summary>
     /// ID of the currently selected result row.
     /// Bound from the per-row Select button value via <see cref="OnPostSelectAsync"/>.
@@ -94,11 +143,19 @@ public class ViewSubmissionsModel : HistoPageModel
 
     private async Task LoadLookupsAsync()
     {
-        Users       = await _users.GetAllUsersAsync();
-        Projects    = await _lookups.GetLookupDataAsync(LookupProjects);
-        Contacts    = await _lookups.GetLookupDataAsync(LookupContacts);
-        SpeciesList = await _lookups.GetSpeciesLookupAsync();
-        Fixations   = await _lookups.GetLookupDataAsync(LookupFixative);
+        var usersTask = _users.GetAllUsersAsync();
+        var projectsTask = _lookups.GetLookupDataAsync(LookupProjects);
+        var contactsTask = _lookups.GetLookupDataAsync(LookupContacts);
+        var speciesTask = _lookups.GetSpeciesLookupAsync();
+        var fixationsTask = _lookups.GetLookupDataAsync(LookupFixative);
+
+        await Task.WhenAll(usersTask, projectsTask, contactsTask, speciesTask, fixationsTask);
+
+        Users       = await usersTask;
+        Projects    = await projectsTask;
+        Contacts    = await contactsTask;
+        SpeciesList = await speciesTask;
+        Fixations   = await fixationsTask;
     }
 
     public async Task OnGetAsync()
@@ -112,10 +169,13 @@ public class ViewSubmissionsModel : HistoPageModel
     {
         ViewData["Title"] = "View submissions";
         ViewData["PageTitle"] = "View submissions";
-        await LoadLookupsAsync();
+        var lookupsTask = LoadLookupsAsync();
+        var resultsTask = _batches.SearchAsync(BuildCriteria());
+        await Task.WhenAll(lookupsTask, resultsTask);
         SelectedBatchId = 0;
-        Results  = await _batches.SearchAsync(BuildCriteria());
+        Results  = await resultsTask;
         Searched = true;
+        PopulateGridViewData();
         return Page();
     }
 
@@ -130,7 +190,9 @@ public class ViewSubmissionsModel : HistoPageModel
     {
         ViewData["Title"] = "View submissions";
         ViewData["PageTitle"] = "View submissions";
-        await LoadLookupsAsync();
+        var lookupsTask = LoadLookupsAsync();
+        var resultsTask = _batches.SearchAsync(BuildCriteria());
+        await Task.WhenAll(lookupsTask, resultsTask);
 
         if (SelectedBatchId > 0)
         {
@@ -139,8 +201,9 @@ public class ViewSubmissionsModel : HistoPageModel
             Session.IsViewSubmissionMode = true;
         }
 
-        Results  = await _batches.SearchAsync(BuildCriteria());
+        Results  = await resultsTask;
         Searched = true;
+        PopulateGridViewData();
         return Page();
     }
 

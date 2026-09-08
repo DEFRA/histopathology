@@ -76,14 +76,39 @@ public sealed class BlockTestRepository : IBlockTestRepository
 
         var results = new List<BlockTest>();
 
-        BlockTest Map(dynamic row, string testType)
+        // Dapper's dynamic rows return DBNull.Value (not C# null) for NULL columns — a raw
+        // `dynamic` cast like `(int)row.QCNoteRef` or a DBNull `is not null` check (true for
+        // DBNull, since it's a real object) throws, which BlockTestService's catch-all then
+        // silently swallows, wiping every indicator column for the WHOLE batch. QCNote/Dispatched
+        // are NULL on any not-yet-QC'd/not-yet-dispatched test — a very common state — so this hit
+        // real submissions. Read every nullable column via IDictionary<string, object> instead,
+        // matching the DBNull-safe convention used elsewhere in this codebase (BatchRepository etc).
+        static string? Str(IDictionary<string, object> d, string key) =>
+            d.TryGetValue(key, out var v) && v is not DBNull && v is not null ? Convert.ToString(v) : null;
+        static int? IntOrNull(IDictionary<string, object> d, string key) =>
+            d.TryGetValue(key, out var v) && v is not DBNull && v is not null ? Convert.ToInt32(v) : null;
+        static DateTime? DateOrNull(IDictionary<string, object> d, string key) =>
+            d.TryGetValue(key, out var v) && v is not DBNull && v is not null ? Convert.ToDateTime(v) : null;
+        static bool Bool(IDictionary<string, object> d, string key)
         {
-            int blockId       = (int)row.BlockID;
+            if (!d.TryGetValue(key, out var v) || v is DBNull || v is null) return false;
+            return v is bool b ? b : Convert.ToInt64(v) != 0;
+        }
+        static byte[]? Bytes(IDictionary<string, object> d, string key) =>
+            d.TryGetValue(key, out var v) && v is not DBNull && v is not null ? (byte[])v : null;
+
+        BlockTest Map(dynamic dynamicRow, string testType)
+        {
+            var row           = (IDictionary<string, object>)dynamicRow;
+            int blockId       = Convert.ToInt32(row["BlockID"]);
             int? animalId     = blockAnimalMap.GetValueOrDefault(blockId);
             int? blockStatus  = blockStatusMap.GetValueOrDefault(blockId);
             string? histoRef  = animalId.HasValue ? animalHistoRefMap.GetValueOrDefault(animalId.Value) : null;
             bool onHold       = blockStatus == 2;
-            bool archived     = row.ArchiveLocation is not null && row.ArchivedDate is not null;
+            var archiveLocation = Str(row, "ArchiveLocation");
+            var archivedDate    = DateOrNull(row, "ArchivedDate");
+            bool archived     = archiveLocation is not null && archivedDate is not null;
+            int id            = Convert.ToInt32(row["ID"]);
 
             var tcLookup = testType switch
             {
@@ -95,38 +120,39 @@ public sealed class BlockTestRepository : IBlockTestRepository
 
             return new BlockTest
             {
-                ID              = (int)row.ID,
+                ID              = id,
                 BlockID         = blockId,
                 BlockRef        = blockRefMap.GetValueOrDefault(blockId) ?? string.Empty,
                 HistologyRef    = histoRef,
                 TestType        = testType,
-                Code            = (string?)row.Code ?? string.Empty,
+                Code            = Str(row, "Code") ?? string.Empty,
                 TestDetails     = null,  // not available from legacy block SPs; page falls back to Code
-                Result          = (string?)row.Result,
-                QCCode          = (string?)row.QCCode,
-                QCNote          = row.QCNote is bool b ? b : row.QCNote is not null && (int)row.QCNote != 0,
-                QCNoteRef       = (int?)row.QCNoteRef,
-                StainRef        = (string?)row.StainRef,
-                Dispatched      = row.Dispatched is bool d ? d : row.Dispatched is not null && (int)row.Dispatched != 0,
-                DispatchedDate  = (DateTime?)row.DispatchedDate,
-                DispatchedBy    = (string?)row.DispatchedBy,
-                DispatchedTo    = (string?)row.DispatchedTo,
-                Comment         = (string?)row.Comment,
-                RemedialAction  = (string?)row.RemedialAction,
-                ArchiveLocation = (string?)row.ArchiveLocation,
-                ArchivedDate    = (DateTime?)row.ArchivedDate,
-                ArchiveComment  = (string?)row.ArchiveComment,
-                NumberOfSlides  = (int?)row.NumberOfSlides,
+                Result          = Str(row, "Result"),
+                QCCode          = Str(row, "QCCode"),
+                QCNote          = Bool(row, "QCNote"),
+                QCNoteRef       = IntOrNull(row, "QCNoteRef"),
+                StainRef        = Str(row, "StainRef"),
+                Dispatched      = Bool(row, "Dispatched"),
+                DispatchedDate  = DateOrNull(row, "DispatchedDate"),
+                DispatchedBy    = Str(row, "DispatchedBy"),
+                DispatchedTo    = Str(row, "DispatchedTo"),
+                Comment         = Str(row, "Comment"),
+                RemedialAction  = Str(row, "RemedialAction"),
+                ArchiveLocation = archiveLocation,
+                ArchivedDate    = archivedDate,
+                ArchiveComment  = Str(row, "ArchiveComment"),
+                NumberOfSlides  = IntOrNull(row, "NumberOfSlides"),
                 OnHold          = onHold,
                 Archived        = archived,
-                RowStamp        = (byte[]?)row.RowStamp,
-                TCCodes         = tcLookup.TryGetValue((int)row.ID, out var codes) ? codes : [],
+                RowStamp        = Bytes(row, "RowStamp"),
+                TCCodes         = tcLookup.TryGetValue(id, out var codes) ? codes : [],
             };
         }
 
         foreach (var row in histology)  results.Add(Map(row, BlockTestType.Histology));
         foreach (var row in antibodies) results.Add(Map(row, BlockTestType.Antibodies));
         foreach (var row in stains)     results.Add(Map(row, BlockTestType.Stain));
+
 
         return results;
     }

@@ -22,7 +22,7 @@ public class SearchSenderModel : HistoPageModel
     public SearchSenderModel(ISessionService session, ISubmissionService submissions)
         : base(session) => _submissions = submissions;
 
-    [BindProperty] public string? SenderRef { get; set; }
+    [BindProperty(SupportsGet = true)] public string? SenderRef { get; set; }
 
     // ── Picker mode: set by the calling page (e.g. CopyBatch) via query params. ──
     [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
@@ -38,10 +38,19 @@ public class SearchSenderModel : HistoPageModel
     /// to show the 'no results' message rather than leaving the page blank.</summary>
     public bool HasSearched { get; private set; }
 
-    public void OnGet()
+    public async Task OnGetAsync()
     {
         ViewData["Title"]     = IsPickerMode ? "Select sender ref" : "Search by Sender";
         ViewData["PageTitle"] = IsPickerMode ? "Select sender ref" : "Search by Sender";
+
+        // Mirrors legacy lbLookup_Click on AddSubmission.aspx: the sender ref already typed on
+        // the calling page is carried over and the search runs immediately, landing the user on
+        // a populated results grid rather than a second blank search box.
+        if (!string.IsNullOrWhiteSpace(SenderRef))
+        {
+            HasSearched = true;
+            Results = await _submissions.GetAnimalsBySenderRefAsync(SenderRef.Trim());
+        }
     }
 
     public async Task<IActionResult> OnPostAsync()

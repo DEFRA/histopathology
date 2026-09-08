@@ -53,10 +53,17 @@ public abstract class GridPageModel : HistoPageModel
     /// </summary>
     protected void PopulateGridViewData(int totalCount)
     {
+        var totalPages = CalculateTotalPages(totalCount);
+        // Clamp so an out-of-range PageNumber (stale link, filtered-down result set, edited
+        // URL) doesn't silently render an empty page — PagedEntries reads PageNumber lazily,
+        // so this also fixes what gets displayed, not just the pagination control.
+        if (PageNumber < 1) PageNumber = 1;
+        else if (PageNumber > totalPages) PageNumber = totalPages;
+
         ViewData["SortColumn"] = SortColumn;
         ViewData["SortDesc"]   = SortDesc;
         ViewData["SortBase"]   = SortBase;
-        ViewData["CurrentPage"] = PageNumber < 1 ? 1 : PageNumber;
-        ViewData["TotalPages"]  = CalculateTotalPages(totalCount);
+        ViewData["CurrentPage"] = PageNumber;
+        ViewData["TotalPages"]  = totalPages;
     }
 }

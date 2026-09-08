@@ -19,7 +19,7 @@ public sealed class BlockRepository : IBlockRepository
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<Block>(
-            "GetBlocksByBatchID",
+            "GetBatchBlockDetails",
             new { ID = batchId },
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
@@ -30,7 +30,7 @@ public sealed class BlockRepository : IBlockRepository
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<Block>(
-            "GetPreBookedBlocksByAnimalID",
+            "GetAnimalPreBookedBlocks",
             new { AnimalID = animalId },
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();

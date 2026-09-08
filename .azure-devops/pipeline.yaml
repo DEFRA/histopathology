@@ -6,91 +6,150 @@ trigger:
 variables:
   - name: buildConfiguration
     value: 'Release'
-
   - name: solution
     value: 'HistopathologySystem.slnx'
-
   - name: webProject
     value: 'src/Histo.Web/Histo.Web.csproj'
 
 stages:
+  - stage: Build
+    displayName: Build and Test
+    jobs:
+      - job: build
+        pool:
+          vmImage: 'ubuntu-24.04'
+        steps:
+          - checkout: self
+            fetchDepth: 1
+            persistCredentials: false
 
-- stage: Build
-  displayName: Build and test
-  jobs:
-  - job: build
-    pool:
-      vmImage: 'ubuntu-24.04'
-    steps:
-
-    - checkout: self
-      fetchDepth: 1
-      persistCredentials: false
-
-    - task: UseDotNet@2
-      displayName: 'Install .NET 10 SDK'
-      inputs:
-        version: '10.0.x'
-        includePreviewVersions: true
-
-    - script: |
-        dotnet --info
-        echo "--- files in working directory ---"
-        ls -la
-      displayName: 'Diagnostics'
-
-    - script: dotnet restore $(solution)
-      displayName: 'Restore dependencies'
-
-    - script: dotnet build $(solution) --configuration $(buildConfiguration) --no-restore
-      displayName: 'Build'
-
-    - script: dotnet test $(solution) --configuration $(buildConfiguration) --no-build --logger trx
-      displayName: 'Run tests'
-
-    - task: PublishTestResults@2
-      displayName: 'Publish test results'
-      condition: succeededOrFailed()
-      inputs:
-        testResultsFormat: VSTest
-        testResultsFiles: '**/*.trx'
-
-    - task: DotNetCoreCLI@2
-      displayName: 'Publish Histo.Web'
-      inputs:
-        command: publish
-        publishWebProjects: false
-        projects: '$(webProject)'
-        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
-        zipAfterPublish: true
-
-    - publish: '$(Build.ArtifactStagingDirectory)'
-      artifact: drop
-      displayName: 'Publish artifact'
-
-- stage: Deploy
-  displayName: Deploy to Dev
-  dependsOn: Build
-  condition: >-
-    and(succeeded(),
-        eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
-        ne(variables['Build.Reason'], 'PullRequest'))
-  jobs:
-  - deployment: deploy_dev
-    environment: 'dev'
-    pool:
-      name: 'DEFRA-COMMON-UBUNTU-SSV3'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - download: current
-            artifact: drop
-          - task: AzureWebApp@1
+          - task: UseDotNet@2
+            displayName: 'Install .NET 10 SDK'
             inputs:
-              azureSubscription: 'AZR-CDE-DEV1'
-              appType: 'webAppLinux'
-              appName: 'DEVCDEWEBAW1401'
-              package: '$(Pipeline.Workspace)/drop/*.zip'
-              runtimeStack: 'DOTNETCORE|10.0'
-              deploymentMethod: 'zipDeploy'
+              version: '10.0.x'
+              includePreviewVersions: true
+
+          - script: |
+              dotnet --info
+              echo "--- files in working directory ---"
+              ls -la
+            displayName: 'Diagnostics'
+
+          - script: dotnet restore $(solution)
+            displayName: 'Restore dependencies'
+
+          - script: dotnet build $(solution) --configuration $(buildConfiguration) --no-restore
+            displayName: 'Build'
+
+          - script: dotnet test $(solution) --configuration $(buildConfiguration) --no-build --logger trx
+            displayName: 'Run tests'
+
+          - task: PublishTestResults@2
+            displayName: 'Publish test results'
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: VSTest
+              testResultsFiles: '**/*.trx'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Publish Histo.Web'
+            inputs:
+              command: publish
+              publishWebProjects: false
+              projects: '$(webProject)'
+              arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+              zipAfterPublish: true
+
+          - publish: '$(Build.ArtifactStagingDirectory)'
+            artifact: drop
+            displayName: 'Publish artifact'
+
+  - stage: DEV
+    displayName: DEV
+    dependsOn: Build
+    condition: >-
+      and(succeeded(),
+          eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
+          ne(variables['Build.Reason'], 'PullRequest'))
+    variables:
+    - name: appName
+      value: 'DEVCDEWEBAW1401'
+    - name: tenantId
+      value: '770a2450-0227-4c62-90c7-4e38537f1102'
+    - name: appId
+      value: '89060d89-195d-47f4-a900-2f66fba81a75'
+    - name: sqlServer
+      value: 'devcdeinfsq1401.database.windows.net,1433'
+    - name: dbName
+      value: 'histopathology'      
+    jobs:
+      - deployment: deploy_dev
+        environment: 'dev'
+        pool:
+          name: 'DEFRA-COMMON-UBUNTU-SSV3'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: drop
+
+                - task: AzureWebApp@1
+                  inputs:
+                    azureSubscription: 'AZR-CDE-DEV1'
+                    appType: 'webAppLinux'
+                    appName: '$(appName)'
+                    package: '$(Pipeline.Workspace)/drop/*.zip'
+                    runtimeStack: 'DOTNETCORE|10.0'
+                    deploymentMethod: 'zipDeploy'
+                    appSettings: >-
+                      -Saml2__SPEntityId "https://dev-cde.azure.defra.cloud"
+                      -Saml2__PublicOrigin "https://dev-cde.azure.defra.cloud"
+                      -Saml2__IdPEntityId "https://sts.windows.net/$(tenantId)/"
+                      -Saml2__IdPMetadataUrl "https://login.microsoftonline.com/$(tenantId)/federationmetadata/2007-06/federationmetadata.xml?appid=$(appId)"
+                      -Authentication__BypassEnabled "false"
+                      -ConnectionStrings__BSE "Server=tcp:$(sqlServer);Database=$(dbName);Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Managed Identity;"
+
+
+  - stage: TST
+    displayName: TST
+    dependsOn: Build
+    condition: and(succeeded(), eq('${{ parameters.deployToTest }}', true))
+    variables:
+    - name: appName
+      value: 'TSTCDEWEBAW1401'
+    - name: tenantId
+      value: '770a2450-0227-4c62-90c7-4e38537f1102'
+    - name: appId
+      value: '3fade19d-06ed-4b1c-8f2c-fff3c22b5955'
+    - name: sqlServer
+      value: 'tstcdeinfsq1401.database.windows.net,1433'
+    - name: dbName
+      value: 'histopathology'      
+    jobs:
+      - deployment: deploy_tst
+        environment: 'test'
+        pool:
+          name: 'DEFRA-COMMON-UBUNTU-SSV3'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: drop
+
+                - task: AzureWebApp@1
+                  inputs:
+                    azureSubscription: 'AZR-CDE-TST1'
+                    appType: 'webAppLinux'
+                    appName: '$(appName)'
+                    package: '$(Pipeline.Workspace)/drop/*.zip'
+                    runtimeStack: 'DOTNETCORE|10.0'
+                    deploymentMethod: 'zipDeploy'
+                    appSettings: >-
+                      -Saml2__SPEntityId "https://tst-cde.azure.defra.cloud"
+                      -Saml2__PublicOrigin "https://tst-cde.azure.defra.cloud"
+                      -Saml2__IdPEntityId "https://sts.windows.net/$(tenantId)/"
+                      -Saml2__IdPMetadataUrl "https://login.microsoftonline.com/$(tenantId)/federationmetadata/2007-06/federationmetadata.xml?appid=$(appId)"
+                      -Authentication__BypassEnabled "false"
+                      -ConnectionStrings__BSE "Server=tcp:$(sqlServer);Database=$(dbName);Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Managed Identity;"

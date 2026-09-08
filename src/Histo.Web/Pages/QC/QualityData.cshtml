@@ -109,18 +109,25 @@
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <th scope="col" class="govuk-table__header">Histology ref</th>
-                <th scope="col" class="govuk-table__header">Block ref</th>
-                <th scope="col" class="govuk-table__header">Test</th>
-                <th scope="col" class="govuk-table__header">Result</th>
-                <th scope="col" class="govuk-table__header">Dispatched</th>
-                <th scope="col" class="govuk-table__header">Archived</th>
-                <th scope="col" class="govuk-table__header">On hold</th>
+                @{ ViewData["Label"] = "Histology ref"; ViewData["Column"] = "HistologyRef"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Block ref"; ViewData["Column"] = "BlockRef"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Test"; ViewData["Column"] = "Test"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Result"; ViewData["Column"] = "Result"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Dispatched"; ViewData["Column"] = "Dispatched"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Archived"; ViewData["Column"] = "Archived"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "On hold"; ViewData["Column"] = "OnHold"; }
+                <partial name="_SortableHeader" />
                 <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
             </tr>
         </thead>
         <tbody class="govuk-table__body">
-            @foreach (var t in Model.Tests)
+            @foreach (var t in Model.PagedEntries)
             {
                 <tr class="govuk-table__row">
                     <td class="govuk-table__cell">@t.HistologyRef</td>
@@ -164,6 +171,7 @@
             }
         </tbody>
     </table>
+    <partial name="_Pagination" />
 }
 else
 {
