@@ -131,7 +131,7 @@ public sealed class BatchService : IBatchService
     public async Task<bool> CompleteBlockAssignmentAsync(int batchId, bool allTissuesAssigned, int userId, CancellationToken ct = default)
     {
         try { await _batches.CompleteBlockAssignmentAsync(batchId, allTissuesAssigned, userId, ct); return true; }
-        catch (Exception ex) { _logger.LogError("Failed to complete block assignment for batch {BatchId}.", ex, batchId); return false; }
+        catch (Exception ex) { _logger.LogError(ex, "Failed to complete block assignment for batch {BatchId}.", batchId); return false; }
     }
 
     public async Task<bool> SetByPassSortAsync(int batchId, bool byPassSort, int userId, CancellationToken ct = default)
