@@ -3,6 +3,17 @@ trigger:
     include:
       - develop
 
+parameters:
+  - name: deployToDev
+    displayName: Deploy to DEV
+    type: boolean
+    default: true
+
+  - name: deployToTest
+    displayName: Deploy to TST
+    type: boolean
+    default: false
+
 variables:
   - name: buildConfiguration
     value: 'Release'
@@ -67,10 +78,7 @@ stages:
   - stage: DEV
     displayName: DEV
     dependsOn: Build
-    condition: >-
-      and(succeeded(),
-          eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
-          ne(variables['Build.Reason'], 'PullRequest'))
+    condition: and(succeeded(), eq('${{ parameters.deployToDev }}', true))
     variables:
     - name: appName
       value: 'DEVCDEWEBAW1401'
