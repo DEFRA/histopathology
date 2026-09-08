@@ -173,7 +173,7 @@
             }
             @if (!Model.Blocks.Any())
             {
-                <tr class="govuk-table__row"><td colspan="11" class="govuk-table__cell">No blocks found for this batch.</td></tr>
+                <tr class="govuk-table__row"><td colspan="@(Model.IsTse ? 12 : 11)" class="govuk-table__cell">No blocks found for this batch.</td></tr>
             }
         </tbody>
     </table>
