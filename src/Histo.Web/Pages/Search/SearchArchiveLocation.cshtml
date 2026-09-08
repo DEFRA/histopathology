@@ -9,19 +9,7 @@
     <a asp-page="/Search/SearchMenu" class="govuk-back-link">Back</a>
 }
 
-@if (Model.ErrorMessage is not null)
-{
-    <div class="govuk-error-summary" data-module="govuk-error-summary">
-        <div role="alert">
-            <h2 class="govuk-error-summary__title">There is a problem</h2>
-            <div class="govuk-error-summary__body">
-                <ul class="govuk-list govuk-error-summary__list">
-                    <li>@Model.ErrorMessage</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-}
+<partial name="_ErrorSummary" model="Model.Errors" />
 
 <form method="post">
     <div class="govuk-form-group">
@@ -53,7 +41,7 @@
         <input class="govuk-input" asp-for="BlockRef" />
     </div>
     <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
-    @if (Model.Searched && Model.ErrorMessage is null)
+    @if (Model.Searched && Model.Errors.Count == 0)
     {
         <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to CSV</button>
     }
