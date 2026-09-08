@@ -18,7 +18,20 @@
                 <ul class="govuk-list govuk-error-summary__list">
                     @foreach (var e in Model.Errors)
                     {
-                        <li>@e</li>
+                        var anchor = e.Contains("user", StringComparison.OrdinalIgnoreCase) ? "UserID"
+                                   : e.Contains("start", StringComparison.OrdinalIgnoreCase) ? "StartDate"
+                                   : e.Contains("end", StringComparison.OrdinalIgnoreCase) ? "EndDate"
+                                   : null;
+                        <li>
+                            @if (anchor is not null)
+                            {
+                                <a class="govuk-link" href="#@anchor">@e</a>
+                            }
+                            else
+                            {
+                                @e
+                            }
+                        </li>
                     }
                 </ul>
             </div>
@@ -105,7 +118,7 @@
     </table>
     <partial name="_Pagination" />
 }
-else
+else if (Model.Searched)
 {
     <p class="govuk-body">No audit log entries found for this user.</p>
 }
