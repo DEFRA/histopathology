@@ -1,0 +1,79 @@
+@page "{tableId:int}"
+@model Histo.Web.Pages.Admin.LookupItemsModel
+@{
+    ViewData["Title"] = "Pick list items";
+    ViewData["PageTitle"] = "Pick list items";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Admin/PickListMaintenance" class="govuk-back-link">Back</a>
+}
+
+<h2 class="govuk-heading-m">@Model.TableName</h2>
+
+@if (!string.IsNullOrEmpty(Model.StatusMessage))
+{
+    <div class="govuk-notification-banner govuk-notification-banner--success" role="alert" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
+        <div class="govuk-notification-banner__header">
+            <h2 class="govuk-notification-banner__title" id="govuk-notification-banner-title">Success</h2>
+        </div>
+        <div class="govuk-notification-banner__content">
+            <p class="govuk-notification-banner__heading">@Model.StatusMessage</p>
+        </div>
+    </div>
+}
+
+<form method="get" class="govuk-!-margin-bottom-4">
+    <input type="hidden" name="tableId" value="@Model.TableId" />
+    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" type="checkbox" id="showDeactivated"
+                   name="ShowDeactivated" value="true"
+                   @(Model.ShowDeactivated ? "checked" : "")
+                   onchange="this.form.submit()" />
+            <label class="govuk-label govuk-checkboxes__label" for="showDeactivated">Show deactivated items</label>
+        </div>
+    </div>
+    <input type="hidden" name="ShowDeactivated" value="false" />
+</form>
+
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            @{ ViewData["Label"] = Model.ShowAreaColumn ? "Area" : "Code"; ViewData["Column"] = "Code"; }
+            <partial name="_SortableHeader" />
+            @{ ViewData["Label"] = "Description"; ViewData["Column"] = "Description"; }
+            <partial name="_SortableHeader" />
+            @{ ViewData["Label"] = "Active"; ViewData["Column"] = "Active"; }
+            <partial name="_SortableHeader" />
+            <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @foreach (var i in Model.PagedEntries)
+        {
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">@(Model.ShowAreaColumn ? (Model.AreaNameById.TryGetValue(i.Area ?? "", out var aName) ? aName : i.Area) : (i.Code ?? i.ID.ToString()))</td>
+                <td class="govuk-table__cell">@i.Name</td>
+                <td class="govuk-table__cell">@(i.Active ? "Yes" : "No")</td>
+                <td class="govuk-table__cell">
+                    @if (Model.TableHasCodes)
+                    {
+                        <a asp-page="/Admin/EditLookupItem" asp-route-tableId="@Model.TableId" asp-route-itemCode="@i.Code" class="govuk-link">Change<span class="govuk-visually-hidden"> @i.Name</span></a>
+                    }
+                    else
+                    {
+                        <a asp-page="/Admin/EditLookupItem" asp-route-tableId="@Model.TableId" asp-route-itemId="@i.ID" class="govuk-link">Change<span class="govuk-visually-hidden"> @i.Name</span></a>
+                    }
+                </td>
+            </tr>
+        }
+        @if (Model.TotalCount == 0)
+        {
+            <tr class="govuk-table__row"><td colspan="4" class="govuk-table__cell">No items found.</td></tr>
+        }
+    </tbody>
+</table>
+<partial name="_Pagination" />
+
+<a asp-page="/Admin/AddLookupItem" asp-route-tableId="@Model.TableId" class="govuk-button" data-module="govuk-button">Add item</a>

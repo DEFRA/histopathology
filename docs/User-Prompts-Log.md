@@ -2191,6 +2191,64 @@ The wider error-summary rollout beyond Search (~30 files) was left alone: the ap
 
 **Files changed:** [src/Histo.Web/Pages/Search/SearchSubmissions.cshtml](../src/Histo.Web/Pages/Search/SearchSubmissions.cshtml), [src/Histo.Web/Pages/Search/SearchSubmissions.cshtml.cs](../src/Histo.Web/Pages/Search/SearchSubmissions.cshtml.cs), [src/Histo.Web/Pages/Search/SearchPMDates.cshtml](../src/Histo.Web/Pages/Search/SearchPMDates.cshtml), [src/Histo.Web/Pages/Search/SearchPMDates.cshtml.cs](../src/Histo.Web/Pages/Search/SearchPMDates.cshtml.cs), [src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml](../src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml), [src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml.cs](../src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml.cs), [src/Histo.Web/Pages/Search/SearchTest.cshtml](../src/Histo.Web/Pages/Search/SearchTest.cshtml), [src/Histo.Web/Pages/Search/SearchTest.cshtml.cs](../src/Histo.Web/Pages/Search/SearchTest.cshtml.cs), [src/Histo.Web/Pages/Search/SearchUnUsedHistologyRefs.cshtml](../src/Histo.Web/Pages/Search/SearchUnUsedHistologyRefs.cshtml), [src/Histo.Web/Pages/Search/SearchUnUsedHistologyRefs.cshtml.cs](../src/Histo.Web/Pages/Search/SearchUnUsedHistologyRefs.cshtml.cs), [src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml), [src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml.cs](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml.cs), [src/Histo.Web/Pages/Search/ViewSamples.cshtml](../src/Histo.Web/Pages/Search/ViewSamples.cshtml), [src/Histo.Web/Pages/Search/ViewSamples.cshtml.cs](../src/Histo.Web/Pages/Search/ViewSamples.cshtml.cs), [src/Histo.Web/Pages/Search/SearchMenu.cshtml](../src/Histo.Web/Pages/Search/SearchMenu.cshtml), [src/Histo.Web/Pages/Index.cshtml](../src/Histo.Web/Pages/Index.cshtml), [src/Histo.Web/Pages/Shared/_ErrorSummary.cshtml](../src/Histo.Web/Pages/Shared/_ErrorSummary.cshtml), [src/Histo.Web/Pages/Shared/_DateInput.cshtml](../src/Histo.Web/Pages/Shared/_DateInput.cshtml), [src/Histo.Web/DateParts.cs](../src/Histo.Web/DateParts.cs), [src/Histo.Submissions/Interfaces/IBatchRepository.cs](../src/Histo.Submissions/Interfaces/IBatchRepository.cs), [src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs), [tests/Histo.Tests/Unit/SearchValidationTests.cs](../tests/Histo.Tests/Unit/SearchValidationTests.cs). **Deleted:** `src/Histo.Web/Pages/Search/SearchSample.cshtml`, `src/Histo.Web/Pages/Search/SearchSample.cshtml.cs`.
 
+---
+
+## Prompt 145 — QualityData Test dropdown/grid showing an extra row vs legacy (2026-09-08)
+
+> QualityData.cshmtl Test dropdonw show additional values Special Stain and grid also showing additional row, but legacy it not showing it, legacy it has 3 rows, new applicaiton 4 rows.
+
+Asked for a specific submission number to confirm live rather than guessing; user supplied submission 29399. Read legacy `clsBatchSummary.vb::CreateTestSummaryData`'s `BLOCK_HISTOLOGY` loop and confirmed via `grep -E "^\s*Case \d"` that only codes 1 (EO), 2 (H&E), 5 (H&E-BSE), 7 (Archive) have an explicit `Case` branch adding a worklist row — codes 3 (Special Stain), 4 (IHC-PrP), 6 (IHC-Other) fall through to `Case Else: 'Do nothing`, because they are gating/indicator flags only; the real per-test rows for those categories live in the separate `BLOCK_ANTIBODIES`/`BLOCK_STAIN` child tables, which get their own unconditional loops. Ran live sqlcmd queries for submission 29399/block 317172: `BLOCK_HISTOLOGY` had 1 row (Code=3), `BLOCK_ANTIBODIES` had 0 rows, `BLOCK_STAIN` had 3 real rows (codes 14/1/18) — confirming legacy math 0+0+3=3 matches the user's report, and the current app's 1+0+3=4 matches the reported bug exactly. Fixed `BlockTestRepository.GetByBatchAsync` to filter the histology result set to `Code IN ("1","2","5","7")` before mapping, matching legacy's `Case Else` exclusion. Same SP (`GetBatchBlocksByID`) on both sides — not a wrong-SP bug, purely a missing code-level filter that the earlier porting phase never replicated.
+
+**Build:** 0 errors (`Histo.Histology` project). No new automated test added — this repository has no existing test harness for `BlockTestRepository` (a Dapper repo with no mockable seam); verified via live sqlcmd data and legacy source comparison instead, consistent with this session's established methodology for data-shape bugs.
+
+**Files changed:** [src/Histo.Histology/Repositories/BlockTestRepository.cs](../src/Histo.Histology/Repositories/BlockTestRepository.cs).
+
+---
+
+## Prompt 146 — EditBlockStain "expects parameter '@Code'" SqlException on save (2026-09-08)
+
+> Below issue is getting when i save the BlockTestRepository.cs — `public async Task UpdateAsync(BlockTest test, int userId, CancellationToken ct = default)` — `Microsoft.Data.SqlClient.SqlException: 'Procedure or function 'EditBlockStain' expects parameter '@Code', which was not supplied.'`
+
+Queried `sys.parameters` for `EditBlockStain`, `EditBlockHistology` and `EditBlockAntibodies` in one go (rather than fixing one missing parameter at a time and hitting the next error later) and confirmed all three share an identical 22-parameter signature, including `@Code`, `@EnteredBy` (varchar) and `@PremiumCharge` (varchar) — none of which `UpdateAsync` was sending. Confirmed via `sp_helptext` on `GetBatchBlockHistology` that `EnteredBy`/`PremiumCharge` are real columns on the read side too, but had never been mapped onto the `BlockTest` model. Added both as nullable properties on `BlockTest`, mapped them in `BlockTestRepository.Map()`, and fixed `UpdateAsync` to send `@Code` (`test.Code`), `@EnteredBy` (always the current `userId` — confirmed via `QualityData.aspx.vb` that legacy always overwrites this with the session user on every save, never preserves the prior value) and `@PremiumCharge` (round-tripped unchanged — legacy never edits this field from the QC screen). `EditQualityDataTest.cshtml.cs`'s `updated` object now also sets `PremiumCharge = Test.PremiumCharge` so the round-trip doesn't silently null it out.
+
+**Build:** 0 errors (`Histo.Histology` and `Histo.Web` both verified).
+
+**Files changed:** [src/Histo.Histology/Models/BlockTest.cs](../src/Histo.Histology/Models/BlockTest.cs), [src/Histo.Histology/Repositories/BlockTestRepository.cs](../src/Histo.Histology/Repositories/BlockTestRepository.cs), [src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml.cs](../src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml.cs).
+
+---
+
+## Prompt 147 — EditQualityDataTest error summary link not clickable (2026-09-08)
+
+> error summary not implmented in this page EditQualityDataTest.cshtml, user can't clikc on the error summary link
+
+Found this app already has an established shared `_ErrorSummary.cshtml` partial (`IReadOnlyDictionary<string,string>` field-id → message, rendering `<a href="#FieldId">`), previously rolled out to the Search module in an earlier session, that `EditQualityDataTest.cshtml` had never adopted — it instead rendered a plain `<li>@Model.Error</li>` with no `href`, so the link could never move focus to a field. Replaced the single `Error` string with a field-keyed `Errors` dictionary (`QCCode`/`DispatchedDate`/`DispatchedBy`/`DispatchedTo`/`RemedialAction`/`ArchiveLocation`/`ArchivedDate`), switched `OnPostAsync` from "return on the first failing check" to accumulating every validation failure in one pass (GDS best practice — show every problem at once), and added a separate non-linked `ConcurrencyError` for the optimistic-concurrency exception case, matching `EditQCNote`'s existing convention for that same class of non-field error. Added GDS field-level error markup (`govuk-form-group--error`/`govuk-error-message`/`aria-describedby`) to all 7 validated fields.
+
+**Build:** 0 errors. Added 5 new tests in `EditQualityDataTestModelTests.cs`, all passing.
+
+**Files changed:** [src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml.cs](../src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml.cs), [src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml](../src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml), [tests/Histo.Tests/Unit/EditQualityDataTestModelTests.cs](../tests/Histo.Tests/Unit/EditQualityDataTestModelTests.cs).
+
+---
+
+## Prompt 148 — Analyse Pick List Maintenance and implement GDS-compliant Add/Edit pages (2026-09-08)
+
+> Requirement: analyse the current implementation of `PickListMaintenance.cshtml` and the related lookup item maintenance functionality. Current behaviour combines Add and Edit on `EditLookupItem.cshtml`; per GDS guidelines these should be separate pages. Review the flow, verify GDS requirements, identify all lookup types and field structures, create separate Add/Edit pages with dynamic form rendering based on lookup configuration, and ensure validation/save/UX consistency across all lookup maintenance pages.
+
+Confirmed `EditLookupItem.cshtml` combined three responsibilities on one page (item list, Add form, Edit form), violating GDS "one thing per page". Enumerated every editable lookup table's real field shape by querying `GetEditableLookupProcs` for all 16 tables and then `sys.parameters` on every resulting Add stored procedure in one batch — confirmed only 2 field-shape variants exist across the 14 non-UserArea tables: "Code-keyed" (12 tables: `@Code`/`@Description`/`@IsActive`) and "Area-scoped/ID-keyed" (Contacts 18, Projects 19: `@Area`/`@Description`/`@IsActive`/`@ID`, no `@Code`) — matching the user's "Lookup Type A"/"Lookup Type B" examples exactly. Split into three pages: new `LookupItems.cshtml(.cs)` (read-only item list, "Show deactivated" filter, "Add item" button, per-row "Change" links), new `AddLookupItem.cshtml(.cs)` (dedicated Add form), and `EditLookupItem.cshtml(.cs)` (stripped of the Add branch and the item list, now Edit-only, with a safe redirect instead of a silently-blank form if the item isn't found). Added `LookupTableSchema` (internal static class in `Pages/Admin/`) with `ShowAreaColumn(tableId)`/`HasCodes(items)` so all three pages derive field shape identically rather than duplicating the logic. Updated `PickListMaintenance.cshtml`'s "Edit items" link and `HelpSectionMap.cs` for the two new routes. No existing test file existed for `EditLookupItemModel` before this change (confirmed via search), so no test breakage risk.
+
+**Build:** 0 errors. **Tests:** 267 passed, 4 pre-existing unrelated `BatchesReceivedModelTests` failures, 1 skipped (12 new tests added across 3 new test files).
+
+**Files changed:** [src/Histo.Web/Pages/Admin/LookupItems.cshtml](../src/Histo.Web/Pages/Admin/LookupItems.cshtml) (new), [src/Histo.Web/Pages/Admin/LookupItems.cshtml.cs](../src/Histo.Web/Pages/Admin/LookupItems.cshtml.cs) (new), [src/Histo.Web/Pages/Admin/AddLookupItem.cshtml](../src/Histo.Web/Pages/Admin/AddLookupItem.cshtml) (new), [src/Histo.Web/Pages/Admin/AddLookupItem.cshtml.cs](../src/Histo.Web/Pages/Admin/AddLookupItem.cshtml.cs) (new), [src/Histo.Web/Pages/Admin/EditLookupItem.cshtml](../src/Histo.Web/Pages/Admin/EditLookupItem.cshtml), [src/Histo.Web/Pages/Admin/EditLookupItem.cshtml.cs](../src/Histo.Web/Pages/Admin/EditLookupItem.cshtml.cs), [src/Histo.Web/Pages/Admin/LookupTableSchema.cs](../src/Histo.Web/Pages/Admin/LookupTableSchema.cs) (new), [src/Histo.Web/Pages/Admin/PickListMaintenance.cshtml](../src/Histo.Web/Pages/Admin/PickListMaintenance.cshtml), [src/Histo.Core/Domain/HelpSectionMap.cs](../src/Histo.Core/Domain/HelpSectionMap.cs).
+
+---
+
+## Prompt 149 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-08)
+
+> can you run log v2, session metric and user prompt
+
+Appended 4 new rows to `run-log-v2.md`'s Run Log table (#46–#49), 4 new rows to `session-metrics.md`'s timing table (#107–#110, complexity-based duration estimates), and 4 new prompt entries to this file (Prompts 145–148, plus this one) covering: the QualityData extra-row histology-code filter fix, the `EditBlockHistology`/`Antibodies`/`Stain` missing-parameter fix, the `EditQualityDataTest` clickable error-summary fix, and the Pick List Maintenance Add/Edit GDS page split.
+
+**Files changed:** [docs/run-log-v2.md](../docs/run-log-v2.md), [docs/session-metrics.md](../docs/session-metrics.md), [docs/User-Prompts-Log.md](../docs/User-Prompts-Log.md).
+
 
 
 
