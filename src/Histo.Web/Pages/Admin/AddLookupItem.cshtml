@@ -1,8 +1,8 @@
 @page "{tableId:int}"
-@model Histo.Web.Pages.Admin.EditLookupItemModel
+@model Histo.Web.Pages.Admin.AddLookupItemModel
 @{
-    ViewData["Title"] = "Edit pick list item";
-    ViewData["PageTitle"] = "Edit pick list item";
+    ViewData["Title"] = "Add pick list item";
+    ViewData["PageTitle"] = "Add pick list item";
 }
 
 @section BeforeHeading {
@@ -29,8 +29,6 @@
 
 <form method="post">
     <input type="hidden" asp-for="TableId" />
-    <input type="hidden" asp-for="ItemId" />
-    <input type="hidden" asp-for="OriginalCode" />
 
     @* Area dropdown — only for Contacts (table 18) and Projects (table 19) *@
     @if (Model.ShowAreaColumn)
@@ -41,14 +39,7 @@
                 <option value="">-- Select area --</option>
                 @foreach (var a in Model.UserAreas)
                 {
-                    if (Model.Area == a.ID.ToString())
-                    {
-                        <option value="@a.ID" selected>@a.Name</option>
-                    }
-                    else
-                    {
-                        <option value="@a.ID">@a.Name</option>
-                    }
+                    <option value="@a.ID">@a.Name</option>
                 }
             </select>
         </div>
@@ -83,8 +74,7 @@
         </div>
     </div>
     <div class="govuk-button-group">
-        <button type="submit" class="govuk-button" data-module="govuk-button">Save changes</button>
+        <button type="submit" class="govuk-button" data-module="govuk-button">Add item</button>
         <a asp-page="/Admin/LookupItems" asp-route-tableId="@Model.TableId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
     </div>
 </form>
-
