@@ -12,10 +12,13 @@ namespace Histo.Web.Pages.Submissions;
 
 /// <summary>
 /// Replaces <c>SubmissionDetailsBlock.aspx</c> — block summary grid for a batch submission's
-/// sample (cassetted workflow). When <see cref="AnimalId"/> is supplied (reached from
-/// SampleSummary's "Edit sample"), shows the header (Sender ref/PM date/Histology ref) and the
-/// block grid for that one sample; when omitted (reached from BatchDetails' "Assign blocks"),
-/// shows a read/delete/copy overview of every block in the batch.
+/// sample (cassetted workflow), reached from SampleSummary's "Edit sample"/"Manage sample".
+/// Shows the header (Sender ref/PM date/Histology ref) and the block grid for that one sample.
+///
+/// The batch-wide "every block in this batch" overview (legacy <c>BatchBlocks.aspx</c>, reached
+/// only from BatchDetails' "Assign blocks") lives on the dedicated
+/// <see cref="Histo.Web.Pages.Batches.BatchBlocksModel"/> page — the two legacy pages served
+/// different journeys and were never the same screen.
 ///
 /// Block creation/editing (ref, customer ref, tissues, per-block test selection) lives on the
 /// dedicated <see cref="Histo.Web.Pages.Blocks.BlockDetailsModel"/> page — restoring the legacy
@@ -66,8 +69,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
 
     /// <summary>
-    /// Optional — when omitted, the page shows a batch-wide overview of every block instead of
-    /// one sample's blocks (the former <c>Blocks/BlockDetails.cshtml</c> use case).
+    /// When omitted, the page redirects to the batch-wide <see cref="Histo.Web.Pages.Batches.BatchBlocksModel"/> overview.
     /// </summary>
     [BindProperty(SupportsGet = true)] public int? AnimalId { get; set; }
 
@@ -109,9 +111,6 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     /// <summary>Resolves a tissue code to its description, matching legacy's LookupDescription(dtTissuesList, TissueCode).</summary>
     public string TissueName(string code) => TissueOptions.FirstOrDefault(o => o.Code == code)?.Name ?? code;
 
-    /// <summary>Sender ref keyed by AnimalID — used only in batch-wide mode (no <see cref="AnimalId"/>) to label each row.</summary>
-    public IReadOnlyDictionary<int, string> SenderRefsByAnimalId { get; private set; } = new Dictionary<int, string>();
-
     public string? ErrorMessage { get; private set; }
 
     /// <summary>Mirrors SampleSummaryModel/SubmissionDetailsModel — hides all block mutation actions
@@ -124,19 +123,12 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         ViewData["Title"] = "Sample Blocks";
         ViewData["PageTitle"] = "Sample Blocks";
 
+        // No AnimalId means the caller wants the batch-wide overview, which now lives on its own page.
+        if (AnimalId is null or <= 0)
+            return RedirectToPage("/Batches/BatchBlocks", new { batchId = BatchId ?? Session.BatchID });
+
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
-
-        // Batch-wide mode is "no AnimalId supplied" — not "animal not found", which must fall
-        // through to the view's "Sample not found" branch rather than silently showing every block.
-        if (AnimalId is null or <= 0)
-        {
-            // Batch-wide overview (former Blocks/BlockDetails.cshtml behaviour) — every block in the batch.
-            Blocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
-            var animals = await _submissions.GetAnimalsByBatchAsync(BatchId ?? 0);
-            SenderRefsByAnimalId = animals.ToDictionary(a => a.ID, a => a.SenderRef);
-            return Page();
-        }
 
         if (Animal is null) return Page();
 

@@ -1,8 +1,8 @@
 @page
 @model BatchesReceivedModel
 @{
-    ViewData["Title"] = "Batches received";
-    ViewData["PageTitle"] = "Batches received";
+    ViewData["Title"] = "Submissions received";
+    ViewData["PageTitle"] = "Submissions received";
 }
 
 @section BeforeHeading {
@@ -10,6 +10,19 @@
 }
 
 <div class="govuk-form-group">
+    @if (!string.IsNullOrEmpty(Model.GoError))
+    {
+        <div class="govuk-error-summary" data-module="govuk-error-summary">
+            <div role="alert">
+                <h2 class="govuk-error-summary__title">There is a problem</h2>
+                <div class="govuk-error-summary__body">
+                    <ul class="govuk-list govuk-error-summary__list">
+                        <li><a href="#QuickGoId">@Model.GoError</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    }
     <form method="post" asp-page-handler="Go">
         <label class="govuk-label govuk-!-display-inline" asp-for="QuickGoId">Go directly to submission number</label>
         <input class="govuk-input govuk-input--width-10 govuk-!-display-inline govuk-!-margin-left-2" type="number" asp-for="QuickGoId" min="1" />
@@ -26,19 +39,15 @@ else
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                @{ ViewData["Label"] = "Batch No"; ViewData["Column"] = "ID"; }
+                @{ ViewData["Label"] = "Submission number"; ViewData["Column"] = "ID"; }
                 <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Project"; ViewData["Column"] = "ProjectDescription"; }
+                @{ ViewData["Label"] = "Project code"; ViewData["Column"] = "ProjectDescription"; }
                 <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "Pathologist"; ViewData["Column"] = "ContactDescription"; }
                 <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "Species"; ViewData["Column"] = "Species"; }
                 <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Batch date"; ViewData["Column"] = "BatchDate"; }
-                <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Received date"; ViewData["Column"] = "ReceivedDate"; }
-                <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Customer ref"; ViewData["Column"] = "OtherSubmittedBy"; }
+                @{ ViewData["Label"] = "Submitted date"; ViewData["Column"] = "BatchDate"; }
                 <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "All tissues assigned"; ViewData["Column"] = "AllTissuesAssigned"; }
                 <partial name="_SortableHeader" />
@@ -54,8 +63,6 @@ else
                     <td class="govuk-table__cell">@b.ContactDescription</td>
                     <td class="govuk-table__cell">@b.Species</td>
                     <td class="govuk-table__cell">@b.BatchDate?.ToShortDateString()</td>
-                    <td class="govuk-table__cell">@b.ReceivedDate?.ToShortDateString()</td>
-                    <td class="govuk-table__cell">@b.OtherSubmittedBy</td>
                     <td class="govuk-table__cell">
                         @if (b.AllTissuesAssigned)
                         {
@@ -67,7 +74,7 @@ else
                         }
                     </td>
                     <td class="govuk-table__cell">
-                        <form method="post">
+                        <form method="post" asp-page="/Batches/BatchesReceived">
                             <input type="hidden" name="batchId" value="@b.ID" />
                             <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-page-handler="Select">View</button>
                         </form>

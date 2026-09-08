@@ -43,6 +43,16 @@
     text-decoration: none;
 }
 
+/* The "current page" pagination item has a blue background (.govuk-pagination__item--current);
+ * real <a> links get white text there via the :link/:visited pseudo-classes, which never match
+ * a <button> — restated here so the POST-based pagination's current-page number is legible
+ * instead of rendering in the same blue as the background. */
+.govuk-pagination__item--current .app-link-button,
+.govuk-pagination__item--current .app-link-button:hover {
+    color: #fff;
+    text-decoration: none;
+}
+
 /* Aligns a <select> with its "Manage …" pick-list button on the same row (e.g. Project/
  * Contract code, Pathologist, Submitted by (external) on EditBatch/BatchDetails) instead of
  * the button stacking below on its own line. Wraps on narrow screens rather than overflowing. */

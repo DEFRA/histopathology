@@ -14,8 +14,8 @@ namespace Histo.Web.Pages.Blocks;
 /// submission onto one or more samples in the current submission.
 ///
 /// Legacy source: entry point was <c>BatchBlocks.aspx</c> (<c>btnCopySamples</c>).
-/// The migrated entry point is <c>Pages/Submissions/SubmissionDetailsBlock.cshtml</c> (batch-wide
-/// mode), the replacement for <c>BatchBlocks.aspx</c>.
+/// The migrated entry point is <c>Pages/Batches/BatchBlocks.cshtml</c>, the replacement for
+/// <c>BatchBlocks.aspx</c>.
 ///
 /// SIMPLIFIED: the legacy 3-page wizard (<c>CopySamples.aspx</c> →
 /// <c>CopySamplesBlocks.aspx</c> → <c>Finish</c>) maintained an in-memory
@@ -29,7 +29,7 @@ namespace Histo.Web.Pages.Blocks;
 /// separate read-only "CopySamplesSummary.aspx" batch-wide grid (reached via
 /// <c>btnSummary</c>, independent of the copy operation itself) is not
 /// reproduced — equivalent detail is already available via
-/// <c>Pages/Submissions/SubmissionDetailsBlock.cshtml</c>.
+/// <c>Pages/Batches/BatchBlocks.cshtml</c>.
 /// </summary>
 public class CopySamplesModel : HistoPageModel
 {
@@ -151,7 +151,7 @@ public class CopySamplesModel : HistoPageModel
         });
     }
 
-    public IActionResult OnPostCancel() => RedirectToPage("/Submissions/SubmissionDetailsBlock");
+    public IActionResult OnPostCancel() => RedirectToPage("/Batches/BatchBlocks");
 
     /// <summary>
     /// Copies each source block (and its tissues) onto the target animal in the

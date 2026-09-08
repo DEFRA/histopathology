@@ -17,7 +17,12 @@ public interface IBatchRepository
     /// </summary>
     Task<Batch?> GetByIdAsync(int batchId, CancellationToken ct = default);
 
-    /// <summary>Returns all batches in Received status. Maps to <c>GetReceivedBatches</c>.</summary>
+    /// <summary>
+    /// Returns batches with status Received, ready to be assigned to blocks. Maps to
+    /// <c>GetBatchesToBeBlocked</c> (confirmed from <c>BatchesReceived.aspx.vb::InitialiseBatchesGrid</c>
+    /// — NOT <c>GetReceivedBatches</c>, which exists in <c>clsBatch.vb</c> but is never called by
+    /// any legacy page).
+    /// </summary>
     Task<IReadOnlyList<BatchListResult>> GetReceivedAsync(CancellationToken ct = default);
 
     /// <summary>Returns all batches in InProgress status. Maps to <c>GetInProgressBatches</c>.</summary>
@@ -68,6 +73,9 @@ public interface IBatchRepository
     /// <c>UpdateBatchDetails</c>; this method loads existing values and only changes the date.
     /// </summary>
     Task SetCustomerReceivedDateAsync(int batchId, DateTime? date, byte[] rowStamp, int userId, CancellationToken ct = default);
+
+    /// <summary>Sets IsBlocked/AllTissuesAssigned/Status(InProgress) without changing any other field. Legacy source: <c>BatchBlocks.aspx.vb::btSubmit_Click</c>.</summary>
+    Task CompleteBlockAssignmentAsync(int batchId, bool allTissuesAssigned, int userId, CancellationToken ct = default);
 
     /// <summary>
     /// Updates batch status. Maps to <c>EditBatchStatus</c>.

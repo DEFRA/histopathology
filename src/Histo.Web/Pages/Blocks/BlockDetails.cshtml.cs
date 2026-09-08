@@ -94,6 +94,10 @@ public class BlockDetailsModel : HistoPageModel
     public IReadOnlyList<Tissue> Tissues { get; private set; } = [];
     public IReadOnlyList<LookupItem> TissueOptions { get; private set; } = [];
 
+    /// <summary>Full tissue lookup list, always unfiltered — used by the inline "edit tissue" row so the
+    /// user can change to any tissue type, not just ones already used on this submission.</summary>
+    public IReadOnlyList<LookupItem> EditTissueOptions { get; private set; } = [];
+
     public IReadOnlyList<LookupItem> HistologyOptions { get; private set; } = [];
     public IReadOnlyList<LookupItem> AntibodyOptions { get; private set; } = [];
     public IReadOnlyList<LookupItem> StainOptions { get; private set; } = [];
@@ -172,14 +176,21 @@ public class BlockDetailsModel : HistoPageModel
             return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
         }
 
+        var preBookedIndex = -1;
         if (IsPreCassetted)
         {
-            if (!PreBookedBlockRefs.Any(b => b.BlockRef == NewBlockRef))
+            var preBookedRefs = PreBookedBlockRefs.Select(b => b.BlockRef).ToList();
+            preBookedIndex = preBookedRefs.FindIndex(r => r == NewBlockRef);
+            if (preBookedIndex < 0)
             {
                 ErrorMessage = "Select one of the pre-booked block references for this pre-cassetted submission.";
                 return Page();
             }
-            NewNumberOfBlocks = 1;
+            if (preBookedIndex + NewNumberOfBlocks > preBookedRefs.Count)
+            {
+                ErrorMessage = $"Only {preBookedRefs.Count - preBookedIndex} pre-booked block reference(s) are available from this starting point.";
+                return Page();
+            }
         }
 
         if (string.IsNullOrWhiteSpace(NewBlockRef)) return Page();
@@ -199,6 +210,7 @@ public class BlockDetailsModel : HistoPageModel
 
         var existingOrders = allBlocks.Select(b => b.Order).ToList();
         var existingRefs = allBlocks.Select(b => b.BlockRef).ToList();
+        var preBookedRefsForCreate = IsPreCassetted ? PreBookedBlockRefs.Select(b => b.BlockRef).ToList() : null;
         var count = Math.Max(1, NewNumberOfBlocks);
         var blockRef = NewBlockRef;
         var firstNewBlockId = 0;
@@ -212,7 +224,14 @@ public class BlockDetailsModel : HistoPageModel
 
             existingRefs.Add(blockRef);
             existingOrders.Add(BlockHelpers.ComputeNextOrder(existingOrders));
-            blockRef = BlockHelpers.ComputeNextBlockRef(existingRefs);
+
+            if (i + 1 < count)
+            {
+                // Pre-cassetted blocks must use the next pre-booked ref, not the free-text auto-increment scheme.
+                blockRef = IsPreCassetted
+                    ? preBookedRefsForCreate![preBookedIndex + i + 1]
+                    : BlockHelpers.ComputeNextBlockRef(existingRefs);
+            }
         }
 
         // Bulk-created blocks (count > 1) have no single block to continue editing — return to
@@ -392,6 +411,7 @@ public class BlockDetailsModel : HistoPageModel
         CanUseAdditionalRequest = submittedAsCode is not ("1" or "3" or "5");
 
         var fullTissueList = await _lookups.GetLookupDataAsync(LookupTissueCode);
+        EditTissueOptions = fullTissueList;
         if (UseWholeTissueList || Animal is null)
         {
             TissueOptions = fullTissueList;
@@ -399,9 +419,17 @@ public class BlockDetailsModel : HistoPageModel
         else
         {
             // Legacy: LoadLookupTypeList default (chkUseWholeTissueList unchecked) — only tissue
-            // types already used on this submission, via GetBatchAnimalTissues(batchId, animalId).
-            var submissionTissues = await _submissions.GetTissuesBySubmissionAsync(BatchId ?? 0, Animal.BatchSubmissionID);
-            var usedCodes = submissionTissues.Select(t => t.TissueCode).ToHashSet();
+            // types already used across this animal's OWN blocks. Legacy source:
+            // BlockDetails.aspx.vb::LoadLookupTypeList -> clsTissue.GetBatchAnimalTissues(BatchID,
+            // AnimalID) -> SP GetBatchSampleTissues. Block-owned tissues have no BatchSubmissionID
+            // of their own, so this cross-references this animal's block IDs against the batch's
+            // block tissues rather than filtering by submission (which was the earlier, wrong fix).
+            var animalBlockIds = (await _blocks.GetByBatchAsync(BatchId ?? 0))
+                .Where(b => b.AnimalID == Animal.ID)
+                .Select(b => b.ID)
+                .ToHashSet();
+            var allBlockTissues = await _submissions.GetTissuesByBatchAsync(BatchId ?? 0);
+            var usedCodes = allBlockTissues.Where(t => animalBlockIds.Contains(t.OwnerID)).Select(t => t.TissueCode).ToHashSet();
             TissueOptions = fullTissueList.Where(o => o.Code is not null && usedCodes.Contains(o.Code)).ToList();
         }
 

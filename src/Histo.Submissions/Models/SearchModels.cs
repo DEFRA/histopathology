@@ -60,10 +60,10 @@ public sealed class BatchSearchCriteria
 /// One result row for the status-filtered batch list pages
 /// (Batches Received, Not Received, For Editing, For Dispatch, On Hold).
 ///
-/// Legacy source: <c>GetReceivedBatches</c>, <c>GetBatchesNotReceived</c>,
-/// <c>GetInProgressBatches</c>, <c>GetBatchesOnHold</c>, <c>GetBatchesForDispatch</c>
-/// stored procedures — column shape from BatchesReceived/NotReceived/ForEditing/
-/// ForDispatch/SubmissionsOnHold .aspx grdBatches BoundColumns.
+/// Legacy source: <c>GetBatchesToBeBlocked</c> (Batches Received — see <c>IBatchRepository.GetReceivedAsync</c>
+/// doc comment), <c>GetBatchesNotReceived</c>, <c>GetInProgressBatches</c>, <c>GetBatchesOnHold</c>,
+/// <c>GetBatchesForDispatch</c> stored procedures — column shape from BatchesReceived/NotReceived/
+/// ForEditing/ForDispatch/SubmissionsOnHold .aspx grdBatches BoundColumns.
 /// </summary>
 public sealed class BatchListResult
 {

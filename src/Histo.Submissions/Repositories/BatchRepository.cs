@@ -119,7 +119,7 @@ public sealed class BatchRepository : IBatchRepository
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<BatchListResult>(
-            "GetReceivedBatches",
+            "GetBatchesToBeBlocked",
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
@@ -309,6 +309,32 @@ public sealed class BatchRepository : IBatchRepository
             OtherSubmittedBy = existing.OtherSubmittedBy, OtherSubmittedArea = existing.OtherSubmittedArea,
             SafeToHandle = existing.SafeToHandle, IsBlocked = existing.IsBlocked,
             SampleSameProjects = existing.SampleSameProjects, AllTissuesAssigned = existing.AllTissuesAssigned,
+            TimeReceived = existing.TimeReceived, ReceivedBy = existing.ReceivedBy,
+            PostFixationOther = existing.PostFixationOther,
+        };
+        await UpdateAsync(updated, userId, ct);
+    }
+
+    /// <inheritdoc/>
+    public async Task CompleteBlockAssignmentAsync(int batchId, bool allTissuesAssigned, int userId, CancellationToken ct = default)
+    {
+        var existing = await GetByIdAsync(batchId, ct);
+        if (existing is null) return;
+        var updated = new Batch
+        {
+            ID = existing.ID, Status = BatchStatus.InProgress, Comments = existing.Comments,
+            StatusComments = existing.StatusComments, BatchDate = existing.BatchDate,
+            ReceivedDate = existing.ReceivedDate, CompletedDate = existing.CompletedDate,
+            SubmittedByUserID = existing.SubmittedByUserID, UserAreaCode = existing.UserAreaCode,
+            IsPreCassetted = existing.IsPreCassetted, ByPassSort = existing.ByPassSort,
+            RowStamp = existing.RowStamp, BatchType = existing.BatchType,
+            ProjectContractCode = existing.ProjectContractCode, ContactName = existing.ContactName,
+            Species = existing.Species, Fixation = existing.Fixation,
+            CustomerReceivedDate = existing.CustomerReceivedDate,
+            SubmittedBy = existing.SubmittedBy, SubmittedArea = existing.SubmittedArea,
+            OtherSubmittedBy = existing.OtherSubmittedBy, OtherSubmittedArea = existing.OtherSubmittedArea,
+            SafeToHandle = existing.SafeToHandle, IsBlocked = true,
+            SampleSameProjects = existing.SampleSameProjects, AllTissuesAssigned = allTissuesAssigned,
             TimeReceived = existing.TimeReceived, ReceivedBy = existing.ReceivedBy,
             PostFixationOther = existing.PostFixationOther,
         };
