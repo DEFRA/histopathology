@@ -101,7 +101,7 @@ public class AddLookupItemModel : HistoPageModel
         TableName = tables.FirstOrDefault(t => t.ID == TableId)?.TableName ?? string.Empty;
 
         _existingItems = await _lookups.GetLookupDataAsync(TableId, includeInactive: true);
-        TableHasCodes = LookupTableSchema.HasCodes(_existingItems);
+        TableHasCodes = !ShowAreaColumn;
 
         if (ShowAreaColumn)
             UserAreas = await _lookups.GetUserAreasAsync();
