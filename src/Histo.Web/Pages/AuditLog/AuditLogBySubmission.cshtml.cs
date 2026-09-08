@@ -19,6 +19,7 @@ public class AuditLogBySubmissionModel : GridPageModel
 
     public IReadOnlyList<AuditLogEntry> Results { get; private set; } = [];
     public List<string> Errors { get; } = [];
+    public bool Searched { get; private set; }
 
     public int TotalCount => Results.Count;
 
@@ -60,6 +61,7 @@ public class AuditLogBySubmissionModel : GridPageModel
         }
 
         Results = await _auditLog.GetBySubmissionAsync(SubmissionID, StartDate, EndDate);
+        Searched = true;
         PopulateGridViewData(TotalCount);
         return Page();
     }

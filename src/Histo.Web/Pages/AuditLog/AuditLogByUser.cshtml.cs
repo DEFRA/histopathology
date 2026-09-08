@@ -27,6 +27,7 @@ public class AuditLogByUserModel : GridPageModel
     public IReadOnlyList<User> Users { get; private set; } = [];
     public IReadOnlyList<AuditLogEntry> Results { get; private set; } = [];
     public List<string> Errors { get; } = [];
+    public bool Searched { get; private set; }
 
     public int TotalCount => Results.Count;
 
@@ -72,6 +73,7 @@ public class AuditLogByUserModel : GridPageModel
         }
 
         Results = await _auditLog.GetByUserAsync(UserID, StartDate, EndDate);
+        Searched = true;
         PopulateGridViewData(TotalCount);
         return Page();
     }
