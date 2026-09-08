@@ -26,10 +26,14 @@ public class AuditLogByDateModel : GridPageModel
     public IReadOnlyList<AuditLogEntry> PagedEntries =>
         (SortColumn switch
         {
-            "FieldName" => SortDesc ? Results.OrderByDescending(e => e.FieldName) : Results.OrderBy(e => e.FieldName),
-            "UserName"  => SortDesc ? Results.OrderByDescending(e => e.UserName)  : Results.OrderBy(e => e.UserName),
-            "TableName" => SortDesc ? Results.OrderByDescending(e => e.TableName) : Results.OrderBy(e => e.TableName),
-            _           => SortDesc ? Results.OrderByDescending(e => e.ChangedAt) : Results.OrderBy(e => e.ChangedAt),
+            "FieldName"   => SortDesc ? Results.OrderByDescending(e => e.FieldName)   : Results.OrderBy(e => e.FieldName),
+            "UserName"    => SortDesc ? Results.OrderByDescending(e => e.UserName)    : Results.OrderBy(e => e.UserName),
+            "TableName"   => SortDesc ? Results.OrderByDescending(e => e.TableName)   : Results.OrderBy(e => e.TableName),
+            "BeforeValue" => SortDesc ? Results.OrderByDescending(e => e.BeforeValue) : Results.OrderBy(e => e.BeforeValue),
+            "AfterValue"  => SortDesc ? Results.OrderByDescending(e => e.AfterValue)  : Results.OrderBy(e => e.AfterValue),
+            "Reason"      => SortDesc ? Results.OrderByDescending(e => e.Reason)      : Results.OrderBy(e => e.Reason),
+            "KeyID"       => SortDesc ? Results.OrderByDescending(e => e.KeyID)       : Results.OrderBy(e => e.KeyID),
+            _             => SortDesc ? Results.OrderByDescending(e => e.ChangedAt)  : Results.OrderBy(e => e.ChangedAt),
         })
         .Skip((PageNumber - 1) * PageSize)
         .Take(PageSize)

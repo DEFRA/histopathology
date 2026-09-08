@@ -26,7 +26,7 @@
     </div>
 }
 
-<form method="post">
+<form method="post" id="audit-log-form">
     <div class="govuk-form-group @(Model.Errors.Any(e => e.Contains("start")) ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="StartDate">From</label>
         <input class="govuk-input govuk-input--width-10" type="date" asp-for="StartDate" />
@@ -47,18 +47,22 @@
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                @{ ViewData["Label"] = "Table"; ViewData["Column"] = "TableName"; }
-                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Table"; ViewData["Column"] = "TableName"; ViewData["FormId"] = "audit-log-form"; ViewData["Handler"] = ""; }
+                <partial name="_SortableHeaderPost" />
                 @{ ViewData["Label"] = "Field"; ViewData["Column"] = "FieldName"; }
-                <partial name="_SortableHeader" />
+                <partial name="_SortableHeaderPost" />
                 @{ ViewData["Label"] = "Date/Time"; ViewData["Column"] = "ChangedAt"; }
-                <partial name="_SortableHeader" />
+                <partial name="_SortableHeaderPost" />
                 @{ ViewData["Label"] = "User"; ViewData["Column"] = "UserName"; }
-                <partial name="_SortableHeader" />
-                <th scope="col" class="govuk-table__header">Before</th>
-                <th scope="col" class="govuk-table__header">After</th>
-                <th scope="col" class="govuk-table__header">Reason</th>
-                <th scope="col" class="govuk-table__header">Key</th>
+                <partial name="_SortableHeaderPost" />
+                @{ ViewData["Label"] = "Before"; ViewData["Column"] = "BeforeValue"; }
+                <partial name="_SortableHeaderPost" />
+                @{ ViewData["Label"] = "After"; ViewData["Column"] = "AfterValue"; }
+                <partial name="_SortableHeaderPost" />
+                @{ ViewData["Label"] = "Reason"; ViewData["Column"] = "Reason"; }
+                <partial name="_SortableHeaderPost" />
+                @{ ViewData["Label"] = "Key"; ViewData["Column"] = "KeyID"; }
+                <partial name="_SortableHeaderPost" />
             </tr>
         </thead>
         <tbody class="govuk-table__body">
