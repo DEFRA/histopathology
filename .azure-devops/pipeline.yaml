@@ -77,7 +77,11 @@ stages:
     - name: tenantId
       value: '770a2450-0227-4c62-90c7-4e38537f1102'
     - name: appId
-      value: '89060d89-195d-47f4-a900-2f66fba81a75'      
+      value: '89060d89-195d-47f4-a900-2f66fba81a75'
+    - name: sqlServer
+      value: 'devcdeinfsq1401.database.windows.net,1433'
+    - name: dbName
+      value: 'histopathology'      
     jobs:
       - deployment: deploy_dev
         environment: 'dev'
@@ -103,21 +107,25 @@ stages:
                       -Saml2__PublicOrigin "https://dev-cde.azure.defra.cloud"
                       -Saml2__IdPEntityId "https://sts.windows.net/$(tenantId)/"
                       -Saml2__IdPMetadataUrl "https://login.microsoftonline.com/$(tenantId)/federationmetadata/2007-06/federationmetadata.xml?appid=$(appId)"
+                      -Authentication__BypassEnabled "false"
+                      -ConnectionStrings__BSE "Server=tcp:$(sqlServer);Database=$(dbName);Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Managed Identity;"
+
 
   - stage: TST
     displayName: TST
-    dependsOn: DEV
-    condition: >-
-      and(succeeded(),
-          eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
-          ne(variables['Build.Reason'], 'PullRequest'))
+    dependsOn: Build
+    condition: and(succeeded(), eq('${{ parameters.deployToTest }}', true))
     variables:
     - name: appName
       value: 'TSTCDEWEBAW1401'
     - name: tenantId
       value: '770a2450-0227-4c62-90c7-4e38537f1102'
     - name: appId
-      value: '3fade19d-06ed-4b1c-8f2c-fff3c22b5955'      
+      value: '3fade19d-06ed-4b1c-8f2c-fff3c22b5955'
+    - name: sqlServer
+      value: 'tstcdeinfsq1401.database.windows.net,1433'
+    - name: dbName
+      value: 'histopathology'      
     jobs:
       - deployment: deploy_tst
         environment: 'test'
@@ -143,3 +151,5 @@ stages:
                       -Saml2__PublicOrigin "https://tst-cde.azure.defra.cloud"
                       -Saml2__IdPEntityId "https://sts.windows.net/$(tenantId)/"
                       -Saml2__IdPMetadataUrl "https://login.microsoftonline.com/$(tenantId)/federationmetadata/2007-06/federationmetadata.xml?appid=$(appId)"
+                      -Authentication__BypassEnabled "false"
+                      -ConnectionStrings__BSE "Server=tcp:$(sqlServer);Database=$(dbName);Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Managed Identity;"
