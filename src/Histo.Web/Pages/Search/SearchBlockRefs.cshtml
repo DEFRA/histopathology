@@ -9,24 +9,21 @@
     <a asp-page="/Search/SearchMenu" class="govuk-back-link">Back</a>
 }
 
-@if (Model.ErrorMessage is not null)
-{
-    <div class="govuk-error-summary" data-module="govuk-error-summary">
-        <div role="alert">
-            <h2 class="govuk-error-summary__title">There is a problem</h2>
-            <div class="govuk-error-summary__body">
-                <ul class="govuk-list govuk-error-summary__list">
-                    <li>@Model.ErrorMessage</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-}
+<partial name="_ErrorSummary" model="Model.Errors" />
 
-<form method="post">
-    <div class="govuk-form-group">
+@* GET so the search is bookmarkable and deep-linkable, matching the legacy page's
+   Request.QueryString("SenderRef"/"HistologyRef") support, and so the sort/paging
+   links below preserve the criteria. *@
+<form method="get">
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("SenderRef") ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="SenderRef">Sender ref</label>
-        <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" />
+        @if (Model.Errors.TryGetValue("SenderRef", out var senderErr))
+        {
+            <p id="SenderRef-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @senderErr</p>
+        }
+        <input class="govuk-input govuk-input--width-20 @(Model.Errors.ContainsKey("SenderRef") ? "govuk-input--error" : "")"
+               asp-for="SenderRef"
+               aria-describedby="@(Model.Errors.ContainsKey("SenderRef") ? "SenderRef-error" : null)" />
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="HistologyRef">Histology ref</label>
@@ -35,11 +32,12 @@
     <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
 </form>
 
-@if (Model.ErrorMessage is null)
+@if (Model.Errors.Count == 0)
 {
     @if (Model.Results.Any())
     {
         <table class="govuk-table">
+        <caption class="govuk-table__caption govuk-table__caption--m govuk-visually-hidden">Block refs matching the search criteria</caption>
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
                 @{ ViewData["Label"] = "Used block refs"; ViewData["Column"] = "UsedBlockRefs"; }
@@ -62,8 +60,19 @@
         </tbody>
     </table>
     <partial name="_Pagination" />
+
+    <div class="govuk-button-group">
+        <a asp-page="/Search/SearchBlockRefs" asp-page-handler="ExportCsv"
+           asp-route-SenderRef="@Model.SenderRef" asp-route-HistologyRef="@Model.HistologyRef"
+           class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to CSV</a>
+        @* Legacy lbViewImportedData opened ViewImportedData.aspx?SearchString=<ref> in a popup.
+           The migrated page names that parameter Filter and needs a table chosen there. *@
+        <a asp-page="/Search/ViewImportedData"
+           asp-route-Filter="@(Model.SenderRef ?? Model.HistologyRef)"
+           class="govuk-link">View old ICC_Sub data</a>
+    </div>
     }
-    else if (Model.SenderRef is not null || Model.HistologyRef is not null)
+    else if (Model.Searched)
     {
         <p class="govuk-body">No block refs found for the given criteria.</p>
     }

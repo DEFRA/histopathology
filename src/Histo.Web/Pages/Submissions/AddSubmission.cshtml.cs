@@ -54,7 +54,7 @@ public class AddSubmissionModel : HistoPageModel
         }
 
         // Restore the sender ref chosen via the Search Sender picker (SearchSender.cshtml),
-        // or pre-fill from the "Copy sample" query parameter (SampleSummary/SearchSample).
+        // or pre-fill from the "Copy sample" query parameter (SampleSummary).
         if (TempData.TryGetValue("SenderRefPicker_Selected", out var chosen) && chosen is string chosenRef)
             SenderRef = chosenRef;
         else if (!string.IsNullOrWhiteSpace(senderRef))
