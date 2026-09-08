@@ -48,7 +48,8 @@ public class SampleSummaryModel : HistoPageModel
 
     /// <summary>Animal awaiting delete confirmation — drives the inline GOV.UK confirmation panel (replaces browser confirm()).</summary>
     [BindProperty(SupportsGet = true)] public int? ConfirmDeleteAnimalId { get; set; }
-
+    /// <summary>Set when a POST action (e.g. delete sample) failed server-side; survives the redirect via TempData.</summary>
+    public string? SaveError { get; private set; }
     /// <summary>Tissue detail strings keyed by AnimalID for the Tissue Details column.</summary>
     public IReadOnlyDictionary<int, IReadOnlyList<string>> TissuesByAnimalId { get; private set; } =
         new Dictionary<int, IReadOnlyList<string>>();
@@ -95,6 +96,7 @@ public class SampleSummaryModel : HistoPageModel
     {
         ViewData["Title"] = "Sample summary";
         ViewData["PageTitle"] = "Sample summary";
+        if (TempData["SampleSummary_Error"] is string err) SaveError = err;
         var batchId = BatchId ?? Session.BatchID;
         if (batchId is null or <= 0) return RedirectToPage("/Index");
 
@@ -214,7 +216,8 @@ public class SampleSummaryModel : HistoPageModel
     /// </summary>
     public async Task<IActionResult> OnPostDeleteAsync(int animalId)
     {
-        await _submissions.DeleteAnimalAsync(animalId, Session.UserID);
+        if (!await _submissions.DeleteAnimalAsync(animalId, Session.UserID))
+            TempData["SampleSummary_Error"] = "Could not delete this sample. It may still have blocks or tissues recorded against it.";
         return RedirectToPage(new { batchId = BatchId ?? Session.BatchID });
     }
 

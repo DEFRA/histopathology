@@ -30,12 +30,20 @@ public class AddSubmissionModel : HistoPageModel
 
     [BindProperty] public string SenderRef   { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Set when this form was reached via "Copy sample" — the animal whose tissues should be
+    /// duplicated onto the newly created sample. Round-tripped via a hidden field so it survives
+    /// the POST (and the SearchSender picker detour, which only restores <see cref="SenderRef"/>).
+    /// </summary>
+    [BindProperty] public int? SourceAnimalId { get; set; }
+
     public string? ModelError { get; private set; }
 
-    public async Task OnGetAsync(string? senderRef)
+    public async Task OnGetAsync(string? senderRef, int? sourceAnimalId)
     {
         ViewData["Title"] = "Add sample";
         BatchId ??= Session.BatchID;
+        if (sourceAnimalId is > 0) SourceAnimalId = sourceAnimalId;
 
         // Pre-resolve submission ID so the form POST never needs AddSubmissionAsync.
         BatchSubmissionId ??= Session.BatchSubmissionID;
@@ -115,6 +123,19 @@ public class AddSubmissionModel : HistoPageModel
                 new BatchSubmission { BatchID = batchId.Value, AnimalID = newAnimalId, SubmissionName = "Default", Order = nextOrder },
                 Session.UserID);
             if (ownSubmissionId > 0) Session.BatchSubmissionID = ownSubmissionId;
+
+            // "Copy sample" — duplicate the source sample's tissues onto the new one (Wet Tissue only;
+            // block-owned tissues on other submission types are copied via the separate Copy Blocks flow).
+            if (SourceAnimalId is > 0 && ownSubmissionId > 0)
+            {
+                var sourceSubmission = siblingSubmissions.FirstOrDefault(s => s.AnimalID == SourceAnimalId);
+                if (sourceSubmission is not null)
+                {
+                    var sourceTissues = await _submissions.GetTissuesBySubmissionAsync(batchId.Value, sourceSubmission.ID);
+                    foreach (var tissue in sourceTissues)
+                        await _submissions.CopyTissueAsync(tissue, ownSubmissionId, Session.UserID);
+                }
+            }
 
             return RedirectToPage("/Submissions/SubmissionDetails", new { batchId, animalId = newAnimalId });
         }
