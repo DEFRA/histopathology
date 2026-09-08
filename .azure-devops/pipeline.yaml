@@ -115,8 +115,8 @@ stages:
                       -Saml2__PublicOrigin "https://dev-cde.azure.defra.cloud"
                       -Saml2__IdPEntityId "https://sts.windows.net/$(tenantId)/"
                       -Saml2__IdPMetadataUrl "https://login.microsoftonline.com/$(tenantId)/federationmetadata/2007-06/federationmetadata.xml?appid=$(appId)"
-                      -Authentication__BypassEnabled "false"
-                      -ConnectionStrings__BSE "Server=tcp:$(sqlServer);Database=$(dbName);Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Managed Identity;"
+                      -Authentication__Bypass "false"
+                      -ConnectionStrings__HistologyDb "Server=tcp:$(sqlServer);Database=$(dbName);Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Managed Identity;"
 
 
   - stage: TST
@@ -159,5 +159,5 @@ stages:
                       -Saml2__PublicOrigin "https://tst-cde.azure.defra.cloud"
                       -Saml2__IdPEntityId "https://sts.windows.net/$(tenantId)/"
                       -Saml2__IdPMetadataUrl "https://login.microsoftonline.com/$(tenantId)/federationmetadata/2007-06/federationmetadata.xml?appid=$(appId)"
-                      -Authentication__BypassEnabled "false"
-                      -ConnectionStrings__BSE "Server=tcp:$(sqlServer);Database=$(dbName);Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Managed Identity;"
+                      -Authentication__Bypass "false"
+                      -ConnectionStrings__HistologyDb "Server=tcp:$(sqlServer);Database=$(dbName);Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Managed Identity;"
