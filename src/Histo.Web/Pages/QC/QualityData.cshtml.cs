@@ -25,8 +25,6 @@ public class QualityDataModel : GridPageModel
     private readonly ILookupService _lookups;
     private readonly IUserService _users;
 
-    private const int LookupProjects          = 19;
-    private const int LookupContacts          = 18;
     private const int LookupAntibodiesTse    = 4;
     private const int LookupAntibodiesNonTse = 5;
     private const int LookupSpecialStain     = 6;
@@ -149,35 +147,14 @@ public class QualityDataModel : GridPageModel
 
     private async Task ResolveBatchSummaryAsync(Batch batch)
     {
-        var projectsTask  = _lookups.GetLookupDataAsync(LookupProjects, includeInactive: true);
-        var contactsTask  = _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true);
-        var speciesTask   = _lookups.GetSpeciesLookupAsync();
-        var userAreasTask = _lookups.GetUserAreasAsync();
-        var usersTask     = _users.GetAllUsersAsync();
-
-        await Task.WhenAll(projectsTask, contactsTask, speciesTask, userAreasTask, usersTask);
-
-        var projectsById = projectsTask.Result.ToDictionary(p => p.ID.ToString(), p => p.Name, StringComparer.OrdinalIgnoreCase);
-        ProjectName = !string.IsNullOrWhiteSpace(batch.ProjectContractCode)
-            && projectsById.TryGetValue(batch.ProjectContractCode, out var pn) ? pn : batch.ProjectContractCode;
-
-        var contactsById = contactsTask.Result.ToDictionary(c => c.ID.ToString(), c => c.Name, StringComparer.OrdinalIgnoreCase);
-        PathologistName = !string.IsNullOrWhiteSpace(batch.ContactName)
-            && contactsById.TryGetValue(batch.ContactName, out var cn) ? cn : batch.ContactName;
-
-        var speciesById = speciesTask.Result.ToDictionary(s => s.ID.ToString(), s => s.Name, StringComparer.OrdinalIgnoreCase);
-        SpeciesName = !string.IsNullOrWhiteSpace(batch.Species)
-            && speciesById.TryGetValue(batch.Species, out var sn) ? sn : batch.Species;
-
-        var userById = usersTask.Result.ToDictionary(u => u.UserID, u => u.Name);
-        EnteredByName   = batch.SubmittedBy.HasValue      && userById.TryGetValue(batch.SubmittedBy.Value,      out var eb) ? eb : null;
-        SubmittedByName = batch.OtherSubmittedBy.HasValue && userById.TryGetValue(batch.OtherSubmittedBy.Value, out var sb) ? sb : null;
-
-        var areaById = userAreasTask.Result.ToDictionary(a => a.ID, a => a.Name);
-        EnteredAreaName = int.TryParse(batch.SubmittedArea, out var enteredAreaId)
-            && areaById.TryGetValue(enteredAreaId, out var ea) ? ea : batch.SubmittedArea;
-        SubmittedAreaName = int.TryParse(batch.OtherSubmittedArea, out var submittedAreaId)
-            && areaById.TryGetValue(submittedAreaId, out var sa) ? sa : batch.OtherSubmittedArea;
+        var summary = await BatchSummaryDisplayResolver.ResolveAsync(batch, _lookups, _users);
+        ProjectName       = summary.ProjectName;
+        PathologistName   = summary.PathologistName;
+        SpeciesName       = summary.SpeciesName;
+        EnteredByName     = summary.EnteredByName;
+        EnteredAreaName   = summary.EnteredAreaName;
+        SubmittedByName   = summary.SubmittedByName;
+        SubmittedAreaName = summary.SubmittedAreaName;
     }
 }
 

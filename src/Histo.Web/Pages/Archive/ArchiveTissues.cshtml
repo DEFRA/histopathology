@@ -17,8 +17,40 @@
             <dd class="govuk-summary-list__value">@Model.Batch.ID</dd>
         </div>
         <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Species</dt>
+            <dd class="govuk-summary-list__value">@Model.SpeciesName</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Project/Contract Code</dt>
+            <dd class="govuk-summary-list__value">@Model.ProjectName</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Pathologist</dt>
+            <dd class="govuk-summary-list__value">@Model.PathologistName</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submission date</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.BatchDate?.ToShortDateString()</dd>
+        </div>
+        <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Received date</dt>
             <dd class="govuk-summary-list__value">@(Model.Batch.ReceivedDate?.ToShortDateString() ?? "Not recorded")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Entered by</dt>
+            <dd class="govuk-summary-list__value">@(Model.EnteredByName ?? "—")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Entered area</dt>
+            <dd class="govuk-summary-list__value">@(Model.EnteredAreaName ?? "—")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submitted by</dt>
+            <dd class="govuk-summary-list__value">@(Model.SubmittedByName ?? "—")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submitted area</dt>
+            <dd class="govuk-summary-list__value">@(Model.SubmittedAreaName ?? "—")</dd>
         </div>
     </dl>
 }
@@ -52,7 +84,8 @@
                 <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "Histology ref"; ViewData["Column"] = "HistologyRef"; }
                 <partial name="_SortableHeader" />
-                <th scope="col" class="govuk-table__header">Tissue</th>
+                @{ ViewData["Label"] = "Tissue"; ViewData["Column"] = "Tissue"; }
+                <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "Archived date"; ViewData["Column"] = "ArchivedDate"; }
                 <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "Archive location"; ViewData["Column"] = "ArchiveLocation"; }
@@ -75,7 +108,7 @@
                     <td class="govuk-table__cell">@r.HistologyRef</td>
                     <td class="govuk-table__cell">@r.TissueDescription</td>
                     <td class="govuk-table__cell">@r.ArchivedDate?.ToShortDateString()</td>
-                    <td class="govuk-table__cell">@r.ArchiveLocation</td>
+                    <td class="govuk-table__cell">@r.ArchiveLocationName</td>
                 </tr>
             }
             @if (!Model.Rows.Any())
@@ -110,5 +143,4 @@
         </div>
         <button type="submit" class="govuk-button" data-module="govuk-button">Update selected</button>
     }
-    <a asp-page="/Archive/ArchiveMenu" asp-route-batchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
 </form>

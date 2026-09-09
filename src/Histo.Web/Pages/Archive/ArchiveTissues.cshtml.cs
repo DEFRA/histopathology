@@ -16,6 +16,7 @@ public sealed class ArchiveTissueRow
     public string TissueDescription { get; init; } = string.Empty;
     public DateTime? ArchivedDate { get; init; }
     public string? ArchiveLocation { get; init; }
+    public string? ArchiveLocationName { get; init; }
     public string? ArchiveComment { get; init; }
 }
 
@@ -40,9 +41,10 @@ public class ArchiveTissuesModel : GridPageModel
     private readonly ISubmissionService _submissions;
     private readonly IBatchService _batches;
     private readonly ILookupService _lookups;
+    private readonly IUserService _users;
 
-    public ArchiveTissuesModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups)
-        : base(session) { _submissions = submissions; _batches = batches; _lookups = lookups; }
+    public ArchiveTissuesModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups, IUserService users)
+        : base(session) { _submissions = submissions; _batches = batches; _lookups = lookups; _users = users; }
 
     [BindProperty(SupportsGet = true)]
     public int? BatchId { get; set; }
@@ -52,14 +54,24 @@ public class ArchiveTissuesModel : GridPageModel
     public IReadOnlyList<LookupItem> ArchiveLocations { get; private set; } = [];
     public bool IsViewMode => Session.IsViewSubmissionMode;
 
+    // Resolved display names for the batch summary header (shared with QualityData).
+    public string? ProjectName { get; private set; }
+    public string? PathologistName { get; private set; }
+    public string? SpeciesName { get; private set; }
+    public string? EnteredByName { get; private set; }
+    public string? EnteredAreaName { get; private set; }
+    public string? SubmittedByName { get; private set; }
+    public string? SubmittedAreaName { get; private set; }
+
     public int TotalCount => Rows.Count;
 
     public IReadOnlyList<ArchiveTissueRow> PagedEntries =>
         (SortColumn switch
         {
             "HistologyRef"    => SortDesc ? Rows.OrderByDescending(r => r.HistologyRef)    : Rows.OrderBy(r => r.HistologyRef),
+            "Tissue"          => SortDesc ? Rows.OrderByDescending(r => r.TissueDescription) : Rows.OrderBy(r => r.TissueDescription),
             "ArchivedDate"    => SortDesc ? Rows.OrderByDescending(r => r.ArchivedDate)    : Rows.OrderBy(r => r.ArchivedDate),
-            "ArchiveLocation" => SortDesc ? Rows.OrderByDescending(r => r.ArchiveLocation) : Rows.OrderBy(r => r.ArchiveLocation),
+            "ArchiveLocation" => SortDesc ? Rows.OrderByDescending(r => r.ArchiveLocationName) : Rows.OrderBy(r => r.ArchiveLocationName),
             _                 => SortDesc ? Rows.OrderByDescending(r => r.SenderRef)       : Rows.OrderBy(r => r.SenderRef),
         })
         .Skip((PageNumber - 1) * PageSize)
@@ -145,10 +157,22 @@ public class ArchiveTissuesModel : GridPageModel
     private async Task LoadAsync()
     {
         ArchiveLocations = await _lookups.GetLookupDataAsync(LookupArchiveLocation);
+        var archiveLocationNameByCode = ArchiveLocations.ToDictionary(l => l.Code ?? string.Empty, l => l.Name, StringComparer.OrdinalIgnoreCase);
         if (Session.BatchID is not > 0) { Rows = []; return; }
 
         var batchId = Session.BatchID.Value;
         Batch = await _batches.GetByIdAsync(batchId);
+        if (Batch is not null)
+        {
+            var summary = await BatchSummaryDisplayResolver.ResolveAsync(Batch, _lookups, _users);
+            ProjectName       = summary.ProjectName;
+            PathologistName   = summary.PathologistName;
+            SpeciesName       = summary.SpeciesName;
+            EnteredByName     = summary.EnteredByName;
+            EnteredAreaName   = summary.EnteredAreaName;
+            SubmittedByName   = summary.SubmittedByName;
+            SubmittedAreaName = summary.SubmittedAreaName;
+        }
 
         var tissues = await _submissions.GetBatchSubmissionTissuesAsync(batchId);
         var submissions = await _submissions.GetSubmissionsByBatchAsync(batchId);
@@ -164,6 +188,7 @@ public class ArchiveTissuesModel : GridPageModel
             animalIdBySubmission.TryGetValue(t.OwnerID, out var animalId);
             animalsById.TryGetValue(animalId, out var animal);
             tissueDescByCode.TryGetValue(t.TissueCode, out var tissueDesc);
+            archiveLocationNameByCode.TryGetValue(t.ArchiveLocation ?? string.Empty, out var locationName);
             return new ArchiveTissueRow
             {
                 ID = t.ID,
@@ -172,6 +197,7 @@ public class ArchiveTissuesModel : GridPageModel
                 TissueDescription = tissueDesc ?? t.TissueCode,
                 ArchivedDate = t.ArchivedDate,
                 ArchiveLocation = t.ArchiveLocation,
+                ArchiveLocationName = locationName ?? t.ArchiveLocation,
                 ArchiveComment = t.ArchiveComment,
             };
         }).ToList();

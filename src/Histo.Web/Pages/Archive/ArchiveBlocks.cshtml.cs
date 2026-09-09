@@ -18,6 +18,7 @@ public sealed class ArchiveBlockRow
     public string BlockRef { get; init; } = string.Empty;
     public DateTime? ArchivedDate { get; init; }
     public string? ArchiveLocation { get; init; }
+    public string? ArchiveLocationName { get; init; }
     public string? ArchiveComment { get; init; }
 }
 
@@ -38,9 +39,10 @@ public class ArchiveBlocksModel : GridPageModel
     private readonly IBatchService _batches;
     private readonly ISubmissionService _submissions;
     private readonly ILookupService _lookups;
+    private readonly IUserService _users;
 
-    public ArchiveBlocksModel(ISessionService session, IBlockService blocks, IBatchService batches, ISubmissionService submissions, ILookupService lookups)
-        : base(session) { _blocks = blocks; _batches = batches; _submissions = submissions; _lookups = lookups; }
+    public ArchiveBlocksModel(ISessionService session, IBlockService blocks, IBatchService batches, ISubmissionService submissions, ILookupService lookups, IUserService users)
+        : base(session) { _blocks = blocks; _batches = batches; _submissions = submissions; _lookups = lookups; _users = users; }
 
     [BindProperty(SupportsGet = true)]
     public int? BatchId { get; set; }
@@ -50,6 +52,15 @@ public class ArchiveBlocksModel : GridPageModel
     public IReadOnlyList<LookupItem> ArchiveLocations { get; private set; } = [];
     public bool IsViewMode => Session.IsViewSubmissionMode;
 
+    // Resolved display names for the batch summary header (shared with QualityData).
+    public string? ProjectName { get; private set; }
+    public string? PathologistName { get; private set; }
+    public string? SpeciesName { get; private set; }
+    public string? EnteredByName { get; private set; }
+    public string? EnteredAreaName { get; private set; }
+    public string? SubmittedByName { get; private set; }
+    public string? SubmittedAreaName { get; private set; }
+
     public int TotalCount => Rows.Count;
 
     public IReadOnlyList<ArchiveBlockRow> PagedEntries =>
@@ -57,8 +68,9 @@ public class ArchiveBlocksModel : GridPageModel
         {
             "SenderRef"       => SortDesc ? Rows.OrderByDescending(r => r.SenderRef)       : Rows.OrderBy(r => r.SenderRef),
             "HistologyRef"    => SortDesc ? Rows.OrderByDescending(r => r.HistologyRef)    : Rows.OrderBy(r => r.HistologyRef),
+            "BlockRef"        => SortDesc ? Rows.OrderByDescending(r => r.BlockRef)        : Rows.OrderBy(r => r.BlockRef),
             "ArchivedDate"    => SortDesc ? Rows.OrderByDescending(r => r.ArchivedDate)    : Rows.OrderBy(r => r.ArchivedDate),
-            "ArchiveLocation" => SortDesc ? Rows.OrderByDescending(r => r.ArchiveLocation) : Rows.OrderBy(r => r.ArchiveLocation),
+            "ArchiveLocation" => SortDesc ? Rows.OrderByDescending(r => r.ArchiveLocationName) : Rows.OrderBy(r => r.ArchiveLocationName),
             _                 => SortDesc ? Rows.OrderByDescending(r => r.BlockRef)        : Rows.OrderBy(r => r.BlockRef),
         })
         .Skip((PageNumber - 1) * PageSize)
@@ -146,10 +158,22 @@ public class ArchiveBlocksModel : GridPageModel
     private async Task LoadAsync()
     {
         ArchiveLocations = await _lookups.GetLookupDataAsync(LookupArchiveLocation);
+        var archiveLocationNameByCode = ArchiveLocations.ToDictionary(l => l.Code ?? string.Empty, l => l.Name, StringComparer.OrdinalIgnoreCase);
         if (Session.BatchID is not > 0) { Rows = []; return; }
 
         var batchId = Session.BatchID.Value;
         Batch = await _batches.GetByIdAsync(batchId);
+        if (Batch is not null)
+        {
+            var summary = await BatchSummaryDisplayResolver.ResolveAsync(Batch, _lookups, _users);
+            ProjectName       = summary.ProjectName;
+            PathologistName   = summary.PathologistName;
+            SpeciesName       = summary.SpeciesName;
+            EnteredByName     = summary.EnteredByName;
+            EnteredAreaName   = summary.EnteredAreaName;
+            SubmittedByName   = summary.SubmittedByName;
+            SubmittedAreaName = summary.SubmittedAreaName;
+        }
 
         var blocks = await _blocks.GetByBatchAsync(batchId);
         var animals = await _submissions.GetBlockAnimalsByBatchAsync(batchId);
@@ -158,6 +182,7 @@ public class ArchiveBlocksModel : GridPageModel
         Rows = blocks.Select(b =>
         {
             animalsById.TryGetValue(b.AnimalID, out var animal);
+            archiveLocationNameByCode.TryGetValue(b.ArchiveLocation ?? string.Empty, out var locationName);
             return new ArchiveBlockRow
             {
                 ID = b.ID,
@@ -166,6 +191,7 @@ public class ArchiveBlocksModel : GridPageModel
                 BlockRef = b.BlockRef,
                 ArchivedDate = b.ArchivedDate,
                 ArchiveLocation = b.ArchiveLocation,
+                ArchiveLocationName = locationName ?? b.ArchiveLocation,
                 ArchiveComment = b.ArchiveComment,
             };
         }).ToList();

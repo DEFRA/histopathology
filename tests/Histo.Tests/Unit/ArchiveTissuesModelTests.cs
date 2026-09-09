@@ -19,6 +19,7 @@ public class ArchiveTissuesModelTests
     private readonly Mock<ISubmissionService> _submissions = new();
     private readonly Mock<IBatchService> _batches = new();
     private readonly Mock<ILookupService> _lookups = new();
+    private readonly Mock<IUserService> _users = new();
 
     public ArchiveTissuesModelTests()
     {
@@ -30,6 +31,15 @@ public class ArchiveTissuesModelTests
             .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { Code = "A", Name = "Archive A" }]);
         _lookups.Setup(l => l.GetLookupDataAsync(9, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<LookupItem>)[]);
+        _lookups.Setup(l => l.GetLookupDataAsync(19, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[]);
+        _lookups.Setup(l => l.GetLookupDataAsync(18, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[]);
+        _lookups.Setup(l => l.GetSpeciesLookupAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[]);
+        _lookups.Setup(l => l.GetUserAreasAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[]);
+        _users.Setup(u => u.GetAllUsersAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<User>)[]);
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -37,7 +47,7 @@ public class ArchiveTissuesModelTests
     }
 
     private ArchiveTissuesModel CreateSut() =>
-        new(_session.Object, _submissions.Object, _batches.Object, _lookups.Object)
+        new(_session.Object, _submissions.Object, _batches.Object, _lookups.Object, _users.Object)
         {
             PageContext = new PageContext
             {

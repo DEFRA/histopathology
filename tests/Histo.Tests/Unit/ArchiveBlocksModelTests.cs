@@ -22,6 +22,7 @@ public class ArchiveBlocksModelTests
     private readonly Mock<IBatchService> _batches = new();
     private readonly Mock<ISubmissionService> _submissions = new();
     private readonly Mock<ILookupService> _lookups = new();
+    private readonly Mock<IUserService> _users = new();
 
     public ArchiveBlocksModelTests()
     {
@@ -31,12 +32,21 @@ public class ArchiveBlocksModelTests
         _session.Setup(s => s.UserID).Returns(99);
         _lookups.Setup(l => l.GetLookupDataAsync(16, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { Code = "A", Name = "Archive A" }]);
+        _lookups.Setup(l => l.GetLookupDataAsync(19, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[]);
+        _lookups.Setup(l => l.GetLookupDataAsync(18, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[]);
+        _lookups.Setup(l => l.GetSpeciesLookupAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[]);
+        _lookups.Setup(l => l.GetUserAreasAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[]);
+        _users.Setup(u => u.GetAllUsersAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<User>)[]);
         _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[]);
     }
 
     private ArchiveBlocksModel CreateSut() =>
-        new(_session.Object, _blocks.Object, _batches.Object, _submissions.Object, _lookups.Object)
+        new(_session.Object, _blocks.Object, _batches.Object, _submissions.Object, _lookups.Object, _users.Object)
         {
             PageContext = new PageContext
             {
