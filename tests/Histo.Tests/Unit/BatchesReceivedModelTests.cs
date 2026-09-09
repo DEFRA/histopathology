@@ -53,7 +53,7 @@ public class BatchesReceivedModelTests
         var result = sut.OnPostSelect(42);
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
-        Assert.Equal("/Batches/BatchDetails", redirect.PageName);
+        Assert.Equal("/Batches/BatchBlocks", redirect.PageName);
         Assert.Equal(42, _session.Object.BatchID);
         Assert.False(_session.Object.IsViewSubmissionMode);
     }

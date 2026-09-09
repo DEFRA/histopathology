@@ -174,7 +174,11 @@ public class BookBlockRefModel : HistoPageModel
             ResultMessages.Add($"Sample: {senderRef} {numberSuccess} blocks booked, {numberFails} blocks not booked.");
         }
 
-        SuccessMessage = ResultMessages.Count > 0 ? null : "No blocks were requested.";
+        var requested = (senderRefs?.Count ?? 0) * (blockRefTo - blockRefFrom + 1);
+        var anyFailed = ResultMessages.Exists(m =>
+            m.Contains("not booked", StringComparison.OrdinalIgnoreCase)
+            || m.Contains("failed", StringComparison.OrdinalIgnoreCase));
+        SuccessMessage = requested == 0 ? "No blocks were requested." : (anyFailed ? null : "Blocks booked successfully.");
         return Page();
     }
 }
