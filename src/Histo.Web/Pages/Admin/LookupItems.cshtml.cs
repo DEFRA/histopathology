@@ -62,7 +62,11 @@ public class LookupItemsModel : GridPageModel
         var tables = await _lookups.ListEditableLookupsAsync();
         TableName = tables.FirstOrDefault(t => t.ID == TableId)?.TableName ?? string.Empty;
 
-        TableHasCodes = !ShowAreaColumn;
+        // Always load ALL items (active and inactive) so the "show deactivated" filter can
+        // reveal them without a second round trip; TableHasCodes is derived from the full set.
+        Items = await _lookups.GetLookupDataAsync(TableId, includeInactive: true);
+        TableHasCodes = LookupTableSchema.HasCodes(Items);
+
         if (ShowAreaColumn)
         {
             var userAreas = await _lookups.GetUserAreasAsync();
