@@ -52,11 +52,11 @@ public class BatchesForEditingModel : GridPageModel
 
     public IActionResult OnPostSelect(int batchId)
     {
-        // Matches legacy grdBatchesForEditing_SelectedIndexChanged, which always redirects to EditBatch.aspx.
+        // This list's purpose is status management — routes to the status page, not header-field editing.
         Session.BatchID    = batchId;
         Session.ReturnPage = "/Batches/BatchesForEditing";
         Session.IsViewSubmissionMode = false;
-        return RedirectToPage("/Batches/EditBatch");
+        return RedirectToPage("/Batches/EditSubmissionStatus");
     }
 
     public async Task<IActionResult> OnPostGoAsync()
@@ -80,6 +80,8 @@ public class BatchesForEditingModel : GridPageModel
         }
 
         Session.BatchID = QuickGoId.Value;
-        return RedirectToPage("/Batches/EditBatch");
+        Session.ReturnPage = "/Batches/BatchesForEditing";
+        Session.IsViewSubmissionMode = false;
+        return RedirectToPage("/Batches/EditSubmissionStatus");
     }
 }

@@ -136,9 +136,6 @@ public class ViewSubmissionsModel : HistoPageModel
     public bool CanViewSubmission  => SelectedBatchStatus is not null;
     public bool CanCopySubmission  => SelectedBatchStatus is not null;
     public bool CanDateReturned    => SelectedBatchStatus == BatchStatus.Completed;
-    // Edit test types — Submitted (Not started) only. Received and In Progress submissions
-    // have already been actioned by the lab, so test types must no longer be user-editable there.
-    public bool CanEditTestTypes   => SelectedBatchStatus == BatchStatus.Submitted;
 
     private async Task LoadLookupsAsync()
     {

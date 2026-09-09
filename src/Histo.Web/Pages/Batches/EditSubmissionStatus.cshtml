@@ -1,0 +1,88 @@
+@page
+@model Histo.Web.Pages.Batches.EditSubmissionStatusModel
+@using Histo.Core.Domain
+@{
+    ViewData["Title"] = "Edit submission status";
+    ViewData["PageTitle"] = "Edit submission status";
+}
+
+@section BeforeHeading {
+    <a href="@Url.Page(Model.ReturnPage)" class="govuk-back-link">Back</a>
+}
+
+@if (!string.IsNullOrEmpty(Model.SaveError))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.SaveError</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+@* Read-only context — this page only changes status, not submission details. *@
+<dl class="govuk-summary-list govuk-!-margin-bottom-6">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Submission number</dt>
+        <dd class="govuk-summary-list__value">@Model.Batch?.ID</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Entered by</dt>
+        <dd class="govuk-summary-list__value">@(Model.EnteredByName ?? "Not recorded")</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Entered area</dt>
+        <dd class="govuk-summary-list__value">@(Model.EnteredAreaName ?? "Not recorded")</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Project or contract code</dt>
+        <dd class="govuk-summary-list__value">@Model.ProjectName</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Pathologist</dt>
+        <dd class="govuk-summary-list__value">@Model.PathologistName</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Species</dt>
+        <dd class="govuk-summary-list__value">@Model.SpeciesName</dd>
+    </div>
+</dl>
+
+<form method="post" asp-page-handler="Save">
+    <input type="hidden" asp-for="OriginalStatus" />
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Status">Submission status</label>
+        <select class="govuk-select" asp-for="Status">
+            <option value="@BatchStatus.Submitted"  selected="@(Model.Status == BatchStatus.Submitted)">Not started</option>
+            <option value="@BatchStatus.Received"   selected="@(Model.Status == BatchStatus.Received)">Received</option>
+            <option value="@BatchStatus.InProgress" selected="@(Model.Status == BatchStatus.InProgress)">In progress</option>
+            <option value="@BatchStatus.OnHold"     selected="@(Model.Status == BatchStatus.OnHold)">On hold</option>
+            <option value="@BatchStatus.Completed"  selected="@(Model.Status == BatchStatus.Completed)">Completed</option>
+            <option value="@BatchStatus.Rejected"   selected="@(Model.Status == BatchStatus.Rejected)">Rejected</option>
+        </select>
+        <div class="govuk-hint govuk-!-margin-top-2">
+            To mark as Received, use <a asp-page="/Batches/BatchesNotReceived" class="govuk-link">Receive submissions</a>.
+        </div>
+    </div>
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="StatusComments">Reason / comments for status change</label>
+        <textarea class="govuk-textarea" asp-for="StatusComments" rows="3"></textarea>
+    </div>
+
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
+        <a href="@Url.Page(Model.ReturnPage)" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    </div>
+</form>
+
+<div class="govuk-button-group">
+    @* Legacy EditBatch.aspx btnSamplesOnHold — the only entry point to the on-hold list. *@
+    <a asp-page="/Batches/SubmissionsOnHold" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples on hold</a>
+    <a asp-page="/Batches/EditBatch" class="govuk-button govuk-button--secondary" data-module="govuk-button">Continue to edit submission</a>
+</div>

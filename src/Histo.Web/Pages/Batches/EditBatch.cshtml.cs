@@ -12,6 +12,8 @@ namespace Histo.Web.Pages.Batches;
 /// Replaces <c>EditBatch.aspx</c> — "Edit submission".
 /// Provides the complete set of editable batch header fields matching legacy <c>BatchDetails.aspx</c>
 /// edit mode, plus status management from the original <c>EditBatch.aspx</c>.
+/// Also surfaces histology/antibody/special-stain test-type editing inline (previously the separate
+/// <c>EditBatchTests</c> page), matching the Create Submission journey's consistent single-page experience.
 /// </summary>
 public class EditBatchModel : HistoPageModel
 {
@@ -20,6 +22,9 @@ public class EditBatchModel : HistoPageModel
     private const int LookupFixation = 10;
     private const int LookupUserArea = 13;
     private const int LookupSubmittedAs = 11;
+    private const int LookupTseAntibodies    = 4;
+    private const int LookupNonTseAntibodies = 5;
+    private const int LookupSpecialStain     = 6;
 
     private readonly IBatchService   _batches;
     private readonly ILookupService  _lookups;
@@ -48,10 +53,10 @@ public class EditBatchModel : HistoPageModel
     [BindProperty] public int?    OtherSubmittedBy    { get; set; }
     [BindProperty] public string? OtherSubmittedArea  { get; set; }
 
-    // ---- Status fields ----
-    [BindProperty] public string? Status         { get; set; }
-    [BindProperty] public string? StatusComments { get; set; }
-    [BindProperty] public string? OriginalStatus { get; set; }
+    // ---- Test-type selections (merged from the former EditBatchTests page) ----
+    [BindProperty] public List<string> SelectedHistologyCodes { get; set; } = [];
+    [BindProperty] public List<string> SelectedAntibodyCodes  { get; set; } = [];
+    [BindProperty] public List<string> SelectedStainCodes     { get; set; } = [];
 
     // ---- Read-only display ----
     public Batch?  Batch     { get; private set; }
@@ -76,6 +81,18 @@ public class EditBatchModel : HistoPageModel
     public IReadOnlyList<LookupItem> Fixations   { get; private set; } = [];
     public IReadOnlyList<LookupItem> UserAreas   { get; private set; } = [];
     public IReadOnlyList<User>       AllUsers    { get; private set; } = [];
+
+    /// <summary>Histology type options, filtered for TSE/NonTSE (mirrors former EditBatchTestsModel).</summary>
+    public IReadOnlyList<LookupItem> HistologyOptions { get; private set; } = [];
+    public IReadOnlyList<LookupItem> AntibodyOptions  { get; private set; } = [];
+    public IReadOnlyList<LookupItem> StainOptions     { get; private set; } = [];
+
+    /// <summary>True when the current histology selection contains IHC-PrP (TSE) or IHC-Other (NonTSE).</summary>
+    public bool ShowAntibodies => SelectedHistologyCodes.Contains(HistologyCode.IhcPrp)
+                                || SelectedHistologyCodes.Contains(HistologyCode.IhcOther);
+
+    /// <summary>True when the current histology selection contains Special Stain.</summary>
+    public bool ShowStains => SelectedHistologyCodes.Contains(HistologyCode.SpecialStain);
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -105,15 +122,24 @@ public class EditBatchModel : HistoPageModel
         Comments            = Batch.Comments;
         OtherSubmittedBy    = Batch.OtherSubmittedBy;
         OtherSubmittedArea  = Batch.OtherSubmittedArea;
-        Status              = Batch.Status;
-        StatusComments      = Batch.StatusComments;
-        OriginalStatus      = Batch.Status;
 
         RestoreDraft(); // unsaved edits made before a detour to pick list management
 
         Session.BatchType = Batch.BatchType;
         await LoadLookupsAsync();
         await LoadDisplayFieldsAsync();
+        await LoadTestTypeOptionsAsync(Batch.BatchType);
+
+        // Pre-select the checkboxes from the existing batch-level test selections, unless a
+        // draft (from a pick-list detour) already restored them above.
+        if (TempData[DraftKey] is null)
+        {
+            var current = await _batches.GetBatchTestSelectionsAsync(Batch.ID);
+            SelectedHistologyCodes = current.Histology.Select(r => r.Code).ToList();
+            SelectedAntibodyCodes  = current.Antibodies.Select(r => r.Code).ToList();
+            SelectedStainCodes     = current.Stains.Select(r => r.Code).ToList();
+        }
+
         return Page();
     }
 
@@ -136,9 +162,9 @@ public class EditBatchModel : HistoPageModel
         string? Comments,
         int? OtherSubmittedBy,
         string? OtherSubmittedArea,
-        string? Status,
-        string? StatusComments,
-        string? OriginalStatus);
+        List<string> SelectedHistologyCodes,
+        List<string> SelectedAntibodyCodes,
+        List<string> SelectedStainCodes);
 
     /// <summary>
     /// Replaces legacy <c>btnNewSubmittedBy</c> / <c>btnNewProject</c> / <c>btnNewContact</c> —
@@ -150,7 +176,7 @@ public class EditBatchModel : HistoPageModel
         TempData[DraftKey] = System.Text.Json.JsonSerializer.Serialize(new EditDraft(
             ProjectContractCode, ContactName, SpeciesId, BatchDateStr, BatchTypeField,
             Fixation, SafeToHandle, IsPreCassetted, Comments, OtherSubmittedBy,
-            OtherSubmittedArea, Status, StatusComments, OriginalStatus));
+            OtherSubmittedArea, SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes));
 
         var returnUrl = Url.Page("/Batches/EditBatch");
 
@@ -183,9 +209,9 @@ public class EditBatchModel : HistoPageModel
         Comments            = draft.Comments;
         OtherSubmittedBy    = draft.OtherSubmittedBy;
         OtherSubmittedArea  = draft.OtherSubmittedArea;
-        Status              = draft.Status;
-        StatusComments      = draft.StatusComments;
-        OriginalStatus      = draft.OriginalStatus;
+        SelectedHistologyCodes = draft.SelectedHistologyCodes;
+        SelectedAntibodyCodes  = draft.SelectedAntibodyCodes;
+        SelectedStainCodes     = draft.SelectedStainCodes;
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -199,16 +225,29 @@ public class EditBatchModel : HistoPageModel
 
         await LoadLookupsAsync();
         await LoadDisplayFieldsAsync();
+        await LoadTestTypeOptionsAsync(Batch.BatchType);
 
-        // ---- Status transition validation ----
-        if (Status == BatchStatus.Received && OriginalStatus != BatchStatus.Received)
+        // ---- Test-type validation (mirrors former EditBatchTestsModel) ----
+        if (SelectedHistologyCodes.Count == 0)
         {
-            SaveError = "Mark a submission as Received using the Receive Submissions workflow.";
+            SaveError = "Select at least one histology type.";
             return Page();
         }
-        if (Status == BatchStatus.InProgress && OriginalStatus == BatchStatus.Submitted)
+        if (SelectedHistologyCodes.Contains(HistologyCode.Archive) && SelectedHistologyCodes.Count > 1)
         {
-            SaveError = "The submission cannot be set to In Progress while still Submitted. Receive it first.";
+            SaveError = "Archive cannot be combined with other histology types.";
+            return Page();
+        }
+        if (SelectedHistologyCodes.Contains(HistologyCode.SpecialStain) && SelectedStainCodes.Count == 0)
+        {
+            SaveError = "Special Stain is selected — you must also select at least one special stain.";
+            return Page();
+        }
+        var ihcSelected = SelectedHistologyCodes.Contains(HistologyCode.IhcPrp)
+                       || SelectedHistologyCodes.Contains(HistologyCode.IhcOther);
+        if (ihcSelected && SelectedAntibodyCodes.Count == 0)
+        {
+            SaveError = "IHC is selected — you must also select at least one antibody.";
             return Page();
         }
 
@@ -226,22 +265,15 @@ public class EditBatchModel : HistoPageModel
             batchDate = parsedDate;
         }
 
-        // ---- Set DateCompleted when status changes to Completed ----
-        var completedDate = Batch.CompletedDate;
-        if (Status == BatchStatus.Completed && OriginalStatus != BatchStatus.Completed)
-            completedDate = DateTime.Today;
-        else if (Status != BatchStatus.Completed)
-            completedDate = null;
-
         var updated = new Batch
         {
             ID                  = Batch.ID,
-            Status              = Status ?? Batch.Status,
+            Status              = Batch.Status,
             Comments            = Comments,
-            StatusComments      = StatusComments,
+            StatusComments      = Batch.StatusComments,
             BatchDate           = batchDate,
             ReceivedDate        = Batch.ReceivedDate,
-            CompletedDate       = completedDate,
+            CompletedDate       = Batch.CompletedDate,
             SubmittedByUserID   = Batch.SubmittedByUserID,
             UserAreaCode        = Batch.UserAreaCode,
             IsPreCassetted      = IsPreCassetted,
@@ -276,6 +308,15 @@ public class EditBatchModel : HistoPageModel
         catch (Exception ex)
         {
             SaveError = "Failed to save the submission. Please try again.";
+            return Page();
+        }
+
+        // Clear stain/antibody selections if their triggering histology codes aren't selected.
+        var cleanedStainCodes    = ShowStains     ? SelectedStainCodes    : (IReadOnlyList<string>)[];
+        var cleanedAntibodyCodes = ihcSelected     ? SelectedAntibodyCodes : (IReadOnlyList<string>)[];
+        if (!await _batches.SaveBatchTestSelectionsAsync(Batch.ID, SelectedHistologyCodes, cleanedAntibodyCodes, cleanedStainCodes, Session.UserID))
+        {
+            SaveError = "Submission saved, but failed to save test types. Please try again.";
             return Page();
         }
 
@@ -317,5 +358,23 @@ public class EditBatchModel : HistoPageModel
             var submittedAsOptions = await _lookups.GetLookupDataAsync(LookupSubmittedAs);
             SubmittedAsDescription = submittedAsOptions.FirstOrDefault(o => o.Code == submittedAsCode)?.Name;
         }
+    }
+
+    /// <summary>Loads histology/antibody/stain options filtered for TSE/NonTSE (mirrors former EditBatchTestsModel).</summary>
+    private async Task LoadTestTypeOptionsAsync(int batchType)
+    {
+        var antibodyTableId = batchType == BatchTypeConstants.NonTse ? LookupNonTseAntibodies : LookupTseAntibodies;
+
+        var histologyTask = _lookups.GetHistologyTypesAsync();
+        var antibodyTask  = _lookups.GetLookupDataAsync(antibodyTableId);
+        var stainTask     = _lookups.GetLookupDataAsync(LookupSpecialStain);
+        await Task.WhenAll(histologyTask, antibodyTask, stainTask);
+
+        // TSE: hide IHC-Other. NonTSE: hide IHC-PrP and H&E (BSE). Legacy: BatchDetails.aspx.vb::HideOptions()
+        HistologyOptions = batchType == BatchTypeConstants.NonTse
+            ? histologyTask.Result.Where(i => i.Code != HistologyCode.IhcPrp && i.Code != HistologyCode.HeBse).ToList()
+            : histologyTask.Result.Where(i => i.Code != HistologyCode.IhcOther).ToList();
+        AntibodyOptions = antibodyTask.Result;
+        StainOptions    = stainTask.Result;
     }
 }
