@@ -32,7 +32,9 @@ public class QCNotesModel : GridPageModel
             "StainRef"     => SortDesc ? Notes.OrderByDescending(n => n.StainRef)             : Notes.OrderBy(n => n.StainRef),
             "Project"      => SortDesc ? Notes.OrderByDescending(n => n.ProjectDescription)   : Notes.OrderBy(n => n.ProjectDescription),
             "Species"      => SortDesc ? Notes.OrderByDescending(n => n.Species)              : Notes.OrderBy(n => n.Species),
-            _              => SortDesc ? Notes.OrderByDescending(n => n.QCNoteRef)            : Notes.OrderBy(n => n.QCNoteRef),
+            "QCNoteRef"    => SortDesc ? Notes.OrderByDescending(n => n.QCNoteRef)            : Notes.OrderBy(n => n.QCNoteRef),
+            // No column clicked yet — default: ID DESC (most recent first).
+            _              => Notes.OrderByDescending(n => n.ID),
         })
         .Skip((PageNumber - 1) * PageSize)
         .Take(PageSize)

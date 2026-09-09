@@ -148,13 +148,13 @@ else
                         <div class="govuk-radios__item">
                             <input class="govuk-radios__input" type="radio" id="status-received" name="Status"
                                    value="@BatchStatus.Received" checked="@(Model.Status == BatchStatus.Received)"
-                                   data-aria-controls="receipt-details" aria-expanded="@(Model.Status == BatchStatus.Received ? "true" : "false")" />
+                                   aria-expanded="@(Model.Status == BatchStatus.Received ? "true" : "false")" />
                             <label class="govuk-label govuk-radios__label" for="status-received">Received</label>
                         </div>
                         <div class="govuk-radios__item">
                             <input class="govuk-radios__input" type="radio" id="status-rejected" name="Status"
                                    value="@BatchStatus.Rejected" checked="@(Model.Status == BatchStatus.Rejected)"
-                                   data-aria-controls="receipt-details" aria-expanded="@(Model.Status == BatchStatus.Rejected ? "true" : "false")" />
+                                   aria-expanded="@(Model.Status == BatchStatus.Rejected ? "true" : "false")" />
                             <label class="govuk-label govuk-radios__label" for="status-rejected">Rejected</label>
                         </div>
                         @{
@@ -273,9 +273,11 @@ else
                     }
                 }
 
-                // Deliberately no aria-controls attribute here: govuk-frontend's own radios
-                // script re-scans for it on every page load and reintroduces the shared-target
-                // bug (see comment above) the moment it finds one, even if added dynamically.
+                // No data-aria-controls on the radios above: that's the attribute govuk-frontend's own
+                // radios script actually keys off (not aria-controls), and since Received/Rejected shared
+                // one target, its own init pass collapsed the panel on every page load — it processed
+                // whichever of the two radios came last in the DOM and hid the target if that one was
+                // unchecked, even when the other (checked) radio wanted it shown.
                 statusRadios.forEach(function (radio) {
                     radio.addEventListener('change', function () { applyStatus(radio.value); });
                 });

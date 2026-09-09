@@ -136,10 +136,9 @@ public class ViewSubmissionsModel : HistoPageModel
     public bool CanViewSubmission  => SelectedBatchStatus is not null;
     public bool CanCopySubmission  => SelectedBatchStatus is not null;
     public bool CanDateReturned    => SelectedBatchStatus == BatchStatus.Completed;
-    // Edit test types — Submitted, Received, or InProgress only (matches CanEditTestTypes on BatchDetails).
-    public bool CanEditTestTypes   => SelectedBatchStatus == BatchStatus.Submitted
-                                   || SelectedBatchStatus == BatchStatus.Received
-                                   || SelectedBatchStatus == BatchStatus.InProgress;
+    // Edit test types — Submitted (Not started) only. Received and In Progress submissions
+    // have already been actioned by the lab, so test types must no longer be user-editable there.
+    public bool CanEditTestTypes   => SelectedBatchStatus == BatchStatus.Submitted;
 
     private async Task LoadLookupsAsync()
     {
@@ -162,7 +161,14 @@ public class ViewSubmissionsModel : HistoPageModel
     {
         ViewData["Title"] = "View submissions";
         ViewData["PageTitle"] = "View submissions";
-        await LoadLookupsAsync();
+        var lookupsTask = LoadLookupsAsync();
+        // Show the unfiltered list on first load, matching legacy — a search isn't mandatory
+        // before the user sees any submissions.
+        var resultsTask = _batches.SearchAsync(BuildCriteria());
+        await Task.WhenAll(lookupsTask, resultsTask);
+        Results  = await resultsTask;
+        Searched = true;
+        PopulateGridViewData();
     }
 
     public async Task<IActionResult> OnPostSearchAsync()

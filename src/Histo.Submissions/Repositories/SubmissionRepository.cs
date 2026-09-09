@@ -270,10 +270,16 @@ public sealed class SubmissionRepository : ISubmissionRepository
                          d.TryGetValue("SubmissionID", out var sid) ? Convert.ToInt32(sid) : 0;
             return new Tissue
             {
+                ID = d.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0,
                 OwnerID = submId,
                 Owner = TissueOwner.Submission,
                 TissueCode = d.TryGetValue("TissueCode", out var tc) ? Convert.ToString(tc) ?? "" : "",
                 NoPieces = d.TryGetValue("NoPieces", out var np) ? Convert.ToInt16(np) : (short)0,
+                Comment = d.TryGetValue("Comment", out var c) && c is not DBNull ? Convert.ToString(c) : null,
+                ArchiveLocation = d.TryGetValue("ArchiveLocation", out var al) && al is not DBNull ? Convert.ToString(al) : null,
+                ArchivedDate = d.TryGetValue("ArchivedDate", out var ad) && ad is not DBNull ? Convert.ToDateTime(ad) : null,
+                ArchiveComment = d.TryGetValue("ArchiveComment", out var ac) && ac is not DBNull ? Convert.ToString(ac) : null,
+                RowStamp = d.TryGetValue("RowStamp", out var rs) && rs is not DBNull ? (byte[])rs : null,
             };
         }).ToList();
     }

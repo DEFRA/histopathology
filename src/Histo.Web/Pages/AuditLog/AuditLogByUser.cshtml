@@ -18,7 +18,20 @@
                 <ul class="govuk-list govuk-error-summary__list">
                     @foreach (var e in Model.Errors)
                     {
-                        <li>@e</li>
+                        var anchor = e.Contains("user", StringComparison.OrdinalIgnoreCase) ? "UserID"
+                                   : e.Contains("start", StringComparison.OrdinalIgnoreCase) ? "StartDate"
+                                   : e.Contains("end", StringComparison.OrdinalIgnoreCase) ? "EndDate"
+                                   : null;
+                        <li>
+                            @if (anchor is not null)
+                            {
+                                <a class="govuk-link" href="#@anchor">@e</a>
+                            }
+                            else
+                            {
+                                @e
+                            }
+                        </li>
                     }
                 </ul>
             </div>
@@ -26,7 +39,7 @@
     </div>
 }
 
-<form method="post">
+<form method="post" id="audit-log-form">
     <div class="govuk-form-group @(Model.Errors.Any(e => e.Contains("user")) ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="UserID">User</label>
         @if (Model.Errors.Any(e => e.Contains("user")))
@@ -69,18 +82,22 @@
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                @{ ViewData["Label"] = "Table"; ViewData["Column"] = "TableName"; }
-                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Table"; ViewData["Column"] = "TableName"; ViewData["FormId"] = "audit-log-form"; ViewData["Handler"] = ""; }
+                <partial name="_SortableHeaderPost" />
                 @{ ViewData["Label"] = "Field"; ViewData["Column"] = "FieldName"; }
-                <partial name="_SortableHeader" />
+                <partial name="_SortableHeaderPost" />
                 @{ ViewData["Label"] = "Date/Time"; ViewData["Column"] = "ChangedAt"; }
-                <partial name="_SortableHeader" />
+                <partial name="_SortableHeaderPost" />
                 @{ ViewData["Label"] = "User"; ViewData["Column"] = "UserName"; }
-                <partial name="_SortableHeader" />
-                <th scope="col" class="govuk-table__header">Before</th>
-                <th scope="col" class="govuk-table__header">After</th>
-                <th scope="col" class="govuk-table__header">Reason</th>
-                <th scope="col" class="govuk-table__header">Key</th>
+                <partial name="_SortableHeaderPost" />
+                @{ ViewData["Label"] = "Before"; ViewData["Column"] = "BeforeValue"; }
+                <partial name="_SortableHeaderPost" />
+                @{ ViewData["Label"] = "After"; ViewData["Column"] = "AfterValue"; }
+                <partial name="_SortableHeaderPost" />
+                @{ ViewData["Label"] = "Reason"; ViewData["Column"] = "Reason"; }
+                <partial name="_SortableHeaderPost" />
+                @{ ViewData["Label"] = "Key"; ViewData["Column"] = "KeyID"; }
+                <partial name="_SortableHeaderPost" />
             </tr>
         </thead>
         <tbody class="govuk-table__body">
@@ -99,9 +116,9 @@
             }
         </tbody>
     </table>
-    <partial name="_Pagination" />
+    <partial name="_PaginationPost" />
 }
-else
+else if (Model.Searched)
 {
     <p class="govuk-body">No audit log entries found for this user.</p>
 }

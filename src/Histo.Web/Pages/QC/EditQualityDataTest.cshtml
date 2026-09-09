@@ -9,14 +9,16 @@
     <a asp-page="/QC/QualityData" class="govuk-back-link">Back</a>
 }
 
-@if (!string.IsNullOrEmpty(Model.Error))
+<partial name="_ErrorSummary" model="Model.Errors" />
+
+@if (!string.IsNullOrEmpty(Model.ConcurrencyError))
 {
     <div class="govuk-error-summary" data-module="govuk-error-summary">
         <div role="alert">
             <h2 class="govuk-error-summary__title">There is a problem</h2>
             <div class="govuk-error-summary__body">
                 <ul class="govuk-list govuk-error-summary__list">
-                    <li>@Model.Error</li>
+                    <li>@Model.ConcurrencyError</li>
                 </ul>
             </div>
         </div>
@@ -80,9 +82,14 @@
         <input class="govuk-input govuk-input--width-20" asp-for="StainRef" maxlength="20" />
     </div>
 
-    <div class="govuk-form-group">
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("QCCode") ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="QCCode">QC code</label>
-        <select class="govuk-select" asp-for="QCCode">
+        @if (Model.Errors.TryGetValue("QCCode", out var qcCodeErr))
+        {
+            <p id="QCCode-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @qcCodeErr</p>
+        }
+        <select class="govuk-select @(Model.Errors.ContainsKey("QCCode") ? "govuk-select--error" : "")" asp-for="QCCode"
+                aria-describedby="@(Model.Errors.ContainsKey("QCCode") ? "QCCode-error" : null)">
             <option value="">Select</option>
             @foreach (var c in Model.QCCodes)
             {
@@ -91,9 +98,14 @@
         </select>
     </div>
 
-    <div class="govuk-form-group">
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("RemedialAction") ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="RemedialAction">Remedial action</label>
-        <select class="govuk-select" asp-for="RemedialAction">
+        @if (Model.Errors.TryGetValue("RemedialAction", out var remedialErr))
+        {
+            <p id="RemedialAction-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @remedialErr</p>
+        }
+        <select class="govuk-select @(Model.Errors.ContainsKey("RemedialAction") ? "govuk-select--error" : "")" asp-for="RemedialAction"
+                aria-describedby="@(Model.Errors.ContainsKey("RemedialAction") ? "RemedialAction-error" : null)">
             <option value="">Select</option>
             @foreach (var r in Model.RemedialActions)
             {
@@ -110,13 +122,23 @@
                 <label class="govuk-label govuk-checkboxes__label" for="Dispatched">Dispatched</label>
             </div>
             <div class="govuk-checkboxes__conditional govuk-checkboxes__conditional--hidden" id="conditional-dispatched">
-                <div class="govuk-form-group govuk-!-margin-top-4">
+                <div class="govuk-form-group govuk-!-margin-top-4 @(Model.Errors.ContainsKey("DispatchedDate") ? "govuk-form-group--error" : "")">
                     <label class="govuk-label" for="DispatchedDate">Dispatched date</label>
-                    <input class="govuk-input govuk-input--width-10" type="date" asp-for="DispatchedDate" />
+                    @if (Model.Errors.TryGetValue("DispatchedDate", out var dispatchedDateErr))
+                    {
+                        <p id="DispatchedDate-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @dispatchedDateErr</p>
+                    }
+                    <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("DispatchedDate") ? "govuk-input--error" : "")" type="date" asp-for="DispatchedDate"
+                           aria-describedby="@(Model.Errors.ContainsKey("DispatchedDate") ? "DispatchedDate-error" : null)" />
                 </div>
-                <div class="govuk-form-group">
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("DispatchedBy") ? "govuk-form-group--error" : "")">
                     <label class="govuk-label" for="DispatchedBy">Dispatched by</label>
-                    <select class="govuk-select" asp-for="DispatchedBy">
+                    @if (Model.Errors.TryGetValue("DispatchedBy", out var dispatchedByErr))
+                    {
+                        <p id="DispatchedBy-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @dispatchedByErr</p>
+                    }
+                    <select class="govuk-select @(Model.Errors.ContainsKey("DispatchedBy") ? "govuk-select--error" : "")" asp-for="DispatchedBy"
+                            aria-describedby="@(Model.Errors.ContainsKey("DispatchedBy") ? "DispatchedBy-error" : null)">
                         <option value="">Select</option>
                         @foreach (var u in Model.Users)
                         {
@@ -124,17 +146,27 @@
                         }
                     </select>
                 </div>
-                <div class="govuk-form-group">
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("DispatchedTo") ? "govuk-form-group--error" : "")">
                     <label class="govuk-label" for="DispatchedTo">Dispatched to</label>
-                    <input class="govuk-input govuk-input--width-30" asp-for="DispatchedTo" maxlength="30" />
+                    @if (Model.Errors.TryGetValue("DispatchedTo", out var dispatchedToErr))
+                    {
+                        <p id="DispatchedTo-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @dispatchedToErr</p>
+                    }
+                    <input class="govuk-input govuk-input--width-30 @(Model.Errors.ContainsKey("DispatchedTo") ? "govuk-input--error" : "")" asp-for="DispatchedTo" maxlength="30"
+                           aria-describedby="@(Model.Errors.ContainsKey("DispatchedTo") ? "DispatchedTo-error" : null)" />
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="govuk-form-group">
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("ArchiveLocation") ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="ArchiveLocation">Archive location</label>
-        <select class="govuk-select" asp-for="ArchiveLocation">
+        @if (Model.Errors.TryGetValue("ArchiveLocation", out var archiveLocationErr))
+        {
+            <p id="ArchiveLocation-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @archiveLocationErr</p>
+        }
+        <select class="govuk-select @(Model.Errors.ContainsKey("ArchiveLocation") ? "govuk-select--error" : "")" asp-for="ArchiveLocation"
+                aria-describedby="@(Model.Errors.ContainsKey("ArchiveLocation") ? "ArchiveLocation-error" : null)">
             <option value="">Select</option>
             @foreach (var a in Model.ArchiveLocations)
             {
@@ -143,9 +175,14 @@
         </select>
     </div>
 
-    <div class="govuk-form-group">
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("ArchivedDate") ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="ArchivedDate">Archive date</label>
-        <input class="govuk-input govuk-input--width-10" type="date" asp-for="ArchivedDate" />
+        @if (Model.Errors.TryGetValue("ArchivedDate", out var archivedDateErr))
+        {
+            <p id="ArchivedDate-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @archivedDateErr</p>
+        }
+        <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("ArchivedDate") ? "govuk-input--error" : "")" type="date" asp-for="ArchivedDate"
+               aria-describedby="@(Model.Errors.ContainsKey("ArchivedDate") ? "ArchivedDate-error" : null)" />
     </div>
 
     <div class="govuk-form-group">

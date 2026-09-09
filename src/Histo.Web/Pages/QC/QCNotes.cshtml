@@ -9,15 +9,6 @@
     <a asp-page="/Batches/BatchDetails" class="govuk-back-link">Back</a>
 }
 
-@if (!Model.IsGlobalView)
-{
-    <p class="govuk-body"><strong>Batch No:</strong> @Model.BatchID</p>
-}
-else
-{
-    <p class="govuk-body">Showing all QC notes (no batch selected).</p>
-}
-
 <div class="govuk-form-group">
     <form method="post" asp-page-handler="Go">
         <label class="govuk-label govuk-!-display-inline" asp-for="QuickGoRef">Go directly to QC note ref</label>
@@ -25,10 +16,6 @@ else
         <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0 govuk-!-margin-left-2">Go</button>
     </form>
 </div>
-
-<p class="govuk-body">
-    <a asp-page="/QC/AddQCNote" class="govuk-button" data-module="govuk-button">Add QC note</a>
-</p>
 
 @if (Model.Notes.Any())
 {

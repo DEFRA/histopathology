@@ -185,9 +185,6 @@ public class BatchDetailsModel : HistoPageModel
 
     // ── Status-gated action availability (mirrors legacy EnableDisableControls) ──
 
-    /// <summary>True when blocks can be assigned — Received or InProgress (lab is working on it).</summary>
-    public bool CanAssignBlocks => Batch?.Status is BatchStatus.Received or BatchStatus.InProgress;
-
     /// <summary>True while the submission is still being built — drives the task-list-style progress summary.</summary>
     public bool CanModifySamples => Batch?.Status is BatchStatus.Submitted or BatchStatus.Rejected;
 
@@ -499,6 +496,11 @@ public class BatchDetailsModel : HistoPageModel
 
         if (Create_SelectedHistologyCodes.Count == 0)
             errors["Create_Histology"] = "Select at least one histology type.";
+        else if (Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.Archive) && Create_SelectedHistologyCodes.Count > 1)
+            errors["Create_Histology"] = "Archive cannot be combined with other histology types.";
+
+        if (!Create_SafeToHandle)
+            errors["Create_SafeToHandle"] = "Confirm the submission is adequately fixed.";
 
         // Antibody required when IHC-PrP or IHC-Other is selected
         var needsAntibodies = Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcPrp)

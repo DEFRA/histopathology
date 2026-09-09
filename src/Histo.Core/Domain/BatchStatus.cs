@@ -47,4 +47,26 @@ public static class BatchStatus
         InProgress => "In progress",
         _          => status   // unknown code — show raw value rather than blank
     };
+
+    /// <summary>
+    /// Normalises a status label that came back as free text from a legacy stored procedure
+    /// (e.g. <c>GetBatchesWithStatus</c>, which returns a description column rather than a
+    /// code) to the same canonical wording as <see cref="DisplayName"/>. Fixes the
+    /// inconsistency where BatchesForEditing showed the SP's raw "Not Received" while
+    /// EditBatch/ReceiveBatch showed "Not started" for the identical status.
+    /// </summary>
+    public static string NormalizeDisplayText(string? rawText)
+    {
+        if (string.IsNullOrWhiteSpace(rawText)) return rawText ?? string.Empty;
+        return rawText.Trim().ToLowerInvariant() switch
+        {
+            "not received" or "not started" or "submitted" => "Not started",
+            "received"                                      => "Received",
+            "rejected"                                       => "Rejected",
+            "completed"                                      => "Completed",
+            "on hold" or "onhold"                             => "On hold",
+            "in progress" or "inprogress"                     => "In progress",
+            _                                                 => rawText
+        };
+    }
 }

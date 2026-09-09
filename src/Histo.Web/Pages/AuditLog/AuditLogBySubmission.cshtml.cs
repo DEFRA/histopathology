@@ -13,22 +13,27 @@ public class AuditLogBySubmissionModel : GridPageModel
     public AuditLogBySubmissionModel(ISessionService session, IAuditLogService auditLog)
         : base(session) => _auditLog = auditLog;
 
-    [BindProperty] public int      SubmissionID { get; set; }
+    [BindProperty] public int?      SubmissionID { get; set; }
     [BindProperty] public DateTime? StartDate    { get; set; }
     [BindProperty] public DateTime? EndDate      { get; set; }
 
     public IReadOnlyList<AuditLogEntry> Results { get; private set; } = [];
     public List<string> Errors { get; } = [];
+    public bool Searched { get; private set; }
 
     public int TotalCount => Results.Count;
 
     public IReadOnlyList<AuditLogEntry> PagedEntries =>
         (SortColumn switch
         {
-            "FieldName" => SortDesc ? Results.OrderByDescending(e => e.FieldName) : Results.OrderBy(e => e.FieldName),
-            "UserName"  => SortDesc ? Results.OrderByDescending(e => e.UserName)  : Results.OrderBy(e => e.UserName),
-            "TableName" => SortDesc ? Results.OrderByDescending(e => e.TableName) : Results.OrderBy(e => e.TableName),
-            _           => SortDesc ? Results.OrderByDescending(e => e.ChangedAt) : Results.OrderBy(e => e.ChangedAt),
+            "FieldName"   => SortDesc ? Results.OrderByDescending(e => e.FieldName)   : Results.OrderBy(e => e.FieldName),
+            "UserName"    => SortDesc ? Results.OrderByDescending(e => e.UserName)    : Results.OrderBy(e => e.UserName),
+            "TableName"   => SortDesc ? Results.OrderByDescending(e => e.TableName)   : Results.OrderBy(e => e.TableName),
+            "BeforeValue" => SortDesc ? Results.OrderByDescending(e => e.BeforeValue) : Results.OrderBy(e => e.BeforeValue),
+            "AfterValue"  => SortDesc ? Results.OrderByDescending(e => e.AfterValue)  : Results.OrderBy(e => e.AfterValue),
+            "Reason"      => SortDesc ? Results.OrderByDescending(e => e.Reason)      : Results.OrderBy(e => e.Reason),
+            "KeyID"       => SortDesc ? Results.OrderByDescending(e => e.KeyID)       : Results.OrderBy(e => e.KeyID),
+            _             => SortDesc ? Results.OrderByDescending(e => e.ChangedAt)  : Results.OrderBy(e => e.ChangedAt),
         })
         .Skip((PageNumber - 1) * PageSize)
         .Take(PageSize)
@@ -48,14 +53,15 @@ public class AuditLogBySubmissionModel : GridPageModel
         ViewData["Title"] = "Audit log by submission";
         ViewData["PageTitle"] = "Audit log — by submission";
 
-        if (SubmissionID <= 0) Errors.Add("Enter a submission number.");
+        if (SubmissionID is null or <= 0) Errors.Add("Enter a submission number.");
         if (Errors.Count > 0)
         {
             PopulateGridViewData(TotalCount);
             return Page();
         }
 
-        Results = await _auditLog.GetBySubmissionAsync(SubmissionID, StartDate, EndDate);
+        Results = await _auditLog.GetBySubmissionAsync(SubmissionID!.Value, StartDate, EndDate);
+        Searched = true;
         PopulateGridViewData(TotalCount);
         return Page();
     }
@@ -63,7 +69,8 @@ public class AuditLogBySubmissionModel : GridPageModel
     /// <summary>Replaces the legacy ExcelExport.aspx link — exports the current results as CSV.</summary>
     public async Task<IActionResult> OnPostExportCsvAsync()
     {
-        var results = await _auditLog.GetBySubmissionAsync(SubmissionID, StartDate, EndDate);
+        if (SubmissionID is null or <= 0) return RedirectToPage();
+        var results = await _auditLog.GetBySubmissionAsync(SubmissionID.Value, StartDate, EndDate);
         return CsvExportHelper.BuildCsv(
             "AuditLogBySubmission.csv",
             ["Table", "Field", "Date/Time", "User", "Before", "After", "Reason", "Key"],

@@ -1,0 +1,80 @@
+@page "{tableId:int}"
+@model Histo.Web.Pages.Admin.AddLookupItemModel
+@{
+    ViewData["Title"] = "Add pick list item";
+    ViewData["PageTitle"] = "Add pick list item";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Admin/LookupItems" asp-route-tableId="@Model.TableId" class="govuk-back-link">Back</a>
+}
+
+<h2 class="govuk-heading-m">@Model.TableName</h2>
+
+<partial name="_ErrorSummary" model="Model.Errors" />
+
+@if (!string.IsNullOrEmpty(Model.SaveError))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.SaveError</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+<form method="post">
+    <input type="hidden" asp-for="TableId" />
+
+    @* Area dropdown — only for Contacts (table 18) and Projects (table 19) *@
+    @if (Model.ShowAreaColumn)
+    {
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="Area">Area</label>
+            <select class="govuk-select" asp-for="Area" id="Area">
+                <option value="">-- Select area --</option>
+                @foreach (var a in Model.UserAreas)
+                {
+                    <option value="@a.ID">@a.Name</option>
+                }
+            </select>
+        </div>
+    }
+    @if (Model.TableHasCodes)
+    {
+        <div class="govuk-form-group @(Model.Errors.ContainsKey("Code") ? "govuk-form-group--error" : "")">
+            <label class="govuk-label" for="Code">Code</label>
+            @if (Model.Errors.TryGetValue("Code", out var codeError))
+            {
+                <p id="Code-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @codeError</p>
+            }
+            <input class="govuk-input @(Model.Errors.ContainsKey("Code") ? "govuk-input--error" : "")" asp-for="Code" maxlength="10"
+                   aria-describedby="@(Model.Errors.ContainsKey("Code") ? "Code-error" : null)" />
+        </div>
+    }
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("Description") ? "govuk-form-group--error" : "")">
+        <label class="govuk-label" for="Description">Description</label>
+        @if (Model.Errors.TryGetValue("Description", out var descriptionError))
+        {
+            <p id="Description-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @descriptionError</p>
+        }
+        <input class="govuk-input @(Model.Errors.ContainsKey("Description") ? "govuk-input--error" : "")" asp-for="Description" maxlength="50"
+               aria-describedby="@(Model.Errors.ContainsKey("Description") ? "Description-error" : null)" />
+    </div>
+    <div class="govuk-form-group">
+        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="Active" type="checkbox" />
+                <label class="govuk-label govuk-checkboxes__label" for="Active">Active</label>
+            </div>
+        </div>
+    </div>
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Add item</button>
+        <a asp-page="/Admin/LookupItems" asp-route-tableId="@Model.TableId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    </div>
+</form>
