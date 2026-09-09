@@ -74,6 +74,13 @@ public class EditBatchModel : HistoPageModel
         ? "/Batches/BatchesForEditing"
         : Session.ReturnPage;
 
+    /// <summary>
+    /// <see cref="ReturnPage"/> plus the sort/page query string captured when the user left the
+    /// list, so Back/Cancel restore the exact filter/sort/page state. Hrefs only — never pass to
+    /// <c>RedirectToPage</c>, which requires a bare page name.
+    /// </summary>
+    public string ReturnUrl => ReturnPage + (Session.ReturnPageQuery ?? string.Empty);
+
     // ---- Lookup data for dropdowns ----
     public IReadOnlyList<LookupItem> Projects    { get; private set; } = [];
     public IReadOnlyList<LookupItem> Contacts    { get; private set; } = [];
@@ -320,7 +327,20 @@ public class EditBatchModel : HistoPageModel
             return Page();
         }
 
-        return RedirectToPage(ReturnPage);
+        return RedirectToPage(ReturnPage, ParseReturnQuery());
+    }
+
+    /// <summary>Parses <see cref="ISessionService.ReturnPageQuery"/> into route values so a
+    /// post-save redirect restores the list's sort/page state, not just its bare page name.</summary>
+    private Dictionary<string, string> ParseReturnQuery()
+    {
+        var result = new Dictionary<string, string>();
+        var query = Session.ReturnPageQuery;
+        if (string.IsNullOrEmpty(query)) return result;
+
+        foreach (var pair in Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(query))
+            result[pair.Key] = pair.Value.ToString();
+        return result;
     }
 
     private async Task LoadLookupsAsync()

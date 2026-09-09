@@ -17,9 +17,6 @@ namespace Histo.Web.Pages.Batches;
 /// </summary>
 public class EditSubmissionStatusModel : HistoPageModel
 {
-    private const int LookupContacts = 18;
-    private const int LookupProjects = 19;
-
     private readonly IBatchService  _batches;
     private readonly ILookupService _lookups;
     private readonly IUserService   _users;
@@ -45,11 +42,21 @@ public class EditSubmissionStatusModel : HistoPageModel
     public string? SpeciesName { get; private set; }
     public string? EnteredByName { get; private set; }
     public string? EnteredAreaName { get; private set; }
+    public string? SubmittedByName { get; private set; }
+    public string? SubmittedAreaName { get; private set; }
 
     // Falls back to BatchesForEditing when no context is available (this page's only entry point).
     public string ReturnPage => string.IsNullOrWhiteSpace(Session.ReturnPage)
         ? "/Batches/BatchesForEditing"
         : Session.ReturnPage;
+
+    /// <summary>
+    /// <see cref="ReturnPage"/> plus the sort/page query string captured when the user left the
+    /// list, so Back/Cancel restore the exact filter/sort/page state instead of resetting to
+    /// page 1 defaults. Used only for hrefs — never pass this to <c>RedirectToPage</c>, which
+    /// requires a bare page name.
+    /// </summary>
+    public string ReturnUrl => ReturnPage + (Session.ReturnPageQuery ?? string.Empty);
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -142,30 +149,33 @@ public class EditSubmissionStatusModel : HistoPageModel
             return Page();
         }
 
-        return RedirectToPage(ReturnPage);
+        return RedirectToPage(ReturnPage, ParseReturnQuery());
+    }
+
+    /// <summary>Parses <see cref="ISessionService.ReturnPageQuery"/> into route values so a
+    /// post-save redirect restores the list's sort/page state, not just its bare page name.</summary>
+    private Dictionary<string, string> ParseReturnQuery()
+    {
+        var result = new Dictionary<string, string>();
+        var query = Session.ReturnPageQuery;
+        if (string.IsNullOrEmpty(query)) return result;
+
+        foreach (var pair in Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(query))
+            result[pair.Key] = pair.Value.ToString();
+        return result;
     }
 
     private async Task LoadDisplayFieldsAsync()
     {
         if (Batch is null) return;
 
-        var projectsTask  = _lookups.GetLookupDataAsync(LookupProjects, includeInactive: true);
-        var contactsTask  = _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true);
-        var speciesTask   = _lookups.GetSpeciesLookupAsync();
-        var usersTask     = _users.GetAllUsersAsync();
-        var areasTask     = _lookups.GetUserAreasAsync();
-        await Task.WhenAll(projectsTask, contactsTask, speciesTask, usersTask, areasTask);
-
-        var projectsById = projectsTask.Result.ToDictionary(i => i.ID.ToString(), i => i.Name);
-        var contactsById = contactsTask.Result.ToDictionary(i => i.ID.ToString(), i => i.Name);
-        var speciesById  = speciesTask.Result.ToDictionary(i => i.ID.ToString(), i => i.Name, StringComparer.OrdinalIgnoreCase);
-        var userById     = usersTask.Result.ToDictionary(u => u.UserID, u => u.Name);
-        var areaByCode   = areasTask.Result.ToDictionary(a => a.ID.ToString(), a => a.Name, StringComparer.OrdinalIgnoreCase);
-
-        ProjectName     = !string.IsNullOrWhiteSpace(Batch.ProjectContractCode) && projectsById.TryGetValue(Batch.ProjectContractCode, out var pn) ? pn : Batch.ProjectContractCode;
-        PathologistName = !string.IsNullOrWhiteSpace(Batch.ContactName) && contactsById.TryGetValue(Batch.ContactName, out var cn) ? cn : Batch.ContactName;
-        SpeciesName     = !string.IsNullOrWhiteSpace(Batch.Species) && speciesById.TryGetValue(Batch.Species, out var sn) ? sn : Batch.Species;
-        EnteredByName   = Batch.SubmittedBy.HasValue && userById.TryGetValue(Batch.SubmittedBy.Value, out var eb) ? eb : null;
-        EnteredAreaName = !string.IsNullOrEmpty(Batch.SubmittedArea) && areaByCode.TryGetValue(Batch.SubmittedArea, out var ea) ? ea : null;
+        var summary = await BatchSummaryDisplayResolver.ResolveAsync(Batch, _lookups, _users);
+        ProjectName       = summary.ProjectName;
+        PathologistName   = summary.PathologistName;
+        SpeciesName       = summary.SpeciesName;
+        EnteredByName     = summary.EnteredByName;
+        EnteredAreaName   = summary.EnteredAreaName;
+        SubmittedByName   = summary.SubmittedByName;
+        SubmittedAreaName = summary.SubmittedAreaName;
     }
 }

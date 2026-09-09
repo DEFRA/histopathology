@@ -140,8 +140,8 @@ public class ViewSubmissionsModel : HistoPageModel
     private async Task LoadLookupsAsync()
     {
         var usersTask = _users.GetAllUsersAsync();
-        var projectsTask = _lookups.GetLookupDataAsync(LookupProjects);
-        var contactsTask = _lookups.GetLookupDataAsync(LookupContacts);
+        var projectsTask = _lookups.GetLookupDataAsync(LookupProjects, includeInactive: true);
+        var contactsTask = _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true);
         var speciesTask = _lookups.GetSpeciesLookupAsync();
         var fixationsTask = _lookups.GetLookupDataAsync(LookupFixative);
 

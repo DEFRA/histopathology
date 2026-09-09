@@ -349,8 +349,10 @@ public class BatchDetailsModel : HistoPageModel
             var userAreasTask      = _lookups.GetUserAreasAsync();
             var submittedAsTask    = _batches.GetSubmittedAsCodeAsync(batchId);
             var submittedAsLookup  = _lookups.GetLookupDataAsync(11); // LOOKUP_SUBMITTEDAS = 11
-            var projectsLookup     = _lookups.GetLookupDataAsync(LookupProjects);
-            var contactsLookup     = _lookups.GetLookupDataAsync(LookupContacts);
+            // includeInactive: true — an existing submission's saved Project/Pathologist may since
+            // have been deactivated; without this the raw code is shown instead of its name.
+            var projectsLookup     = _lookups.GetLookupDataAsync(LookupProjects, includeInactive: true);
+            var contactsLookup     = _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true);
             var fixationsLookup    = _lookups.GetLookupDataAsync(LookupFixation);
             var animalsTask        = _submissions.GetAnimalsByBatchAsync(batchId);
 

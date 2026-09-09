@@ -19,7 +19,7 @@
         <label class="govuk-label" for="Status">Status</label>
         <select class="govuk-select" asp-for="Status">
             <option value="">-- Any --</option>
-            <option value="@BatchStatus.Submitted">Not started</option>
+            <option value="@BatchStatus.Submitted">Not received</option>
             <option value="@BatchStatus.Received">Received</option>
             <option value="@BatchStatus.Rejected">Rejected</option>
             <option value="@BatchStatus.Completed">Completed</option>
@@ -244,13 +244,13 @@
             }
             else
             {
-                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Editing is only available for submissions in Not started or Rejected status">Edit submission</button>
+                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Editing is only available for submissions in Not received or Rejected status">Edit submission</button>
             }
 
             @* View submission — always available once a row is selected *@
             @if (Model.CanViewSubmission)
             {
-                <a asp-page="/Batches/BatchDetails" class="govuk-button" data-module="govuk-button">View submission</a>
+                <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">View submission</a>
             }
 
             @* GAP-2: Date Returned — Completed status only.

@@ -61,10 +61,10 @@ public abstract class HistoPageModel : PageModel
         //        var identity = new System.Security.Claims.ClaimsIdentity("saml2");
         //        identity.AddClaim(new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "Silambarasan Duraiswamy"));
         //        identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.GroupName, "Maintenance"));
-        //        identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.UserDbId,   "243"));
-        //        identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.GroupId,     "3"));
-        //        identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.UserArea,    "Histopath"));
-        //        identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.UserAreaId,  "3"));
+        //        identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.UserDbId, "243"));
+        //        identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.GroupId, "3"));
+        //        identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.UserArea, "Other VLA"));
+        //        identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.UserAreaId, "3"));
         //        var principal = new System.Security.Claims.ClaimsPrincipal(identity);
         //        await context.HttpContext.SignInAsync("saml2", principal);
         //        context.HttpContext.User = principal;

@@ -28,7 +28,8 @@ public class BatchesForEditingModel : GridPageModel
             "Species"            => SortDesc ? Batches.OrderByDescending(b => b.Species)            : Batches.OrderBy(b => b.Species),
             "BatchDate"          => SortDesc ? Batches.OrderByDescending(b => b.BatchDate)           : Batches.OrderBy(b => b.BatchDate),
             "Status"             => SortDesc ? Batches.OrderByDescending(b => b.Status)              : Batches.OrderBy(b => b.Status),
-            _                    => SortDesc ? Batches.OrderByDescending(b => b.ID)                  : Batches.OrderBy(b => b.ID),
+            // No column clicked yet — legacy default: dvBatchesView.Sort = "ID DESC".
+            _                    => Batches.OrderByDescending(b => b.ID),
         })
         .Skip((PageNumber - 1) * PageSize)
         .Take(PageSize)
@@ -55,6 +56,7 @@ public class BatchesForEditingModel : GridPageModel
         // This list's purpose is status management — routes to the status page, not header-field editing.
         Session.BatchID    = batchId;
         Session.ReturnPage = "/Batches/BatchesForEditing";
+        Session.ReturnPageQuery = Request.QueryString.Value;
         Session.IsViewSubmissionMode = false;
         return RedirectToPage("/Batches/EditSubmissionStatus");
     }
@@ -81,6 +83,7 @@ public class BatchesForEditingModel : GridPageModel
 
         Session.BatchID = QuickGoId.Value;
         Session.ReturnPage = "/Batches/BatchesForEditing";
+        Session.ReturnPageQuery = Request.QueryString.Value;
         Session.IsViewSubmissionMode = false;
         return RedirectToPage("/Batches/EditSubmissionStatus");
     }
