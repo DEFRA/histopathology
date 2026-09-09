@@ -25,8 +25,6 @@ public class QualityDataModel : GridPageModel
     private readonly ILookupService _lookups;
     private readonly IUserService _users;
 
-    private const int LookupProjects          = 19;
-    private const int LookupContacts          = 18;
     private const int LookupAntibodiesTse    = 4;
     private const int LookupAntibodiesNonTse = 5;
     private const int LookupSpecialStain     = 6;
@@ -54,6 +52,7 @@ public class QualityDataModel : GridPageModel
     // Resolved display names for batch summary header
     public string? ProjectName { get; private set; }
     public string? PathologistName { get; private set; }
+    public string? SpeciesName { get; private set; }
     public string? EnteredByName { get; private set; }
     public string? EnteredAreaName { get; private set; }
     public string? SubmittedByName { get; private set; }
@@ -108,7 +107,7 @@ public class QualityDataModel : GridPageModel
             .ToList()!;
 
         TestNames = allTests
-            .Select(t => t.TestDetails ?? t.Code)
+            .Select(GetTestName)
             .Where(n => !string.IsNullOrEmpty(n))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(n => n)
@@ -118,7 +117,7 @@ public class QualityDataModel : GridPageModel
         if (!string.IsNullOrEmpty(FilterHistologyRef))
             filtered = filtered.Where(t => t.HistologyRef == FilterHistologyRef);
         if (!string.IsNullOrEmpty(FilterTest))
-            filtered = filtered.Where(t => (t.TestDetails ?? t.Code) == FilterTest);
+            filtered = filtered.Where(t => string.Equals(GetTestName(t), FilterTest, StringComparison.OrdinalIgnoreCase));
         Tests = filtered.ToList();
 
         PopulateGridViewData(Tests.Count);
@@ -148,30 +147,14 @@ public class QualityDataModel : GridPageModel
 
     private async Task ResolveBatchSummaryAsync(Batch batch)
     {
-        var projectsTask  = _lookups.GetLookupDataAsync(LookupProjects);
-        var contactsTask  = _lookups.GetLookupDataAsync(LookupContacts);
-        var userAreasTask = _lookups.GetUserAreasAsync();
-        var usersTask     = _users.GetAllUsersAsync();
-
-        await Task.WhenAll(projectsTask, contactsTask, userAreasTask, usersTask);
-
-        var projectsById = projectsTask.Result.ToDictionary(p => p.ID.ToString(), p => p.Name, StringComparer.OrdinalIgnoreCase);
-        ProjectName = !string.IsNullOrWhiteSpace(batch.ProjectContractCode)
-            && projectsById.TryGetValue(batch.ProjectContractCode, out var pn) ? pn : batch.ProjectContractCode;
-
-        var contactsById = contactsTask.Result.ToDictionary(c => c.ID.ToString(), c => c.Name, StringComparer.OrdinalIgnoreCase);
-        PathologistName = !string.IsNullOrWhiteSpace(batch.ContactName)
-            && contactsById.TryGetValue(batch.ContactName, out var cn) ? cn : batch.ContactName;
-
-        var userById = usersTask.Result.ToDictionary(u => u.UserID, u => u.Name);
-        EnteredByName   = batch.SubmittedBy.HasValue      && userById.TryGetValue(batch.SubmittedBy.Value,      out var eb) ? eb : null;
-        SubmittedByName = batch.OtherSubmittedBy.HasValue && userById.TryGetValue(batch.OtherSubmittedBy.Value, out var sb) ? sb : null;
-
-        var areaById = userAreasTask.Result.ToDictionary(a => a.ID, a => a.Name);
-        EnteredAreaName = int.TryParse(batch.SubmittedArea, out var enteredAreaId)
-            && areaById.TryGetValue(enteredAreaId, out var ea) ? ea : batch.SubmittedArea;
-        SubmittedAreaName = int.TryParse(batch.OtherSubmittedArea, out var submittedAreaId)
-            && areaById.TryGetValue(submittedAreaId, out var sa) ? sa : batch.OtherSubmittedArea;
+        var summary = await BatchSummaryDisplayResolver.ResolveAsync(batch, _lookups, _users);
+        ProjectName       = summary.ProjectName;
+        PathologistName   = summary.PathologistName;
+        SpeciesName       = summary.SpeciesName;
+        EnteredByName     = summary.EnteredByName;
+        EnteredAreaName   = summary.EnteredAreaName;
+        SubmittedByName   = summary.SubmittedByName;
+        SubmittedAreaName = summary.SubmittedAreaName;
     }
 }
 

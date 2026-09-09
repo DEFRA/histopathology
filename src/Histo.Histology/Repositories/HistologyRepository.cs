@@ -37,26 +37,6 @@ public sealed class HistologyRepository : IHistologyRepository
     }
 
     /// <inheritdoc/>
-    public async Task BookRefAsync(string histologyRef, int animalId, int userId, CancellationToken ct = default)
-    {
-        using var conn = _db.CreateConnection();
-        await conn.ExecuteAsync(
-            "BookHistologyRef",
-            new { HistologyRef = histologyRef, AnimalID = animalId, UserID = userId },
-            commandType: System.Data.CommandType.StoredProcedure);
-    }
-
-    /// <inheritdoc/>
-    public async Task UpdateRefAsync(string histologyRef, int histologyType, int userId, CancellationToken ct = default)
-    {
-        using var conn = _db.CreateConnection();
-        await conn.ExecuteAsync(
-            "EditHistologyRef",
-            new { HistologyRef = histologyRef, HistologyType = histologyType, UserID = userId },
-            commandType: System.Data.CommandType.StoredProcedure);
-    }
-
-    /// <inheritdoc/>
     public async Task<IReadOnlyList<HistologyRef>> GetUnusedBookedRefsAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
@@ -74,5 +54,25 @@ public sealed class HistologyRepository : IHistologyRepository
             "GetUnusedHistologyRefs",
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<HistologyRefCounter>> GetCountersAsync(CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<HistologyRefCounter>(
+            "GetHistologyRefs",
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task UpdateCounterAsync(int histologyType, string newNextHistologyRef, byte[]? rowStamp, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        await conn.ExecuteAsync(
+            "EditHistologyRef",
+            new { Type = histologyType, NextHistologyRef = newNextHistologyRef, RowStamp = rowStamp },
+            commandType: System.Data.CommandType.StoredProcedure);
     }
 }

@@ -14,6 +14,12 @@ public interface IBlockService
     Task<int> AddBlockAsync(int batchId, int animalId, string blockRef, IEnumerable<int> existingOrders, int userId,
         string? customerRef = null, string? comment = null, bool repeatBlock = false, CancellationToken ct = default);
 
+    /// <summary>
+    /// Creates a new pre-booked block placeholder for an animal, ahead of any batch existing.
+    /// Returns <see langword="true"/> on success. Legacy source: clsBlock.vb::CreatePreBookedBlock.
+    /// </summary>
+    Task<bool> CreatePreBookedBlockAsync(int animalId, string blockRef, CancellationToken ct = default);
+
     Task<bool> UpdateBlockAsync(Block block, int userId, CancellationToken ct = default);
 
     Task<int> CopyBlockAsync(Block source, int newBatchId, int newAnimalId,

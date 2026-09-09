@@ -54,6 +54,8 @@ public static class HelpSectionMap
         ["/AuditLog/AuditLogBySubmission"] = "audit-logs",
         ["/Search/ViewImportedData"] = "view-imported-data",
         ["/Admin/PickListMaintenance"] = "pick-list-maintenance",
+        ["/Admin/LookupItems"] = "pick-list-maintenance",
+        ["/Admin/AddLookupItem"] = "pick-list-maintenance",
         ["/Admin/EditLookupItem"] = "pick-list-maintenance",
         ["/Admin/PickListUserArea"] = "pick-list-maintenance",
         ["/Search/SearchTest"] = "search-test-totals",

@@ -135,6 +135,8 @@ public sealed class BlockTestRepository : IBlockTestRepository
                 Dispatched      = Bool(row, "Dispatched"),
                 DispatchedDate  = DateOrNull(row, "DispatchedDate"),
                 DispatchedBy    = Str(row, "DispatchedBy"),
+                EnteredBy       = IntOrNull(row, "EnteredBy"),
+                PremiumCharge   = Str(row, "PremiumCharge"),
                 DispatchedTo    = Str(row, "DispatchedTo"),
                 Comment         = Str(row, "Comment"),
                 RemedialAction  = Str(row, "RemedialAction"),
@@ -149,9 +151,21 @@ public sealed class BlockTestRepository : IBlockTestRepository
             };
         }
 
-        foreach (var row in histology)  results.Add(Map(row, BlockTestType.Histology));
-        foreach (var row in antibodies) results.Add(Map(row, BlockTestType.Antibodies));
-        foreach (var row in stains)     results.Add(Map(row, BlockTestType.Stain));
+        // BLOCK_HISTOLOGY codes 3 (Special Stain), 4 (IHC-PrP), 6 (IHC-Other) are gating/indicator
+        // flags only — the real per-test worklist rows for those categories live in the separate
+        // BLOCK_ANTIBODIES/BLOCK_STAIN child tables (added below), which already have their own
+        // rows. Legacy's clsBatchSummary.vb::CreateTestSummaryData explicitly excludes these 3
+        // codes (`Case Else: 'Do nothing`) — only 1 (EO), 2 (H&E), 5 (H&E-BSE), 7 (Archive) get a
+        // worklist row from this table. Including 3/4/6 here double-counts a test already
+        // represented by its own Antibodies/Stain row (confirmed live: batch 29399/block 317172
+        // had a BLOCK_HISTOLOGY Code=3 row plus 3 real BLOCK_STAIN rows — legacy shows 3 rows,
+        // not 4).
+        var histologyWorklistCodes = new HashSet<string> { "1", "2", "5", "7" };
+        var histologyFiltered = histology.Where(row => histologyWorklistCodes.Contains(Str((IDictionary<string, object>)row, "Code") ?? string.Empty));
+
+        foreach (var row in histologyFiltered) results.Add(Map(row, BlockTestType.Histology));
+        foreach (var row in antibodies)         results.Add(Map(row, BlockTestType.Antibodies));
+        foreach (var row in stains)              results.Add(Map(row, BlockTestType.Stain));
 
 
         return results;
@@ -174,6 +188,7 @@ public sealed class BlockTestRepository : IBlockTestRepository
         parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
         parameters.Add("ID",              test.ID);
         parameters.Add("BlockID",         test.BlockID);
+        parameters.Add("Code",            test.Code);
         parameters.Add("Result",          test.Result);
         parameters.Add("QCCode",          test.QCCode);
         parameters.Add("QCNoteRef",       test.QCNoteRef);
@@ -182,6 +197,11 @@ public sealed class BlockTestRepository : IBlockTestRepository
         parameters.Add("Dispatched",      test.Dispatched);
         parameters.Add("DispatchedDate",  test.DispatchedDate);
         parameters.Add("DispatchedBy",    test.DispatchedBy);
+        // Legacy always overwrites EnteredBy with the current session user on every save
+        // (QualityData.aspx.vb: .Item("EnteredBy") = CInt(Session.Item(SV_HeaderUserID))).
+        parameters.Add("EnteredBy",       userId.ToString());
+        // Not editable via the QC screen — round-tripped unchanged.
+        parameters.Add("PremiumCharge",   test.PremiumCharge);
         parameters.Add("DispatchedTo",    test.DispatchedTo);
         parameters.Add("Comment",         test.Comment);
         parameters.Add("RemedialAction",  test.RemedialAction);

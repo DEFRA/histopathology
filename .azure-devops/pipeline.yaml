@@ -3,6 +3,17 @@ trigger:
     include:
       - develop
 
+parameters:
+  - name: deployToDev
+    displayName: Deploy to DEV
+    type: boolean
+    default: true
+
+  - name: deployToTest
+    displayName: Deploy to TST
+    type: boolean
+    default: false
+
 variables:
   - name: buildConfiguration
     value: 'Release'
@@ -67,10 +78,18 @@ stages:
   - stage: DEV
     displayName: DEV
     dependsOn: Build
-    condition: >-
-      and(succeeded(),
-          eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
-          ne(variables['Build.Reason'], 'PullRequest'))
+    condition: and(succeeded(), eq('${{ parameters.deployToDev }}', true))
+    variables:
+    - name: appName
+      value: 'DEVCDEWEBAW1401'
+    - name: tenantId
+      value: '770a2450-0227-4c62-90c7-4e38537f1102'
+    - name: appId
+      value: '89060d89-195d-47f4-a900-2f66fba81a75'
+    - name: sqlServer
+      value: 'devcdeinfsq1401.database.windows.net,1433'
+    - name: dbName
+      value: 'histopathology'      
     jobs:
       - deployment: deploy_dev
         environment: 'dev'
@@ -87,18 +106,34 @@ stages:
                   inputs:
                     azureSubscription: 'AZR-CDE-DEV1'
                     appType: 'webAppLinux'
-                    appName: 'DEVCDEWEBAW1401'
+                    appName: '$(appName)'
                     package: '$(Pipeline.Workspace)/drop/*.zip'
                     runtimeStack: 'DOTNETCORE|10.0'
                     deploymentMethod: 'zipDeploy'
+                    appSettings: >-
+                      -Saml2__SPEntityId "https://dev-cde.azure.defra.cloud"
+                      -Saml2__PublicOrigin "https://dev-cde.azure.defra.cloud"
+                      -Saml2__IdPEntityId "https://sts.windows.net/$(tenantId)/"
+                      -Saml2__IdPMetadataUrl "https://login.microsoftonline.com/$(tenantId)/federationmetadata/2007-06/federationmetadata.xml?appid=$(appId)"
+                      -Authentication__Bypass "false"
+                      -ConnectionStrings__HistologyDb "Server=tcp:$(sqlServer);Database=$(dbName);Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Managed Identity;"
+
 
   - stage: TST
     displayName: TST
-    dependsOn: DEV
-    condition: >-
-      and(succeeded(),
-          eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
-          ne(variables['Build.Reason'], 'PullRequest'))
+    dependsOn: Build
+    condition: and(succeeded(), eq('${{ parameters.deployToTest }}', true))
+    variables:
+    - name: appName
+      value: 'TSTCDEWEBAW1401'
+    - name: tenantId
+      value: '770a2450-0227-4c62-90c7-4e38537f1102'
+    - name: appId
+      value: '2f7f564e-38a4-4cc7-aa92-0ee8c8cfc974'
+    - name: sqlServer
+      value: 'tstcdeinfsq1401.database.windows.net,1433'
+    - name: dbName
+      value: 'histopathology'      
     jobs:
       - deployment: deploy_tst
         environment: 'test'
@@ -115,7 +150,14 @@ stages:
                   inputs:
                     azureSubscription: 'AZR-CDE-TST1'
                     appType: 'webAppLinux'
-                    appName: 'TSTCDEWEBAW1401'
+                    appName: '$(appName)'
                     package: '$(Pipeline.Workspace)/drop/*.zip'
                     runtimeStack: 'DOTNETCORE|10.0'
                     deploymentMethod: 'zipDeploy'
+                    appSettings: >-
+                      -Saml2__SPEntityId "https://tst-cde.azure.defra.cloud"
+                      -Saml2__PublicOrigin "https://tst-cde.azure.defra.cloud"
+                      -Saml2__IdPEntityId "https://sts.windows.net/$(tenantId)/"
+                      -Saml2__IdPMetadataUrl "https://login.microsoftonline.com/$(tenantId)/federationmetadata/2007-06/federationmetadata.xml?appid=$(appId)"
+                      -Authentication__Bypass "false"
+                      -ConnectionStrings__HistologyDb "Server=tcp:$(sqlServer);Database=$(dbName);Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Managed Identity;"

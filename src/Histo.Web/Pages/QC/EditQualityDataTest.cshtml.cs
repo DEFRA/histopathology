@@ -70,7 +70,12 @@ public class EditQualityDataTestModel : HistoPageModel
     public IReadOnlyList<LookupItem> ArchiveLocations { get; private set; } = [];
     public IReadOnlyList<LookupItem> PremiumCharges { get; private set; } = [];
     public IReadOnlyList<User> Users { get; private set; } = [];
-    public string? Error { get; private set; }
+
+    /// <summary>Field id → message, rendered via the shared clickable _ErrorSummary partial.</summary>
+    public Dictionary<string, string> Errors { get; } = new();
+
+    /// <summary>Not tied to a specific field, so shown separately (matches EditQCNote's convention).</summary>
+    public string? ConcurrencyError { get; private set; }
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -110,50 +115,36 @@ public class EditQualityDataTestModel : HistoPageModel
 
         if (Result == Histo.Histology.Models.BlockTestResult.Failed && string.IsNullOrWhiteSpace(QCCode))
         {
-            Error = "Enter a QC code when the test result is Failed.";
-            await LoadLookupsAsync();
-            return Page();
+            Errors["QCCode"] = "Enter a QC code when the test result is Failed.";
         }
 
         if (Dispatched)
         {
             if (DispatchedDate is null)
-            {
-                Error = "Enter a dispatched date.";
-                await LoadLookupsAsync();
-                return Page();
-            }
+                Errors["DispatchedDate"] = "Enter a dispatched date.";
             if (string.IsNullOrWhiteSpace(DispatchedBy))
-            {
-                Error = "Select who dispatched the test.";
-                await LoadLookupsAsync();
-                return Page();
-            }
+                Errors["DispatchedBy"] = "Select who dispatched the test.";
             if (string.IsNullOrWhiteSpace(DispatchedTo))
-            {
-                Error = "Enter who the test was dispatched to.";
-                await LoadLookupsAsync();
-                return Page();
-            }
+                Errors["DispatchedTo"] = "Enter who the test was dispatched to.";
         }
 
         if (string.IsNullOrWhiteSpace(RemedialAction))
         {
-            Error = "Select a remedial action.";
-            await LoadLookupsAsync();
-            return Page();
+            Errors["RemedialAction"] = "Select a remedial action.";
         }
 
         if (!string.IsNullOrWhiteSpace(ArchiveLocation) && ArchivedDate is null)
         {
-            Error = "Enter an archive date when an archive location is selected.";
-            await LoadLookupsAsync();
-            return Page();
+            Errors["ArchivedDate"] = "Enter an archive date when an archive location is selected.";
         }
 
         if (ArchivedDate is not null && string.IsNullOrWhiteSpace(ArchiveLocation))
         {
-            Error = "Select an archive location when an archive date is entered.";
+            Errors["ArchiveLocation"] = "Select an archive location when an archive date is entered.";
+        }
+
+        if (Errors.Count > 0)
+        {
             await LoadLookupsAsync();
             return Page();
         }
@@ -187,6 +178,7 @@ public class EditQualityDataTestModel : HistoPageModel
             Dispatched = Dispatched,
             DispatchedDate = DispatchedDate,
             DispatchedBy = DispatchedBy,
+            PremiumCharge = Test.PremiumCharge, // pass-through, not edited on this screen
             DispatchedTo = DispatchedTo,
             Comment = Comment,
             RemedialAction = RemedialAction,
@@ -209,7 +201,7 @@ public class EditQualityDataTestModel : HistoPageModel
         }
         catch (BlockTestConcurrencyException)
         {
-            Error = "Another user has modified this test. Please reload and try again.";
+            ConcurrencyError = "Another user has modified this test. Please reload and try again.";
             await LoadLookupsAsync();
             return Page();
         }

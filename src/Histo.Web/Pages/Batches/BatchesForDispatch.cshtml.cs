@@ -27,7 +27,9 @@ public class BatchesForDispatchModel : GridPageModel
             "ContactDescription" => SortDesc ? Batches.OrderByDescending(b => b.ContactDescription) : Batches.OrderBy(b => b.ContactDescription),
             "Species"            => SortDesc ? Batches.OrderByDescending(b => b.Species)            : Batches.OrderBy(b => b.Species),
             "BatchDate"          => SortDesc ? Batches.OrderByDescending(b => b.BatchDate)           : Batches.OrderBy(b => b.BatchDate),
-            _                    => SortDesc ? Batches.OrderByDescending(b => b.ID)                  : Batches.OrderBy(b => b.ID),
+            "ID"                 => SortDesc ? Batches.OrderByDescending(b => b.ID)                  : Batches.OrderBy(b => b.ID),
+            // No column clicked yet — legacy default: dvBatchesView.Sort = "ID DESC".
+            _                    => Batches.OrderByDescending(b => b.ID),
         })
         .Skip((PageNumber - 1) * PageSize)
         .Take(PageSize)

@@ -53,7 +53,7 @@ public class ViewSamplesModel : HistoPageModel
     /// <summary>"Tissue" = legacy "Tissue Information" mode (default); "Block" = "Block Information" mode.</summary>
     [BindProperty] public string Mode { get; set; } = "Tissue";
 
-    public string? ErrorMessage { get; private set; }
+    public Dictionary<string, string> Errors { get; } = [];
     public bool Searched { get; private set; }
 
     public IReadOnlyList<LookupItem> Tissues { get; private set; } = [];
@@ -123,7 +123,7 @@ public class ViewSamplesModel : HistoPageModel
 
         if (hasSenderRef == hasHistologyRef)
         {
-            ErrorMessage = "Enter either the Sender Ref or the Histology Ref, not both.";
+            Errors[nameof(SenderRef)] = "Enter either the Sender Ref or the Histology Ref, not both.";
             return false;
         }
 

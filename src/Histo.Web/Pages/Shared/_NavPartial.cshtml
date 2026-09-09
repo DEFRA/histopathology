@@ -54,7 +54,9 @@
         <a class="govuk-service-navigation__link" asp-page="/Bookings/BookingMenu">Booking</a>
     </li>
     <li class="govuk-service-navigation__item">
-        <a class="govuk-service-navigation__link" asp-page="/Archive/ArchiveMenu">Archive</a>
+        @* Points at the grid (batch-selection landing page), not /Archive/ArchiveMenu, which
+           has no batch-selection UI of its own and needs Session.BatchID already set. *@
+        <a class="govuk-service-navigation__link" asp-page="/Batches/BatchesForArchiving">Archive</a>
     </li>
     <li class="govuk-service-navigation__item">
         <a class="govuk-service-navigation__link" asp-page="/AuditLog/AuditLogMenu">Audit log</a>
