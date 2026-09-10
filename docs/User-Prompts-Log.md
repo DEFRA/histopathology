@@ -2249,6 +2249,76 @@ Appended 4 new rows to `run-log-v2.md`'s Run Log table (#46–#49), 4 new rows t
 
 **Files changed:** [docs/run-log-v2.md](../docs/run-log-v2.md), [docs/session-metrics.md](../docs/session-metrics.md), [docs/User-Prompts-Log.md](../docs/User-Prompts-Log.md).
 
+---
+
+## Prompt 150 — Lookup item pagination/sorting missing + failed test cases (2026-09-09)
+
+> Lookup item pagination and sorting is missing also it's not error summary is not clickable link / test cases failed now — fix failed test case
+
+Found `LookupItemsModel.OnGetAsync` had regressed to a stub that never populated `Items` (grid silently empty, so sorting/pagination appeared broken). Restored the lookup-data load. Investigated the reported test failures: 4 pre-existing bugs in `BatchesReceivedModelTests.cs` (missing `await` on async handler calls, a stale redirect-target assertion expecting `/Batches/BatchDetails` instead of the now-correct `/Batches/BatchBlocks`) — all fixed. Also fixed `BatchesForEditing`'s default sort (always ascending regardless of `SortDesc`) and `BatchesForArchiving`'s back-link infinite loop with `ArchiveMenu`. Build 0 errors; `dotnet test` 274 passed, 1 skipped.
+
+**Files changed:** [src/Histo.Web/Pages/Admin/LookupItems.cshtml.cs](../src/Histo.Web/Pages/Admin/LookupItems.cshtml.cs), [src/Histo.Web/Pages/Batches/BatchesForEditing.cshtml.cs](../src/Histo.Web/Pages/Batches/BatchesForEditing.cshtml.cs), [src/Histo.Web/Pages/Archive/BatchesForArchiving.cshtml](../src/Histo.Web/Pages/Archive/BatchesForArchiving.cshtml), [tests/Histo.Tests/Unit/BatchesReceivedModelTests.cs](../tests/Histo.Tests/Unit/BatchesReceivedModelTests.cs).
+
+---
+
+## Prompt 151 — Full View/Create/Edit Submission Journey and Edit Submission Status Journey review (2026-09-09)
+
+> [Two-part review request covering BatchDetails field bugs, ViewSubmissions status-filter over-return, status label "Not Started"→"Not Received", EditBatch button alignment, filter/context retention, BatchesForEditing sort/fields.]
+
+Found and fixed: `BatchDetails.cshtml.cs` Project/Contact lookups missing `includeInactive: true`; `BatchStatus` "Not started"→"Not received" label correction (verified live against `luStatus`); `EditBatch.cshtml` Samples button moved into the Save/Cancel button-group; added `ISessionService.ReturnPageQuery` + `ParseReturnQuery()` so Cancel/Back/post-save redirects restore full list sort/page context; `BatchesForEditing` default-sort fix and `ReturnPageQuery` capture on select; `EditSubmissionStatus` gained missing Submitted by/area/date fields via a new shared `BatchSummaryDisplayResolver`; `ArchiveBlocks`/`ArchiveTissues` given the same summary-field/sortable-column treatment. Build 0 errors.
+
+**Files changed:** [src/Histo.Web/Pages/BatchSummaryDisplayResolver.cs](../src/Histo.Web/Pages/BatchSummaryDisplayResolver.cs), [src/Histo.Web/Pages/Batches/BatchDetails.cshtml.cs](../src/Histo.Web/Pages/Batches/BatchDetails.cshtml.cs), [src/Histo.Web/Pages/Batches/EditBatch.cshtml.cs](../src/Histo.Web/Pages/Batches/EditBatch.cshtml.cs), [src/Histo.Web/Pages/Batches/BatchesForEditing.cshtml.cs](../src/Histo.Web/Pages/Batches/BatchesForEditing.cshtml.cs), [src/Histo.Web/Pages/QC/EditSubmissionStatus.cshtml.cs](../src/Histo.Web/Pages/QC/EditSubmissionStatus.cshtml.cs), [src/Histo.Web/Pages/Archive/ArchiveBlocks.cshtml.cs](../src/Histo.Web/Pages/Archive/ArchiveBlocks.cshtml.cs), [src/Histo.Web/Pages/Archive/ArchiveTissues.cshtml.cs](../src/Histo.Web/Pages/Archive/ArchiveTissues.cshtml.cs), [src/Histo.Core/Domain/BatchStatus.cs](../src/Histo.Core/Domain/BatchStatus.cs), [src/Histo.Web/Services/ISessionService.cs](../src/Histo.Web/Services/ISessionService.cs).
+
+---
+
+## Prompt 152 — ViewSubmissions Status Filter over-returning results, then critical correction (2026-09-09)
+
+> ViewSubmissions.cshtml Status Filter investigation (In Progress/Rejected returning far more rows than legacy) — followed by: "Submitted Area is not available as a search or filtering criterion" in legacy; a Rejected-status record from a different VLA appears under legacy's 2-row result.
+
+Initially hypothesised a missing area-based restriction (the `GetSearchBatchDetails` SP has no area-scoping logic and a `TOP 200` cap) and implemented one. The user then disproved this with a direct legacy observation. Fully reverted: removed `SubmittedArea`/`IsAreaRestricted`/`UserAreas` from `ViewSubmissionsModel` and the criteria/view markup. Cross-checked `docs/migration-run-journal.md` — this exact fact was already established once before (Run #57/ISS-030), confirming the revert was correct and this was a reintroduced regression. Added 2 permanent regression-guard tests. Build 0 errors.
+
+**Files changed:** [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs), [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml), [tests/Histo.Tests/Unit/ViewSubmissionsModelTests.cs](../tests/Histo.Tests/Unit/ViewSubmissionsModelTests.cs).
+
+---
+
+## Prompt 153 — AddSubmission legacy analysis, Neuropath/Mouse Bioassay scope reduction, and button reposition (2026-09-09)
+
+> Legacy `AddSubmission.aspx`/`.aspx.vb` deep analysis; consider that user area is going to be removed in Neuropath and Mouse Bioassay — what would you recommend implementing; why does this button need to be here, can you remove and put it in the right place; is it aligned with legacy?
+
+Deep-read legacy `AddSubmission.aspx.vb`; confirmed the sender-ref search link already matches legacy's `lbLookup_Click` flow. Recommended closing D-3/D-4 (mouse-number bulk entry/Excel upload) and a new D-8 (PG-Number/TSE Daybook auto-lookup) in `Parity-Audit-Report.md` as won't-implement, since all three are gated exclusively on the Neuropath/Mouse Bioassay areas being decommissioned. Repositioned the "Check historical data for this sender ref" button out of an illegally-nested `<form>` into the main form (HTML5 `formmethod`/`formaction`), grouped under the sender-ref search link. Confirmed via `docs/TSE-NonTSE-Submission-Workflow-Redesign.md` this is a deliberate, previously-reviewed popup→page modernisation, so it is aligned with legacy in substance.
+
+**Files changed:** [src/Histo.Web/Pages/Submissions/AddSubmission.cshtml](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml), [docs/Parity-Audit-Report.md](../docs/Parity-Audit-Report.md).
+
+---
+
+## Prompt 154 — Replace footer crown with APHA logo (2026-09-10)
+
+> Where there is a crown logo, change it to this: [APHA_Lesser_Arms_Stacked_Black] attached the png for to make the changes. / I have placed in src/Histo.Web/wwwroot/assets/images/APHA_Lesser_Arms_Stacked_Black.png / is it GDS standard to refer .png from image folder / Can you check the height="60" width="60" is good enough as GDS standard / As per WCAG implement the change
+
+Replaced the `govuk-footer__crown` SVG in `_Layout.cshtml` with the supplied PNG (renamed `apha_icon.png`). Clarified that referencing a `.png` from `wwwroot/assets/images/` is standard, but reusing the `govuk-footer__crown` slot itself isn't — per the GOV.UK Design System's June 2025 brand-refresh guidance, that component is reserved for services on the gov.uk domain. Found the initial `60×60` sizing distorted the image's true `1140×1005` aspect ratio and shrank the stacked wordmark ("Animal & Plant Health Agency") below legible size. Fixed by moving the logo into its own `govuk-footer__logo` row above the footer meta content, sized at `120×136` (correct ratio, WCAG 1.4.5-compliant legibility), with a small CSS margin rule added since govuk-frontend has no built-in class for this slot. Build 0 errors.
+
+**Files changed:** [src/Histo.Web/Pages/Shared/_Layout.cshtml](../src/Histo.Web/Pages/Shared/_Layout.cshtml), [src/Histo.Web/wwwroot/css/Styles.css](../src/Histo.Web/wwwroot/css/Styles.css), [src/Histo.Web/wwwroot/assets/images/apha_icon.png](../src/Histo.Web/wwwroot/assets/images/apha_icon.png).
+
+---
+
+## Prompt 155 — Print Submission Notes should only be enabled when the submission has comments (2026-09-10)
+
+> In view submission page ViewSubmissions.cshtml, Print Submission Notes will only be enabled if the submission includes comments in the "Submission Comments" section of BatchDetails.cshtml
+
+Found the existing precedent for this exact rule in `PrintSubmissionModel.HasNotes` (mirrors legacy `EnableSubmissionNotes`, checking `Batch.Comments`/`Batch.StatusComments`) and replicated it in `ViewSubmissionsModel`: added `HasNotes`, populated in `OnPostSelectAsync` via `_batches.GetByIdAsync(SelectedBatchId)`, and gated the "Print submission notes" button in the view (disabled with a tooltip when false), matching `PrintSubmission.cshtml`'s existing pattern. Build 0 errors.
+
+**Files changed:** [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs), [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml).
+
+---
+
+## Prompt 156 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-10)
+
+> just add the run log and session metrics at end of the file don't read complete file, it consuming more token, i want to add the details in these file — update run-log-v2.md, session-metrics.md, User-Prompts-Log.md
+
+Appended 7 new rows to `run-log-v2.md`'s Run Log table (#50–#56), 7 new rows to `session-metrics.md`'s timing table (#111–#117), and 6 new prompt entries to this file (Prompts 150–155, plus this one) covering everything since the last docs update: LookupItems regression + test-bug fixes, BatchDetails/ArchiveBlocks/ArchiveTissues/BatchStatus parity fixes, EditBatch/EditSubmissionStatus context-restore, the ViewSubmissions area-restriction revert, the AddSubmission review, the footer APHA logo replacement, and the Print submission notes gating fix.
+
+**Files changed:** [docs/run-log-v2.md](../docs/run-log-v2.md), [docs/session-metrics.md](../docs/session-metrics.md), [docs/User-Prompts-Log.md](../docs/User-Prompts-Log.md).
+
 
 
 
