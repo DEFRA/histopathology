@@ -130,6 +130,12 @@ public class EditBatchTestsModel : HistoPageModel
             return Page();
         }
 
+        if (SelectedHistologyCodes.Contains(HistologyCode.Archive) && SelectedHistologyCodes.Count > 1)
+        {
+            SaveError = "Archive cannot be combined with other histology types.";
+            return Page();
+        }
+
         if (SelectedHistologyCodes.Contains(HistologyCode.SpecialStain) && SelectedStainCodes.Count == 0)
         {
             SaveError = "Special Stain is selected — you must also select at least one special stain.";

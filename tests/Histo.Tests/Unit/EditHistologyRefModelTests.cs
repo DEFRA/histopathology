@@ -58,7 +58,7 @@ public class EditHistologyRefModelTests
     [Fact]
     public async Task OnPostAsync_RepositoryReturnsFalse_ReturnsPageWithConcurrencyError()
     {
-        _refs.Setup(r => r.UpdateRefAsync("24/00123", 1, 99, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _refs.Setup(r => r.SetCounterAsync(1, "24/00123", It.IsAny<CancellationToken>())).ReturnsAsync(false);
         var sut = CreateSut();
         sut.HistologyType = 1;
         sut.NewHistologyRef = "24/00123";
@@ -72,7 +72,7 @@ public class EditHistologyRefModelTests
     [Fact]
     public async Task OnPostAsync_Success_SetsSuccessMessage()
     {
-        _refs.Setup(r => r.UpdateRefAsync("24/00123", 1, 99, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _refs.Setup(r => r.SetCounterAsync(1, "24/00123", It.IsAny<CancellationToken>())).ReturnsAsync(true);
         var sut = CreateSut();
         sut.HistologyType = 1;
         sut.NewHistologyRef = "24/00123";
@@ -87,13 +87,13 @@ public class EditHistologyRefModelTests
     [Fact]
     public async Task OnPostAsync_TrimsWhitespaceBeforeCallingRepository()
     {
-        _refs.Setup(r => r.UpdateRefAsync("24/00123", 1, 99, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _refs.Setup(r => r.SetCounterAsync(1, "24/00123", It.IsAny<CancellationToken>())).ReturnsAsync(true);
         var sut = CreateSut();
         sut.HistologyType = 1;
         sut.NewHistologyRef = "  24/00123  ";
 
         await sut.OnPostAsync();
 
-        _refs.Verify(r => r.UpdateRefAsync("24/00123", 1, 99, It.IsAny<CancellationToken>()), Times.Once);
+        _refs.Verify(r => r.SetCounterAsync(1, "24/00123", It.IsAny<CancellationToken>()), Times.Once);
     }
 }

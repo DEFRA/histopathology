@@ -19,7 +19,7 @@
     {
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Species</dt>
-            <dd class="govuk-summary-list__value">@Model.BatchSummary.Species</dd>
+            <dd class="govuk-summary-list__value">@Model.SpeciesName</dd>
         </div>
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Project/Contract Code</dt>
@@ -172,14 +172,21 @@
         </tbody>
     </table>
     <partial name="_Pagination" />
+    @if (Model.TotalPages > 1)
+    {
+        <form method="get" class="govuk-!-margin-top-4">
+            <input type="hidden" name="FilterHistologyRef" value="@Model.FilterHistologyRef" />
+            <input type="hidden" name="FilterTest" value="@Model.FilterTest" />
+            <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
+            <input type="hidden" name="SortDesc" value="@Model.SortDesc" />
+            <label class="govuk-label govuk-!-display-inline" for="GoToPage">Go to page (1 to @Model.TotalPages)</label>
+            <input class="govuk-input govuk-input--width-3 govuk-!-display-inline govuk-!-margin-left-2" id="GoToPage" name="PageNumber" type="number" min="1" max="@Model.TotalPages" value="@Model.PageNumber" />
+            <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0 govuk-!-margin-left-2">Go</button>
+        </form>
+    }
 }
 else
 {
     <p class="govuk-body">No tests found for this batch.</p>
 }
-
-<div class="govuk-button-group">
-    <a asp-page="/Batches/BatchesForDispatch" class="govuk-button">Done</a>
-    <a asp-page="/Batches/BatchesForDispatch" class="govuk-button govuk-button--secondary">Cancel</a>
-</div>
 

@@ -2157,6 +2157,168 @@ Root-caused the slowness: `ViewSubmissionsModel.LoadLookupsAsync` awaited 5 inde
 
 **Files changed:** [src/Histo.Web/wwwroot/css/Styles.css](../src/Histo.Web/wwwroot/css/Styles.css), [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs).
 
+---
+
+## Prompt 144 — Legacy-to-Razor search screen functional review + search module rationalisation (2026-09-08)
+
+> Requirement: comprehensive analysis of 7 legacy search screens against their Razor/GDS replacements — field-by-field comparison, dropdown population, date loading and validation, grid sorting/pagination/actions, GDS error-summary compliance, accessibility, and any regressions. Plus: assess whether `SearchSample.cshtml` and `SearchSender.cshtml` are still used, compare against `ViewSamples.cshtml`, and remove them (with routes, menu entries, services, ViewModels and tests) if they have no active business use.
+
+**Legacy source not in the repo.** Searched the workspace, the sibling `bse` repo and the whole `source\repos` tree — zero `.aspx` files. Flagged this rather than reviewing against the migration docs alone; the user supplied the path (`Histopathology-2026-07-15\HistopathologySystem.2018`), and the review then read the real legacy markup and code-behind. Four `Explore` subagents ran the screen comparisons in parallel, and the highest-severity findings were re-verified by hand before any edit — one subagent claim about stored-procedure naming was not taken at face value.
+
+**Two mappings in the brief were wrong** and were corrected: `ViewImportedData.aspx` maps to a real `Search/ViewImportedData.cshtml`, not `SearchSubmissions.cshtml`; and `SearchMenu.aspx` / `SearchTest.aspx` are two distinct legacy pages, not a single "Search Outputs Menu".
+
+### Findings and fixes
+
+**H1 — `SearchSubmissions` lookup dropdowns downgraded to free-text.** Legacy `LoadLookupLists()` populated Project, Pathologist, Species, Fixation and Submitted Area from lookup SPs, each with a blank "-- All --" item. The migrated page rendered all five as plain `govuk-input`, so users had to guess exact stored values and any typo silently returned zero rows. Restored as `govuk-select` fed by `ILookupService`, following the `ViewSubmissions` ISS-030 pattern; Submitted area binds to the area **code** (`a.ID`), matching how `EditBatch` resolves `Batch.SubmittedArea`. Also fixed `SubmittedArea` bypassing `NullIfEmpty()` — a blank value was being sent as a real filter.
+
+**H2 — `SearchTest` date filter was decorative.** `StartDate`/`EndDate` were bound and rendered but `GetTestItemRowsAsync(ProjectDescription, SubmissionType)` takes no date parameters. Rather than guess, read the actual stored procedure at `Support\1\GetTestRows.sql`: it declares only `@ProjectContractDesc` and `@BatchType`, so passing dates would throw *"too many arguments specified"*, and `TestItemRow` carries no date to filter client-side. Removed the controls and documented the constraint on `IBatchRepository` — restoring date filtering requires a DB change.
+
+**H3 — no date-range validation anywhere in the module.** Legacy called `IsDateRangeValid` before every search. Restored on `SearchPMDates` and both `SearchSubmissions` ranges, plus the legacy `revSubmissionNumber` regex rule (the migrated `int?` binding accepted `0` and negatives).
+
+**GDS.** Only 3 of 11 search pages had an error summary, and where one existed it rendered `<li>@Model.ErrorMessage</li>` — plain text, so clicking an error could not move focus to the field (checklist item 8 failed). Added shared `_ErrorSummary.cshtml` rendering `<a href="#FieldId">` entries, rolled it out, and added `govuk-form-group--error` / `govuk-error-message` (with visually-hidden "Error:") / `aria-describedby` at field level. Replaced native `<input type="date">` throughout with the GOV.UK three-field date input — new `DateParts` holds parts as strings so invalid input survives the round-trip and is redisplayed with the error, and rejects partial input, non-existent dates (via `DaysInMonth`) and non-4-digit years.
+
+**Parity.** Added sorting and pagination to `SearchSubmissions` (default **ID DESC**, matching legacy `dvBatchesView.Sort`), `SearchPMDates` and `SearchUnUsedHistologyRefs`; CSV export to the 4 pages missing it. Converted `SearchBlockRefs` to a GET search to restore legacy `Request.QueryString` deep-linking — which also **fixed a latent bug found while making the change**: the page already used the GET `_SortableHeader`/`_Pagination` partials against POST-bound criteria, so sorting or paging silently dropped the search terms and rendered an empty grid.
+
+### Rationalisation outcome
+
+`SearchSample` **removed** — it called the same `GetAnimalsBySenderRefAsync` and rendered the same two columns as `SearchSender`, with only two navigation links referencing it, no programmatic redirects and no tests. `SearchSender` **kept**: `CopyBatch.OnPostPick` redirects into its picker mode and reads back `TempData["SenderRefPicker_Selected"]`, so removing it would break the batch-copy flow. `ViewSamples` confirmed correctly located at `/Search/ViewSamples` with no duplicate under `Submissions/` (the traceability-matrix reference to that path is stale). `SearchMenu` gained the missing "View samples" and "View old ICC_Sub data" entries.
+
+### Deliberately not done
+
+The wider error-summary rollout beyond Search (~30 files) was left alone: the app mixes `List<string>`, single-string and dictionary error models, and several summaries carry page-level load/save failures that GDS does not require to link to a field. That needs per-page judgement, not a mechanical sweep.
+
+**Build:** 0 errors. **Tests:** 224 total, 217 passed, 1 skipped, 6 failed — all 6 pre-existing and unrelated (`BatchesReceivedModelTests`, `BookBlockRefModelTests`, `BookHistologyRefModelTests`), confirmed by stashing the working tree and re-running to establish a 199-passed / 6-failed baseline. 18 new tests added.
+
+**Files changed:** [src/Histo.Web/Pages/Search/SearchSubmissions.cshtml](../src/Histo.Web/Pages/Search/SearchSubmissions.cshtml), [src/Histo.Web/Pages/Search/SearchSubmissions.cshtml.cs](../src/Histo.Web/Pages/Search/SearchSubmissions.cshtml.cs), [src/Histo.Web/Pages/Search/SearchPMDates.cshtml](../src/Histo.Web/Pages/Search/SearchPMDates.cshtml), [src/Histo.Web/Pages/Search/SearchPMDates.cshtml.cs](../src/Histo.Web/Pages/Search/SearchPMDates.cshtml.cs), [src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml](../src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml), [src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml.cs](../src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml.cs), [src/Histo.Web/Pages/Search/SearchTest.cshtml](../src/Histo.Web/Pages/Search/SearchTest.cshtml), [src/Histo.Web/Pages/Search/SearchTest.cshtml.cs](../src/Histo.Web/Pages/Search/SearchTest.cshtml.cs), [src/Histo.Web/Pages/Search/SearchUnUsedHistologyRefs.cshtml](../src/Histo.Web/Pages/Search/SearchUnUsedHistologyRefs.cshtml), [src/Histo.Web/Pages/Search/SearchUnUsedHistologyRefs.cshtml.cs](../src/Histo.Web/Pages/Search/SearchUnUsedHistologyRefs.cshtml.cs), [src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml), [src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml.cs](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml.cs), [src/Histo.Web/Pages/Search/ViewSamples.cshtml](../src/Histo.Web/Pages/Search/ViewSamples.cshtml), [src/Histo.Web/Pages/Search/ViewSamples.cshtml.cs](../src/Histo.Web/Pages/Search/ViewSamples.cshtml.cs), [src/Histo.Web/Pages/Search/SearchMenu.cshtml](../src/Histo.Web/Pages/Search/SearchMenu.cshtml), [src/Histo.Web/Pages/Index.cshtml](../src/Histo.Web/Pages/Index.cshtml), [src/Histo.Web/Pages/Shared/_ErrorSummary.cshtml](../src/Histo.Web/Pages/Shared/_ErrorSummary.cshtml), [src/Histo.Web/Pages/Shared/_DateInput.cshtml](../src/Histo.Web/Pages/Shared/_DateInput.cshtml), [src/Histo.Web/DateParts.cs](../src/Histo.Web/DateParts.cs), [src/Histo.Submissions/Interfaces/IBatchRepository.cs](../src/Histo.Submissions/Interfaces/IBatchRepository.cs), [src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs), [tests/Histo.Tests/Unit/SearchValidationTests.cs](../tests/Histo.Tests/Unit/SearchValidationTests.cs). **Deleted:** `src/Histo.Web/Pages/Search/SearchSample.cshtml`, `src/Histo.Web/Pages/Search/SearchSample.cshtml.cs`.
+
+---
+
+## Prompt 145 — QualityData Test dropdown/grid showing an extra row vs legacy (2026-09-08)
+
+> QualityData.cshmtl Test dropdonw show additional values Special Stain and grid also showing additional row, but legacy it not showing it, legacy it has 3 rows, new applicaiton 4 rows.
+
+Asked for a specific submission number to confirm live rather than guessing; user supplied submission 29399. Read legacy `clsBatchSummary.vb::CreateTestSummaryData`'s `BLOCK_HISTOLOGY` loop and confirmed via `grep -E "^\s*Case \d"` that only codes 1 (EO), 2 (H&E), 5 (H&E-BSE), 7 (Archive) have an explicit `Case` branch adding a worklist row — codes 3 (Special Stain), 4 (IHC-PrP), 6 (IHC-Other) fall through to `Case Else: 'Do nothing`, because they are gating/indicator flags only; the real per-test rows for those categories live in the separate `BLOCK_ANTIBODIES`/`BLOCK_STAIN` child tables, which get their own unconditional loops. Ran live sqlcmd queries for submission 29399/block 317172: `BLOCK_HISTOLOGY` had 1 row (Code=3), `BLOCK_ANTIBODIES` had 0 rows, `BLOCK_STAIN` had 3 real rows (codes 14/1/18) — confirming legacy math 0+0+3=3 matches the user's report, and the current app's 1+0+3=4 matches the reported bug exactly. Fixed `BlockTestRepository.GetByBatchAsync` to filter the histology result set to `Code IN ("1","2","5","7")` before mapping, matching legacy's `Case Else` exclusion. Same SP (`GetBatchBlocksByID`) on both sides — not a wrong-SP bug, purely a missing code-level filter that the earlier porting phase never replicated.
+
+**Build:** 0 errors (`Histo.Histology` project). No new automated test added — this repository has no existing test harness for `BlockTestRepository` (a Dapper repo with no mockable seam); verified via live sqlcmd data and legacy source comparison instead, consistent with this session's established methodology for data-shape bugs.
+
+**Files changed:** [src/Histo.Histology/Repositories/BlockTestRepository.cs](../src/Histo.Histology/Repositories/BlockTestRepository.cs).
+
+---
+
+## Prompt 146 — EditBlockStain "expects parameter '@Code'" SqlException on save (2026-09-08)
+
+> Below issue is getting when i save the BlockTestRepository.cs — `public async Task UpdateAsync(BlockTest test, int userId, CancellationToken ct = default)` — `Microsoft.Data.SqlClient.SqlException: 'Procedure or function 'EditBlockStain' expects parameter '@Code', which was not supplied.'`
+
+Queried `sys.parameters` for `EditBlockStain`, `EditBlockHistology` and `EditBlockAntibodies` in one go (rather than fixing one missing parameter at a time and hitting the next error later) and confirmed all three share an identical 22-parameter signature, including `@Code`, `@EnteredBy` (varchar) and `@PremiumCharge` (varchar) — none of which `UpdateAsync` was sending. Confirmed via `sp_helptext` on `GetBatchBlockHistology` that `EnteredBy`/`PremiumCharge` are real columns on the read side too, but had never been mapped onto the `BlockTest` model. Added both as nullable properties on `BlockTest`, mapped them in `BlockTestRepository.Map()`, and fixed `UpdateAsync` to send `@Code` (`test.Code`), `@EnteredBy` (always the current `userId` — confirmed via `QualityData.aspx.vb` that legacy always overwrites this with the session user on every save, never preserves the prior value) and `@PremiumCharge` (round-tripped unchanged — legacy never edits this field from the QC screen). `EditQualityDataTest.cshtml.cs`'s `updated` object now also sets `PremiumCharge = Test.PremiumCharge` so the round-trip doesn't silently null it out.
+
+**Build:** 0 errors (`Histo.Histology` and `Histo.Web` both verified).
+
+**Files changed:** [src/Histo.Histology/Models/BlockTest.cs](../src/Histo.Histology/Models/BlockTest.cs), [src/Histo.Histology/Repositories/BlockTestRepository.cs](../src/Histo.Histology/Repositories/BlockTestRepository.cs), [src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml.cs](../src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml.cs).
+
+---
+
+## Prompt 147 — EditQualityDataTest error summary link not clickable (2026-09-08)
+
+> error summary not implmented in this page EditQualityDataTest.cshtml, user can't clikc on the error summary link
+
+Found this app already has an established shared `_ErrorSummary.cshtml` partial (`IReadOnlyDictionary<string,string>` field-id → message, rendering `<a href="#FieldId">`), previously rolled out to the Search module in an earlier session, that `EditQualityDataTest.cshtml` had never adopted — it instead rendered a plain `<li>@Model.Error</li>` with no `href`, so the link could never move focus to a field. Replaced the single `Error` string with a field-keyed `Errors` dictionary (`QCCode`/`DispatchedDate`/`DispatchedBy`/`DispatchedTo`/`RemedialAction`/`ArchiveLocation`/`ArchivedDate`), switched `OnPostAsync` from "return on the first failing check" to accumulating every validation failure in one pass (GDS best practice — show every problem at once), and added a separate non-linked `ConcurrencyError` for the optimistic-concurrency exception case, matching `EditQCNote`'s existing convention for that same class of non-field error. Added GDS field-level error markup (`govuk-form-group--error`/`govuk-error-message`/`aria-describedby`) to all 7 validated fields.
+
+**Build:** 0 errors. Added 5 new tests in `EditQualityDataTestModelTests.cs`, all passing.
+
+**Files changed:** [src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml.cs](../src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml.cs), [src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml](../src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml), [tests/Histo.Tests/Unit/EditQualityDataTestModelTests.cs](../tests/Histo.Tests/Unit/EditQualityDataTestModelTests.cs).
+
+---
+
+## Prompt 148 — Analyse Pick List Maintenance and implement GDS-compliant Add/Edit pages (2026-09-08)
+
+> Requirement: analyse the current implementation of `PickListMaintenance.cshtml` and the related lookup item maintenance functionality. Current behaviour combines Add and Edit on `EditLookupItem.cshtml`; per GDS guidelines these should be separate pages. Review the flow, verify GDS requirements, identify all lookup types and field structures, create separate Add/Edit pages with dynamic form rendering based on lookup configuration, and ensure validation/save/UX consistency across all lookup maintenance pages.
+
+Confirmed `EditLookupItem.cshtml` combined three responsibilities on one page (item list, Add form, Edit form), violating GDS "one thing per page". Enumerated every editable lookup table's real field shape by querying `GetEditableLookupProcs` for all 16 tables and then `sys.parameters` on every resulting Add stored procedure in one batch — confirmed only 2 field-shape variants exist across the 14 non-UserArea tables: "Code-keyed" (12 tables: `@Code`/`@Description`/`@IsActive`) and "Area-scoped/ID-keyed" (Contacts 18, Projects 19: `@Area`/`@Description`/`@IsActive`/`@ID`, no `@Code`) — matching the user's "Lookup Type A"/"Lookup Type B" examples exactly. Split into three pages: new `LookupItems.cshtml(.cs)` (read-only item list, "Show deactivated" filter, "Add item" button, per-row "Change" links), new `AddLookupItem.cshtml(.cs)` (dedicated Add form), and `EditLookupItem.cshtml(.cs)` (stripped of the Add branch and the item list, now Edit-only, with a safe redirect instead of a silently-blank form if the item isn't found). Added `LookupTableSchema` (internal static class in `Pages/Admin/`) with `ShowAreaColumn(tableId)`/`HasCodes(items)` so all three pages derive field shape identically rather than duplicating the logic. Updated `PickListMaintenance.cshtml`'s "Edit items" link and `HelpSectionMap.cs` for the two new routes. No existing test file existed for `EditLookupItemModel` before this change (confirmed via search), so no test breakage risk.
+
+**Build:** 0 errors. **Tests:** 267 passed, 4 pre-existing unrelated `BatchesReceivedModelTests` failures, 1 skipped (12 new tests added across 3 new test files).
+
+**Files changed:** [src/Histo.Web/Pages/Admin/LookupItems.cshtml](../src/Histo.Web/Pages/Admin/LookupItems.cshtml) (new), [src/Histo.Web/Pages/Admin/LookupItems.cshtml.cs](../src/Histo.Web/Pages/Admin/LookupItems.cshtml.cs) (new), [src/Histo.Web/Pages/Admin/AddLookupItem.cshtml](../src/Histo.Web/Pages/Admin/AddLookupItem.cshtml) (new), [src/Histo.Web/Pages/Admin/AddLookupItem.cshtml.cs](../src/Histo.Web/Pages/Admin/AddLookupItem.cshtml.cs) (new), [src/Histo.Web/Pages/Admin/EditLookupItem.cshtml](../src/Histo.Web/Pages/Admin/EditLookupItem.cshtml), [src/Histo.Web/Pages/Admin/EditLookupItem.cshtml.cs](../src/Histo.Web/Pages/Admin/EditLookupItem.cshtml.cs), [src/Histo.Web/Pages/Admin/LookupTableSchema.cs](../src/Histo.Web/Pages/Admin/LookupTableSchema.cs) (new), [src/Histo.Web/Pages/Admin/PickListMaintenance.cshtml](../src/Histo.Web/Pages/Admin/PickListMaintenance.cshtml), [src/Histo.Core/Domain/HelpSectionMap.cs](../src/Histo.Core/Domain/HelpSectionMap.cs).
+
+---
+
+## Prompt 149 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-08)
+
+> can you run log v2, session metric and user prompt
+
+Appended 4 new rows to `run-log-v2.md`'s Run Log table (#46–#49), 4 new rows to `session-metrics.md`'s timing table (#107–#110, complexity-based duration estimates), and 4 new prompt entries to this file (Prompts 145–148, plus this one) covering: the QualityData extra-row histology-code filter fix, the `EditBlockHistology`/`Antibodies`/`Stain` missing-parameter fix, the `EditQualityDataTest` clickable error-summary fix, and the Pick List Maintenance Add/Edit GDS page split.
+
+**Files changed:** [docs/run-log-v2.md](../docs/run-log-v2.md), [docs/session-metrics.md](../docs/session-metrics.md), [docs/User-Prompts-Log.md](../docs/User-Prompts-Log.md).
+
+---
+
+## Prompt 150 — Lookup item pagination/sorting missing + failed test cases (2026-09-09)
+
+> Lookup item pagination and sorting is missing also it's not error summary is not clickable link / test cases failed now — fix failed test case
+
+Found `LookupItemsModel.OnGetAsync` had regressed to a stub that never populated `Items` (grid silently empty, so sorting/pagination appeared broken). Restored the lookup-data load. Investigated the reported test failures: 4 pre-existing bugs in `BatchesReceivedModelTests.cs` (missing `await` on async handler calls, a stale redirect-target assertion expecting `/Batches/BatchDetails` instead of the now-correct `/Batches/BatchBlocks`) — all fixed. Also fixed `BatchesForEditing`'s default sort (always ascending regardless of `SortDesc`) and `BatchesForArchiving`'s back-link infinite loop with `ArchiveMenu`. Build 0 errors; `dotnet test` 274 passed, 1 skipped.
+
+**Files changed:** [src/Histo.Web/Pages/Admin/LookupItems.cshtml.cs](../src/Histo.Web/Pages/Admin/LookupItems.cshtml.cs), [src/Histo.Web/Pages/Batches/BatchesForEditing.cshtml.cs](../src/Histo.Web/Pages/Batches/BatchesForEditing.cshtml.cs), [src/Histo.Web/Pages/Archive/BatchesForArchiving.cshtml](../src/Histo.Web/Pages/Archive/BatchesForArchiving.cshtml), [tests/Histo.Tests/Unit/BatchesReceivedModelTests.cs](../tests/Histo.Tests/Unit/BatchesReceivedModelTests.cs).
+
+---
+
+## Prompt 151 — Full View/Create/Edit Submission Journey and Edit Submission Status Journey review (2026-09-09)
+
+> [Two-part review request covering BatchDetails field bugs, ViewSubmissions status-filter over-return, status label "Not Started"→"Not Received", EditBatch button alignment, filter/context retention, BatchesForEditing sort/fields.]
+
+Found and fixed: `BatchDetails.cshtml.cs` Project/Contact lookups missing `includeInactive: true`; `BatchStatus` "Not started"→"Not received" label correction (verified live against `luStatus`); `EditBatch.cshtml` Samples button moved into the Save/Cancel button-group; added `ISessionService.ReturnPageQuery` + `ParseReturnQuery()` so Cancel/Back/post-save redirects restore full list sort/page context; `BatchesForEditing` default-sort fix and `ReturnPageQuery` capture on select; `EditSubmissionStatus` gained missing Submitted by/area/date fields via a new shared `BatchSummaryDisplayResolver`; `ArchiveBlocks`/`ArchiveTissues` given the same summary-field/sortable-column treatment. Build 0 errors.
+
+**Files changed:** [src/Histo.Web/Pages/BatchSummaryDisplayResolver.cs](../src/Histo.Web/Pages/BatchSummaryDisplayResolver.cs), [src/Histo.Web/Pages/Batches/BatchDetails.cshtml.cs](../src/Histo.Web/Pages/Batches/BatchDetails.cshtml.cs), [src/Histo.Web/Pages/Batches/EditBatch.cshtml.cs](../src/Histo.Web/Pages/Batches/EditBatch.cshtml.cs), [src/Histo.Web/Pages/Batches/BatchesForEditing.cshtml.cs](../src/Histo.Web/Pages/Batches/BatchesForEditing.cshtml.cs), [src/Histo.Web/Pages/QC/EditSubmissionStatus.cshtml.cs](../src/Histo.Web/Pages/QC/EditSubmissionStatus.cshtml.cs), [src/Histo.Web/Pages/Archive/ArchiveBlocks.cshtml.cs](../src/Histo.Web/Pages/Archive/ArchiveBlocks.cshtml.cs), [src/Histo.Web/Pages/Archive/ArchiveTissues.cshtml.cs](../src/Histo.Web/Pages/Archive/ArchiveTissues.cshtml.cs), [src/Histo.Core/Domain/BatchStatus.cs](../src/Histo.Core/Domain/BatchStatus.cs), [src/Histo.Web/Services/ISessionService.cs](../src/Histo.Web/Services/ISessionService.cs).
+
+---
+
+## Prompt 152 — ViewSubmissions Status Filter over-returning results, then critical correction (2026-09-09)
+
+> ViewSubmissions.cshtml Status Filter investigation (In Progress/Rejected returning far more rows than legacy) — followed by: "Submitted Area is not available as a search or filtering criterion" in legacy; a Rejected-status record from a different VLA appears under legacy's 2-row result.
+
+Initially hypothesised a missing area-based restriction (the `GetSearchBatchDetails` SP has no area-scoping logic and a `TOP 200` cap) and implemented one. The user then disproved this with a direct legacy observation. Fully reverted: removed `SubmittedArea`/`IsAreaRestricted`/`UserAreas` from `ViewSubmissionsModel` and the criteria/view markup. Cross-checked `docs/migration-run-journal.md` — this exact fact was already established once before (Run #57/ISS-030), confirming the revert was correct and this was a reintroduced regression. Added 2 permanent regression-guard tests. Build 0 errors.
+
+**Files changed:** [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs), [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml), [tests/Histo.Tests/Unit/ViewSubmissionsModelTests.cs](../tests/Histo.Tests/Unit/ViewSubmissionsModelTests.cs).
+
+---
+
+## Prompt 153 — AddSubmission legacy analysis, Neuropath/Mouse Bioassay scope reduction, and button reposition (2026-09-09)
+
+> Legacy `AddSubmission.aspx`/`.aspx.vb` deep analysis; consider that user area is going to be removed in Neuropath and Mouse Bioassay — what would you recommend implementing; why does this button need to be here, can you remove and put it in the right place; is it aligned with legacy?
+
+Deep-read legacy `AddSubmission.aspx.vb`; confirmed the sender-ref search link already matches legacy's `lbLookup_Click` flow. Recommended closing D-3/D-4 (mouse-number bulk entry/Excel upload) and a new D-8 (PG-Number/TSE Daybook auto-lookup) in `Parity-Audit-Report.md` as won't-implement, since all three are gated exclusively on the Neuropath/Mouse Bioassay areas being decommissioned. Repositioned the "Check historical data for this sender ref" button out of an illegally-nested `<form>` into the main form (HTML5 `formmethod`/`formaction`), grouped under the sender-ref search link. Confirmed via `docs/TSE-NonTSE-Submission-Workflow-Redesign.md` this is a deliberate, previously-reviewed popup→page modernisation, so it is aligned with legacy in substance.
+
+**Files changed:** [src/Histo.Web/Pages/Submissions/AddSubmission.cshtml](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml), [docs/Parity-Audit-Report.md](../docs/Parity-Audit-Report.md).
+
+---
+
+## Prompt 154 — Replace footer crown with APHA logo (2026-09-10)
+
+> Where there is a crown logo, change it to this: [APHA_Lesser_Arms_Stacked_Black] attached the png for to make the changes. / I have placed in src/Histo.Web/wwwroot/assets/images/APHA_Lesser_Arms_Stacked_Black.png / is it GDS standard to refer .png from image folder / Can you check the height="60" width="60" is good enough as GDS standard / As per WCAG implement the change
+
+Replaced the `govuk-footer__crown` SVG in `_Layout.cshtml` with the supplied PNG (renamed `apha_icon.png`). Clarified that referencing a `.png` from `wwwroot/assets/images/` is standard, but reusing the `govuk-footer__crown` slot itself isn't — per the GOV.UK Design System's June 2025 brand-refresh guidance, that component is reserved for services on the gov.uk domain. Found the initial `60×60` sizing distorted the image's true `1140×1005` aspect ratio and shrank the stacked wordmark ("Animal & Plant Health Agency") below legible size. Fixed by moving the logo into its own `govuk-footer__logo` row above the footer meta content, sized at `120×136` (correct ratio, WCAG 1.4.5-compliant legibility), with a small CSS margin rule added since govuk-frontend has no built-in class for this slot. Build 0 errors.
+
+**Files changed:** [src/Histo.Web/Pages/Shared/_Layout.cshtml](../src/Histo.Web/Pages/Shared/_Layout.cshtml), [src/Histo.Web/wwwroot/css/Styles.css](../src/Histo.Web/wwwroot/css/Styles.css), [src/Histo.Web/wwwroot/assets/images/apha_icon.png](../src/Histo.Web/wwwroot/assets/images/apha_icon.png).
+
+---
+
+## Prompt 155 — Print Submission Notes should only be enabled when the submission has comments (2026-09-10)
+
+> In view submission page ViewSubmissions.cshtml, Print Submission Notes will only be enabled if the submission includes comments in the "Submission Comments" section of BatchDetails.cshtml
+
+Found the existing precedent for this exact rule in `PrintSubmissionModel.HasNotes` (mirrors legacy `EnableSubmissionNotes`, checking `Batch.Comments`/`Batch.StatusComments`) and replicated it in `ViewSubmissionsModel`: added `HasNotes`, populated in `OnPostSelectAsync` via `_batches.GetByIdAsync(SelectedBatchId)`, and gated the "Print submission notes" button in the view (disabled with a tooltip when false), matching `PrintSubmission.cshtml`'s existing pattern. Build 0 errors.
+
+**Files changed:** [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs), [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml).
+
+---
+
+## Prompt 156 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-10)
+
+> just add the run log and session metrics at end of the file don't read complete file, it consuming more token, i want to add the details in these file — update run-log-v2.md, session-metrics.md, User-Prompts-Log.md
+
+Appended 7 new rows to `run-log-v2.md`'s Run Log table (#50–#56), 7 new rows to `session-metrics.md`'s timing table (#111–#117), and 6 new prompt entries to this file (Prompts 150–155, plus this one) covering everything since the last docs update: LookupItems regression + test-bug fixes, BatchDetails/ArchiveBlocks/ArchiveTissues/BatchStatus parity fixes, EditBatch/EditSubmissionStatus context-restore, the ViewSubmissions area-restriction revert, the AddSubmission review, the footer APHA logo replacement, and the Print submission notes gating fix.
+
+**Files changed:** [docs/run-log-v2.md](../docs/run-log-v2.md), [docs/session-metrics.md](../docs/session-metrics.md), [docs/User-Prompts-Log.md](../docs/User-Prompts-Log.md).
+
 
 
 

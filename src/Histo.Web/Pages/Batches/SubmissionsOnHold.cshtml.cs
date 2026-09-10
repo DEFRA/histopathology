@@ -31,6 +31,7 @@ public class SubmissionsOnHoldModel : HistoPageModel
 
     public Batch? Batch { get; private set; }
     public IReadOnlyList<Animal> Animals { get; private set; } = [];
+    public string? SaveError { get; private set; }
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -62,12 +63,22 @@ public class SubmissionsOnHoldModel : HistoPageModel
 
         var animals = await LoadAnimalsAsync(BatchId.Value);
         var onHoldIds = OnHoldAnimalIds.ToHashSet();
+        var anyFailed = false;
         foreach (var animal in animals)
         {
             var shouldBeOnHold = onHoldIds.Contains(animal.ID);
             if (animal.OnHold == shouldBeOnHold) continue;
             animal.OnHold = shouldBeOnHold;
-            await _submissions.UpdateAnimalAsync(animal, Session.UserID);
+            if (!await _submissions.UpdateAnimalAsync(animal, Session.UserID))
+                anyFailed = true;
+        }
+
+        if (anyFailed)
+        {
+            SaveError = "Could not save one or more on-hold changes. Please try again.";
+            Batch = await _batches.GetByIdAsync(BatchId.Value);
+            Animals = await LoadAnimalsAsync(BatchId.Value);
+            return Page();
         }
 
         return RedirectToPage(new { batchId = BatchId });
@@ -77,7 +88,7 @@ public class SubmissionsOnHoldModel : HistoPageModel
     public IActionResult OnPostDone()
     {
         BatchId ??= Session.BatchID;
-        return RedirectToPage("/Batches/EditBatch", new { batchId = BatchId });
+        return RedirectToPage("/Batches/EditSubmissionStatus", new { batchId = BatchId });
     }
 
     private async Task<IReadOnlyList<Animal>> LoadAnimalsAsync(int batchId)
@@ -86,12 +97,17 @@ public class SubmissionsOnHoldModel : HistoPageModel
         var allAnimals = await _submissions.GetAnimalsByBatchAsync(batchId);
         var merged = blockAnimals.Count > 0 ? MergeAnimals(blockAnimals, allAnimals) : allAnimals;
 
-        // GetBlockAnimalsByBatchAsync's result set doesn't reliably carry OnHold (same gap that
-        // broke BatchSubmissionID elsewhere) — patch it from the plain animals list, which does.
-        var onHoldById = allAnimals.ToDictionary(a => a.ID, a => a.OnHold);
+        // GetBlockAnimalsByBatchAsync's result set doesn't reliably carry OnHold or RowStamp (same
+        // gap that broke BatchSubmissionID elsewhere) — patch both from the plain animals list,
+        // which does. A missing/stale RowStamp makes EditAnimal's concurrency check fail silently,
+        // which was why ticking a box and clicking Save appeared to do nothing.
+        var patchById = allAnimals.ToDictionary(a => a.ID, a => a);
         foreach (var animal in merged)
-            if (onHoldById.TryGetValue(animal.ID, out var real))
-                animal.OnHold = real;
+            if (patchById.TryGetValue(animal.ID, out var real))
+            {
+                animal.OnHold   = real.OnHold;
+                animal.RowStamp = real.RowStamp;
+            }
 
         return merged;
     }

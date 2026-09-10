@@ -19,6 +19,9 @@ public sealed class Block
     public bool RepeatBlock { get; init; }
     public int Status { get; init; }
     public int Order { get; init; }
+    public string? ArchiveLocation { get; init; }
+    public DateTime? ArchivedDate { get; init; }
+    public string? ArchiveComment { get; init; }
     public byte[]? RowStamp { get; init; }
 }
 

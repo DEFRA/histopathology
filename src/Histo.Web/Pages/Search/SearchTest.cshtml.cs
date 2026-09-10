@@ -16,9 +16,14 @@ namespace Histo.Web.Pages.Search;
 /// submission type from a session flag set by the legacy Search Outputs menu.
 /// This page reproduces the reduced-scope replacement already defined by
 /// <see cref="Histo.Submissions.Interfaces.IBatchRepository.GetTestItemRowsAsync"/> —
-/// a project/date-range/submission-type test-item count listing — with the
+/// a project/submission-type test-item count listing — with the
 /// submission type selected directly on the page instead of via a session flag.
-/// See the search module report for details of what analytics were not ported.
+///
+/// No date filter is offered: the <c>GetTestRows</c> stored procedure accepts only
+/// <c>@ProjectContractDesc</c> and <c>@BatchType</c>. Date inputs were previously
+/// rendered here but never reached the query, so they were removed rather than left
+/// as controls that silently did nothing. Restoring date filtering requires adding
+/// date parameters to the stored procedure.
 /// </summary>
 public class SearchTestModel : HistoPageModel
 {
@@ -34,8 +39,6 @@ public class SearchTestModel : HistoPageModel
         _lookups = lookups;
     }
 
-    [BindProperty] public DateTime StartDate { get; set; } = DateTime.Today.AddDays(-7);
-    [BindProperty] public DateTime EndDate { get; set; } = DateTime.Today;
     [BindProperty] public string? ProjectDescription { get; set; }
     [BindProperty] public int SubmissionType { get; set; }
 
@@ -60,5 +63,15 @@ public class SearchTestModel : HistoPageModel
         Searched = true;
 
         return Page();
+    }
+
+    /// <summary>Replaces the legacy <c>hlbExcel</c> link.</summary>
+    public async Task<IActionResult> OnPostExportCsvAsync()
+    {
+        var results = await _batches.GetTestItemRowsAsync(ProjectDescription, SubmissionType);
+        return CsvExportHelper.BuildCsv(
+            "search-test-totals.csv",
+            ["Description", "Count"],
+            results.Select(r => (IReadOnlyList<string?>)new string?[] { r.Description, r.Count.ToString() }));
     }
 }

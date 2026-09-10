@@ -78,6 +78,14 @@ public interface ISessionService
     string ReturnPage { get; set; }
 
     /// <summary>
+    /// Query string (e.g. <c>"?SortColumn=ID&amp;SortDesc=true&amp;PageNumber=2"</c>) captured
+    /// alongside <see cref="ReturnPage"/> so a back link/cancel button can restore the exact
+    /// sort/page state the user left, without breaking <c>RedirectToPage(ReturnPage)</c> call
+    /// sites (which require a bare page name, not a full URL). Null/empty when not set.
+    /// </summary>
+    string? ReturnPageQuery { get; set; }
+
+    /// <summary>
     /// True when the user is in the read-only "View Submission" journey (legacy
     /// <c>SessionVars.SV_ViewSubmission</c>). Gates Add/Edit/Copy/Delete sample on
     /// <c>BatchBlockSummary</c>/<c>BatchDetails</c>.

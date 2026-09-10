@@ -19,6 +19,7 @@ public class SearchSubmissionsModelTests
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<IBatchService> _batches = new();
     private readonly Mock<IUserService> _users = new();
+    private readonly Mock<ILookupService> _lookups = new();
 
     public SearchSubmissionsModelTests()
     {
@@ -26,22 +27,24 @@ public class SearchSubmissionsModelTests
         _session.SetupProperty(s => s.ReturnPage, string.Empty);
         _session.SetupProperty(s => s.IsViewSubmissionMode);
         _users.Setup(u => u.GetAllUsersAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<User>)[]);
+        _lookups.Setup(l => l.GetLookupDataAsync(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[]);
+        _lookups.Setup(l => l.GetSpeciesLookupAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[]);
     }
 
     private SearchSubmissionsModel CreateSut() =>
-        new(_session.Object, _batches.Object, _users.Object)
+        new(_session.Object, _batches.Object, _users.Object, _lookups.Object)
         {
             PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
         };
 
     [Fact]
-    public async Task OnPostAsync_PopulatesResultsAndSetsSearched()
+    public async Task OnPostSearchAsync_PopulatesResultsAndSetsSearched()
     {
         _batches.Setup(b => b.SearchAsync(It.IsAny<BatchSearchCriteria>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BatchSearchResult>)[new BatchSearchResult { ID = 1 }]);
         var sut = CreateSut();
 
-        var result = await sut.OnPostAsync();
+        var result = await sut.OnPostSearchAsync();
 
         Assert.IsType<PageResult>(result);
         Assert.True(sut.Searched);
@@ -74,8 +77,6 @@ public class SearchSubmissionsModelTests
 
         Assert.IsAssignableFrom<FileResult>(result);
     }
-
-    // ── Action-button availability matrix (mirrors grdSearchResults_SelectedIndexChanged) ──
 
     [Theory]
     [InlineData(BatchStatus.Submitted, true, false, false, false, false)]

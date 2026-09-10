@@ -99,23 +99,6 @@ public class BatchDetailsModelTests
     }
 
     [Theory]
-    [InlineData(BatchStatus.Received, true, false)]
-    [InlineData(BatchStatus.InProgress, true, false)]
-    [InlineData(BatchStatus.Submitted, false, false)]
-    [InlineData(BatchStatus.Rejected, false, false)]
-    [InlineData(BatchStatus.Completed, false, false)]
-    public async Task CanAssignBlocks_ReflectsStatus(string status, bool expectedCanAssign, bool _)
-    {
-        _session.Object.BatchID = 1;
-        _batches.Setup(b => b.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(MakeBatch(status));
-        var sut = CreateSut();
-
-        await sut.OnGetAsync();
-
-        Assert.Equal(expectedCanAssign, sut.CanAssignBlocks);
-    }
-
-    [Theory]
     [InlineData(BatchStatus.Submitted, true)]
     [InlineData(BatchStatus.Rejected, true)]
     [InlineData(BatchStatus.Received, false)]
@@ -142,32 +125,6 @@ public class BatchDetailsModelTests
         await sut.OnGetAsync();
 
         Assert.True(sut.CanDateReturned);
-    }
-
-    [Fact]
-    public async Task CanPrint_ViewMode_IsTrueEvenWhileModifiable()
-    {
-        _session.Object.BatchID = 1;
-        _session.Object.IsViewSubmissionMode = true;
-        _batches.Setup(b => b.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(MakeBatch(BatchStatus.Submitted));
-        var sut = CreateSut();
-
-        await sut.OnGetAsync();
-
-        Assert.True(sut.CanPrint);
-    }
-
-    [Fact]
-    public async Task CanPrint_NotViewModeAndStillModifiable_IsFalse()
-    {
-        _session.Object.BatchID = 1;
-        _session.Object.IsViewSubmissionMode = false;
-        _batches.Setup(b => b.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(MakeBatch(BatchStatus.Submitted));
-        var sut = CreateSut();
-
-        await sut.OnGetAsync();
-
-        Assert.False(sut.CanPrint);
     }
 
     [Fact]

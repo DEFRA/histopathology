@@ -35,11 +35,13 @@ public static class BatchStatus
     /// </summary>
     public static string DisplayName(string status) => status switch
     {
-        // Legacy display text sourced from the GetluStatus lookup table (LookupData.vb::GetStatusLookupData),
-        // which every legacy status dropdown (ViewSubmissions, SearchSubmissions, EditBatch, ReceiveBatch) binds
-        // to via DataTextField="Description". That description reads "Not started" for code "1" — i.e. the batch
-        // has been submitted by the customer but the lab has not yet started work on it — not "Submitted".
-        Submitted  => "Not started",
+        // Legacy display text sourced from the real luStatus lookup table (confirmed live:
+        // Code=1 → Description="Not Received") — every legacy status dropdown (ViewSubmissions,
+        // SearchSubmissions, EditBatch, ReceiveBatch) binds to this via DataTextField="Description".
+        // A batch with this status has been submitted by the customer but not yet received by the
+        // lab. Sentence-cased to "Not received" to match this method's existing casing convention
+        // for other multi-word statuses ("On hold", "In progress").
+        Submitted  => "Not received",
         Received   => "Received",
         Rejected   => "Rejected",
         Completed  => "Completed",
@@ -47,4 +49,24 @@ public static class BatchStatus
         InProgress => "In progress",
         _          => status   // unknown code — show raw value rather than blank
     };
+
+    /// <summary>
+    /// Normalises a status label that came back as free text from a legacy stored procedure
+    /// (e.g. <c>GetBatchesWithStatus</c>, which returns a description column rather than a
+    /// code) to the same canonical wording as <see cref="DisplayName"/>.
+    /// </summary>
+    public static string NormalizeDisplayText(string? rawText)
+    {
+        if (string.IsNullOrWhiteSpace(rawText)) return rawText ?? string.Empty;
+        return rawText.Trim().ToLowerInvariant() switch
+        {
+            "not received" or "not started" or "submitted" => "Not received",
+            "received"                                      => "Received",
+            "rejected"                                       => "Rejected",
+            "completed"                                      => "Completed",
+            "on hold" or "onhold"                             => "On hold",
+            "in progress" or "inprogress"                     => "In progress",
+            _                                                 => rawText
+        };
+    }
 }

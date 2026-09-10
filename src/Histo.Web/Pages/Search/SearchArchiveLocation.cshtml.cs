@@ -35,7 +35,7 @@ public class SearchArchiveLocationModel : GridPageModel
     [BindProperty] public string? TissueCode { get; set; }
     [BindProperty] public string? BlockRef { get; set; }
 
-    public string? ErrorMessage { get; private set; }
+    public Dictionary<string, string> Errors { get; } = [];
     public bool Searched { get; private set; }
 
     public IReadOnlyList<TissueArchiveInfo> TissueResults { get; private set; } = [];
@@ -107,7 +107,7 @@ public class SearchArchiveLocationModel : GridPageModel
 
         if (hasSenderRef == hasHistologyRef)
         {
-            ErrorMessage = "Enter either the Sender Ref or the Histology Ref, not both.";
+            Errors[nameof(SenderRef)] = "Enter either the Sender Ref or the Histology Ref, not both.";
             PopulateGridViewData(TotalCount);
             return Page();
         }

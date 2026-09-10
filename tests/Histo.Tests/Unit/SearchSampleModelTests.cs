@@ -10,13 +10,13 @@ using Moq;
 
 namespace Histo.Tests.Unit;
 
-/// <summary>Unit tests for <see cref="SearchSampleModel"/>.</summary>
+/// <summary>Unit tests for <see cref="SearchSenderModel"/>.</summary>
 public class SearchSampleModelTests
 {
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<ISubmissionService> _submissions = new();
 
-    private SearchSampleModel CreateSut() =>
+    private SearchSenderModel CreateSut() =>
         new(_session.Object, _submissions.Object)
         {
             PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },

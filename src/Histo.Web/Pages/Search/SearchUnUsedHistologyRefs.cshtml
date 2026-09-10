@@ -12,13 +12,15 @@
 @if (Model.Results.Any())
 {
     <table class="govuk-table">
+        <caption class="govuk-table__caption govuk-table__caption--m govuk-visually-hidden">Unused histology refs</caption>
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <th scope="col" class="govuk-table__header">Histology ref</th>
+                @{ ViewData["Label"] = "Histology ref"; ViewData["Column"] = "Ref"; }
+                <partial name="_SortableHeader" />
             </tr>
         </thead>
         <tbody class="govuk-table__body">
-            @foreach (var r in Model.Results)
+            @foreach (var r in Model.PagedResults)
             {
                 <tr class="govuk-table__row">
                     <td class="govuk-table__cell">@r.Ref</td>
@@ -26,6 +28,10 @@
             }
         </tbody>
     </table>
+    <partial name="_Pagination" />
+
+    <a asp-page="/Search/SearchUnUsedHistologyRefs" asp-page-handler="ExportCsv"
+       class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to CSV</a>
 }
 else
 {

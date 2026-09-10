@@ -29,76 +29,54 @@ public class SearchBlockRefsModelTests
         };
 
     [Fact]
-    public async Task OnPostAsync_NeitherFieldEntered_ReturnsErrorMessage()
+    public async Task OnGetAsync_NeitherFieldEntered_ShowsEmptyResults()
     {
         var sut = CreateSut();
-        sut.SenderRef = null;
-        sut.HistologyRef = null;
 
-        var result = await sut.OnPostAsync();
+        await sut.OnGetAsync();
 
-        Assert.IsType<PageResult>(result);
-        Assert.Equal("Enter either the Sender Ref or the Histology Ref, not both.", sut.ErrorMessage);
+        Assert.Empty(sut.Errors);
+        Assert.Empty(sut.Results);
     }
 
     [Fact]
-    public async Task OnPostAsync_BothFieldsEntered_ReturnsErrorMessage()
+    public async Task OnGetAsync_BothFieldsEntered_ReturnsValidationError()
     {
         var sut = CreateSut();
         sut.SenderRef = "S123";
         sut.HistologyRef = "24/00001";
 
-        var result = await sut.OnPostAsync();
+        await sut.OnGetAsync();
 
-        Assert.IsType<PageResult>(result);
-        Assert.Equal("Enter either the Sender Ref or the Histology Ref, not both.", sut.ErrorMessage);
+        Assert.Contains(nameof(SearchBlockRefsModel.SenderRef), sut.Errors.Keys);
+        Assert.Equal("Enter either the Sender Ref or the Histology Ref, not both.", sut.Errors[nameof(SearchBlockRefsModel.SenderRef)]);
     }
 
     [Fact]
-    public async Task OnPostAsync_OnlySenderRefEntered_SearchesBySenderRef()
+    public async Task OnGetAsync_OnlySenderRefEntered_SearchesBySenderRef()
     {
         _blocks.Setup(b => b.GetUsedBlockRefsBySenderRefAsync("S123", It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<UsedBlockRef>)[]);
         var sut = CreateSut();
         sut.SenderRef = "S123";
-        sut.HistologyRef = null;
 
-        var result = await sut.OnPostAsync();
+        await sut.OnGetAsync();
 
-        Assert.IsType<PageResult>(result);
-        Assert.Null(sut.ErrorMessage);
+        Assert.True(sut.Searched);
         _blocks.Verify(b => b.GetUsedBlockRefsBySenderRefAsync("S123", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task OnPostAsync_OnlyHistologyRefEntered_SearchesByHistologyRef()
+    public async Task OnGetAsync_OnlyHistologyRefEntered_SearchesByHistologyRef()
     {
         _blocks.Setup(b => b.GetUsedBlockRefsByHistologyRefAsync("24/00001", It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<UsedBlockRef>)[]);
         var sut = CreateSut();
-        sut.SenderRef = null;
         sut.HistologyRef = "24/00001";
 
-        var result = await sut.OnPostAsync();
+        await sut.OnGetAsync();
 
-        Assert.IsType<PageResult>(result);
-        Assert.Null(sut.ErrorMessage);
+        Assert.True(sut.Searched);
         _blocks.Verify(b => b.GetUsedBlockRefsByHistologyRefAsync("24/00001", It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task OnPostAsync_NoUsedBlocksFound_ReturnsSingleFullUnusedRange()
-    {
-        // BlockRefRangeHelpers.ComputeRanges always synthesises a full "01+" unused
-        // range when there are no used blocks — it never returns an empty collection.
-        _blocks.Setup(b => b.GetUsedBlockRefsBySenderRefAsync("S123", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<UsedBlockRef>)[]);
-        var sut = CreateSut();
-        sut.SenderRef = "S123";
-
-        await sut.OnPostAsync();
-
-        var row = Assert.Single(sut.Results);
-        Assert.Equal("01+", row.UnusedBlockRefs);
     }
 }

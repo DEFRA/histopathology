@@ -108,6 +108,24 @@ public sealed class BlockService : IBlockService
     }
 
     /// <summary>
+    /// Creates a new pre-booked block placeholder for an animal, ahead of any batch existing.
+    /// Used by the "Book blocks" workflow (Bookings/BookBlockRef).
+    /// </summary>
+    public async Task<bool> CreatePreBookedBlockAsync(int animalId, string blockRef, CancellationToken ct = default)
+    {
+        try
+        {
+            await _repo.CreatePreBookedBlockAsync(animalId, blockRef, ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to create pre-booked block {BlockRef} for animal {AnimalId}.", ex, blockRef, animalId);
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Creates a copy of an existing block on a target animal, computing the next
     /// free block reference for that animal from <paramref name="existingBlockRefs"/>.
     /// Used by the "Copy blocks" and "Copy samples" workflows.

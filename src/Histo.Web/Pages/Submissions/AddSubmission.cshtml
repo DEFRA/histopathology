@@ -24,6 +24,8 @@
 <form method="post">
     <input type="hidden" asp-for="BatchId" />
     <input type="hidden" asp-for="BatchSubmissionId" />
+    <input type="hidden" asp-for="SourceAnimalId" />
+    <input type="hidden" id="icc-filter" name="Filter" value="" />
     <div class="govuk-form-group">
         <label class="govuk-label" for="SenderRef">Sender reference</label>
         <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" required />
@@ -33,18 +35,17 @@
             Search for a previously used sender reference
         </a>
     </p>
+    <p class="govuk-body">
+        @* Contextual lookup, pre-filled with the sender ref entered above — a plain submit
+           button with formmethod/formaction so it doesn't need its own nested <form>. *@
+        <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button"
+                formmethod="get" formaction="@Url.Page("/Search/ViewImportedData")" formnovalidate
+                onclick="document.getElementById('icc-filter').value = document.getElementById('SenderRef').value;">
+            Check historical data for this sender ref
+        </button>
+    </p>
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Add sample</button>
         <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
-    </div>
-</form>
-
-@* Contextual lookup, pre-filled with the sender ref entered above, replacing the need to leave
-   this task and navigate to the standalone Search menu. *@
-<form method="get" asp-page="/Search/ViewImportedData" class="govuk-!-margin-top-4"
-      onsubmit="document.getElementById('icc-filter').value = document.getElementById('SenderRef').value;">
-    <input type="hidden" id="icc-filter" name="Filter" value="" />
-    <div class="govuk-button-group">
-        <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Check historical data for this sender ref</button>
     </div>
 </form>

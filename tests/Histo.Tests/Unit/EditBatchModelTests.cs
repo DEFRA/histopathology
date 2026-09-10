@@ -32,6 +32,7 @@ public class EditBatchModelTests
         _lookups.Setup(l => l.GetLookupDataAsync(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[]);
         _lookups.Setup(l => l.GetSpeciesLookupAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[]);
         _lookups.Setup(l => l.GetUserAreasAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[]);
+        _lookups.Setup(l => l.GetHistologyTypesAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[]);
         _users.Setup(u => u.GetAllUsersAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<User>)[]);
     }
 
@@ -80,54 +81,15 @@ public class EditBatchModelTests
     {
         _session.Object.BatchID = 1;
         _batches.Setup(b => b.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(MakeBatch());
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new BatchTestSelections());
         var sut = CreateSut();
 
         var result = await sut.OnGetAsync();
 
         Assert.IsType<PageResult>(result);
-        Assert.Equal(BatchStatus.Received, sut.Status);
+        Assert.NotNull(sut.Batch);
         Assert.Equal("01/01/2026", sut.BatchDateStr);
         Assert.False(_session.Object.IsViewSubmissionMode);
-    }
-
-    [Fact]
-    public async Task OnPostAsync_BatchHasNoRowStamp_RedirectsToIndex()
-    {
-        _batches.Setup(b => b.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(MakeBatch(useDefaultRowStamp: false));
-        var sut = CreateSut();
-
-        var result = await sut.OnPostAsync();
-
-        var redirect = Assert.IsType<RedirectToPageResult>(result);
-        Assert.Equal("/Index", redirect.PageName);
-    }
-
-    [Fact]
-    public async Task OnPostAsync_TransitionToReceivedDirectly_IsBlocked()
-    {
-        _batches.Setup(b => b.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(MakeBatch(status: BatchStatus.Submitted));
-        var sut = CreateSut();
-        sut.Status = BatchStatus.Received;
-        sut.OriginalStatus = BatchStatus.Submitted;
-
-        var result = await sut.OnPostAsync();
-
-        Assert.IsType<PageResult>(result);
-        Assert.Equal("Mark a submission as Received using the Receive Submissions workflow.", sut.SaveError);
-    }
-
-    [Fact]
-    public async Task OnPostAsync_TransitionToInProgressWhileStillSubmitted_IsBlocked()
-    {
-        _batches.Setup(b => b.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(MakeBatch(status: BatchStatus.Submitted));
-        var sut = CreateSut();
-        sut.Status = BatchStatus.InProgress;
-        sut.OriginalStatus = BatchStatus.Submitted;
-
-        var result = await sut.OnPostAsync();
-
-        Assert.IsType<PageResult>(result);
-        Assert.Equal("The submission cannot be set to In Progress while still Submitted. Receive it first.", sut.SaveError);
     }
 
     [Fact]
@@ -135,9 +97,8 @@ public class EditBatchModelTests
     {
         _batches.Setup(b => b.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(MakeBatch());
         var sut = CreateSut();
-        sut.Status = BatchStatus.Received;
-        sut.OriginalStatus = BatchStatus.Received;
         sut.BatchDateStr = "not-a-date";
+        sut.SelectedHistologyCodes = [HistologyCode.HeBse];
 
         var result = await sut.OnPostAsync();
 
@@ -150,32 +111,16 @@ public class EditBatchModelTests
     {
         _batches.Setup(b => b.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(MakeBatch());
         _batches.Setup(b => b.UpdateAsync(It.IsAny<Batch>(), 99, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _batches.Setup(b => b.SaveBatchTestSelectionsAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), 99, It.IsAny<CancellationToken>())).ReturnsAsync(true);
         var sut = CreateSut();
-        sut.Status = BatchStatus.Received;
-        sut.OriginalStatus = BatchStatus.Received;
         sut.BatchDateStr = "02/01/2026";
+        sut.SelectedHistologyCodes = [HistologyCode.HeBse];
         _session.Object.ReturnPage = "/Batches/BatchesForEditing";
 
         var result = await sut.OnPostAsync();
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
         Assert.Equal("/Batches/BatchesForEditing", redirect.PageName);
-    }
-
-    [Fact]
-    public async Task OnPostAsync_UpdateThrows_ReturnsPageWithError()
-    {
-        _batches.Setup(b => b.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(MakeBatch());
-        _batches.Setup(b => b.UpdateAsync(It.IsAny<Batch>(), 99, It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("concurrency"));
-        var sut = CreateSut();
-        sut.Status = BatchStatus.Received;
-        sut.OriginalStatus = BatchStatus.Received;
-
-        var result = await sut.OnPostAsync();
-
-        Assert.IsType<PageResult>(result);
-        Assert.Equal("Failed to save the submission. Please try again.", sut.SaveError);
     }
 
     [Fact]

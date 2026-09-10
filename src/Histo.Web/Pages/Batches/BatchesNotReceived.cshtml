@@ -39,17 +39,15 @@ else
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                @{ ViewData["Label"] = "Batch No"; ViewData["Column"] = "ID"; }
+                @{ ViewData["Label"] = "Submission Number"; ViewData["Column"] = "ID"; }
                 <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Project"; ViewData["Column"] = "ProjectDescription"; }
+                @{ ViewData["Label"] = "Project Code"; ViewData["Column"] = "ProjectDescription"; }
                 <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "Pathologist"; ViewData["Column"] = "ContactDescription"; }
                 <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "Species"; ViewData["Column"] = "Species"; }
                 <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "Batch date"; ViewData["Column"] = "SubmissionDate"; }
-                <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Customer ref"; ViewData["Column"] = "OtherSubmittedBy"; }
                 <partial name="_SortableHeader" />
                 <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
             </tr>
@@ -63,7 +61,6 @@ else
                     <td class="govuk-table__cell">@b.ContactDescription</td>
                     <td class="govuk-table__cell">@b.Species</td>
                     <td class="govuk-table__cell">@b.SubmissionDate</td>
-                    <td class="govuk-table__cell">@b.OtherSubmittedBy</td>
                     <td class="govuk-table__cell">
                         <form method="post">
                             <input type="hidden" name="batchId" value="@b.ID" />

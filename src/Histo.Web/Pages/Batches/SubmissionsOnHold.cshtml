@@ -6,10 +6,24 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Batches/EditBatch" asp-route-BatchId="@Model.BatchId" class="govuk-back-link">Back</a>
+    <a asp-page="/Batches/EditSubmissionStatus" asp-route-BatchId="@Model.BatchId" class="govuk-back-link">Back</a>
 }
 
 <p class="govuk-body">Select which samples in this submission should be put on hold.</p>
+
+@if (!string.IsNullOrEmpty(Model.SaveError))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.SaveError</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+}
 
 <form method="post" asp-page-handler="Save">
     <input type="hidden" asp-for="BatchId" />

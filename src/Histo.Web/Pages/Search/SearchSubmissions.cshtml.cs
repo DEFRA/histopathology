@@ -10,13 +10,12 @@ namespace Histo.Web.Pages.Search;
 /// <summary>
 /// Replaces <c>SearchSubmissions.aspx</c>.
 ///
-/// SIMPLIFIED: the legacy page drives several of its filters (Status,
-/// Submitted Area, Submitted By, Project, Pathologist, Species, Fixation)
-/// from lookup-populated drop-downs and hides a "SubmittedBy" grid column.
-/// Status is rendered from the fixed <see cref="BatchStatus"/> constants,
-/// Submitted/Entered By are populated from <see cref="UserService.GetAllUsersAsync"/>,
-/// and the remaining filters are plain text fields matching the string
-/// criteria already accepted by <see cref="BatchSearchCriteria"/>.
+/// Filters mirror the legacy page: Status is rendered from the fixed
+/// <see cref="BatchStatus"/> constants, Submitted/Entered By are populated from
+/// <see cref="UserService.GetAllUsersAsync"/>, and Project, Pathologist, Species,
+/// Fixation and Submitted Area are lookup-populated drop-downs matching legacy's
+/// <c>ddlProject</c>, <c>ddlContact</c>, <c>ddlSpecies</c>, <c>ddlFixation</c> and
+/// <c>ddlUserArea</c>.
 ///
 /// Row selection and action panel: the legacy page enabled 6 action buttons
 /// (Print, Edit, View, Quality Data, Archive, Receipt) when a grid row was
@@ -29,12 +28,20 @@ public class SearchSubmissionsModel : HistoPageModel
 {
     private readonly IBatchService _batches;
     private readonly IUserService _users;
+    private readonly ILookupService _lookups;
 
-    public SearchSubmissionsModel(ISessionService session, IBatchService batches, IUserService users)
+    // Constants matching Common.vb
+    private const int LookupFixative = 10;
+    private const int LookupUserArea = 13;
+    private const int LookupContacts = 18;
+    private const int LookupProjects = 19;
+
+    public SearchSubmissionsModel(ISessionService session, IBatchService batches, IUserService users, ILookupService lookups)
         : base(session)
     {
         _batches = batches;
         _users = users;
+        _lookups = lookups;
     }
 
     [BindProperty] public int? SubmissionNumber { get; set; }
@@ -48,10 +55,10 @@ public class SearchSubmissionsModel : HistoPageModel
     [BindProperty] public int? EnteredBy { get; set; }
     [BindProperty] public string? HistologyRef { get; set; }
     [BindProperty] public string? SenderRef { get; set; }
-    [BindProperty] public DateTime? SubmittedDateFrom { get; set; }
-    [BindProperty] public DateTime? SubmittedDateTo { get; set; }
-    [BindProperty] public DateTime? ReceivedDateFrom { get; set; }
-    [BindProperty] public DateTime? ReceivedDateTo { get; set; }
+    [BindProperty] public DateParts SubmittedDateFrom { get; set; } = new();
+    [BindProperty] public DateParts SubmittedDateTo { get; set; } = new();
+    [BindProperty] public DateParts ReceivedDateFrom { get; set; } = new();
+    [BindProperty] public DateParts ReceivedDateTo { get; set; } = new();
 
     /// <summary>
     /// ID of the currently selected search result row.
@@ -60,9 +67,62 @@ public class SearchSubmissionsModel : HistoPageModel
     /// </summary>
     [BindProperty] public int SelectedBatchId { get; set; }
 
+    // Sort/page state is bound the same way as the filter criteria — [BindProperty] binds from
+    // route/query/form on any non-GET request, so these survive the POST-based sort/page buttons
+    // (see _SortableHeaderPost/_PaginationPost) without needing GridPageModel's GET-oriented
+    // SupportsGet mechanism, which this POST-only search page cannot use.
+    private const int PageSize = 10;
+    [BindProperty] public string? SortColumn { get; set; }
+    // Legacy FillSearchGrid defaulted the view to "ID DESC" when no sort had been chosen.
+    [BindProperty] public bool SortDesc { get; set; } = true;
+    [BindProperty] public int PageNumber { get; set; } = 1;
+
+    public IReadOnlyList<BatchSearchResult> PagedResults =>
+        (SortColumn switch
+        {
+            "ProjectDescription" => SortDesc ? Results.OrderByDescending(r => r.ProjectDescription) : Results.OrderBy(r => r.ProjectDescription),
+            "ContactDescription" => SortDesc ? Results.OrderByDescending(r => r.ContactDescription) : Results.OrderBy(r => r.ContactDescription),
+            "Species"            => SortDesc ? Results.OrderByDescending(r => r.Species)            : Results.OrderBy(r => r.Species),
+            "BatchDate"          => SortDesc ? Results.OrderByDescending(r => r.BatchDate)          : Results.OrderBy(r => r.BatchDate),
+            "Status"             => SortDesc ? Results.OrderByDescending(r => r.Status)             : Results.OrderBy(r => r.Status),
+            _                    => SortDesc ? Results.OrderByDescending(r => r.ID)                 : Results.OrderBy(r => r.ID),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
+
+    /// <summary>
+    /// formaction for each row's Select button. SortColumn/PageNumber are POST-bound (user
+    /// controllable), so they're percent-encoded before being embedded in the query string —
+    /// otherwise a value containing '&amp;' could inject extra query parameters.
+    /// </summary>
+    public string SelectFormAction =>
+        $"?handler=Select&SortColumn={Uri.EscapeDataString(SortColumn ?? string.Empty)}&SortDesc={(SortDesc ? "true" : "false")}&PageNumber={PageNumber}";
+
+    private void PopulateGridViewData()
+    {
+        var totalPages = Results.Count == 0 ? 1 : (int)Math.Ceiling(Results.Count / (double)PageSize);
+        if (PageNumber < 1) PageNumber = 1;
+        else if (PageNumber > totalPages) PageNumber = totalPages;
+        ViewData["SortColumn"] = SortColumn;
+        ViewData["SortDesc"] = SortDesc;
+        ViewData["CurrentPage"] = PageNumber;
+        ViewData["TotalPages"] = totalPages;
+        ViewData["FormId"] = "submission-action-form";
+        ViewData["Handler"] = "Search";
+    }
+
     public IReadOnlyList<Administration.Models.User> Users { get; private set; } = [];
+    public IReadOnlyList<Administration.Models.LookupItem> Projects { get; private set; } = [];
+    public IReadOnlyList<Administration.Models.LookupItem> Contacts { get; private set; } = [];
+    public IReadOnlyList<Administration.Models.LookupItem> SpeciesList { get; private set; } = [];
+    public IReadOnlyList<Administration.Models.LookupItem> Fixations { get; private set; } = [];
+    public IReadOnlyList<Administration.Models.LookupItem> UserAreas { get; private set; } = [];
     public IReadOnlyList<BatchSearchResult> Results { get; private set; } = [];
     public bool Searched { get; private set; }
+
+    /// <summary>Field id → message, rendered by the GDS error summary and inline field errors.</summary>
+    public Dictionary<string, string> Errors { get; } = [];
 
     /// <summary>
     /// <see cref="BatchStatus"/> code of the selected row, or <c>null</c> when no row is selected.
@@ -89,26 +149,76 @@ public class SearchSubmissionsModel : HistoPageModel
                                    || SelectedBatchStatus == BatchStatus.InProgress;
     public bool CanViewArchiveData => CanViewQualityData;
     public bool CanViewReceipt     => SelectedBatchStatus is not null && SelectedBatchStatus != BatchStatus.Submitted;
-    // Edit test types — Submitted, Received, or InProgress only (matches CanEditTestTypes on BatchDetails).
-    public bool CanEditTestTypes   => SelectedBatchStatus == BatchStatus.Submitted
-                                   || SelectedBatchStatus == BatchStatus.Received
-                                   || SelectedBatchStatus == BatchStatus.InProgress;
+
+    private async Task LoadLookupsAsync()
+    {
+        var usersTask = _users.GetAllUsersAsync();
+        var projectsTask = _lookups.GetLookupDataAsync(LookupProjects);
+        var contactsTask = _lookups.GetLookupDataAsync(LookupContacts);
+        var speciesTask = _lookups.GetSpeciesLookupAsync();
+        var fixationsTask = _lookups.GetLookupDataAsync(LookupFixative);
+        var userAreasTask = _lookups.GetLookupDataAsync(LookupUserArea);
+
+        await Task.WhenAll(usersTask, projectsTask, contactsTask, speciesTask, fixationsTask, userAreasTask);
+
+        Users = await usersTask;
+        Projects = await projectsTask;
+        Contacts = await contactsTask;
+        SpeciesList = await speciesTask;
+        Fixations = await fixationsTask;
+        UserAreas = await userAreasTask;
+    }
+
+    /// <summary>
+    /// Reproduces the legacy pre-search checks: <c>revSubmissionNumber</c>
+    /// (<c>^[1-9]+[0-9]*$</c>) and the two <c>IsDateRangeValid</c> calls guarding the
+    /// Submitted and Received date ranges. All four dates are optional filters.
+    /// </summary>
+    private bool Validate()
+    {
+        if (SubmissionNumber is <= 0)
+            Errors[nameof(SubmissionNumber)] = "Submission number must be a whole number greater than zero.";
+
+        var submittedFrom = ParseDate(SubmittedDateFrom, "SubmittedDateFrom-day", "Submitted date from");
+        var submittedTo = ParseDate(SubmittedDateTo, "SubmittedDateTo-day", "Submitted date to");
+        var receivedFrom = ParseDate(ReceivedDateFrom, "ReceivedDateFrom-day", "Received date from");
+        var receivedTo = ParseDate(ReceivedDateTo, "ReceivedDateTo-day", "Received date to");
+
+        if (submittedFrom.HasValue && submittedTo.HasValue && submittedFrom > submittedTo)
+            Errors["SubmittedDateFrom-day"] = "Submitted date from must not be later than submitted date to.";
+
+        if (receivedFrom.HasValue && receivedTo.HasValue && receivedFrom > receivedTo)
+            Errors["ReceivedDateFrom-day"] = "Received date from must not be later than received date to.";
+
+        return Errors.Count == 0;
+    }
+
+    private DateTime? ParseDate(DateParts parts, string errorKey, string label)
+    {
+        if (parts.TryGetDate(out var value)) return value;
+        Errors[errorKey] = $"{label} must be a real date.";
+        return null;
+    }
 
     public async Task OnGetAsync()
     {
         ViewData["Title"] = "Search Submissions";
         ViewData["PageTitle"] = "Search Submissions";
-        Users = await _users.GetAllUsersAsync();
+        await LoadLookupsAsync();
     }
 
-    public async Task<IActionResult> OnPostAsync()
+    public async Task<IActionResult> OnPostSearchAsync()
     {
         ViewData["Title"] = "Search Submissions";
         ViewData["PageTitle"] = "Search Submissions";
-        Users = await _users.GetAllUsersAsync();
+        await LoadLookupsAsync();
         SelectedBatchId = 0;
+
+        if (!Validate()) return Page();
+
         Results = await _batches.SearchAsync(BuildCriteria());
         Searched = true;
+        PopulateGridViewData();
         return Page();
     }
 
@@ -122,7 +232,7 @@ public class SearchSubmissionsModel : HistoPageModel
     {
         ViewData["Title"] = "Search Submissions";
         ViewData["PageTitle"] = "Search Submissions";
-        Users = await _users.GetAllUsersAsync();
+        await LoadLookupsAsync();
 
         if (SelectedBatchId > 0)
         {
@@ -133,6 +243,7 @@ public class SearchSubmissionsModel : HistoPageModel
 
         Results = await _batches.SearchAsync(BuildCriteria());
         Searched = true;
+        PopulateGridViewData();
         return Page();
     }
 
@@ -165,16 +276,18 @@ public class SearchSubmissionsModel : HistoPageModel
         ContactName         = NullIfEmpty(ContactName),
         Species             = NullIfEmpty(Species),
         Fixation            = NullIfEmpty(Fixation),
-        SubmittedArea       = SubmittedArea,
+        SubmittedArea       = NullIfEmpty(SubmittedArea),
         SubmittedBy         = SubmittedBy,
         EnteredBy           = EnteredBy,
         HistologyRef        = NullIfEmpty(HistologyRef),
         SenderRef           = NullIfEmpty(SenderRef),
-        SubmittedDateFrom   = SubmittedDateFrom,
-        SubmittedDateTo     = SubmittedDateTo,
-        ReceivedDateFrom    = ReceivedDateFrom,
-        ReceivedDateTo      = ReceivedDateTo,
+        SubmittedDateFrom   = ToDate(SubmittedDateFrom),
+        SubmittedDateTo     = ToDate(SubmittedDateTo),
+        ReceivedDateFrom    = ToDate(ReceivedDateFrom),
+        ReceivedDateTo      = ToDate(ReceivedDateTo),
     };
+
+    private static DateTime? ToDate(DateParts parts) => parts.TryGetDate(out var value) ? value : null;
 
     // Hidden form sends empty string for null-valued fields; the SP treats "" as a real
     // filter value and returns 0 rows. Convert to null so the SP applies no filter.

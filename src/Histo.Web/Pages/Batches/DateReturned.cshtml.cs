@@ -115,7 +115,7 @@ public class DateReturnedModel : HistoPageModel
             return Page();
         }
 
-        return RedirectToPage("/Batches/BatchDetails");
+        return RedirectToPage("/Submissions/ViewSubmissions");
     }
 
     /// <summary>

@@ -126,6 +126,9 @@ public class ViewSubmissionsModel : HistoPageModel
     /// </summary>
     public string? SelectedBatchStatus => Results.FirstOrDefault(r => r.ID == SelectedBatchId)?.Status;
 
+    /// <summary>Mirrors legacy <c>EnableSubmissionNotes</c> — Print submission notes is only offered when notes exist.</summary>
+    public bool HasNotes { get; private set; }
+
     // ── Action-button availability — mirrors grdviewResults_SelectedIndexChanged ──────────────
     // Submitted("1") or Rejected("3"): Edit ✓, View ✓, Copy ✓, DateReturned ✗
     // Completed("4"):                  Edit ✗, View ✓, Copy ✓, DateReturned ✓
@@ -136,16 +139,12 @@ public class ViewSubmissionsModel : HistoPageModel
     public bool CanViewSubmission  => SelectedBatchStatus is not null;
     public bool CanCopySubmission  => SelectedBatchStatus is not null;
     public bool CanDateReturned    => SelectedBatchStatus == BatchStatus.Completed;
-    // Edit test types — Submitted, Received, or InProgress only (matches CanEditTestTypes on BatchDetails).
-    public bool CanEditTestTypes   => SelectedBatchStatus == BatchStatus.Submitted
-                                   || SelectedBatchStatus == BatchStatus.Received
-                                   || SelectedBatchStatus == BatchStatus.InProgress;
 
     private async Task LoadLookupsAsync()
     {
         var usersTask = _users.GetAllUsersAsync();
-        var projectsTask = _lookups.GetLookupDataAsync(LookupProjects);
-        var contactsTask = _lookups.GetLookupDataAsync(LookupContacts);
+        var projectsTask = _lookups.GetLookupDataAsync(LookupProjects, includeInactive: true);
+        var contactsTask = _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true);
         var speciesTask = _lookups.GetSpeciesLookupAsync();
         var fixationsTask = _lookups.GetLookupDataAsync(LookupFixative);
 
@@ -162,7 +161,14 @@ public class ViewSubmissionsModel : HistoPageModel
     {
         ViewData["Title"] = "View submissions";
         ViewData["PageTitle"] = "View submissions";
-        await LoadLookupsAsync();
+        var lookupsTask = LoadLookupsAsync();
+        // Show the unfiltered list on first load, matching legacy — a search isn't mandatory
+        // before the user sees any submissions.
+        var resultsTask = _batches.SearchAsync(BuildCriteria());
+        await Task.WhenAll(lookupsTask, resultsTask);
+        Results  = await resultsTask;
+        Searched = true;
+        PopulateGridViewData();
     }
 
     public async Task<IActionResult> OnPostSearchAsync()
@@ -199,6 +205,9 @@ public class ViewSubmissionsModel : HistoPageModel
             Session.BatchID     = SelectedBatchId;
             Session.ReturnPage  = "/Submissions/ViewSubmissions";  // GAP-3: context-aware back link on BatchDetails
             Session.IsViewSubmissionMode = true;
+
+            var selectedBatch = await _batches.GetByIdAsync(SelectedBatchId);
+            HasNotes = !string.IsNullOrWhiteSpace(selectedBatch?.Comments) || !string.IsNullOrWhiteSpace(selectedBatch?.StatusComments);
         }
 
         Results  = await resultsTask;

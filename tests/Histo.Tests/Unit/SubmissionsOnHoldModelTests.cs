@@ -1,3 +1,4 @@
+using Histo.Core.Domain;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.Batches;
@@ -16,15 +17,21 @@ public class SubmissionsOnHoldModelTests
 {
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<IBatchService> _batches = new();
+    private readonly Mock<ISubmissionService> _submissions = new();
 
     public SubmissionsOnHoldModelTests()
     {
         _session.SetupProperty(s => s.BatchID);
         _session.SetupProperty(s => s.IsViewSubmissionMode, true);
+        _session.Setup(s => s.UserID).Returns(99);
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
     }
 
     private SubmissionsOnHoldModel CreateSut() =>
-        new(_session.Object, _batches.Object)
+        new(_session.Object, _batches.Object, _submissions.Object)
         {
             PageContext = new PageContext
             {
@@ -34,38 +41,32 @@ public class SubmissionsOnHoldModelTests
         };
 
     [Fact]
-    public async Task OnGetAsync_LoadsOnHoldBatches()
+    public async Task OnGetAsync_BatchId_LoadsAnimals()
     {
-        _batches.Setup(b => b.GetOnHoldAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<BatchListResult>)[new BatchListResult { ID = 1 }, new BatchListResult { ID = 2 }]);
+        _session.Object.BatchID = 42;
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 42, Status = BatchStatus.Received });
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1, SenderRef = "S1" }]);
+
         var sut = CreateSut();
+        var result = await sut.OnGetAsync();
 
-        await sut.OnGetAsync();
-
-        Assert.Equal(2, sut.TotalCount);
+        Assert.IsType<PageResult>(result);
+        Assert.Single(sut.Animals);
     }
 
     [Fact]
-    public void OnPostSelect_SetsSessionStateAndRedirectsToBatchDetails()
+    public void OnPostDone_RedirectsToEditSubmissionStatus()
     {
         var sut = CreateSut();
+        _session.Object.BatchID = 42;
 
-        var result = sut.OnPostSelect(42);
+        var result = sut.OnPostDone();
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
-        Assert.Equal("/Batches/BatchDetails", redirect.PageName);
-        Assert.Equal(42, _session.Object.BatchID);
-        Assert.False(_session.Object.IsViewSubmissionMode);
-    }
-
-    [Fact]
-    public async Task PagedEntries_DefaultSort_OrdersByIdAscending()
-    {
-        _batches.Setup(b => b.GetOnHoldAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<BatchListResult>)[new BatchListResult { ID = 3 }, new BatchListResult { ID = 1 }, new BatchListResult { ID = 2 }]);
-        var sut = CreateSut();
-        await sut.OnGetAsync();
-
-        Assert.Equal([1, 2, 3], sut.PagedEntries.Select(b => b.ID));
+        Assert.Equal("/Batches/EditSubmissionStatus", redirect.PageName);
+        Assert.Equal(42, redirect.RouteValues!["batchId"]);
     }
 }

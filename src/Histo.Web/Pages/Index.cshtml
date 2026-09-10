@@ -29,7 +29,7 @@
                 <li><a class="govuk-link" asp-page="/Batches/BatchesReceived">Assign tissues to blocks</a></li>
                 <li><a class="govuk-link" asp-page="/Batches/BatchesForEditing">Edit submission status</a></li>
                 <li><a class="govuk-link" asp-page="/Batches/BatchesForDispatch">Enter quality data</a></li>
-                <li><a class="govuk-link" asp-page="/Batches/BatchesForArchiving">Archive batches</a></li>
+                <li><a class="govuk-link" asp-page="/Batches/BatchesForArchiving">Archive submission</a></li>
             </ul>
         </div>
 
@@ -37,7 +37,6 @@
             <h2 class="govuk-heading-m">Search and reports</h2>
             <ul class="govuk-list">
                 <li><a class="govuk-link" asp-page="/Search/SearchMenu">Search submissions</a></li>
-                <li><a class="govuk-link" asp-page="/Search/SearchSample">Search samples</a></li>
                 <li><a class="govuk-link" asp-page="/Search/ViewSamples">View samples</a></li>
                 <li><a class="govuk-link" asp-page="/Search/SearchBlockRefs">Search block refs</a></li>
                 <li><a class="govuk-link" asp-page="/QC/QCNotes">QC notes</a></li>
@@ -47,10 +46,9 @@
         </div>
 
         <div class="govuk-grid-column-one-third">
-            <h2 class="govuk-heading-m">Bookings and archive</h2>
+            <h2 class="govuk-heading-m">Booking</h2>
             <ul class="govuk-list">
                 <li><a class="govuk-link" asp-page="/Bookings/BookingMenu">Booking</a></li>
-                <li><a class="govuk-link" asp-page="/Archive/ArchiveMenu">Archive</a></li>
             </ul>
         </div>
     }
@@ -64,6 +62,7 @@
                 <li><a class="govuk-link" asp-page="/Admin/UserMaintenance">User maintenance</a></li>
                 <li><a class="govuk-link" asp-page="/Admin/PickListMaintenance">Pick list maintenance</a></li>
                 <li><a class="govuk-link" asp-page="/Admin/EditAnimalRef">Edit Sender/Histology Ref</a></li>
+                <li><a class="govuk-link" asp-page="/Bookings/EditHistologyRef">Edit histology ref counter</a></li>
             </ul>
         </div>
     }

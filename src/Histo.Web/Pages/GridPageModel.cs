@@ -47,6 +47,9 @@ public abstract class GridPageModel : HistoPageModel
     protected static int CalculateTotalPages(int totalCount) =>
         totalCount == 0 ? 1 : (int)Math.Ceiling(totalCount / (double)PageSize);
 
+    /// <summary>Total page count for the current result set — set by <see cref="PopulateGridViewData"/>.</summary>
+    public int TotalPages { get; private set; } = 1;
+
     /// <summary>
     /// Populates the ViewData keys read by the _SortableHeader and _Pagination
     /// partials. Call once, before rendering the table, from OnGet/OnGetAsync.
@@ -54,6 +57,7 @@ public abstract class GridPageModel : HistoPageModel
     protected void PopulateGridViewData(int totalCount)
     {
         var totalPages = CalculateTotalPages(totalCount);
+        TotalPages = totalPages;
         // Clamp so an out-of-range PageNumber (stale link, filtered-down result set, edited
         // URL) doesn't silently render an empty page — PagedEntries reads PageNumber lazily,
         // so this also fixes what gets displayed, not just the pagination control.

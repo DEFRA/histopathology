@@ -1,3 +1,5 @@
+using Histo.Administration.Interfaces;
+using Histo.Administration.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.Submissions;
@@ -16,6 +18,7 @@ public class AddSubmissionModelTests
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<ISubmissionService> _submissions = new();
     private readonly Mock<IBatchService> _batches = new();
+    private readonly Mock<ILookupService> _lookups = new();
     private readonly Mock<ITempDataDictionary> _tempData = new();
 
     public AddSubmissionModelTests()
@@ -23,13 +26,22 @@ public class AddSubmissionModelTests
         _session.SetupProperty(s => s.BatchID);
         _session.SetupProperty(s => s.BatchSubmissionID);
         _session.Setup(s => s.UserID).Returns(99);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(9);
+        _lookups.Setup(l => l.GetLookupDataAsync(11, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new LookupItem { Code = "4", Name = "Wet Tissue" },
+                new LookupItem { Code = "5", Name = "Wax Block" }
+            ]);
 
         object? outValue = null;
         _tempData.Setup(t => t.TryGetValue(It.IsAny<string>(), out outValue)).Returns(false);
     }
 
     private AddSubmissionModel CreateSut() =>
-        new(_session.Object, _submissions.Object, _batches.Object)
+        new(_session.Object, _submissions.Object, _batches.Object, _lookups.Object)
         {
             PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
             TempData = _tempData.Object,
@@ -42,7 +54,7 @@ public class AddSubmissionModelTests
         var sut = CreateSut();
         sut.BatchId = 1;
 
-        await sut.OnGetAsync(null);
+        await sut.OnGetAsync(null, null);
 
         Assert.Equal(string.Empty, sut.SenderRef);
     }
@@ -54,7 +66,7 @@ public class AddSubmissionModelTests
         var sut = CreateSut();
         sut.BatchId = 1;
 
-        await sut.OnGetAsync("S123");
+        await sut.OnGetAsync("S123", null);
 
         Assert.Equal("S123", sut.SenderRef);
     }
@@ -67,7 +79,7 @@ public class AddSubmissionModelTests
         var sut = CreateSut();
         sut.BatchId = 1;
 
-        await sut.OnGetAsync(null);
+        await sut.OnGetAsync(null, null);
 
         Assert.Equal(7, sut.BatchSubmissionId);
     }
@@ -105,6 +117,8 @@ public class AddSubmissionModelTests
     {
         _submissions.Setup(s => s.AddAnimalAsync(7, "S123", false, 99, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(55);
+        _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), 99, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(9);
         _batches.Setup(b => b.GetSubmittedAsCodeAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync("4");
         var sut = CreateSut();
         sut.BatchId = 1;
@@ -115,7 +129,7 @@ public class AddSubmissionModelTests
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
         Assert.Equal("/Submissions/SubmissionDetails", redirect.PageName);
-        Assert.Equal(7, _session.Object.BatchSubmissionID);
+        Assert.Equal(9, _session.Object.BatchSubmissionID);
     }
 
     [Fact]

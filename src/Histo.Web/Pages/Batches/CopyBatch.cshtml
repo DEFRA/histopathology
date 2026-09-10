@@ -89,7 +89,7 @@
 
         <div class="govuk-button-group">
             <button type="submit" class="govuk-button" data-module="govuk-button">Finish</button>
-            <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Summary</a>
+            <a asp-page="/Batches/BatchDetails" asp-route-BatchId="@Model.SourceBatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Summary</a>
             <a asp-page="/Submissions/ViewSubmissions" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
         </div>
     </form>

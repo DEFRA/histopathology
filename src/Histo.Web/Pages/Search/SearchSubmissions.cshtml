@@ -9,10 +9,18 @@
     <a asp-page="/Search/SearchMenu" class="govuk-back-link">Back</a>
 }
 
-<form method="post">
-    <div class="govuk-form-group">
+<partial name="_ErrorSummary" model="Model.Errors" />
+
+<form method="post" asp-page-handler="Search">
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("SubmissionNumber") ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="SubmissionNumber">Submission number</label>
-        <input class="govuk-input govuk-input--width-10" asp-for="SubmissionNumber" />
+        @if (Model.Errors.TryGetValue("SubmissionNumber", out var subNumErr))
+        {
+            <p id="SubmissionNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @subNumErr</p>
+        }
+        <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("SubmissionNumber") ? "govuk-input--error" : "")"
+               asp-for="SubmissionNumber"
+               aria-describedby="@(Model.Errors.ContainsKey("SubmissionNumber") ? "SubmissionNumber-error" : null)" />
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="Status">Status</label>
@@ -28,23 +36,54 @@
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="ProjectContractCode">Project or contract code</label>
-        <input class="govuk-input" asp-for="ProjectContractCode" />
+        <select class="govuk-select" asp-for="ProjectContractCode">
+            <option value="">-- Any --</option>
+            @foreach (var p in Model.Projects)
+            {
+                <option value="@p.Name">@p.Name</option>
+            }
+        </select>
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="ContactName">Pathologist</label>
-        <input class="govuk-input" asp-for="ContactName" />
+        <select class="govuk-select" asp-for="ContactName">
+            <option value="">-- Any --</option>
+            @foreach (var c in Model.Contacts)
+            {
+                <option value="@c.Name">@c.Name</option>
+            }
+        </select>
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="Species">Species</label>
-        <input class="govuk-input" asp-for="Species" />
+        <select class="govuk-select" asp-for="Species">
+            <option value="">-- Any --</option>
+            @foreach (var s in Model.SpeciesList)
+            {
+                <option value="@s.Name">@s.Name</option>
+            }
+        </select>
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="Fixation">Fixation</label>
-        <input class="govuk-input" asp-for="Fixation" />
+        <select class="govuk-select" asp-for="Fixation">
+            <option value="">-- Any --</option>
+            @foreach (var f in Model.Fixations)
+            {
+                <option value="@f.Name">@f.Name</option>
+            }
+        </select>
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="SubmittedArea">Submitted area</label>
-        <input class="govuk-input" asp-for="SubmittedArea" />
+        @* Legacy ddlUserArea bound its value to the area code; tblBatch.SubmittedArea stores that code. *@
+        <select class="govuk-select" asp-for="SubmittedArea">
+            <option value="">-- Any --</option>
+            @foreach (var a in Model.UserAreas)
+            {
+                <option value="@a.ID">@a.Name</option>
+            }
+        </select>
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="SubmittedBy">Submitted by</label>
@@ -74,22 +113,18 @@
         <label class="govuk-label" for="SenderRef">Sender ref</label>
         <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" />
     </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="SubmittedDateFrom">Submitted date from</label>
-        <input class="govuk-input govuk-input--width-10" type="date" asp-for="SubmittedDateFrom" />
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="SubmittedDateTo">Submitted date to</label>
-        <input class="govuk-input govuk-input--width-10" type="date" asp-for="SubmittedDateTo" />
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="ReceivedDateFrom">Received date from</label>
-        <input class="govuk-input govuk-input--width-10" type="date" asp-for="ReceivedDateFrom" />
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="ReceivedDateTo">Received date to</label>
-        <input class="govuk-input govuk-input--width-10" type="date" asp-for="ReceivedDateTo" />
-    </div>
+    <partial name="_DateInput" model="@(new DateInputViewModel {
+        Name = "SubmittedDateFrom", Legend = "Submitted date from", Hint = "For example, 27 3 2026",
+        Value = Model.SubmittedDateFrom, Error = Model.Errors.GetValueOrDefault("SubmittedDateFrom-day") })" />
+    <partial name="_DateInput" model="@(new DateInputViewModel {
+        Name = "SubmittedDateTo", Legend = "Submitted date to", Hint = "For example, 27 3 2026",
+        Value = Model.SubmittedDateTo, Error = Model.Errors.GetValueOrDefault("SubmittedDateTo-day") })" />
+    <partial name="_DateInput" model="@(new DateInputViewModel {
+        Name = "ReceivedDateFrom", Legend = "Received date from", Hint = "For example, 27 3 2026",
+        Value = Model.ReceivedDateFrom, Error = Model.Errors.GetValueOrDefault("ReceivedDateFrom-day") })" />
+    <partial name="_DateInput" model="@(new DateInputViewModel {
+        Name = "ReceivedDateTo", Legend = "Received date to", Hint = "For example, 27 3 2026",
+        Value = Model.ReceivedDateTo, Error = Model.Errors.GetValueOrDefault("ReceivedDateTo-day") })" />
     <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
 </form>
 
@@ -117,26 +152,41 @@
             <input type="hidden" name="EnteredBy"           value="@Model.EnteredBy" />
             <input type="hidden" name="HistologyRef"        value="@Model.HistologyRef" />
             <input type="hidden" name="SenderRef"           value="@Model.SenderRef" />
-            <input type="hidden" name="SubmittedDateFrom"   value="@Model.SubmittedDateFrom?.ToString("yyyy-MM-dd")" />
-            <input type="hidden" name="SubmittedDateTo"     value="@Model.SubmittedDateTo?.ToString("yyyy-MM-dd")" />
-            <input type="hidden" name="ReceivedDateFrom"    value="@Model.ReceivedDateFrom?.ToString("yyyy-MM-dd")" />
-            <input type="hidden" name="ReceivedDateTo"      value="@Model.ReceivedDateTo?.ToString("yyyy-MM-dd")" />
+            <input type="hidden" name="SubmittedDateFrom.Day"   value="@Model.SubmittedDateFrom.Day" />
+            <input type="hidden" name="SubmittedDateFrom.Month" value="@Model.SubmittedDateFrom.Month" />
+            <input type="hidden" name="SubmittedDateFrom.Year"  value="@Model.SubmittedDateFrom.Year" />
+            <input type="hidden" name="SubmittedDateTo.Day"     value="@Model.SubmittedDateTo.Day" />
+            <input type="hidden" name="SubmittedDateTo.Month"   value="@Model.SubmittedDateTo.Month" />
+            <input type="hidden" name="SubmittedDateTo.Year"    value="@Model.SubmittedDateTo.Year" />
+            <input type="hidden" name="ReceivedDateFrom.Day"    value="@Model.ReceivedDateFrom.Day" />
+            <input type="hidden" name="ReceivedDateFrom.Month"  value="@Model.ReceivedDateFrom.Month" />
+            <input type="hidden" name="ReceivedDateFrom.Year"   value="@Model.ReceivedDateFrom.Year" />
+            <input type="hidden" name="ReceivedDateTo.Day"      value="@Model.ReceivedDateTo.Day" />
+            <input type="hidden" name="ReceivedDateTo.Month"    value="@Model.ReceivedDateTo.Month" />
+            <input type="hidden" name="ReceivedDateTo.Year"     value="@Model.ReceivedDateTo.Year" />
         </form>
 
         <table class="govuk-table">
+            <caption class="govuk-table__caption govuk-table__caption--m govuk-visually-hidden">Submissions matching the search criteria</caption>
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
                     <th scope="col" class="govuk-table__header govuk-table__header--numeric">Select</th>
-                    <th scope="col" class="govuk-table__header">Submission number</th>
-                    <th scope="col" class="govuk-table__header">Project code</th>
-                    <th scope="col" class="govuk-table__header">Pathologist</th>
-                    <th scope="col" class="govuk-table__header">Species</th>
-                    <th scope="col" class="govuk-table__header">Date</th>
-                    <th scope="col" class="govuk-table__header">Status</th>
+                    @{ ViewData["Label"] = "Submission number"; ViewData["Column"] = "ID"; }
+                    <partial name="_SortableHeaderPost" />
+                    @{ ViewData["Label"] = "Project code"; ViewData["Column"] = "ProjectDescription"; }
+                    <partial name="_SortableHeaderPost" />
+                    @{ ViewData["Label"] = "Pathologist"; ViewData["Column"] = "ContactDescription"; }
+                    <partial name="_SortableHeaderPost" />
+                    @{ ViewData["Label"] = "Species"; ViewData["Column"] = "Species"; }
+                    <partial name="_SortableHeaderPost" />
+                    @{ ViewData["Label"] = "Date"; ViewData["Column"] = "BatchDate"; }
+                    <partial name="_SortableHeaderPost" />
+                    @{ ViewData["Label"] = "Status"; ViewData["Column"] = "Status"; }
+                    <partial name="_SortableHeaderPost" />
                 </tr>
             </thead>
             <tbody class="govuk-table__body">
-                @foreach (var r in Model.Results)
+                @foreach (var r in Model.PagedResults)
                 {
                     var isSelected = r.ID == Model.SelectedBatchId;
                     <tr class="govuk-table__row" @(isSelected ? "style=background-color:#bbd4ea" : "")>
@@ -144,7 +194,7 @@
                             @* HTML5 form association: this button submits submission-action-form
                                with SelectedBatchId overridden to this row's ID. *@
                             <button form="submission-action-form"
-                                    formaction="?handler=Select"
+                                    formaction="@Model.SelectFormAction"
                                     type="submit"
                                     name="SelectedBatchId"
                                     value="@r.ID"
@@ -163,6 +213,8 @@
                 }
             </tbody>
         </table>
+
+        <partial name="_PaginationPost" />
 
         @* Export to CSV — mirrors legacy lbExportExcel behaviour (all result rows, not just selected). *@
         <button form="submission-action-form"
@@ -239,14 +291,6 @@
 
             @* Print submission — blocked on Phase 2 (report engine replacement) *@
             <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Print submission will be available in Phase 2">Print submission</button>
-
-            @* Edit test types — Submitted, Received, or InProgress only.
-               Moved from BatchDetails.cshtml (view page) to here (list-page action panel)
-               to match legacy behaviour where BatchDetails in view mode had no editing buttons. *@
-            @if (Model.CanEditTestTypes)
-            {
-                <a asp-page="/Batches/EditBatchTests" class="govuk-button govuk-button--secondary" data-module="govuk-button">Edit test types</a>
-            }
 
         </div>
     }

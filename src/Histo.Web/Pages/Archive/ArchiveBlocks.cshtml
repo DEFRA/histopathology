@@ -6,34 +6,142 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Archive/ArchiveMenu" class="govuk-back-link">Back</a>
+    <a asp-page="/Archive/ArchiveMenu" asp-route-batchId="@Model.BatchId" class="govuk-back-link">Back</a>
 }
 
-<table class="govuk-table">
-    <thead class="govuk-table__head">
-        <tr class="govuk-table__row">
-            @{ ViewData["Label"] = "Block ref"; ViewData["Column"] = "BlockRef"; }
-            <partial name="_SortableHeader" />
-            @{ ViewData["Label"] = "Customer ref"; ViewData["Column"] = "CustomerRef"; }
-            <partial name="_SortableHeader" />
-            @{ ViewData["Label"] = "Status"; ViewData["Column"] = "Status"; }
-            <partial name="_SortableHeader" />
-        </tr>
-    </thead>
-    <tbody class="govuk-table__body">
-        @foreach (var b in Model.PagedEntries)
-        {
+@if (Model.Batch is not null)
+{
+    <dl class="govuk-summary-list govuk-!-margin-bottom-6">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submission number</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.ID</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Species</dt>
+            <dd class="govuk-summary-list__value">@Model.SpeciesName</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Project/Contract Code</dt>
+            <dd class="govuk-summary-list__value">@Model.ProjectName</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Pathologist</dt>
+            <dd class="govuk-summary-list__value">@Model.PathologistName</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submission date</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.BatchDate?.ToShortDateString()</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Received date</dt>
+            <dd class="govuk-summary-list__value">@(Model.Batch.ReceivedDate?.ToShortDateString() ?? "Not recorded")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Entered by</dt>
+            <dd class="govuk-summary-list__value">@(Model.EnteredByName ?? "—")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Entered area</dt>
+            <dd class="govuk-summary-list__value">@(Model.EnteredAreaName ?? "—")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submitted by</dt>
+            <dd class="govuk-summary-list__value">@(Model.SubmittedByName ?? "—")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submitted area</dt>
+            <dd class="govuk-summary-list__value">@(Model.SubmittedAreaName ?? "—")</dd>
+        </div>
+    </dl>
+}
+
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list"><li>@Model.Error</li></ul>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="govuk-panel govuk-panel--confirmation govuk-!-margin-bottom-6">
+        <p class="govuk-panel__body">@Model.SuccessMessage</p>
+    </div>
+}
+
+<form method="post" asp-page-handler="Update">
+    <input type="hidden" name="BatchId" value="@Model.BatchId" />
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <td class="govuk-table__cell">@b.BlockRef</td>
-                <td class="govuk-table__cell">@b.CustomerRef</td>
-                <td class="govuk-table__cell">@b.Status</td>
+                <th scope="col" class="govuk-table__header govuk-visually-hidden">Select</th>
+                @{ ViewData["Label"] = "Sender ref"; ViewData["Column"] = "SenderRef"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Histology ref"; ViewData["Column"] = "HistologyRef"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Block ref"; ViewData["Column"] = "BlockRef"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Archived date"; ViewData["Column"] = "ArchivedDate"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Archive location"; ViewData["Column"] = "ArchiveLocation"; }
+                <partial name="_SortableHeader" />
             </tr>
-        }
-        @if (!Model.Blocks.Any())
-        {
-            <tr class="govuk-table__row"><td colspan="3" class="govuk-table__cell">No blocks to archive.</td></tr>
-        }
-    </tbody>
-</table>
-<partial name="_Pagination" />
-<a asp-page="/Archive/ArchiveMenu" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back</a>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var r in Model.PagedEntries)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">
+                        <div class="govuk-checkboxes govuk-checkboxes--small">
+                            <div class="govuk-checkboxes__item">
+                                <input class="govuk-checkboxes__input" type="checkbox" id="select-@r.ID" name="SelectedIds" value="@r.ID" @(Model.IsViewMode ? "disabled" : "") />
+                                <label class="govuk-label govuk-checkboxes__label" for="select-@r.ID"><span class="govuk-visually-hidden">Select block @r.BlockRef</span></label>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="govuk-table__cell">@r.SenderRef</td>
+                    <td class="govuk-table__cell">@r.HistologyRef</td>
+                    <td class="govuk-table__cell">@r.BlockRef</td>
+                    <td class="govuk-table__cell">@r.ArchivedDate?.ToShortDateString()</td>
+                    <td class="govuk-table__cell">@r.ArchiveLocationName</td>
+                </tr>
+            }
+            @if (!Model.Rows.Any())
+            {
+                <tr class="govuk-table__row"><td colspan="5" class="govuk-table__cell">No blocks to archive.</td></tr>
+            }
+        </tbody>
+    </table>
+    <partial name="_Pagination" />
+
+    @if (!Model.IsViewMode)
+    {
+        <h2 class="govuk-heading-m">Archive selected blocks</h2>
+        <p class="govuk-hint">Selecting one block lets you edit its existing archive details. Selecting two or more applies only the fields you fill in below to every selected block, leaving blanks unchanged.</p>
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="ArchiveLocationCode">Archive location</label>
+            <select class="govuk-select" id="ArchiveLocationCode" name="ArchiveLocationCode">
+                <option value="">-- Select --</option>
+                @foreach (var loc in Model.ArchiveLocations)
+                {
+                    <option value="@loc.Code" selected="@(Model.ArchiveLocationCode == loc.Code)">@loc.Name</option>
+                }
+            </select>
+        </div>
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="ArchivedDate">Archived date</label>
+            <input class="govuk-input govuk-input--width-10" id="ArchivedDate" name="ArchivedDate" type="date" value="@Model.ArchivedDate?.ToString("yyyy-MM-dd")" />
+        </div>
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="Comment">Comment</label>
+            <textarea class="govuk-textarea" id="Comment" name="Comment" rows="4">@Model.Comment</textarea>
+        </div>
+        <button type="submit" class="govuk-button" data-module="govuk-button">Update selected</button>
+    }
+    <a asp-page="/Archive/ArchiveMenu" asp-route-batchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
+</form>

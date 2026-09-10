@@ -13,9 +13,20 @@ public interface IHistologyRefService
     Task<IReadOnlyList<HistologyRef>> GetUnusedBookedRefsAsync(CancellationToken ct = default);
     Task<IReadOnlyList<HistologyRef>> GetAllUnusedRefsAsync(CancellationToken ct = default);
 
-    /// <summary>Books a histology reference to an animal. Returns <see langword="true"/> on success.</summary>
-    Task<bool> BookRefAsync(string histologyRef, int animalId, int userId, CancellationToken ct = default);
+    /// <summary>Returns the current "next histology ref" counter for every histology type.</summary>
+    Task<IReadOnlyList<HistologyRefCounter>> GetCountersAsync(CancellationToken ct = default);
 
-    /// <summary>Updates a histology reference record. Returns <see langword="true"/> on success.</summary>
-    Task<bool> UpdateRefAsync(string histologyRef, int histologyType, int userId, CancellationToken ct = default);
+    /// <summary>
+    /// Books (reserves) a contiguous range of <paramref name="numberToBook"/> histology refs for
+    /// a type by incrementing its counter, enforcing legacy's per-type upper bound.
+    /// Legacy source: BookHistologyRef.aspx.vb::UpdateHistologyRefs.
+    /// </summary>
+    Task<HistologyBookingResult> BookCounterRangeAsync(int histologyType, int numberToBook, CancellationToken ct = default);
+
+    /// <summary>
+    /// Directly overwrites a type's "next histology ref" counter to an absolute value,
+    /// looking up the current RowStamp itself. Returns <see langword="false"/> on failure
+    /// (unknown type, or a concurrency conflict).
+    /// </summary>
+    Task<bool> SetCounterAsync(int histologyType, string newNextHistologyRef, CancellationToken ct = default);
 }

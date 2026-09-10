@@ -149,8 +149,18 @@ else
         (function () {
             var IHC_CODES      = ['@HistologyCode.IhcPrp', '@HistologyCode.IhcOther'];
             var STAIN_CODE     = '@HistologyCode.SpecialStain';
+            var ARCHIVE_CODE   = '@HistologyCode.Archive';
             var antibodiesDiv  = document.getElementById('antibodies-section');
             var stainsDiv      = document.getElementById('stains-section');
+            var histologyCheckboxes = document.querySelectorAll('#histology-checkboxes input[type=checkbox]');
+
+            function enforceArchiveExclusivity(changed) {
+                if (changed.value === ARCHIVE_CODE && changed.checked) {
+                    histologyCheckboxes.forEach(function (cb) { if (cb !== changed) cb.checked = false; });
+                } else if (changed.value !== ARCHIVE_CODE && changed.checked) {
+                    histologyCheckboxes.forEach(function (cb) { if (cb.value === ARCHIVE_CODE) cb.checked = false; });
+                }
+            }
 
             function updateConditionalSections() {
                 var checked = Array.from(
@@ -173,7 +183,10 @@ else
             }
 
             document.querySelectorAll('#histology-checkboxes input[type=checkbox]').forEach(function (cb) {
-                cb.addEventListener('change', updateConditionalSections);
+                cb.addEventListener('change', function (e) {
+                    enforceArchiveExclusivity(e.target);
+                    updateConditionalSections();
+                });
             });
         }());
     </script>
