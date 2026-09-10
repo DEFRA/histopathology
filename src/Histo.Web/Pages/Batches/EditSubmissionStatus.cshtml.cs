@@ -154,9 +154,9 @@ public class EditSubmissionStatusModel : HistoPageModel
 
     /// <summary>Parses <see cref="ISessionService.ReturnPageQuery"/> into route values so a
     /// post-save redirect restores the list's sort/page state, not just its bare page name.</summary>
-    private Dictionary<string, string> ParseReturnQuery()
+    private Microsoft.AspNetCore.Routing.RouteValueDictionary ParseReturnQuery()
     {
-        var result = new Dictionary<string, string>();
+        var result = new Microsoft.AspNetCore.Routing.RouteValueDictionary();
         var query = Session.ReturnPageQuery;
         if (string.IsNullOrEmpty(query)) return result;
 
