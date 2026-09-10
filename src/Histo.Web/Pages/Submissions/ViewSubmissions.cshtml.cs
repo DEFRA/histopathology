@@ -126,6 +126,9 @@ public class ViewSubmissionsModel : HistoPageModel
     /// </summary>
     public string? SelectedBatchStatus => Results.FirstOrDefault(r => r.ID == SelectedBatchId)?.Status;
 
+    /// <summary>Mirrors legacy <c>EnableSubmissionNotes</c> — Print submission notes is only offered when notes exist.</summary>
+    public bool HasNotes { get; private set; }
+
     // ── Action-button availability — mirrors grdviewResults_SelectedIndexChanged ──────────────
     // Submitted("1") or Rejected("3"): Edit ✓, View ✓, Copy ✓, DateReturned ✗
     // Completed("4"):                  Edit ✗, View ✓, Copy ✓, DateReturned ✓
@@ -202,6 +205,9 @@ public class ViewSubmissionsModel : HistoPageModel
             Session.BatchID     = SelectedBatchId;
             Session.ReturnPage  = "/Submissions/ViewSubmissions";  // GAP-3: context-aware back link on BatchDetails
             Session.IsViewSubmissionMode = true;
+
+            var selectedBatch = await _batches.GetByIdAsync(SelectedBatchId);
+            HasNotes = !string.IsNullOrWhiteSpace(selectedBatch?.Comments) || !string.IsNullOrWhiteSpace(selectedBatch?.StatusComments);
         }
 
         Results  = await resultsTask;

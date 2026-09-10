@@ -227,8 +227,16 @@
                single entry point. Relies on Session.BatchID, set by OnPostSelectAsync above. *@
             <a asp-page="/Reports/HistologyReport" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission</a>
 
-            @* Print Submission Notes — see Print Submission comment above. *@
-            <a asp-page="/Reports/SubmissionNotes" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission notes</a>
+            @* Print Submission Notes — see Print Submission comment above. Only enabled when the
+               submission has recorded notes (Batch.Comments/StatusComments), mirroring legacy EnableSubmissionNotes. *@
+            @if (Model.HasNotes)
+            {
+                <a asp-page="/Reports/SubmissionNotes" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission notes</a>
+            }
+            else
+            {
+                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="No submission notes have been recorded">Print submission notes</button>
+            }
 
             @* Copy submission — always available once a row is selected.
                CopyBatchModel.OnGetAsync expects sourceBatchId as a query/route param. *@
