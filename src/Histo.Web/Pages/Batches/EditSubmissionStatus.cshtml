@@ -70,12 +70,12 @@
     <div class="govuk-form-group">
         <label class="govuk-label" for="Status">Submission status</label>
         <select class="govuk-select" asp-for="Status">
-            <option value="@BatchStatus.Submitted"  selected="@(Model.Status == BatchStatus.Submitted)">Not received</option>
-            <option value="@BatchStatus.Received"   selected="@(Model.Status == BatchStatus.Received)">Received</option>
-            <option value="@BatchStatus.InProgress" selected="@(Model.Status == BatchStatus.InProgress)">In progress</option>
-            <option value="@BatchStatus.OnHold"     selected="@(Model.Status == BatchStatus.OnHold)">On hold</option>
-            <option value="@BatchStatus.Completed"  selected="@(Model.Status == BatchStatus.Completed)">Completed</option>
-            <option value="@BatchStatus.Rejected"   selected="@(Model.Status == BatchStatus.Rejected)">Rejected</option>
+            <option value="@BatchStatus.Submitted">Not received</option>
+            <option value="@BatchStatus.Received">Received</option>
+            <option value="@BatchStatus.InProgress">In progress</option>
+            <option value="@BatchStatus.OnHold">On hold</option>
+            <option value="@BatchStatus.Completed">Completed</option>
+            <option value="@BatchStatus.Rejected">Rejected</option>
         </select>
         <div class="govuk-hint govuk-!-margin-top-2">
             To mark as Received, use <a asp-page="/Batches/BatchesNotReceived" class="govuk-link">Receive submissions</a>.
