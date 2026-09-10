@@ -106,24 +106,23 @@ public class AddSubmissionModel : HistoPageModel
         var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId.Value);
         var isWetTissue = await IsWetTissueCodeAsync(submittedAsCode);
 
+        // Every new animal needs its own dedicated BatchSubmission row with AnimalID set — the
+        // "GetBatchAnimal" SP (used by both SubmissionDetails and SubmissionDetailsBlock to find the
+        // sample) joins on BatchSubmission.AnimalID; it never sees the shared "Default" submission
+        // resolved above (that one only exists to satisfy AddAnimalAsync's batchSubmissionId parameter
+        // — the AddAnimal SP itself has no BatchSubmissionID column to receive it). Without this row
+        // the newly added animal is unreachable from either page, surfacing as "Sample not found"
+        // immediately after "Add sample" — previously only fixed for the Wet Tissue branch, but the
+        // link requirement is identical for block-type submissions too.
+        var siblingSubmissions = await _submissions.GetSubmissionsByBatchAsync(batchId.Value);
+        var nextOrder = siblingSubmissions.Count > 0 ? siblingSubmissions.Max(s => s.Order) + 1 : 1;
+        var ownSubmissionId = await _submissions.AddSubmissionAsync(
+            new BatchSubmission { BatchID = batchId.Value, AnimalID = newAnimalId, SubmissionName = "Default", Order = nextOrder },
+            Session.UserID);
+        if (ownSubmissionId > 0) Session.BatchSubmissionID = ownSubmissionId;
+
         if (isWetTissue)
         {
-            // Wet Tissue tissues are owned by BatchSubmissionID (not BlockID — see SubmissionDetails),
-            // so each animal needs its own dedicated submission row linked via AnimalID. Legacy source:
-            // clsBatchSubmission.vb::NewRecord(dtBatchSubmission, id, batchId, animalId) overload — the
-            // SP genuinely accepts a real AnimalID once one is known. The submission reused above only
-            // exists to satisfy AddAnimalAsync's batchSubmissionId parameter (never actually sent to the
-            // SQL insert), so reusing the SAME shared submission for every animal left each new animal's
-            // real owning submission unresolvable (SubmissionDetailsModel.LoadAnimalAsync matches on
-            // AnimalID, which stayed the 0 placeholder), silently breaking Tissue Details add/edit/
-            // delete/display for every sample after the first.
-            var siblingSubmissions = await _submissions.GetSubmissionsByBatchAsync(batchId.Value);
-            var nextOrder = siblingSubmissions.Count > 0 ? siblingSubmissions.Max(s => s.Order) + 1 : 1;
-            var ownSubmissionId = await _submissions.AddSubmissionAsync(
-                new BatchSubmission { BatchID = batchId.Value, AnimalID = newAnimalId, SubmissionName = "Default", Order = nextOrder },
-                Session.UserID);
-            if (ownSubmissionId > 0) Session.BatchSubmissionID = ownSubmissionId;
-
             // "Copy sample" — duplicate the source sample's tissues onto the new one (Wet Tissue only;
             // block-owned tissues on other submission types are copied via the separate Copy Blocks flow).
             if (SourceAnimalId is > 0 && ownSubmissionId > 0)
