@@ -10,10 +10,11 @@ var builder = new HostBuilder();
 builder
     .ConfigureAppConfiguration((context, config) =>
     {
+        // Single appsettings.json, same as Histo.Web: real per-environment values come from
+        // Azure DevOps-injected App Service Application Settings (env vars), not per-env json files.
         config
             .SetBasePath(context.HostingEnvironment.ContentRootPath)
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-            .AddJsonFile($"appsettings.{context.HostingEnvironment.EnvironmentName}.json", optional: true)
             .AddEnvironmentVariables()
             .AddUserSecrets<Program>(optional: true);
     })
