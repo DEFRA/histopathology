@@ -39,7 +39,7 @@
         @* Contextual lookup, pre-filled with the sender ref entered above — a plain submit
            button with formmethod/formaction so it doesn't need its own nested <form>. *@
         <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button"
-                formmethod="get" formaction="/Search/ViewImportedData" formnovalidate
+                formmethod="get" formaction="@Url.Page("/Search/ViewImportedData")" formnovalidate
                 onclick="document.getElementById('icc-filter').value = document.getElementById('SenderRef').value;">
             Check historical data for this sender ref
         </button>
