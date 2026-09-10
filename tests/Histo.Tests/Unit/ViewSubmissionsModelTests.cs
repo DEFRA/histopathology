@@ -70,4 +70,3 @@ public class ViewSubmissionsModelTests
         Assert.Null(modelType.GetProperty("IsAreaRestricted"));
     }
 }
-}
