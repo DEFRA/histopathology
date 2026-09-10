@@ -292,14 +292,6 @@
             @* Print submission — blocked on Phase 2 (report engine replacement) *@
             <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Print submission will be available in Phase 2">Print submission</button>
 
-            @* Edit test types — Submitted, Received, or InProgress only.
-               Moved from BatchDetails.cshtml (view page) to here (list-page action panel)
-               to match legacy behaviour where BatchDetails in view mode had no editing buttons. *@
-            @if (Model.CanEditTestTypes)
-            {
-                <a asp-page="/Batches/EditBatchTests" class="govuk-button govuk-button--secondary" data-module="govuk-button">Edit test types</a>
-            }
-
         </div>
     }
 }

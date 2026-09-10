@@ -19,7 +19,7 @@
         <label class="govuk-label" for="Status">Status</label>
         <select class="govuk-select" asp-for="Status">
             <option value="">-- Any --</option>
-            <option value="@BatchStatus.Submitted">Not started</option>
+            <option value="@BatchStatus.Submitted">Not received</option>
             <option value="@BatchStatus.Received">Received</option>
             <option value="@BatchStatus.Rejected">Rejected</option>
             <option value="@BatchStatus.Completed">Completed</option>
@@ -223,11 +223,20 @@
 
         <div class="govuk-button-group">
 
-            @* Print Submission — blocked on Phase 2 (Crystal Reports SubmissionForm.aspx) *@
-            <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Print submission will be available in Phase 2">Print submission</button>
+            @* Print Submission — now that BatchDetails no longer duplicates these, this is the
+               single entry point. Relies on Session.BatchID, set by OnPostSelectAsync above. *@
+            <a asp-page="/Reports/HistologyReport" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission</a>
 
-            @* Print Submission Notes — blocked on Phase 2 (Crystal Reports SubmissionNotes.aspx) *@
-            <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Print submission notes will be available in Phase 2">Print submission notes</button>
+            @* Print Submission Notes — see Print Submission comment above. Only enabled when the
+               submission has recorded notes (Batch.Comments/StatusComments), mirroring legacy EnableSubmissionNotes. *@
+            @if (Model.HasNotes)
+            {
+                <a asp-page="/Reports/SubmissionNotes" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission notes</a>
+            }
+            else
+            {
+                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="No submission notes have been recorded">Print submission notes</button>
+            }
 
             @* Copy submission — always available once a row is selected.
                CopyBatchModel.OnGetAsync expects sourceBatchId as a query/route param. *@
@@ -243,21 +252,13 @@
             }
             else
             {
-                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Editing is only available for submissions in Not started or Rejected status">Edit submission</button>
+                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Editing is only available for submissions in Not received or Rejected status">Edit submission</button>
             }
 
             @* View submission — always available once a row is selected *@
             @if (Model.CanViewSubmission)
             {
-                <a asp-page="/Batches/BatchDetails" class="govuk-button" data-module="govuk-button">View submission</a>
-            }
-
-            @* Edit test types — Submitted, Received, or InProgress only.
-               Moved from BatchDetails.cshtml (view page) to here (list-page action panel)
-               to match legacy behaviour where BatchDetails in view mode had no editing buttons. *@
-            @if (Model.CanEditTestTypes)
-            {
-                <a asp-page="/Batches/EditBatchTests" class="govuk-button govuk-button--secondary" data-module="govuk-button">Edit test types</a>
+                <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">View submission</a>
             }
 
             @* GAP-2: Date Returned — Completed status only.

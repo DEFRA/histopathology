@@ -126,6 +126,9 @@ public class ViewSubmissionsModel : HistoPageModel
     /// </summary>
     public string? SelectedBatchStatus => Results.FirstOrDefault(r => r.ID == SelectedBatchId)?.Status;
 
+    /// <summary>Mirrors legacy <c>EnableSubmissionNotes</c> — Print submission notes is only offered when notes exist.</summary>
+    public bool HasNotes { get; private set; }
+
     // ── Action-button availability — mirrors grdviewResults_SelectedIndexChanged ──────────────
     // Submitted("1") or Rejected("3"): Edit ✓, View ✓, Copy ✓, DateReturned ✗
     // Completed("4"):                  Edit ✗, View ✓, Copy ✓, DateReturned ✓
@@ -136,15 +139,12 @@ public class ViewSubmissionsModel : HistoPageModel
     public bool CanViewSubmission  => SelectedBatchStatus is not null;
     public bool CanCopySubmission  => SelectedBatchStatus is not null;
     public bool CanDateReturned    => SelectedBatchStatus == BatchStatus.Completed;
-    // Edit test types — Submitted (Not started) only. Received and In Progress submissions
-    // have already been actioned by the lab, so test types must no longer be user-editable there.
-    public bool CanEditTestTypes   => SelectedBatchStatus == BatchStatus.Submitted;
 
     private async Task LoadLookupsAsync()
     {
         var usersTask = _users.GetAllUsersAsync();
-        var projectsTask = _lookups.GetLookupDataAsync(LookupProjects);
-        var contactsTask = _lookups.GetLookupDataAsync(LookupContacts);
+        var projectsTask = _lookups.GetLookupDataAsync(LookupProjects, includeInactive: true);
+        var contactsTask = _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true);
         var speciesTask = _lookups.GetSpeciesLookupAsync();
         var fixationsTask = _lookups.GetLookupDataAsync(LookupFixative);
 
@@ -205,6 +205,9 @@ public class ViewSubmissionsModel : HistoPageModel
             Session.BatchID     = SelectedBatchId;
             Session.ReturnPage  = "/Submissions/ViewSubmissions";  // GAP-3: context-aware back link on BatchDetails
             Session.IsViewSubmissionMode = true;
+
+            var selectedBatch = await _batches.GetByIdAsync(SelectedBatchId);
+            HasNotes = !string.IsNullOrWhiteSpace(selectedBatch?.Comments) || !string.IsNullOrWhiteSpace(selectedBatch?.StatusComments);
         }
 
         Results  = await resultsTask;

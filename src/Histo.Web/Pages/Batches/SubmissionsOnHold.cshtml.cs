@@ -88,7 +88,7 @@ public class SubmissionsOnHoldModel : HistoPageModel
     public IActionResult OnPostDone()
     {
         BatchId ??= Session.BatchID;
-        return RedirectToPage("/Batches/EditBatch", new { batchId = BatchId });
+        return RedirectToPage("/Batches/EditSubmissionStatus", new { batchId = BatchId });
     }
 
     private async Task<IReadOnlyList<Animal>> LoadAnimalsAsync(int batchId)

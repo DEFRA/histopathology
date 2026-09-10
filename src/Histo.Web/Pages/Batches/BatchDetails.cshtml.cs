@@ -17,7 +17,8 @@ namespace Histo.Web.Pages.Batches;
 /// into distinct GDS pages:
 /// <list type="bullet">
 /// <item><description><c>Cassetted.cshtml</c> + <c>AddSubmission.cshtml</c> — new submission</description></item>
-/// <item><description><c>EditBatch.cshtml</c> — edit submission status / comments</description></item>
+/// <item><description><c>EditBatch.cshtml</c> — edit submission header fields and test types</description></item>
+/// <item><description><c>EditSubmissionStatus.cshtml</c> — edit submission status and Samples on hold</description></item>
 /// <item><description><c>BatchDetails.cshtml</c> — read-only view (this page)</description></item>
 /// <item><description><c>DateReturned.cshtml</c> — set customer received date on completed batches</description></item>
 /// </list>
@@ -198,13 +199,6 @@ public class BatchDetailsModel : HistoPageModel
     public bool IsViewMode => Session.IsViewSubmissionMode;
 
     /// <summary>
-    /// Gates the print buttons — a submission has nothing meaningful to print until it has left
-    /// the in-progress Create Submission journey (per legacy, printing happens via the "Finish"
-    /// step, not mid-build) or is being looked at via the View Submission journey.
-    /// </summary>
-    public bool CanPrint => IsViewMode || !CanModifySamples;
-
-    /// <summary>
     /// Page path for the back link, populated from <see cref="ISessionService.ReturnPage"/>.
     /// Falls back to <c>/Index</c> if the session value is absent (e.g. direct URL access).
     /// </summary>
@@ -355,8 +349,10 @@ public class BatchDetailsModel : HistoPageModel
             var userAreasTask      = _lookups.GetUserAreasAsync();
             var submittedAsTask    = _batches.GetSubmittedAsCodeAsync(batchId);
             var submittedAsLookup  = _lookups.GetLookupDataAsync(11); // LOOKUP_SUBMITTEDAS = 11
-            var projectsLookup     = _lookups.GetLookupDataAsync(LookupProjects);
-            var contactsLookup     = _lookups.GetLookupDataAsync(LookupContacts);
+            // includeInactive: true — an existing submission's saved Project/Pathologist may since
+            // have been deactivated; without this the raw code is shown instead of its name.
+            var projectsLookup     = _lookups.GetLookupDataAsync(LookupProjects, includeInactive: true);
+            var contactsLookup     = _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true);
             var fixationsLookup    = _lookups.GetLookupDataAsync(LookupFixation);
             var animalsTask        = _submissions.GetAnimalsByBatchAsync(batchId);
 

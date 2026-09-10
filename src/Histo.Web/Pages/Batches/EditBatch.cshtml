@@ -8,7 +8,7 @@
 }
 
 @section BeforeHeading {
-    <a href="@Url.Page(Model.ReturnPage)" class="govuk-back-link">Back</a>
+    <a href="@Model.ReturnUrl" class="govuk-back-link">Back</a>
 }
 
 @if (!string.IsNullOrEmpty(Model.SaveError))
@@ -26,8 +26,6 @@
 }
 
 <form method="post" asp-page="/Batches/EditBatch">
-    <input type="hidden" asp-for="OriginalStatus" />
-
     <h2 class="govuk-heading-m">Submission details</h2>
 
     @* Read-only — fixed at submission creation, never editable here (legacy Batch.ascx / Edit Submission). *@
@@ -191,28 +189,66 @@
         <input type="hidden" asp-for="OtherSubmittedArea" />
     </div>
 
-    <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m" />
-    <h2 class="govuk-heading-m">Submission status</h2>
-
-    @* Status *@
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="Status">Submission status</label>
-        <select class="govuk-select" asp-for="Status">
-            <option value="@BatchStatus.Submitted"  selected="@(Model.Status == BatchStatus.Submitted)">Not started</option>
-            <option value="@BatchStatus.Received"   selected="@(Model.Status == BatchStatus.Received)">Received</option>
-            <option value="@BatchStatus.InProgress" selected="@(Model.Status == BatchStatus.InProgress)">In progress</option>
-            <option value="@BatchStatus.OnHold"     selected="@(Model.Status == BatchStatus.OnHold)">On hold</option>
-            <option value="@BatchStatus.Completed"  selected="@(Model.Status == BatchStatus.Completed)">Completed</option>
-            <option value="@BatchStatus.Rejected"   selected="@(Model.Status == BatchStatus.Rejected)">Rejected</option>
-        </select>
-        <div class="govuk-hint govuk-!-margin-top-2">
-            To mark as Received, use <a asp-page="/Batches/BatchesNotReceived" class="govuk-link">Receive submissions</a>.
-        </div>
+    @* Histology, antibodies and special stains — merged from the former EditBatchTests page for a
+       consistent editing experience with Create Submission. *@
+    <div class="govuk-form-group @(Model.SaveError != null && Model.SelectedHistologyCodes.Count == 0 ? "govuk-form-group--error" : "")">
+        <fieldset class="govuk-fieldset">
+            <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Histology</legend>
+            <div class="govuk-hint">Select at least one histology type.</div>
+            <div class="govuk-checkboxes" data-module="govuk-checkboxes" id="edit-histology-checkboxes">
+                @foreach (var item in Model.HistologyOptions)
+                {
+                    var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
+                    var checkboxId = $"edit-histology-{code}";
+                    <div class="govuk-checkboxes__item">
+                        <input class="govuk-checkboxes__input" id="@checkboxId" name="SelectedHistologyCodes"
+                               type="checkbox" value="@code" data-histology-code="@code"
+                               @(Model.SelectedHistologyCodes.Contains(code) ? "checked" : "") />
+                        <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+                    </div>
+                }
+            </div>
+        </fieldset>
     </div>
 
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="StatusComments">Reason / comments for status change</label>
-        <textarea class="govuk-textarea" asp-for="StatusComments" rows="3"></textarea>
+    <div class="govuk-form-group" id="edit-antibodies-section" style="@(Model.ShowAntibodies ? "" : "display:none")">
+        <fieldset class="govuk-fieldset">
+            <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Antibodies</legend>
+            <div class="govuk-hint">Required when IHC is selected above.</div>
+            <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                @foreach (var item in Model.AntibodyOptions)
+                {
+                    var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
+                    var checkboxId = $"edit-antibody-{code}";
+                    <div class="govuk-checkboxes__item">
+                        <input class="govuk-checkboxes__input" id="@checkboxId" name="SelectedAntibodyCodes"
+                               type="checkbox" value="@code"
+                               @(Model.SelectedAntibodyCodes.Contains(code) ? "checked" : "") />
+                        <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+                    </div>
+                }
+            </div>
+        </fieldset>
+    </div>
+
+    <div class="govuk-form-group" id="edit-stains-section" style="@(Model.ShowStains ? "" : "display:none")">
+        <fieldset class="govuk-fieldset">
+            <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Special stains</legend>
+            <div class="govuk-hint">Required when Special Stain is selected above.</div>
+            <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                @foreach (var item in Model.StainOptions)
+                {
+                    var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
+                    var checkboxId = $"edit-stain-{code}";
+                    <div class="govuk-checkboxes__item">
+                        <input class="govuk-checkboxes__input" id="@checkboxId" name="SelectedStainCodes"
+                               type="checkbox" value="@code"
+                               @(Model.SelectedStainCodes.Contains(code) ? "checked" : "") />
+                        <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+                    </div>
+                }
+            </div>
+        </fieldset>
     </div>
 
     <div class="govuk-form-group">
@@ -222,15 +258,40 @@
 
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
-        <a href="@Url.Page(Model.ReturnPage)" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        <a href="@Model.ReturnUrl" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        @* "Samples" — this page only edits submission header fields; sample/animal/block details
+           (Add sample, Edit sample, Copy sample, Delete sample) are on SampleSummary, matching
+           the same "Samples" entry point already used from BatchDetails.cshtml. *@
+        <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples</a>
     </div>
 </form>
 
-@* "Samples" — this page only edits submission header fields; sample/animal/block details
-   (Add sample, Edit sample, Copy sample, Delete sample) are on SampleSummary, matching
-   the same "Samples" entry point already used from BatchDetails.cshtml. *@
-<div class="govuk-button-group">
-    <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples</a>
-    @* Legacy EditBatch.aspx btnSamplesOnHold — the only entry point to the on-hold list. *@
-    <a asp-page="/Batches/SubmissionsOnHold" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples on hold</a>
-</div>
+@* Show/hide antibody and stain sections when histology checkboxes change; Archive is mutually
+   exclusive with all other histology types. *@
+<script>
+(function () {
+    var archiveCode = '@Histo.Submissions.Models.HistologyCode.Archive';
+    var ihcCodes     = ['@Histo.Submissions.Models.HistologyCode.IhcPrp', '@Histo.Submissions.Models.HistologyCode.IhcOther'];
+    var stainCode    = '@Histo.Submissions.Models.HistologyCode.SpecialStain';
+    var checkboxes   = document.querySelectorAll('#edit-histology-checkboxes input[type=checkbox]');
+
+    function enforceArchiveExclusivity(changed) {
+        if (changed.value === archiveCode && changed.checked) {
+            checkboxes.forEach(function (cb) { if (cb !== changed) cb.checked = false; });
+        } else if (changed.value !== archiveCode && changed.checked) {
+            checkboxes.forEach(function (cb) { if (cb.value === archiveCode) cb.checked = false; });
+        }
+    }
+
+    function syncTestSections() {
+        var codes = Array.from(checkboxes).filter(function (cb) { return cb.checked; }).map(function (cb) { return cb.value; });
+        document.getElementById('edit-antibodies-section').style.display = codes.some(function (c) { return ihcCodes.indexOf(c) >= 0; }) ? '' : 'none';
+        document.getElementById('edit-stains-section').style.display     = codes.indexOf(stainCode) >= 0 ? '' : 'none';
+    }
+
+    document.getElementById('edit-histology-checkboxes').addEventListener('change', function (e) {
+        enforceArchiveExclusivity(e.target);
+        syncTestSections();
+    });
+})();
+</script>

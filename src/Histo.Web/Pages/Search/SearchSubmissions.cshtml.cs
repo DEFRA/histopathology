@@ -149,10 +149,6 @@ public class SearchSubmissionsModel : HistoPageModel
                                    || SelectedBatchStatus == BatchStatus.InProgress;
     public bool CanViewArchiveData => CanViewQualityData;
     public bool CanViewReceipt     => SelectedBatchStatus is not null && SelectedBatchStatus != BatchStatus.Submitted;
-    // Edit test types — Submitted, Received, or InProgress only (matches CanEditTestTypes on BatchDetails).
-    public bool CanEditTestTypes   => SelectedBatchStatus == BatchStatus.Submitted
-                                   || SelectedBatchStatus == BatchStatus.Received
-                                   || SelectedBatchStatus == BatchStatus.InProgress;
 
     private async Task LoadLookupsAsync()
     {

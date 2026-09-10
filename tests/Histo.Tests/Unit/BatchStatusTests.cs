@@ -75,4 +75,16 @@ public class BatchStatusTests
                 $"BatchStatus value '{value}' is not a numeric string — stored procedures expect numeric status codes.");
         }
     }
+
+    // Confirmed live against the real luStatus lookup table (Code=1 -> Description="Not Received").
+    [Fact]
+    public void DisplayName_Submitted_ReturnsNotReceived()
+        => Assert.Equal("Not received", BatchStatus.DisplayName(BatchStatus.Submitted));
+
+    [Fact]
+    public void NormalizeDisplayText_NotReceivedOrNotStarted_BothMapToNotReceived()
+    {
+        Assert.Equal("Not received", BatchStatus.NormalizeDisplayText("Not Received"));
+        Assert.Equal("Not received", BatchStatus.NormalizeDisplayText("Not started"));
+    }
 }

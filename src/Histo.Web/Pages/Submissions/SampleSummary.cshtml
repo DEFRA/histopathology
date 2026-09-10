@@ -105,13 +105,12 @@
                     }
                 </td>
                 <td class="govuk-table__cell">
-                    @* "Edit sample" — visible in both edit and view mode (legacy EnableDisableButtons
-                       kept Edit enabled in ViewSubmission mode); routes to SubmissionDetails (Wet Tissue)
-                       or SubmissionDetailsBlock (block types). *@
+                    @* Routes to SubmissionDetails (Wet Tissue) or SubmissionDetailsBlock (block types),
+                       both of which already render read-only when IsViewMode — labelled to match. *@
                     <form method="post" asp-page-handler="Select" class="govuk-!-display-inline">
                         <input type="hidden" name="animalId" value="@a.ID" />
                         <input type="hidden" asp-for="BatchId" />
-                        <button type="submit" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button">Edit sample</button>
+                        <button type="submit" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button">@(Model.IsViewMode ? "View sample" : "Edit sample")</button>
                     </form>
                     @if (Model.CanModifySamples && !Model.IsViewMode)
                     {
