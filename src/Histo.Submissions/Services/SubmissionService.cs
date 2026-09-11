@@ -253,8 +253,8 @@ public sealed class SubmissionService : ISubmissionService
     // Search (read-only)
     // -----------------------------------------------------------------------
 
-    /// <summary>Returns submissions whose PM date falls within the given range.</summary>
-    public async Task<IReadOnlyList<PmDateSearchResult>> GetByPmDateRangeAsync(DateTime fromDate, DateTime toDate, CancellationToken ct = default)
+    /// <summary>Returns submissions whose PM date falls within the given range. Either bound may be null — GetSearchPMDates treats a null bound as unrestricted.</summary>
+    public async Task<IReadOnlyList<PmDateSearchResult>> GetByPmDateRangeAsync(DateTime? fromDate, DateTime? toDate, CancellationToken ct = default)
     {
         try { return await _repo.GetByPmDateRangeAsync(fromDate, toDate, ct); }
         catch (Exception ex) { _logger.LogError("Failed to search submissions by PM date.", ex); return []; }

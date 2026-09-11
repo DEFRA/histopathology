@@ -56,32 +56,34 @@
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="Species">Species</label>
+        @* GetSearchBatchDetails filters Batch.Species, which stores tlkpSpecies.SpeciesID (an int FK), not the species name. *@
         <select class="govuk-select" asp-for="Species">
             <option value="">-- Any --</option>
             @foreach (var s in Model.SpeciesList)
             {
-                <option value="@s.Name">@s.Name</option>
+                <option value="@s.ID">@s.Name</option>
             }
         </select>
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="Fixation">Fixation</label>
+        @* GetSearchBatchDetails joins luFixatives ON luFixatives.Code = Batch.Fixation — filter on Code, not Description. *@
         <select class="govuk-select" asp-for="Fixation">
             <option value="">-- Any --</option>
             @foreach (var f in Model.Fixations)
             {
-                <option value="@f.Name">@f.Name</option>
+                <option value="@f.Code">@f.Name</option>
             }
         </select>
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="SubmittedArea">Submitted area</label>
-        @* Legacy ddlUserArea bound its value to the area code; tblBatch.SubmittedArea stores that code. *@
+        @* GetSearchBatchDetails joins luUserArea ON luUserArea.Code = Batch.OtherSubmittedArea — filter on Code, not the surrogate ID. *@
         <select class="govuk-select" asp-for="SubmittedArea">
             <option value="">-- Any --</option>
             @foreach (var a in Model.UserAreas)
             {
-                <option value="@a.ID">@a.Name</option>
+                <option value="@a.Code">@a.Name</option>
             }
         </select>
     </div>
@@ -208,7 +210,7 @@
                         <td class="govuk-table__cell">@r.ContactDescription</td>
                         <td class="govuk-table__cell">@r.Species</td>
                         <td class="govuk-table__cell">@r.BatchDate?.ToShortDateString()</td>
-                        <td class="govuk-table__cell">@r.Status</td>
+                        <td class="govuk-table__cell">@Histo.Core.Domain.BatchStatus.DisplayName(r.Status ?? string.Empty)</td>
                     </tr>
                 }
             </tbody>
@@ -222,7 +224,7 @@
                 type="submit"
                 class="govuk-button govuk-button--secondary"
                 data-module="govuk-button">
-            Export to CSV
+            Export to excel
         </button>
     }
     else
@@ -239,16 +241,9 @@
 
         <div class="govuk-button-group">
 
-            @* View submission — available for all statuses except Submitted *@
-            @if (Model.CanViewSubmission)
-            {
-                <a asp-page="/Batches/BatchDetails" class="govuk-button" data-module="govuk-button">View submission</a>
-            }
-            else
-            {
-                <button class="govuk-button" disabled aria-disabled="true" title="Not available for submissions in Not started status">View submission</button>
-            }
-
+              @* Print submission *@
+            <button class="govuk-button govuk-button--secondary" title="Print submission will be available in Phase 2">Print submission</button>
+            
             @* Edit submission — available for Received / On Hold / In Progress only *@
             @if (Model.CanEditSubmission)
             {
@@ -259,14 +254,14 @@
                 <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Editing is only available for submissions in Received, On Hold or In Progress status">Edit submission</button>
             }
 
-            @* View receipt — available for all statuses except Submitted *@
-            @if (Model.CanViewReceipt)
+            @* View submission — available for all statuses except Submitted *@
+            @if (Model.CanViewSubmission)
             {
-                <a asp-page="/Batches/ReceiveBatch" class="govuk-button govuk-button--secondary" data-module="govuk-button">View receipt</a>
+                <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">View submission</a>
             }
             else
             {
-                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Not available for submissions in Not started status">View receipt</button>
+                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Not available for submissions in Not started status">View submission</button>
             }
 
             @* View quality data — Completed / Received / On Hold / In Progress *@
@@ -289,9 +284,16 @@
                 <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Archive is not available for this submission status">View archive</button>
             }
 
-            @* Print submission — blocked on Phase 2 (report engine replacement) *@
-            <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Print submission will be available in Phase 2">Print submission</button>
-
+            @* View receipt — available for all statuses except Submitted *@
+            @if (Model.CanViewReceipt)
+            {
+                <a asp-page="/Batches/ReceiveBatch" class="govuk-button govuk-button--secondary" data-module="govuk-button">View receipt</a>
+            }
+            else
+            {
+                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Not available for submissions in Not started status">View receipt</button>
+            }
+          
         </div>
     }
 }

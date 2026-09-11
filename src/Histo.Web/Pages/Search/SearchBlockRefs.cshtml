@@ -64,7 +64,7 @@
     <div class="govuk-button-group">
         <a asp-page="/Search/SearchBlockRefs" asp-page-handler="ExportCsv"
            asp-route-SenderRef="@Model.SenderRef" asp-route-HistologyRef="@Model.HistologyRef"
-           class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to CSV</a>
+               class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</a>
         @* Legacy lbViewImportedData opened ViewImportedData.aspx?SearchString=<ref> in a popup.
            The migrated page names that parameter Filter and needs a table chosen there. *@
         <a asp-page="/Search/ViewImportedData"

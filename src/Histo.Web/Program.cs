@@ -16,6 +16,7 @@ using ITfoxtec.Identity.Saml2.MvcCore.Configuration;
 using ITfoxtec.Identity.Saml2.Schemas.Metadata;
 using Histo.Web.Telemetry;
 using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Diagnostics;
@@ -223,8 +224,18 @@ try
     // top-level — the same key Azure's own AI extension and the SDK's auto-detection use).
     var aiConnString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
     if (!string.IsNullOrWhiteSpace(aiConnString) && !aiConnString.StartsWith("__", StringComparison.Ordinal))
+    {
         builder.Services.AddApplicationInsightsTelemetry(o =>
             o.ConnectionString = aiConnString);
+    }
+    else
+    {
+        // AddApplicationInsightsTelemetry is what registers TelemetryClient — skipped above when
+        // no connection string is configured (e.g. local dev). TelemetryHelper still requires one,
+        // so register a client backed by an unconfigured TelemetryConfiguration: it accepts every
+        // Track*/Flush call but has nowhere to send data, so it's a safe local no-op.
+        builder.Services.AddSingleton(new TelemetryClient(new TelemetryConfiguration()));
+    }
 
     var app = builder.Build();
 

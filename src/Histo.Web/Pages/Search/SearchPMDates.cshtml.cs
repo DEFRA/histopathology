@@ -102,32 +102,29 @@ public class SearchPMDatesModel : HistoPageModel
             }));
     }
 
-    /// <summary>Reproduces legacy <c>IsDateRangeValid</c>: both dates required, real, and from ≤ to.</summary>
-    private bool TryBuildRange(out DateTime from, out DateTime to)
+    /// <summary>Both dates are optional — an unselected date is treated as an open bound, matching
+    /// GetSearchPMDates' own NULL-safe defaults. Only real-date and from ≤ to are enforced.</summary>
+    private bool TryBuildRange(out DateTime? from, out DateTime? to)
     {
-        from = default;
-        to = default;
+        from = null;
+        to = null;
 
         if (!StartDate.TryGetDate(out var fromValue))
             Errors["StartDate-day"] = "PM from date must be a real date.";
-        else if (fromValue is null)
-            Errors["StartDate-day"] = "Enter a PM from date.";
 
         if (!EndDate.TryGetDate(out var toValue))
             Errors["EndDate-day"] = "PM to date must be a real date.";
-        else if (toValue is null)
-            Errors["EndDate-day"] = "Enter a PM to date.";
 
         if (Errors.Count > 0) return false;
 
-        if (fromValue > toValue)
+        if (fromValue.HasValue && toValue.HasValue && fromValue > toValue)
         {
             Errors["StartDate-day"] = "PM from date must not be later than PM to date.";
             return false;
         }
 
-        from = fromValue!.Value;
-        to = toValue!.Value;
+        from = fromValue;
+        to = toValue;
         return true;
     }
 }

@@ -49,10 +49,13 @@ public sealed class HistologyRepository : IHistologyRepository
     /// <inheritdoc/>
     public async Task<IReadOnlyList<HistologyRef>> GetAllUnusedRefsAsync(CancellationToken ct = default)
     {
+        // GetUnusedHistologyRefs only returns a single unaliased "HistologyRef" column (doesn't
+        // match the HistologyRef.Ref property name) and never returns SenderRef, even though the
+        // backing UnUsedHistologyRefs table has it. Queried directly here instead so both columns
+        // populate correctly for the search grid.
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<HistologyRef>(
-            "GetUnusedHistologyRefs",
-            commandType: System.Data.CommandType.StoredProcedure);
+            "SELECT HistologyRef AS Ref, SenderRef FROM UnUsedHistologyRefs WHERE Used = 0 ORDER BY HistologyRef");
         return rows.ToList();
     }
 

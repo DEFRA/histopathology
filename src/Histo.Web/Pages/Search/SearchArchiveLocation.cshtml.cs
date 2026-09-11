@@ -1,3 +1,5 @@
+using Histo.Administration.Interfaces;
+using Histo.Administration.Models;
 using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
@@ -15,17 +17,24 @@ namespace Histo.Web.Pages.Search;
 /// This page shows the same three search modes and result sets as flat
 /// tables — see <see cref="TissueArchiveInfo"/>, <see cref="BlockArchiveInfo"/>
 /// and <see cref="SlideArchiveInfo"/> for details of what was not reproduced.
+///
+/// Legacy's result grids have no sorting or paging — matched here by not
+/// inheriting <c>GridPageModel</c>.
 /// </summary>
-public class SearchArchiveLocationModel : GridPageModel
+public class SearchArchiveLocationModel : HistoPageModel
 {
+    private const int LookupArchiveLocation = 16; // Code-keyed; see LookupItem.Code doc comment.
+
     private readonly ISubmissionService _submissions;
     private readonly IBlockService _blocks;
+    private readonly ILookupService _lookups;
 
-    public SearchArchiveLocationModel(ISessionService session, ISubmissionService submissions, IBlockService blocks)
+    public SearchArchiveLocationModel(ISessionService session, ISubmissionService submissions, IBlockService blocks, ILookupService lookups)
         : base(session)
     {
         _submissions = submissions;
         _blocks = blocks;
+        _lookups = lookups;
     }
 
     [BindProperty] public string ArchiveType { get; set; } = "Tissue";
@@ -38,69 +47,25 @@ public class SearchArchiveLocationModel : GridPageModel
     public Dictionary<string, string> Errors { get; } = [];
     public bool Searched { get; private set; }
 
+    /// <summary>Archive location pick list (table 16) — only Tissue/Slide archive use a dropdown; Block archive is free text.</summary>
+    public IReadOnlyList<LookupItem> ArchiveLocations { get; private set; } = [];
+
     public IReadOnlyList<TissueArchiveInfo> TissueResults { get; private set; } = [];
     public IReadOnlyList<BlockArchiveInfo> BlockResults { get; private set; } = [];
     public IReadOnlyList<SlideArchiveInfo> SlideResults { get; private set; } = [];
 
-    public int TotalCount => ArchiveType switch
-    {
-        "Block" => BlockResults.Count,
-        "Slide" => SlideResults.Count,
-        _       => TissueResults.Count,
-    };
-
-    public IReadOnlyList<BlockArchiveInfo> PagedBlockResults =>
-        (SortColumn switch
-        {
-            "BlockRef"         => SortDesc ? BlockResults.OrderByDescending(r => r.BlockRef)         : BlockResults.OrderBy(r => r.BlockRef),
-            "ArchiveLocation"  => SortDesc ? BlockResults.OrderByDescending(r => r.ArchiveLocation)  : BlockResults.OrderBy(r => r.ArchiveLocation),
-            "ArchivedDate"     => SortDesc ? BlockResults.OrderByDescending(r => r.ArchivedDate)     : BlockResults.OrderBy(r => r.ArchivedDate),
-            "TissueDescription" => SortDesc ? BlockResults.OrderByDescending(r => r.TissueDescription) : BlockResults.OrderBy(r => r.TissueDescription),
-            "NoPieces"         => SortDesc ? BlockResults.OrderByDescending(r => r.NoPieces)         : BlockResults.OrderBy(r => r.NoPieces),
-            _                  => SortDesc ? BlockResults.OrderByDescending(r => r.ID)               : BlockResults.OrderBy(r => r.ID),
-        })
-        .Skip((PageNumber - 1) * PageSize)
-        .Take(PageSize)
-        .ToList();
-
-    public IReadOnlyList<SlideArchiveInfo> PagedSlideResults =>
-        (SortColumn switch
-        {
-            "BlockRef"         => SortDesc ? SlideResults.OrderByDescending(r => r.BlockRef)         : SlideResults.OrderBy(r => r.BlockRef),
-            "ArchiveLocation"  => SortDesc ? SlideResults.OrderByDescending(r => r.ArchiveLocation)  : SlideResults.OrderBy(r => r.ArchiveLocation),
-            "ArchivedDate"     => SortDesc ? SlideResults.OrderByDescending(r => r.ArchivedDate)     : SlideResults.OrderBy(r => r.ArchivedDate),
-            "Description"      => SortDesc ? SlideResults.OrderByDescending(r => r.Description)      : SlideResults.OrderBy(r => r.Description),
-            "TissueDescription" => SortDesc ? SlideResults.OrderByDescending(r => r.TissueDescription) : SlideResults.OrderBy(r => r.TissueDescription),
-            _                  => SortDesc ? SlideResults.OrderByDescending(r => r.BatchID)          : SlideResults.OrderBy(r => r.BatchID),
-        })
-        .Skip((PageNumber - 1) * PageSize)
-        .Take(PageSize)
-        .ToList();
-
-    public IReadOnlyList<TissueArchiveInfo> PagedTissueResults =>
-        (SortColumn switch
-        {
-            "TissueDescription" => SortDesc ? TissueResults.OrderByDescending(r => r.TissueDescription) : TissueResults.OrderBy(r => r.TissueDescription),
-            "ArchiveLocation"   => SortDesc ? TissueResults.OrderByDescending(r => r.ArchiveLocation)    : TissueResults.OrderBy(r => r.ArchiveLocation),
-            "ArchivedDate"      => SortDesc ? TissueResults.OrderByDescending(r => r.ArchivedDate)       : TissueResults.OrderBy(r => r.ArchivedDate),
-            "NoPieces"          => SortDesc ? TissueResults.OrderByDescending(r => r.NoPieces)           : TissueResults.OrderBy(r => r.NoPieces),
-            _                   => SortDesc ? TissueResults.OrderByDescending(r => r.BatchID)            : TissueResults.OrderBy(r => r.BatchID),
-        })
-        .Skip((PageNumber - 1) * PageSize)
-        .Take(PageSize)
-        .ToList();
-
-    public void OnGet()
+    public async Task OnGetAsync()
     {
         ViewData["Title"] = "Search Archive Location";
         ViewData["PageTitle"] = "Search Archive Location";
-        PopulateGridViewData(TotalCount);
+        await LoadLookupsAsync();
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
         ViewData["Title"] = "Search Archive Location";
         ViewData["PageTitle"] = "Search Archive Location";
+        await LoadLookupsAsync();
 
         var hasSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
         var hasHistologyRef = !string.IsNullOrWhiteSpace(HistologyRef);
@@ -108,7 +73,6 @@ public class SearchArchiveLocationModel : GridPageModel
         if (hasSenderRef == hasHistologyRef)
         {
             Errors[nameof(SenderRef)] = "Enter either the Sender Ref or the Histology Ref, not both.";
-            PopulateGridViewData(TotalCount);
             return Page();
         }
 
@@ -127,9 +91,10 @@ public class SearchArchiveLocationModel : GridPageModel
                 break;
         }
 
-        PopulateGridViewData(TotalCount);
         return Page();
     }
+
+    private async Task LoadLookupsAsync() => ArchiveLocations = await _lookups.GetLookupDataAsync(LookupArchiveLocation);
 
     /// <summary>Replaces the legacy ExcelExport.aspx link — exports the current results as CSV.</summary>
     public async Task<IActionResult> OnPostExportCsvAsync()

@@ -130,6 +130,8 @@
 | 116 | 2026-09-10 | `GitHub Copilot` | — | — | **~20 min (complexity-based estimate)** | Run #55 — Footer GOV.UK crown replaced with the APHA departmental logo; corrected an initial aspect-ratio-distorted `60×60` sizing to the image's true ratio at `120×136`, moved out of `govuk-footer__crown` into a dedicated `govuk-footer__logo` row per GOV.UK Design System guidance and WCAG 1.4.5 legibility. |
 | 117 | 2026-09-10 | `GitHub Copilot` | — | — | **~10 min (complexity-based estimate)** | Run #56 — `ViewSubmissions` "Print submission notes" button gated on `HasNotes` (mirrors existing `PrintSubmissionModel.HasNotes` precedent), so it's only enabled when the submission has recorded comments/status comments. |
 
+| 118 | 2026-09-10 | `GitHub Copilot` | — | — | **~55 min (complexity-based estimate)** | Run #57 — New `Histo.WebJobs` project: annual histology-reset TimerTrigger WebJob, 4 build-error fixes (missing WebJobs.Extensions package, OutputType=Exe, SqlClient version conflict, Logging:LogLevel not binding), Application Insights via `Microsoft.ApplicationInsights.WorkerService` (2 wrong-package attempts before landing on the correct API), and full config alignment with `Histo.Web`'s real conventions (top-level `APPLICATIONINSIGHTS_CONNECTION_STRING`, Managed-Identity connection string, removed per-environment appsettings file loading). Build 0 errors, 1 pre-existing NU1603 warning. |
+
 ## Run #87 sub-task breakdown (2026-08-27)
 
 | # | Duration | Area | Summary |

@@ -11,7 +11,7 @@
 
 <partial name="_ErrorSummary" model="Model.Errors" />
 
-<form method="post">
+<form method="post" asp-page-handler="Search" id="view-samples-form">
     <div class="govuk-form-group">
         <label class="govuk-label" for="SenderRef">Sender ref</label>
         <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" />
@@ -62,7 +62,7 @@
         <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
         @if (Model.Searched && Model.Errors.Count == 0)
         {
-            <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to CSV</button>
+            <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</button>
         }
     </div>
 </form>
@@ -74,23 +74,47 @@
         <table class="govuk-table">
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
-                    <th scope="col" class="govuk-table__header">Sub. number</th>
-                    <th scope="col" class="govuk-table__header">Date submitted</th>
-                    <th scope="col" class="govuk-table__header">Date received</th>
-                    <th scope="col" class="govuk-table__header">Time received</th>
-                    <th scope="col" class="govuk-table__header">Date completed</th>
-                    <th scope="col" class="govuk-table__header">Customer received date</th>
-                    <th scope="col" class="govuk-table__header">Submitted as</th>
+                    @{ ViewData["Label"] = "Sub. number"; ViewData["Column"] = "ID"; }
+                    <partial name="_SortableHeaderPost" />
+                    @{ ViewData["Label"] = "Date submitted"; ViewData["Column"] = "DateSubmitted"; }
+                    <partial name="_SortableHeaderPost" />
+                    @{
+                        ViewData["Label"] = "Date received / Rejected"; ViewData["Column"] = "DateReceived";
+                    }
+                    <partial name="_SortableHeaderPost" />
+                    @{
+                        ViewData["Label"] = "Time Received / Rejected"; ViewData["Column"] = "TimeReceived";
+                    }
+                    <partial name="_SortableHeaderPost" />
+
+
+                    @{ ViewData["Label"] = "Date completed"; ViewData["Column"] = "DateCompleted"; }
+                    <partial name="_SortableHeaderPost" />
+
+                    @{
+                        ViewData["Label"] = "Customer received date"; ViewData["Column"] = "CustomerReceivedDate";
+                    }
+                    <partial name="_SortableHeaderPost" />
+
+                    @{ ViewData["Label"] = "Submitted as"; ViewData["Column"] = "SubmittedAs"; }
+                    <partial name="_SortableHeaderPost" />
                     @if (Model.Mode == "Block")
                     {
-                        <th scope="col" class="govuk-table__header">Block ref</th>
+                        {
+                            ViewData["Label"] = "Block ref"; ViewData["Column"] = "BlockRef";
+                        }
+                    <partial name="_SortableHeaderPost" />
                     }
-                    <th scope="col" class="govuk-table__header">Tissue</th>
-                    <th scope="col" class="govuk-table__header">No pieces</th>
+                    @{ ViewData["Label"] = "Tissue"; ViewData["Column"] = "TissueDescription"; }
+                    <partial name="_SortableHeaderPost" />
+                    @{
+                        ViewData["Label"] = "Number of Pieces"; ViewData["Column"] = "NoPieces";
+                    }
+                    <partial name="_SortableHeaderPost" />
                 </tr>
             </thead>
             <tbody class="govuk-table__body">
-                @foreach (var r in Model.Results)
+                @foreach (var r in Model.PagedResults)
                 {
                     <tr class="govuk-table__row">
                         <td class="govuk-table__cell">@r.ID</td>
@@ -110,6 +134,7 @@
                 }
             </tbody>
         </table>
+        <partial name="_PaginationPost" />
         <p class="govuk-body govuk-hint">Submitted as: WT = Wet Tissue, WB = Wax Block, SS = Stained Section, US = Unstained Section, PC = Pre Cassetted</p>
     }
     else
