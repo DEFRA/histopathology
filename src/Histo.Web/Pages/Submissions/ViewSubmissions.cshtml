@@ -31,7 +31,7 @@
         <label class="govuk-label" for="ProjectContractCode">Project or contract code</label>
         <select class="govuk-select" asp-for="ProjectContractCode">
             <option value="">-- Any --</option>
-            @foreach (var p in Model.Projects)
+            @foreach (var p in Model.Projects.Where(p => !string.IsNullOrWhiteSpace(p.Name)))
             {
                 <option value="@p.Name">@p.Name</option>
             }
@@ -41,7 +41,7 @@
         <label class="govuk-label" for="ContactName">Pathologist</label>
         <select class="govuk-select" asp-for="ContactName">
             <option value="">-- Any --</option>
-            @foreach (var c in Model.Contacts)
+            @foreach (var c in Model.Contacts.Where(c => !string.IsNullOrWhiteSpace(c.Name)))
             {
                 <option value="@c.Name">@c.Name</option>
             }
@@ -51,7 +51,7 @@
         <label class="govuk-label" for="Species">Species</label>
         <select class="govuk-select" asp-for="Species">
             <option value="">-- Any --</option>
-            @foreach (var s in Model.SpeciesList)
+            @foreach (var s in Model.SpeciesList.Where(s => !string.IsNullOrWhiteSpace(s.Name)))
             {
                 <option value="@s.Name">@s.Name</option>
             }
@@ -61,7 +61,7 @@
         <label class="govuk-label" for="Fixation">Fixation</label>
         <select class="govuk-select" asp-for="Fixation">
             <option value="">-- Any --</option>
-            @foreach (var f in Model.Fixations)
+            @foreach (var f in Model.Fixations.Where(f => !string.IsNullOrWhiteSpace(f.Name)))
             {
                 <option value="@f.Name">@f.Name</option>
             }
@@ -73,7 +73,7 @@
             <option value="">-- Any --</option>
             @foreach (var u in Model.Users)
             {
-                <option value="@u.UserID">@u.Name</option>
+                <option value="@u.UserID">@(string.IsNullOrWhiteSpace(u.Name) ? u.NtLogin : u.Name)</option>
             }
         </select>
     </div>
@@ -83,7 +83,7 @@
             <option value="">-- Any --</option>
             @foreach (var u in Model.Users)
             {
-                <option value="@u.UserID">@u.Name</option>
+                <option value="@u.UserID">@(string.IsNullOrWhiteSpace(u.Name) ? u.NtLogin : u.Name)</option>
             }
         </select>
     </div>

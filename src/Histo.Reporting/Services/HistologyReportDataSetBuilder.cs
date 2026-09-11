@@ -1,5 +1,6 @@
 using System.Data;
 using Dapper;
+using Histo.Administration.Interfaces;
 using Histo.Infrastructure;
 using Microsoft.Extensions.Configuration;
 
@@ -27,13 +28,25 @@ namespace Histo.Reporting.Services;
 /// </summary>
 public sealed class HistologyReportDataSetBuilder
 {
+    // Legacy source: HistopathologySystem/Common.vb — LOOKUP_CONTACTS / LOOKUP_PROJECTS
+    private const int LookupContacts = 18;
+    private const int LookupProjects = 19;
+
     private readonly IDbConnectionFactory _db;
     private readonly IConfiguration _config;
+    private readonly ILookupService _lookups;
+    private readonly IUserService _users;
 
-    public HistologyReportDataSetBuilder(IDbConnectionFactory db, IConfiguration config)
+    public HistologyReportDataSetBuilder(
+        IDbConnectionFactory db,
+        IConfiguration config,
+        ILookupService lookups,
+        IUserService users)
     {
         _db = db;
         _config = config;
+        _lookups = lookups;
+        _users = users;
     }
 
     /// <summary>
@@ -81,10 +94,24 @@ public sealed class HistologyReportDataSetBuilder
         var rawTissues          = (await submissionGrid.ReadAsync()).Cast<IDictionary<string, object>>().ToList();
         var rawAnimals          = (await submissionGrid.ReadAsync()).Cast<IDictionary<string, object>>().ToList();
 
+        // ── 2a. ID→name lookups — tblBatch stores raw codes (Species ID, Project code,
+        // Pathologist/Contact ID, Submitted-By user ID), not display names; GetCommonBatchTablesByID
+        // does not join them, so resolve here to match legacy's dropdown-bound display.
+        var speciesTask   = _lookups.GetSpeciesLookupAsync(ct);
+        var projectsTask  = _lookups.GetLookupDataAsync(LookupProjects, includeInactive: true, ct: ct);
+        var contactsTask  = _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true, ct: ct);
+        var usersTask     = _users.GetAllUsersAsync(ct);
+        await Task.WhenAll(speciesTask, projectsTask, contactsTask, usersTask);
+
+        var speciesById  = speciesTask.Result.ToDictionary(s => s.ID.ToString(), s => s.Name, StringComparer.OrdinalIgnoreCase);
+        var projectsById = projectsTask.Result.ToDictionary(p => p.ID.ToString(), p => p.Name, StringComparer.OrdinalIgnoreCase);
+        var contactsById = contactsTask.Result.ToDictionary(c => c.ID.ToString(), c => c.Name, StringComparer.OrdinalIgnoreCase);
+        var userById      = usersTask.Result.ToDictionary(u => u.UserID, u => u.Name);
+
         // ── 3. Assemble the report DataSet ───────────────────────────────────
         var ds = new DataSet("HistologyReport");
 
-        ds.Tables.Add(BuildBatchTable(rawBatch, rawSubmittedAs, batchId));
+        ds.Tables.Add(BuildBatchTable(rawBatch, rawSubmittedAs, batchId, speciesById, projectsById, contactsById, userById));
         ds.Tables.Add(BuildPostFixationTable(rawPostFix, batchId));
         ds.Tables.Add(BuildHistologyTable(rawHistology, batchId));
         ds.Tables.Add(BuildSubmissionTable(rawBatchSubmissions, rawTissues, rawAnimals, batchId));
@@ -98,7 +125,11 @@ public sealed class HistologyReportDataSetBuilder
     internal static DataTable BuildBatchTable(
         IList<IDictionary<string, object>> rawBatch,
         IList<IDictionary<string, object>> rawSubmittedAs,
-        int batchId)
+        int batchId,
+        IReadOnlyDictionary<string, string>? speciesById = null,
+        IReadOnlyDictionary<string, string>? projectsById = null,
+        IReadOnlyDictionary<string, string>? contactsById = null,
+        IReadOnlyDictionary<int, string>? userById = null)
     {
         var dt = new DataTable("Batch");
         dt.Columns.Add("ProjectContractCode");
@@ -125,19 +156,33 @@ public sealed class HistologyReportDataSetBuilder
         var src = rawBatch[0];
         var dr  = dt.NewRow();
 
-        // Fields mapped directly from stored proc result
+        // Fields mapped directly from stored proc result. tblBatch stores raw codes for
+        // ProjectContractCode (project ID), ContactName (pathologist/contact ID), Species
+        // (species ID), and OtherSubmittedBy (submitter user ID) — resolve to display names
+        // via the supplied lookup dictionaries, matching legacy's dropdown-bound display.
+        // Falls back to the raw code when it cannot be resolved or no lookup was supplied.
         dr["ID"]               = Str(src, "ID",               batchId.ToString());
-        dr["ProjectContractCode"] = Str(src, "ProjectContractCode");
-        dr["ContactName"]      = Str(src, "ContactName");
+        var rawProjectCode    = Str(src, "ProjectContractCode");
+        dr["ProjectContractCode"] = projectsById is not null && projectsById.TryGetValue(rawProjectCode, out var pn)
+            ? pn : rawProjectCode;
+        var rawContactCode    = Str(src, "ContactName");
+        dr["ContactName"]      = contactsById is not null && contactsById.TryGetValue(rawContactCode, out var cn)
+            ? cn : rawContactCode;
         dr["BatchDate"]        = Str(src, "BatchDate");
-        dr["Species"]          = Str(src, "Species");
+        var rawSpecies        = Str(src, "Species");
+        dr["Species"]          = speciesById is not null && speciesById.TryGetValue(rawSpecies, out var sn)
+            ? sn : rawSpecies;
         dr["DateReceived"]     = Str(src, "DateReceived");
         dr["TimeReceived"]     = Str(src, "TimeReceived");
         dr["SafeToHandle"]     = Bool(src, "SafeToHandle");
         dr["Comments"]         = Str(src, "Comments");
         dr["Fixation"]         = Str(src, "Fixation");
         dr["PostFixationOther"] = Str(src, "PostFixationOther");
-        dr["OtherSubmittedBy"] = Str(src, "OtherSubmittedBy");
+        var rawSubmittedBy     = Str(src, "OtherSubmittedBy");
+        dr["OtherSubmittedBy"] = userById is not null
+            && int.TryParse(rawSubmittedBy, out var submittedByUserId)
+            && userById.TryGetValue(submittedByUserId, out var sbn)
+                ? sbn : rawSubmittedBy;
         dr["NumberSamples"]    = Str(src, "NumberSamples");
         dr["MoreHistology"]    = string.Empty; // set below if any histology overflows
 

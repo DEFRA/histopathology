@@ -88,7 +88,7 @@
 
 <h2 class="govuk-heading-m">@(Model.ItemId is int ? "Edit item" : "Add item")</h2>
 
-<form method="post">
+<form method="post" asp-antiforgery="true">
     <input type="hidden" asp-for="ItemId" />
     <input type="hidden" asp-for="ReturnUrl" />
     <div class="govuk-form-group">

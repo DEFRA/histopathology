@@ -9,7 +9,7 @@
     <a asp-page="/Search/SearchMenu" class="govuk-back-link">Back</a>
 }
 
-<form method="post">
+<form method="post" asp-antiforgery="true">
     <div class="govuk-form-group">
         <label class="govuk-label" for="ProjectDescription">Project or contract code</label>
         <select class="govuk-select" asp-for="ProjectDescription">

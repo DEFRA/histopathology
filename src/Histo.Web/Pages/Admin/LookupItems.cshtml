@@ -59,11 +59,11 @@
                 <td class="govuk-table__cell">
                     @if (Model.TableHasCodes)
                     {
-                        <a asp-page="/Admin/EditLookupItem" asp-route-tableId="@Model.TableId" asp-route-itemCode="@i.Code" class="govuk-link">Change<span class="govuk-visually-hidden"> @i.Name</span></a>
+                        <a asp-page="/Admin/EditLookupItem" asp-route-tableId="@Model.TableId" asp-route-itemCode="@i.Code" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Change<span class="govuk-visually-hidden"> @i.Name</span></a>
                     }
                     else
                     {
-                        <a asp-page="/Admin/EditLookupItem" asp-route-tableId="@Model.TableId" asp-route-itemId="@i.ID" class="govuk-link">Change<span class="govuk-visually-hidden"> @i.Name</span></a>
+                        <a asp-page="/Admin/EditLookupItem" asp-route-tableId="@Model.TableId" asp-route-itemId="@i.ID" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Change<span class="govuk-visually-hidden"> @i.Name</span></a>
                     }
                 </td>
             </tr>

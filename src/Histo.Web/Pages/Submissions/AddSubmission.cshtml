@@ -21,7 +21,7 @@
     </div>
 }
 
-<form method="post">
+<form method="post" asp-antiforgery="true">
     <input type="hidden" asp-for="BatchId" />
     <input type="hidden" asp-for="BatchSubmissionId" />
     <input type="hidden" asp-for="SourceAnimalId" />

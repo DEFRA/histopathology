@@ -13,12 +13,22 @@
 
 @if (!string.IsNullOrEmpty(Model.Error))
 {
+    ViewData["HasErrors"] = true;
     <div class="govuk-error-summary" data-module="govuk-error-summary">
         <div role="alert">
             <h2 class="govuk-error-summary__title">There is a problem</h2>
             <div class="govuk-error-summary__body">
                 <ul class="govuk-list govuk-error-summary__list">
-                    <li>@Model.Error</li>
+                    <li>
+                        @if (Model.ErrorField is not null)
+                        {
+                            <a href="#@Model.ErrorField">@Model.Error</a>
+                        }
+                        else
+                        {
+                            @Model.Error
+                        }
+                    </li>
                 </ul>
             </div>
         </div>
@@ -32,36 +42,60 @@
     </div>
 }
 
-<form method="post">
-    <div class="govuk-form-group">
-        <label class="govuk-label govuk-label--s" for="OriginalSenderRef">Sample (Sender) Ref</label>
-        <input class="govuk-input govuk-input--width-10 govuk-!-display-inline" id="OriginalSenderRef" name="OriginalSenderRef" type="text" value="@Model.OriginalSenderRef" />
-        <button type="submit" asp-page-handler="GetHistologyRef" class="govuk-button govuk-button--secondary govuk-!-display-inline govuk-!-margin-left-2 govuk-!-margin-bottom-0" data-module="govuk-button">Get Histology Ref</button>
+<form method="post" asp-antiforgery="true">
+    <div class="govuk-form-group @(Model.ErrorField == "OriginalSenderRef" ? "govuk-form-group--error" : "")">
+        <label class="govuk-label govuk-label--s" for="OriginalSenderRef">Sender ref</label>
+        @if (Model.ErrorField == "OriginalSenderRef")
+        {
+            <p id="OriginalSenderRef-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @Model.Error</p>
+        }
+        <input class="govuk-input govuk-input--width-10 @(Model.ErrorField == "OriginalSenderRef" ? "govuk-input--error" : "")"
+               id="OriginalSenderRef" name="OriginalSenderRef" type="text" value="@Model.OriginalSenderRef"
+               aria-describedby="@(Model.ErrorField == "OriginalSenderRef" ? "OriginalSenderRef-error" : null)" />
     </div>
 
     <div class="govuk-form-group">
-        <label class="govuk-label govuk-label--s" for="CurrentHistologyRef">Original Histology Ref</label>
-        <input class="govuk-input govuk-input--width-10" id="CurrentHistologyRef" value="@Model.CurrentHistologyRef" disabled />
+        <label class="govuk-label govuk-label--s" for="CurrentHistologyRef">Original histology ref</label>
+        <div class="app-field-with-button">
+            <input class="govuk-input govuk-input--width-10" id="CurrentHistologyRef" value="@Model.CurrentHistologyRef" disabled />
+            <button type="submit" asp-page-handler="GetHistologyRef" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Get histology ref</button>
+        </div>
     </div>
 
     <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m" />
 
-    <div class="govuk-form-group">
-        <label class="govuk-label govuk-label--s" for="NewSenderRef">New Sample (Sender) Ref</label>
-        <input class="govuk-input govuk-input--width-10 govuk-!-display-inline" id="NewSenderRef" name="NewSenderRef" type="text" value="@Model.NewSenderRef" />
-        <button type="submit" asp-page-handler="EditSenderRef" class="govuk-button govuk-!-display-inline govuk-!-margin-left-2 govuk-!-margin-bottom-0" data-module="govuk-button">Save Sender Ref</button>
+    <div class="govuk-form-group @(Model.ErrorField == "NewSenderRef" ? "govuk-form-group--error" : "")">
+        <label class="govuk-label govuk-label--s" for="NewSenderRef">New sender ref</label>
+        @if (Model.ErrorField == "NewSenderRef")
+        {
+            <p id="NewSenderRef-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @Model.Error</p>
+        }
+        <div class="app-field-with-button">
+            <input class="govuk-input govuk-input--width-10 @(Model.ErrorField == "NewSenderRef" ? "govuk-input--error" : "")"
+                   id="NewSenderRef" name="NewSenderRef" type="text" value="@Model.NewSenderRef"
+                   aria-describedby="@(Model.ErrorField == "NewSenderRef" ? "NewSenderRef-error" : null)" />
+            <button type="submit" asp-page-handler="EditSenderRef" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button">Save sender ref</button>
+        </div>
     </div>
 
     <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m" />
 
-    <div class="govuk-form-group">
-        <label class="govuk-label govuk-label--s" for="NewHistologyRef">New Histology Ref</label>
+    <div class="govuk-form-group @(Model.ErrorField == "NewHistologyRef" ? "govuk-form-group--error" : "")">
+        <label class="govuk-label govuk-label--s" for="NewHistologyRef">New histology ref</label>
         <div class="govuk-hint">Leave blank to remove any existing Histology Ref for this sample.</div>
-        <input class="govuk-input govuk-input--width-10 govuk-!-display-inline" id="NewHistologyRef" name="NewHistologyRef" type="text" value="@Model.NewHistologyRef" />
-        <button type="submit" asp-page-handler="SaveHistologyRef" class="govuk-button govuk-!-display-inline govuk-!-margin-left-2 govuk-!-margin-bottom-0" data-module="govuk-button" data-prevent-double-click="true"
-                onclick="return document.getElementById('NewHistologyRef').value !== '' || confirm('You have not entered a Histology ref. This will delete any existing Histology Ref. Do you wish to continue?');">
-            Save Histology Ref
-        </button>
+        @if (Model.ErrorField == "NewHistologyRef")
+        {
+            <p id="NewHistologyRef-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @Model.Error</p>
+        }
+        <div class="app-field-with-button">
+            <input class="govuk-input govuk-input--width-10 @(Model.ErrorField == "NewHistologyRef" ? "govuk-input--error" : "")"
+                   id="NewHistologyRef" name="NewHistologyRef" type="text" value="@Model.NewHistologyRef"
+                   aria-describedby="@(Model.ErrorField == "NewHistologyRef" ? "NewHistologyRef-error" : null)" />
+            <button type="submit" asp-page-handler="SaveHistologyRef" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button" data-prevent-double-click="true"
+                    onclick="return document.getElementById('NewHistologyRef').value !== '' || confirm('You have not entered a Histology ref. This will delete any existing Histology Ref. Do you wish to continue?');">
+                Save histology ref
+            </button>
+        </div>
     </div>
 
     <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m" />

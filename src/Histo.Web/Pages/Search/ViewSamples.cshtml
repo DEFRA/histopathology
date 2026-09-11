@@ -11,7 +11,7 @@
 
 <partial name="_ErrorSummary" model="Model.Errors" />
 
-<form method="post">
+<form method="post" asp-antiforgery="true">
     <div class="govuk-form-group">
         <label class="govuk-label" for="SenderRef">Sender ref</label>
         <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" />
@@ -22,7 +22,7 @@
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="TissueCode">Tissue</label>
-        <select class="govuk-select" asp-for="TissueCode">
+        <select class="govuk-select govuk-input--width-20" asp-for="TissueCode">
             <option value="">-- Select --</option>
             @foreach (var t in Model.Tissues)
             {
@@ -33,7 +33,7 @@
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="ProjectDesc">Project</label>
-        <select class="govuk-select" asp-for="ProjectDesc">
+        <select class="govuk-select govuk-input--width-20" asp-for="ProjectDesc">
             <option value="">-- Select --</option>
             @foreach (var p in Model.Projects)
             {

@@ -1,5 +1,6 @@
 using System.Data;
 using Dapper;
+using Histo.Administration.Interfaces;
 using Histo.Infrastructure;
 
 namespace Histo.Reporting.Services;
@@ -31,8 +32,13 @@ namespace Histo.Reporting.Services;
 public sealed class QCNoteDataSetBuilder
 {
     private readonly IDbConnectionFactory _db;
+    private readonly ILookupService _lookups;
 
-    public QCNoteDataSetBuilder(IDbConnectionFactory db) => _db = db;
+    public QCNoteDataSetBuilder(IDbConnectionFactory db, ILookupService lookups)
+    {
+        _db = db;
+        _lookups = lookups;
+    }
 
     /// <summary>
     /// Builds the report DataSet for the given QC Note reference.
@@ -121,6 +127,13 @@ public sealed class QCNoteDataSetBuilder
             .FirstOrDefault(r => Str(r, "ID") == projectCode);
         var projectName = project is not null ? Str(project, "Description") : projectCode;
 
+        // ── 3a. Species lookup ──────────────────────────────────────────────
+        // GetBatchQCNotes returns the raw SpeciesID (not the name); resolve via the
+        // dedicated species lookup, matching legacy's dropdown-bound display.
+        var speciesRows = await _lookups.GetSpeciesLookupAsync(ct);
+        var speciesMatch = speciesRows.FirstOrDefault(s => s.ID.ToString() == species);
+        var speciesName = speciesMatch?.Name ?? species;
+
         // ── 4. Assemble "Header" DataTable ──────────────────────────────────
         var header = new DataTable("Header");
         header.Columns.Add("QCNoteRef");
@@ -136,7 +149,7 @@ public sealed class QCNoteDataSetBuilder
         row["QCNoteRef"]        = qcNoteRefStr;
         row["SubmissionNumber"] = submissionNo;
         row["Project"]          = projectName;
-        row["Species"]          = species;
+        row["Species"]          = speciesName;
         row["StainRef"]         = stainRef;
         row["QCText"]           = qcText;
         row["CreatedBy"]        = createdBy;

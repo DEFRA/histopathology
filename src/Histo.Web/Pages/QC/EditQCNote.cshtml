@@ -49,7 +49,7 @@
     </dl>
 }
 
-<form method="post">
+<form method="post" asp-antiforgery="true">
     <div class="govuk-form-group">
         <label class="govuk-label" for="Text">Note text</label>
         <textarea name="Text" id="Text" class="govuk-textarea" rows="6">@Model.Text</textarea>

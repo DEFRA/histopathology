@@ -40,6 +40,9 @@ public class EditAnimalRefModel : HistoPageModel
 
     public string? CurrentHistologyRef { get; private set; }
     public string? Error { get; private set; }
+
+    /// <summary>Id of the field <see cref="Error"/> relates to — drives the error summary link and inline field error.</summary>
+    public string? ErrorField { get; private set; }
     public string? SuccessMessage { get; private set; }
 
     public void OnGet()
@@ -56,6 +59,7 @@ public class EditAnimalRefModel : HistoPageModel
         if (string.IsNullOrEmpty(OriginalSenderRef))
         {
             Error = "You must enter a Sample Ref.";
+            ErrorField = "OriginalSenderRef";
             return Page();
         }
 
@@ -68,6 +72,7 @@ public class EditAnimalRefModel : HistoPageModel
         if (match is null)
         {
             Error = "Sample Ref. not found.";
+            ErrorField = "OriginalSenderRef";
             return Page();
         }
 
@@ -86,12 +91,14 @@ public class EditAnimalRefModel : HistoPageModel
         if (string.IsNullOrEmpty(OriginalSenderRef))
         {
             Error = "You must enter a Sample Ref.";
+            ErrorField = "OriginalSenderRef";
             return Page();
         }
 
         if (string.IsNullOrEmpty(NewSenderRef))
         {
             Error = "You must enter a New Sample Ref.";
+            ErrorField = "NewSenderRef";
             return Page();
         }
 
@@ -123,6 +130,7 @@ public class EditAnimalRefModel : HistoPageModel
         if (string.IsNullOrEmpty(OriginalSenderRef))
         {
             Error = "You must enter a Sample Ref.";
+            ErrorField = "OriginalSenderRef";
             return Page();
         }
 
@@ -133,12 +141,14 @@ public class EditAnimalRefModel : HistoPageModel
             if (NewHistologyRef != pgReversedRef)
             {
                 Error = "The Histology Ref is not correct for the PG Number entered.";
+                ErrorField = "NewHistologyRef";
                 return Page();
             }
         }
         else if (NewHistologyRef.Length > 0 && !ValidationHelpers.ValidateHistoRef(NewHistologyRef, isHistologyUser: false))
         {
             Error = "You must enter a valid Histology Ref.";
+            ErrorField = "NewHistologyRef";
             return Page();
         }
 

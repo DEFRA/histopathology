@@ -27,7 +27,7 @@
     </div>
 }
 
-<form method="post">
+<form method="post" asp-antiforgery="true">
     <input type="hidden" asp-for="TableId" />
 
     @* Area dropdown — only for Contacts (table 18) and Projects (table 19) *@

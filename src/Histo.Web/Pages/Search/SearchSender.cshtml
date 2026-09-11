@@ -15,7 +15,7 @@
     }
 }
 
-<form method="post">
+<form method="post" asp-antiforgery="true">
     @* Preserve picker params across the search POST so Select buttons and back link render correctly. *@
     @if (Model.IsPickerMode)
     {

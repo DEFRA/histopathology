@@ -26,7 +26,7 @@
     </div>
 }
 
-<form method="post">
+<form method="post" asp-antiforgery="true">
     <input type="hidden" asp-for="ReturnUrl" />
     <div class="govuk-form-group">
         <label class="govuk-label" for="NtLogin">NT login</label>
