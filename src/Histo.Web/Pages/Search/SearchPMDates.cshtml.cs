@@ -73,6 +73,13 @@ public class SearchPMDatesModel : HistoPageModel
 
         if (!TryBuildRange(out var from, out var to)) return Page();
 
+        // Default to Submission number descending until the user explicitly picks a column.
+        if (string.IsNullOrEmpty(SortColumn))
+        {
+            SortColumn = "ID";
+            SortDesc = true;
+        }
+
         Results = await _submissions.GetByPmDateRangeAsync(from, to);
         Searched = true;
         PopulateGridViewData();

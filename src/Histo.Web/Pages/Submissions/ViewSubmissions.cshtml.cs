@@ -61,9 +61,9 @@ public class ViewSubmissionsModel : HistoPageModel
     // sort/page buttons (see _SortableHeaderPost/_PaginationPost) without needing GridPageModel's
     // GET-oriented SupportsGet mechanism, which this POST-only search page cannot use.
     private const int PageSize = 10;
-    [BindProperty] public string? SortColumn { get; set; }
-    [BindProperty] public bool    SortDesc   { get; set; }
-    [BindProperty] public int     PageNumber { get; set; } = 1;
+    [BindProperty(SupportsGet = true)] public string? SortColumn { get; set; }
+    [BindProperty(SupportsGet = true)] public bool    SortDesc   { get; set; }
+    [BindProperty(SupportsGet = true)] public int     PageNumber { get; set; } = 1;
 
     public IReadOnlyList<BatchSearchResult> PagedResults =>
         (SortColumn switch

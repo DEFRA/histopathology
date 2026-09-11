@@ -24,6 +24,7 @@ namespace Histo.Web.Pages.Search;
 public class SearchArchiveLocationModel : HistoPageModel
 {
     private const int LookupArchiveLocation = 16; // Code-keyed; see LookupItem.Code doc comment.
+    private const int LookupTissueCode = 9; // Legacy source: HistopathologySystem/Common.vb — LOOKUP_TISSUE_CODE
 
     private readonly ISubmissionService _submissions;
     private readonly IBlockService _blocks;
@@ -46,6 +47,9 @@ public class SearchArchiveLocationModel : HistoPageModel
 
     public Dictionary<string, string> Errors { get; } = [];
     public bool Searched { get; private set; }
+
+    /// <summary>Tissue pick list (table 9) — populates the Tissue code dropdown for Tissue archive mode.</summary>
+    public IReadOnlyList<LookupItem> Tissues { get; private set; } = [];
 
     /// <summary>Archive location pick list (table 16) — only Tissue/Slide archive use a dropdown; Block archive is free text.</summary>
     public IReadOnlyList<LookupItem> ArchiveLocations { get; private set; } = [];
@@ -70,39 +74,58 @@ public class SearchArchiveLocationModel : HistoPageModel
         var hasSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
         var hasHistologyRef = !string.IsNullOrWhiteSpace(HistologyRef);
 
-        if (hasSenderRef == hasHistologyRef)
+        // The underlying SPs tolerate both being supplied (SenderRef takes precedence, HistologyRef
+        // is then ignored) — only reject when NEITHER is given, there's nothing to filter on.
+        if (!hasSenderRef && !hasHistologyRef)
         {
-            Errors[nameof(SenderRef)] = "Enter either the Sender Ref or the Histology Ref, not both.";
+            Errors[nameof(HistologyRef)] = "Enter the Sender Ref or the Histology Ref.";
             return Page();
         }
 
         Searched = true;
 
+        var senderRef = NullIfEmpty(SenderRef);
+        var histologyRef = NullIfEmpty(HistologyRef);
+        var archiveLocation = NullIfEmpty(ArchiveLocation);
+
         switch (ArchiveType)
         {
             case "Block":
-                BlockResults = await _blocks.GetBlockArchiveAsync(SenderRef, HistologyRef, BlockRef, ArchiveLocation);
+                BlockResults = await _blocks.GetBlockArchiveAsync(senderRef, histologyRef, NullIfEmpty(BlockRef), archiveLocation);
                 break;
             case "Slide":
-                SlideResults = await _blocks.GetSlideArchiveAsync(SenderRef, HistologyRef, ArchiveLocation);
+                SlideResults = await _blocks.GetSlideArchiveAsync(senderRef, histologyRef, archiveLocation);
                 break;
             default:
-                TissueResults = await _submissions.GetTissueArchiveAsync(SenderRef, HistologyRef, ArchiveLocation, TissueCode);
+                TissueResults = await _submissions.GetTissueArchiveAsync(senderRef, histologyRef, archiveLocation, NullIfEmpty(TissueCode));
                 break;
         }
 
         return Page();
     }
 
-    private async Task LoadLookupsAsync() => ArchiveLocations = await _lookups.GetLookupDataAsync(LookupArchiveLocation);
+    // The stored procedures treat an unapplied filter as "@Param IS NULL" — an empty string
+    // (what a blank text input/unselected dropdown actually posts) never satisfies that check,
+    // so it silently filters out every row instead of being ignored.
+    private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private async Task LoadLookupsAsync()
+    {
+        ArchiveLocations = await _lookups.GetLookupDataAsync(LookupArchiveLocation);
+        Tissues = await _lookups.GetLookupDataAsync(LookupTissueCode);
+    }
 
     /// <summary>Replaces the legacy ExcelExport.aspx link — exports the current results as CSV.</summary>
     public async Task<IActionResult> OnPostExportCsvAsync()
     {
+        var senderRef = NullIfEmpty(SenderRef);
+        var histologyRef = NullIfEmpty(HistologyRef);
+        var archiveLocation = NullIfEmpty(ArchiveLocation);
+
         switch (ArchiveType)
         {
             case "Block":
-                var blockResults = await _blocks.GetBlockArchiveAsync(SenderRef, HistologyRef, BlockRef, ArchiveLocation);
+                var blockResults = await _blocks.GetBlockArchiveAsync(senderRef, histologyRef, NullIfEmpty(BlockRef), archiveLocation);
                 return CsvExportHelper.BuildCsv(
                     "BlockArchive.csv",
                     ["Submission number", "Block ref", "Archive location", "Archived date", "Tissue", "No pieces"],
@@ -112,7 +135,7 @@ public class SearchArchiveLocationModel : HistoPageModel
                     }));
 
             case "Slide":
-                var slideResults = await _blocks.GetSlideArchiveAsync(SenderRef, HistologyRef, ArchiveLocation);
+                var slideResults = await _blocks.GetSlideArchiveAsync(senderRef, histologyRef, archiveLocation);
                 return CsvExportHelper.BuildCsv(
                     "SlideArchive.csv",
                     ["Submission number", "Block ref", "Archive location", "Archived date", "Slide", "Tissue"],
@@ -122,7 +145,7 @@ public class SearchArchiveLocationModel : HistoPageModel
                     }));
 
             default:
-                var tissueResults = await _submissions.GetTissueArchiveAsync(SenderRef, HistologyRef, ArchiveLocation, TissueCode);
+                var tissueResults = await _submissions.GetTissueArchiveAsync(senderRef, histologyRef, archiveLocation, NullIfEmpty(TissueCode));
                 return CsvExportHelper.BuildCsv(
                     "TissueArchive.csv",
                     ["Submission number", "Tissue", "Archive location", "Archived date", "No pieces"],
