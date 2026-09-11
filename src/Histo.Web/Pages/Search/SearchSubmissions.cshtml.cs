@@ -264,7 +264,7 @@ public class SearchSubmissionsModel : HistoPageModel
                 r.ContactDescription,
                 r.Species,
                 r.BatchDate?.ToShortDateString(),
-                r.Status
+                BatchStatus.DisplayName(r.Status ?? string.Empty)
             }));
     }
 

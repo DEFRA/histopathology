@@ -53,6 +53,14 @@ public class ViewSamplesModel : HistoPageModel
     /// <summary>"Tissue" = legacy "Tissue Information" mode (default); "Block" = "Block Information" mode.</summary>
     [BindProperty] public string Mode { get; set; } = "Tissue";
 
+    // Sort/page state bound the same way as the filter criteria — [BindProperty] carries it
+    // through the POST-based sort/page buttons (see _SortableHeaderPost/_PaginationPost), which
+    // resubmit this same form rather than navigating via a GET link.
+    private const int PageSize = 10;
+    [BindProperty] public string? SortColumn { get; set; }
+    [BindProperty] public bool SortDesc { get; set; }
+    [BindProperty] public int PageNumber { get; set; } = 1;
+
     public Dictionary<string, string> Errors { get; } = [];
     public bool Searched { get; private set; }
 
@@ -60,13 +68,43 @@ public class ViewSamplesModel : HistoPageModel
     public IReadOnlyList<LookupItem> Projects { get; private set; } = [];
     public IReadOnlyList<AnimalTissueSearchResult> Results { get; private set; } = [];
 
+    public IReadOnlyList<AnimalTissueSearchResult> PagedResults =>
+        (SortColumn switch
+        {
+            "DateSubmitted"  => SortDesc ? Results.OrderByDescending(r => r.DateSubmitted)  : Results.OrderBy(r => r.DateSubmitted),
+            "DateReceived"   => SortDesc ? Results.OrderByDescending(r => r.DateReceived)   : Results.OrderBy(r => r.DateReceived),
+            "TimeReceived" => SortDesc ? Results.OrderByDescending(r => r.TimeReceived) : Results.OrderBy(r => r.TimeReceived),
+            "DateCompleted"  => SortDesc ? Results.OrderByDescending(r => r.DateCompleted)  : Results.OrderBy(r => r.DateCompleted),
+            "SubmittedAs"    => SortDesc ? Results.OrderByDescending(r => r.SubmittedAs)    : Results.OrderBy(r => r.SubmittedAs),
+            "NoPieces" => SortDesc ? Results.OrderByDescending(r => r.NoPieces) : Results.OrderBy(r => r.NoPieces),
+            "CustomerReceivedDate" => SortDesc ? Results.OrderByDescending(r => r.CustomerReceivedDate) : Results.OrderBy(r => r.CustomerReceivedDate),
+            "TissueDescription" => SortDesc ? Results.OrderByDescending(r => r.TissueDescription) : Results.OrderBy(r => r.TissueDescription),
+            _                => SortDesc ? Results.OrderByDescending(r => r.ID) : Results.OrderBy(r => r.ID),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
+
+    private void PopulateGridViewData()
+    {
+        var totalPages = Results.Count == 0 ? 1 : (int)Math.Ceiling(Results.Count / (double)PageSize);
+        if (PageNumber < 1) PageNumber = 1;
+        else if (PageNumber > totalPages) PageNumber = totalPages;
+        ViewData["SortColumn"] = SortColumn;
+        ViewData["SortDesc"] = SortDesc;
+        ViewData["CurrentPage"] = PageNumber;
+        ViewData["TotalPages"] = totalPages;
+        ViewData["FormId"] = "view-samples-form";
+        ViewData["Handler"] = "Search";
+    }
+
     public async Task OnGetAsync()
     {
         SetTitle();
         await LoadLookupsAsync();
     }
 
-    public async Task<IActionResult> OnPostAsync()
+    public async Task<IActionResult> OnPostSearchAsync()
     {
         SetTitle();
         await LoadLookupsAsync();
@@ -76,6 +114,7 @@ public class ViewSamplesModel : HistoPageModel
 
         Searched = true;
         Results = await SearchAsync();
+        PopulateGridViewData();
 
         return Page();
     }

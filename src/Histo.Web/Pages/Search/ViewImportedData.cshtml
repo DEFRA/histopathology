@@ -22,13 +22,13 @@
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="Filter">Filter</label>
-        <input class="govuk-input" asp-for="Filter" />
+        <input class="govuk-input govuk-input--width-30" asp-for="Filter" />
     </div>
     <button type="submit" class="govuk-button" data-module="govuk-button">Go</button>
     <a class="govuk-button govuk-button--secondary" asp-page="/Search/ViewImportedData">Clear</a>
     @if (!string.IsNullOrEmpty(Model.SelectedTable) && Model.Results.Any())
     {
-        <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to CSV</button>
+        <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</button>
     }
 </form>
 
@@ -39,18 +39,29 @@
         <table class="govuk-table">
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
-                    <th scope="col" class="govuk-table__header">Sender ref</th>
-                    <th scope="col" class="govuk-table__header">Histology ref</th>
-                    <th scope="col" class="govuk-table__header">Block ref</th>
-                    <th scope="col" class="govuk-table__header">Project</th>
-                    <th scope="col" class="govuk-table__header">Date submitted</th>
-                    <th scope="col" class="govuk-table__header">Species</th>
-                    <th scope="col" class="govuk-table__header">Tissue</th>
-                    <th scope="col" class="govuk-table__header">Comments</th>
+                    @{ ViewData["Label"] = "Sender ref"; ViewData["Column"] = "SenderRef"; }
+                    <partial name="_SortableHeader" />
+                    @{ ViewData["Label"] = "Histology ref"; ViewData["Column"] = "HistologyRef"; }
+                    <partial name="_SortableHeader" />
+                    @{ ViewData["Label"] = "Block ref"; ViewData["Column"] = "BlockRef"; }
+                    <partial name="_SortableHeader" />
+                    @{ ViewData["Label"] = "Project"; ViewData["Column"] = "Project"; }
+                    <partial name="_SortableHeader" />
+                    @{ ViewData["Label"] = "Date submitted"; ViewData["Column"] = "DateSubmitted"; }
+                    <partial name="_SortableHeader" />
+                    @{ ViewData["Label"] = "Species"; ViewData["Column"] = "Species"; }
+                    <partial name="_SortableHeader" />
+                    @{ ViewData["Label"] = "Tissue"; ViewData["Column"] = "Tissue"; }
+                    <partial name="_SortableHeader" />
+                    @{
+                        ViewData["Label"] = "Comments"; ViewData["Column"] = "Comments";
+                    }
+                    <partial name="_SortableHeader" />
+                    @* <th scope="col" class="govuk-table__header">Comments</th> *@
                 </tr>
             </thead>
             <tbody class="govuk-table__body">
-                @foreach (var r in Model.Results)
+                @foreach (var r in Model.PagedResults)
                 {
                     <tr class="govuk-table__row">
                         <td class="govuk-table__cell">@r.SenderRef</td>
@@ -65,6 +76,7 @@
                 }
             </tbody>
         </table>
+        <partial name="_Pagination" />
     }
     else
     {

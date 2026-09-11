@@ -368,7 +368,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
     // -----------------------------------------------------------------------
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<PmDateSearchResult>> GetByPmDateRangeAsync(DateTime fromDate, DateTime toDate, CancellationToken ct = default)
+    public async Task<IReadOnlyList<PmDateSearchResult>> GetByPmDateRangeAsync(DateTime? fromDate, DateTime? toDate, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<PmDateSearchResult>(

@@ -40,7 +40,7 @@ public class SearchValidationTests
             .ReturnsAsync((IReadOnlyList<User>)[]);
         _batches.Setup(b => b.SearchAsync(It.IsAny<BatchSearchCriteria>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BatchSearchResult>)[]);
-        _submissions.Setup(s => s.GetByPmDateRangeAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        _submissions.Setup(s => s.GetByPmDateRangeAsync(It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<PmDateSearchResult>)[]);
         _blocks.Setup(b => b.GetUsedBlockRefsByHistologyRefAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<UsedBlockRef>)[]);
@@ -78,7 +78,7 @@ public class SearchValidationTests
 
         Assert.True(sut.Errors.ContainsKey("StartDate-day"));
         Assert.False(sut.Searched);
-        _submissions.Verify(s => s.GetByPmDateRangeAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
+        _submissions.Verify(s => s.GetByPmDateRangeAsync(It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -97,15 +97,15 @@ public class SearchValidationTests
     }
 
     [Fact]
-    public async Task SearchPMDates_MissingDates_AreRequiredAsInLegacy()
+    public async Task SearchPMDates_MissingDates_TreatedAsOpenRangeAndSearches()
     {
         var sut = CreateSearchPmDates();
 
         await sut.OnPostSearchAsync();
 
-        Assert.Equal("Enter a PM from date.", sut.Errors["StartDate-day"]);
-        Assert.Equal("Enter a PM to date.", sut.Errors["EndDate-day"]);
-        Assert.False(sut.Searched);
+        Assert.Empty(sut.Errors);
+        Assert.True(sut.Searched);
+        _submissions.Verify(s => s.GetByPmDateRangeAsync(null, null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -284,18 +284,20 @@ public class SearchValidationTests
     }
 
     [Fact]
-    public async Task SearchBlockRefs_BothRefsSupplied_AddsErrorAndDoesNotSearch()
+    public async Task SearchBlockRefs_BothRefsSupplied_SearchesBySenderRefPrecedence()
     {
+        // GetBlocksForHistoRef/GetBlocksForSenderRef tolerate both being supplied — Sender ref
+        // takes precedence, matching the same relaxed rule applied to SearchArchiveLocation.
         var sut = CreateSearchBlockRefs();
         sut.SenderRef = "S1";
         sut.HistologyRef = "H1";
 
         await sut.OnGetAsync();
 
-        Assert.True(sut.Errors.ContainsKey(nameof(sut.SenderRef)));
-        Assert.False(sut.Searched);
+        Assert.Empty(sut.Errors);
+        Assert.True(sut.Searched);
+        _blocks.Verify(b => b.GetUsedBlockRefsBySenderRefAsync("S1", It.IsAny<CancellationToken>()), Times.Once);
         _blocks.Verify(b => b.GetUsedBlockRefsByHistologyRefAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-        _blocks.Verify(b => b.GetUsedBlockRefsBySenderRefAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -306,6 +308,18 @@ public class SearchValidationTests
         await sut.OnGetAsync();
 
         Assert.Empty(sut.Errors);
+        Assert.False(sut.Searched);
+    }
+
+    [Fact]
+    public async Task SearchBlockRefs_SubmittedWithNoCriteria_ShowsValidationError()
+    {
+        var sut = CreateSearchBlockRefs();
+        sut.Submitted = true;
+
+        await sut.OnGetAsync();
+
+        Assert.True(sut.Errors.ContainsKey(nameof(sut.SenderRef)));
         Assert.False(sut.Searched);
     }
 }

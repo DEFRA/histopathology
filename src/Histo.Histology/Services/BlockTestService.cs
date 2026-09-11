@@ -80,7 +80,10 @@ public sealed class BlockTestService : IBlockTestService
         }
         catch (Exception ex)
         {
+            // Was silently swallowed — callers (BlockDetails.cshtml.cs) awaited this and
+            // redirected as if the save succeeded even when nothing was persisted.
             _logger.LogError("Failed to save test selections for block {BlockId}.", ex, blockId);
+            throw;
         }
     }
 }

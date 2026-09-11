@@ -14,10 +14,15 @@ using ITfoxtec.Identity.Saml2;
 using ITfoxtec.Identity.Saml2.MvcCore;
 using ITfoxtec.Identity.Saml2.MvcCore.Configuration;
 using ITfoxtec.Identity.Saml2.Schemas.Metadata;
+using Histo.Web.Telemetry;
+using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.HttpOverrides;
 using Serilog;
+using Serilog.Sinks.ApplicationInsights.TelemetryConverters;
 using System.Security.Cryptography.X509Certificates;
 
 // Bootstrap Serilog before the host is built so startup errors are captured.
@@ -41,10 +46,19 @@ try
 
     // -- Serilog -------------------------------------------------------------
     builder.Host.UseSerilog((ctx, services, cfg) =>
+    {
         cfg.ReadFrom.Configuration(ctx.Configuration)
            .ReadFrom.Services(services)
            .Enrich.FromLogContext()
-           .WriteTo.Console());
+           .WriteTo.Console();
+
+        // Routes every IAppLogger/ILogger call (not just ASP.NET Core's own auto-collected
+        // requests/dependencies) into Application Insights, so the existing LogError/LogWarning
+        // calls throughout the repositories/services are actually visible there.
+        var aiConnectionString = ctx.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
+        if (!string.IsNullOrWhiteSpace(aiConnectionString) && !aiConnectionString.StartsWith("__", StringComparison.Ordinal))
+            cfg.WriteTo.ApplicationInsights(aiConnectionString, TelemetryConverter.Traces);
+    });
 
     // -- Strongly-typed options -----------------------------------------------
     builder.Services.Configure<AppOptions>(
@@ -86,6 +100,7 @@ try
         var factory = sp.GetRequiredService<ILoggerFactory>();
         return new AppLogger<IAppLogger>(factory.CreateLogger<IAppLogger>());
     });
+    builder.Services.AddScoped<TelemetryHelper>();
 
     // -- Health checks --------------------------------------------------------
     builder.Services.AddHealthChecks();
@@ -205,10 +220,22 @@ try
     builder.Services.AddTransient<SubmissionNotesRenderer>();
 
     // -- Application Insights telemetry --------------------------------------
-    var aiConnString = builder.Configuration["AppSettings:ApplicationInsightsConnectionString"];
-    if (!string.IsNullOrWhiteSpace(aiConnString))
+    // Matches the standard App Service setting name (APPLICATIONINSIGHTS_CONNECTION_STRING,
+    // top-level — the same key Azure's own AI extension and the SDK's auto-detection use).
+    var aiConnString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
+    if (!string.IsNullOrWhiteSpace(aiConnString) && !aiConnString.StartsWith("__", StringComparison.Ordinal))
+    {
         builder.Services.AddApplicationInsightsTelemetry(o =>
             o.ConnectionString = aiConnString);
+    }
+    else
+    {
+        // AddApplicationInsightsTelemetry is what registers TelemetryClient — skipped above when
+        // no connection string is configured (e.g. local dev). TelemetryHelper still requires one,
+        // so register a client backed by an unconfigured TelemetryConfiguration: it accepts every
+        // Track*/Flush call but has nowhere to send data, so it's a safe local no-op.
+        builder.Services.AddSingleton(new TelemetryClient(new TelemetryConfiguration()));
+    }
 
     var app = builder.Build();
 
@@ -261,8 +288,26 @@ try
     }
     else
     {
-        // GDS "There is a problem with the service" for all unhandled 5xx
-        app.UseExceptionHandler("/Errors/ServiceProblem");
+        // GDS "There is a problem with the service" for all unhandled 5xx. Explicitly tracks
+        // the exception (with URL/user context) before redirecting, so a genuinely unhandled
+        // failure is fully visible in Application Insights rather than just an opaque TraceId.
+        app.UseExceptionHandler(errorApp =>
+        {
+            errorApp.Run(context =>
+            {
+                var error = context.Features.Get<IExceptionHandlerPathFeature>()?.Error;
+                if (error is not null)
+                {
+                    var telemetry = context.RequestServices.GetRequiredService<TelemetryHelper>();
+                    telemetry.TrackException(error, "GlobalExceptionHandler", new Dictionary<string, string>
+                    {
+                        ["url"] = context.Request.Path.Value ?? string.Empty,
+                    });
+                }
+                context.Response.Redirect("/Errors/ServiceProblem");
+                return Task.CompletedTask;
+            });
+        });
         app.UseStatusCodePagesWithReExecute("/Errors/ServiceProblem");
     }
 
@@ -283,6 +328,10 @@ try
     // Renamed to /Submissions/SampleSummary — "Block" is meaningless for Wet Tissue submissions.
     app.MapGet("/Submissions/BatchBlockSummary", (HttpRequest request) =>
         Results.Redirect($"/Submissions/SampleSummary{request.QueryString}", permanent: true));
+
+    // Global.asax Application_End has no .NET 10 equivalent — flush telemetry explicitly on shutdown.
+    app.Lifetime.ApplicationStopped.Register(() =>
+        app.Services.GetRequiredService<TelemetryClient>().Flush());
 
     app.Run();
 }

@@ -1,3 +1,5 @@
+using Histo.Infrastructure.Exceptions;
+
 namespace Histo.Submissions.Models;
 
 /// <summary>
@@ -7,7 +9,7 @@ namespace Histo.Submissions.Models;
 /// Legacy source: HistopathologyLib/clsBatch.vb — <c>BatchUpdateException</c>.
 /// Renamed to follow C# naming conventions.
 /// </summary>
-public sealed class BatchConcurrencyException : Exception
+public sealed class BatchConcurrencyException : HistoConcurrencyException
 {
     public BatchConcurrencyException()
         : base("Another user has modified this batch record.") { }
@@ -20,7 +22,7 @@ public sealed class BatchConcurrencyException : Exception
 ///
 /// Legacy source: HistopathologyLib/clsAnimal.vb — <c>AnimalUpdateException</c>.
 /// </summary>
-public sealed class AnimalConcurrencyException : Exception
+public sealed class AnimalConcurrencyException : HistoConcurrencyException
 {
     public AnimalConcurrencyException()
         : base("Another user has modified this sample record.") { }
@@ -34,7 +36,7 @@ public sealed class AnimalConcurrencyException : Exception
 /// Legacy source: HistopathologyLib/clsAnimal.vb — <c>AnimalUpdateException</c>,
 /// as raised from <c>UpdateAnimalSenderRef</c> / <c>UpdateAnimalHistologyRef</c>.
 /// </summary>
-public sealed class AnimalRefUpdateException : Exception
+public sealed class AnimalRefUpdateException : HistoValidationException
 {
     public AnimalRefUpdateException(string message) : base(message) { }
 }

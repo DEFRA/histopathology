@@ -2319,6 +2319,14 @@ Appended 7 new rows to `run-log-v2.md`'s Run Log table (#50–#56), 7 new rows t
 
 **Files changed:** [docs/run-log-v2.md](../docs/run-log-v2.md), [docs/session-metrics.md](../docs/session-metrics.md), [docs/User-Prompts-Log.md](../docs/User-Prompts-Log.md).
 
+## Prompt 140 — Histo.WebJobs implementation + Application Insights + config alignment with Histo.Web (2026-09-10)
 
+> Series of requests: "implement webjobs add config setting if it's required"; "which log is suitable for histo.web project"; "wat will happen if logs are not capturing in app insights"; "yes implement app insight logs for webjobs, can i add azurestorageaccountconfig in app setting? so it won't missed to configure"; "why this config needed?" (ConfigureAppConfiguration); "no more environment base configuration then why do we need it"; "Histo.web doesn't have environment specific config, can u aligned with that also the same configuration will be reference ex database connection string which is reference from appsetting from azure devops".
+
+Created `src/Histo.WebJobs` — a triggered WebJob (Microsoft.Azure.WebJobs SDK) replacing the legacy SQL Server Agent annual histology-reset job (`dbo.EditResetHistologyRef`, TimerTrigger `0 0 4 1 1 *`), using Managed Identity for DB access (no secrets in code). Fixed 4 build errors (missing `Microsoft.Azure.WebJobs.Extensions`, missing `OutputType=Exe`, `Microsoft.Data.SqlClient` version conflict, `Logging:LogLevel` not binding — `AddConfiguration` was missing). Added Application Insights logging via `Microsoft.ApplicationInsights.WorkerService` after two failed attempts with the wrong package APIs (`Microsoft.Azure.WebJobs.Logging.ApplicationInsights`, `ILoggingBuilder.AddApplicationInsights`). Re-aligned the WebJobs configuration to match `Histo.Web`'s actual conventions exactly: top-level `APPLICATIONINSIGHTS_CONNECTION_STRING` (same placeholder as Web), Managed-Identity `ConnectionStrings:HistologyDb` matching Web's checked-in format, removed non-functional doc-only config sections, and removed `appsettings.Development.json`/per-environment file loading entirely since Web relies purely on the base `appsettings.json` + Azure DevOps-injected App Service Application Settings.
+
+**Build:** 0 errors, 1 pre-existing non-critical `NU1603` warning.
+
+**Files changed:** [src/Histo.WebJobs/Histo.WebJobs.csproj](../src/Histo.WebJobs/Histo.WebJobs.csproj), [src/Histo.WebJobs/Program.cs](../src/Histo.WebJobs/Program.cs), [src/Histo.WebJobs/HistologyResetJob.cs](../src/Histo.WebJobs/HistologyResetJob.cs), [src/Histo.WebJobs/appsettings.json](../src/Histo.WebJobs/appsettings.json), [HistopathologySystem.slnx](../HistopathologySystem.slnx).
 
 

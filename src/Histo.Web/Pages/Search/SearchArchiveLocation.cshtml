@@ -20,10 +20,28 @@
         <label class="govuk-label" for="SenderRef">Sender ref</label>
         <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" />
     </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="ArchiveLocation">Archive location</label>
-        <input class="govuk-input" asp-for="ArchiveLocation" />
-    </div>
+    @* Tissue/Slide archive locations are picked from the Archive Location pick list (table 16);
+       Block archive locations are freeform text, matching legacy's per-mode field behaviour. *@
+    @if (Model.ArchiveType == "Block")
+    {
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="ArchiveLocation">Archive location</label>
+            <input class="govuk-input" asp-for="ArchiveLocation" />
+        </div>
+    }
+    else
+    {
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="ArchiveLocation">Archive location</label>
+            <select class="govuk-select" asp-for="ArchiveLocation">
+                <option value="">-- Any --</option>
+                @foreach (var loc in Model.ArchiveLocations)
+                {
+                    <option value="@loc.Code">@loc.Name</option>
+                }
+            </select>
+        </div>
+    }
     <div class="govuk-form-group">
         <label class="govuk-label" for="ArchiveType">Archive type</label>
         <select class="govuk-select" asp-for="ArchiveType">
@@ -34,19 +52,27 @@
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="TissueCode">Tissue code (Tissue archive only)</label>
-        <input class="govuk-input" asp-for="TissueCode" />
+        <select class="govuk-select" asp-for="TissueCode">
+            <option value="">-- Any --</option>
+            @foreach (var t in Model.Tissues)
+            {
+                var v = !string.IsNullOrWhiteSpace(t.Code) ? t.Code : t.ID.ToString();
+                <option value="@v">@t.Name</option>
+            }
+        </select>
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="BlockRef">Block ref (Block archive only)</label>
-        <input class="govuk-input" asp-for="BlockRef" />
+        <input class="govuk-input  govuk-input--width-5" asp-for="BlockRef" />
     </div>
     <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
     @if (Model.Searched && Model.Errors.Count == 0)
     {
-        <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to CSV</button>
+        <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</button>
     }
 </form>
 
+@* Legacy's result grids have no sorting or paging \u2014 rendered as plain tables. *@
 @if (Model.Searched)
 {
     @if (Model.ArchiveType == "Block")
@@ -56,22 +82,16 @@
             <table class="govuk-table">
                 <thead class="govuk-table__head">
                     <tr class="govuk-table__row">
-                        @{ ViewData["Label"] = "Submission number"; ViewData["Column"] = "ID"; }
-                        <partial name="_SortableHeader" />
-                        @{ ViewData["Label"] = "Block ref"; ViewData["Column"] = "BlockRef"; }
-                        <partial name="_SortableHeader" />
-                        @{ ViewData["Label"] = "Archive location"; ViewData["Column"] = "ArchiveLocation"; }
-                        <partial name="_SortableHeader" />
-                        @{ ViewData["Label"] = "Archived date"; ViewData["Column"] = "ArchivedDate"; }
-                        <partial name="_SortableHeader" />
-                        @{ ViewData["Label"] = "Tissue"; ViewData["Column"] = "TissueDescription"; }
-                        <partial name="_SortableHeader" />
-                        @{ ViewData["Label"] = "No pieces"; ViewData["Column"] = "NoPieces"; }
-                        <partial name="_SortableHeader" />
+                        <th scope="col" class="govuk-table__header">Submission number</th>
+                        <th scope="col" class="govuk-table__header">Block ref</th>
+                        <th scope="col" class="govuk-table__header">Archive location</th>
+                        <th scope="col" class="govuk-table__header">Archived date</th>
+                        <th scope="col" class="govuk-table__header">Tissue</th>
+                        <th scope="col" class="govuk-table__header">No pieces</th>
                     </tr>
                 </thead>
                 <tbody class="govuk-table__body">
-                    @foreach (var r in Model.PagedBlockResults)
+                    @foreach (var r in Model.BlockResults)
                     {
                         <tr class="govuk-table__row">
                             <td class="govuk-table__cell">@r.ID</td>
@@ -84,7 +104,6 @@
                     }
                 </tbody>
             </table>
-            <partial name="_Pagination" />
         }
         else
         {
@@ -98,22 +117,16 @@
             <table class="govuk-table">
                 <thead class="govuk-table__head">
                     <tr class="govuk-table__row">
-                        @{ ViewData["Label"] = "Submission number"; ViewData["Column"] = "BatchID"; }
-                        <partial name="_SortableHeader" />
-                        @{ ViewData["Label"] = "Block ref"; ViewData["Column"] = "BlockRef"; }
-                        <partial name="_SortableHeader" />
-                        @{ ViewData["Label"] = "Archive location"; ViewData["Column"] = "ArchiveLocation"; }
-                        <partial name="_SortableHeader" />
-                        @{ ViewData["Label"] = "Archived date"; ViewData["Column"] = "ArchivedDate"; }
-                        <partial name="_SortableHeader" />
-                        @{ ViewData["Label"] = "Slide"; ViewData["Column"] = "Description"; }
-                        <partial name="_SortableHeader" />
-                        @{ ViewData["Label"] = "Tissue"; ViewData["Column"] = "TissueDescription"; }
-                        <partial name="_SortableHeader" />
+                        <th scope="col" class="govuk-table__header">Submission number</th>
+                        <th scope="col" class="govuk-table__header">Block ref</th>
+                        <th scope="col" class="govuk-table__header">Archive location</th>
+                        <th scope="col" class="govuk-table__header">Archived date</th>
+                        <th scope="col" class="govuk-table__header">Slide</th>
+                        <th scope="col" class="govuk-table__header">Tissue</th>
                     </tr>
                 </thead>
                 <tbody class="govuk-table__body">
-                    @foreach (var r in Model.PagedSlideResults)
+                    @foreach (var r in Model.SlideResults)
                     {
                         <tr class="govuk-table__row">
                             <td class="govuk-table__cell">@r.BatchID</td>
@@ -126,7 +139,6 @@
                     }
                 </tbody>
             </table>
-            <partial name="_Pagination" />
         }
         else
         {
@@ -140,20 +152,15 @@
             <table class="govuk-table">
                 <thead class="govuk-table__head">
                     <tr class="govuk-table__row">
-                        @{ ViewData["Label"] = "Submission number"; ViewData["Column"] = "BatchID"; }
-                        <partial name="_SortableHeader" />
-                        @{ ViewData["Label"] = "Tissue"; ViewData["Column"] = "TissueDescription"; }
-                        <partial name="_SortableHeader" />
-                        @{ ViewData["Label"] = "Archive location"; ViewData["Column"] = "ArchiveLocation"; }
-                        <partial name="_SortableHeader" />
-                        @{ ViewData["Label"] = "Archived date"; ViewData["Column"] = "ArchivedDate"; }
-                        <partial name="_SortableHeader" />
-                        @{ ViewData["Label"] = "No pieces"; ViewData["Column"] = "NoPieces"; }
-                        <partial name="_SortableHeader" />
+                        <th scope="col" class="govuk-table__header">Submission number</th>
+                        <th scope="col" class="govuk-table__header">Tissue</th>
+                        <th scope="col" class="govuk-table__header">Archive location</th>
+                        <th scope="col" class="govuk-table__header">Archived date</th>
+                        <th scope="col" class="govuk-table__header">No pieces</th>
                     </tr>
                 </thead>
                 <tbody class="govuk-table__body">
-                    @foreach (var r in Model.PagedTissueResults)
+                    @foreach (var r in Model.TissueResults)
                     {
                         <tr class="govuk-table__row">
                             <td class="govuk-table__cell">@r.BatchID</td>
@@ -165,7 +172,6 @@
                     }
                 </tbody>
             </table>
-            <partial name="_Pagination" />
         }
         else
         {

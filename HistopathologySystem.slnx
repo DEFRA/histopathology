@@ -9,6 +9,7 @@
     <Project Path="src/Histo.Reporting/Histo.Reporting.csproj" />
     <Project Path="src/Histo.Submissions/Histo.Submissions.csproj" />
     <Project Path="src/Histo.Web/Histo.Web.csproj" />
+    <Project Path="src/Histo.WebJobs/Histo.WebJobs.csproj" />
   </Folder>
   <Folder Name="/src/Database/" />
   <Folder Name="/src/Database/Permissions/">

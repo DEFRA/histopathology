@@ -16,7 +16,7 @@
 /* APHA departmental logo replacing the GOV.UK crown mark. Kept in its own row
  * (not squeezed inline with the licence text) so the wordmark stays legible per WCAG 1.4.5. */
 .govuk-footer__logo {
-    margin-bottom: 25px;
+    margin-bottom: 5px;
 }
 
 /* Resets native <button> chrome so POST-based sort/pagination controls (which must

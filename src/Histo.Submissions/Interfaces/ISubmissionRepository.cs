@@ -150,7 +150,7 @@ public interface ISubmissionRepository
     /// Returns submissions whose PM date falls within the given range.
     /// Maps to <c>GetSearchPMDates</c>. Legacy source: SearchPMDates.aspx.
     /// </summary>
-    Task<IReadOnlyList<PmDateSearchResult>> GetByPmDateRangeAsync(DateTime fromDate, DateTime toDate, CancellationToken ct = default);
+    Task<IReadOnlyList<PmDateSearchResult>> GetByPmDateRangeAsync(DateTime? fromDate, DateTime? toDate, CancellationToken ct = default);
 
     /// <summary>
     /// Returns animals/samples matching a (partial) sender reference.
