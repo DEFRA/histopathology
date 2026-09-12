@@ -21,9 +21,12 @@ namespace Histo.Web.Pages.Search;
 /// <c>BatchBlockSummary</c> and creating this page to reproduce the real
 /// <c>ViewSamples.aspx</c> feature.
 ///
-/// Legacy validation (<c>btnSearch_Click</c>): exactly one of Sender Ref /
-/// Histology Ref must be supplied — an error is shown if both or neither are
-/// filled in. Two mutually exclusive search modes (legacy <c>rbWetTissue</c> /
+/// Validation: at least one of Sender Ref / Histology Ref must be supplied — both
+/// stored procedures tolerate both being given (each branches internally on one
+/// ref, ignoring the other; confirmed via <c>sp_helptext</c> — <c>GetAnimalBatchTissues</c>
+/// (Tissue mode) prefers Sender Ref, <c>GetAnimalBlockTissues</c> (Block mode) prefers
+/// Histology Ref), so an exactly-one-only rule was an unnecessarily strict UI
+/// invention. Two mutually exclusive search modes (legacy <c>rbWetTissue</c> /
 /// <c>rbBlockInformation</c> radio buttons) select between
 /// <c>clsAnimal.GetAnimalTissues</c> (SP <c>GetAnimalBatchTissues</c>,
 /// "Tissue Information") and <c>GetAnimalBlockTissues</c> (SP
@@ -150,19 +153,33 @@ public class ViewSamplesModel : HistoPageModel
         return CsvExportHelper.BuildCsv(isBlockMode ? "BlockInformation.csv" : "TissueInformation.csv", headers, rows);
     }
 
-    private Task<IReadOnlyList<AnimalTissueSearchResult>> SearchAsync() =>
-        Mode == "Block"
-            ? _submissions.GetAnimalBlockTissuesAsync(SenderRef, HistologyRef, TissueCode, ProjectDesc)
-            : _submissions.GetAnimalTissuesAsync(SenderRef, HistologyRef, TissueCode, ProjectDesc);
+    private Task<IReadOnlyList<AnimalTissueSearchResult>> SearchAsync()
+    {
+        var senderRef = NullIfEmpty(SenderRef);
+        var histologyRef = NullIfEmpty(HistologyRef);
+        var tissueCode = NullIfEmpty(TissueCode);
+        var projectDesc = NullIfEmpty(ProjectDesc);
+
+        return Mode == "Block"
+            ? _submissions.GetAnimalBlockTissuesAsync(senderRef, histologyRef, tissueCode, projectDesc)
+            : _submissions.GetAnimalTissuesAsync(senderRef, histologyRef, tissueCode, projectDesc);
+    }
+
+    // The stored procedures treat an unapplied filter as "@Param IS NULL" — an empty string
+    // (what a blank text input actually posts) never satisfies that check, so it silently
+    // filters out every row instead of being ignored.
+    private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
     private bool Validate()
     {
         var hasSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
         var hasHistologyRef = !string.IsNullOrWhiteSpace(HistologyRef);
 
-        if (hasSenderRef == hasHistologyRef)
+        // Both stored procedures tolerate both being supplied (each ignores the other, with its
+        // own internal precedence) — only reject when NEITHER is given.
+        if (!hasSenderRef && !hasHistologyRef)
         {
-            Errors[nameof(SenderRef)] = "Enter either the Sender Ref or the Histology Ref, not both.";
+            Errors[nameof(SenderRef)] = "Enter the Sender Ref or the Histology Ref.";
             return false;
         }
 

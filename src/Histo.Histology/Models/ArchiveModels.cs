@@ -34,11 +34,10 @@ public sealed class BlockArchiveInfo
 /// <summary>
 /// One result row for the Slide Archive search mode of SearchArchiveLocation.
 ///
-/// Legacy source: HistopathologyLib/clsAnimal.vb — <c>GetAnimalSlideArchiveInformation</c>.
-/// SIMPLIFIED: the legacy method fans out across <c>GetAnimalStainArchiveInformation</c>,
-/// <c>GetAnimalBatches</c>, and per-batch-type merge logic to build this shape. This
-/// model reflects only the direct <c>GetAnimalStainArchiveInformation</c> result —
-/// see the search module report for what was not ported.
+/// Legacy source: HistopathologyLib/clsAnimal.vb — <c>GetAnimalSlideArchiveInformation</c>, which
+/// merges rows from <c>GetAnimalStainArchiveInformation</c>, per-batch
+/// <c>GetAnimalAntibodiesArchiveInformation</c>, and <c>GetAnimalHistologyArchiveInformation</c>
+/// into this one shape — reproduced in full by <see cref="Histo.Histology.Repositories.BlockRepository.GetSlideArchiveAsync"/>.
 /// </summary>
 public sealed class SlideArchiveInfo
 {

@@ -2329,4 +2329,116 @@ Created `src/Histo.WebJobs` — a triggered WebJob (Microsoft.Azure.WebJobs SDK)
 
 **Files changed:** [src/Histo.WebJobs/Histo.WebJobs.csproj](../src/Histo.WebJobs/Histo.WebJobs.csproj), [src/Histo.WebJobs/Program.cs](../src/Histo.WebJobs/Program.cs), [src/Histo.WebJobs/HistologyResetJob.cs](../src/Histo.WebJobs/HistologyResetJob.cs), [src/Histo.WebJobs/appsettings.json](../src/Histo.WebJobs/appsettings.json), [HistopathologySystem.slnx](../HistopathologySystem.slnx).
 
+---
+
+## Prompt 141 — Header navigation GDS check + Menu toggle behaviour question (2026-09-11)
+
+> "Can you check the navigatin link which is in header is it GDS standard, where it's picked up"; "why _navPartial.cshmt showing in header"; "there is menu link in gov.uk page, when user click on menu link it's open up and shows all the link what's the difference here"
+
+Confirmed `_Layout.cshtml`/`_NavPartial.cshtml` use the official GOV.UK Service Navigation component (`govuk-service-navigation`, `govuk-frontend` 6.4.0), correctly wired via `_ViewStart.cshtml` → `_Layout.cshtml` → `Html.PartialAsync("_NavPartial")`. Flagged one real gap: no `aria-current="page"` on the active nav link (not actioned, awaiting decision). Confirmed the "Menu" toggle is standard, unmodified `govuk-frontend` JS behaviour (collapses on narrow viewports only) — no difference from any other GOV.UK service. No code changes.
+
+---
+
+## Prompt 142 — SearchArchiveLocation grid presentation, GDS review of sample data (2026-09-11)
+
+> "search is now working when i select slide archive see the below sample data, if data is comming like below it has to show in grid like below is it GDS standard" [supplied sample data showing Block/Slide archive grouped by Submission Number with tissues listed under one row] ... "Can you implmente GDS's default recommendation is a fully flat table"
+
+Implemented the requested grouped/`rowspan` layout matching the user's sample data for Block and Slide archive (removing the earlier click-to-expand `<details>` widget, flagged as a GDS anti-pattern for primary data). On the explicit follow-up request, reverted both to a fully flat table (every row repeats the shared columns) per GOV.UK's own guidance to avoid merged/`rowspan` cells for screen-reader consistency, matching the already-flat Tissue archive table. Removed the now-unused grouping properties.
+
+**Build:** 0 errors. **Tests:** 281 total, 280 pass, 1 skipped.
+
+**Files changed:** [src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml), [src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml.cs](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml.cs).
+
+---
+
+## Prompt 143 — SearchArchiveLocation Tissue code dropdown + field reorder (2026-09-11)
+
+> "can u implment SearchArchiveLocation should be dropdown Tissue code (Tissue archive only)"; "archive location dropdown move to below to sender ref Archive location"
+
+Restored Tissue code as a dropdown fed by the tissue lookup (table 9) — an earlier external edit had reverted it to a plain text input. Moved Archive location to appear directly after Sender ref (before Archive type), per the requested field order.
+
+**Build:** 0 errors.
+
+**Files changed:** [src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml).
+
+---
+
+## Prompt 144 — SearchArchiveLocation Slide archive returns no records (2026-09-11)
+
+> "Grid is not loading when Archive type selected as slide archive 'No slide archive records found.'"; "still i could not see records for archite type for Slide and filtered it"; "i have give vlaues in both field, why i'm getting below error message ... Enter either the Sender Ref or the Histology Ref, not both."; "issue still i could not see records for archite type for Slide archive"
+
+Confirmed via a live DB test (`GetAnimalStainArchiveInformation` called directly with real data) that the stored procedures work correctly, ruling out a data/SP problem. Root cause: `SenderRef`/`HistologyRef`/`ArchiveLocation`/`TissueCode`/`BlockRef` were passed straight from the posted form — a blank input or unselected dropdown posts an empty string, not `null`, but every underlying SP treats an unapplied filter as `@Param IS NULL`, so an empty string satisfied neither side and silently filtered out every row. Added a `NullIfEmpty` helper applied to all 5 filter values. A first retest false-negative was traced to a stale `Histo.Web` process serving a pre-fix build. Also relaxed the "not both" validation (see Prompt 145).
+
+**Build:** 0 errors. **Tests:** 281 total, 280 pass, 1 skipped.
+
+**Files changed:** [src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml.cs](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml.cs).
+
+---
+
+## Prompt 145 — Relax "not both" validation on SearchArchiveLocation and SearchBlockRefs (2026-09-11)
+
+> "Below issue happend in SearchBlockRefs.cshtml as ... Enter either the Sender Ref or the Histology Ref, not both."
+
+Confirmed via `sp_helptext` that `GetBlocksForHistoRef`/`GetBlocksForSenderRef` (and the Archive Location SPs) all tolerate both Sender ref and Histology ref being supplied — Sender ref takes precedence, Histology ref is simply ignored. Relaxed the strict XOR validation on both `SearchArchiveLocation` and `SearchBlockRefs` to only reject when neither is supplied; `SearchBlockRefs.SearchAsync` now explicitly routes to the Sender-ref-only stored procedure whenever Sender ref is present. Rewrote the `SearchBlockRefs_BothRefsSupplied_AddsErrorAndDoesNotSearch` test to assert the new precedence behaviour.
+
+**Build:** 0 errors. **Tests:** 281 total, 280 pass, 1 skipped.
+
+**Files changed:** [src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml.cs](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml.cs), [src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml.cs](../src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml.cs), [tests/Histo.Tests/Unit/SearchValidationTests.cs](../tests/Histo.Tests/Unit/SearchValidationTests.cs).
+
+---
+
+## Prompt 146 — SearchBlockRefs blank-submit validation message missing (2026-09-11)
+
+> "but should validation message is not comming happend in SearchBlockRefs.cshtml as if im'm not given any vlaues in both filed"
+
+Root-caused to `SearchBlockRefs` being a GET-based form: submitting with both fields blank produces the same query-string-less URL as a bare first visit, so the two cases were indistinguishable server-side and the code always chose "show empty form, no error". Added a hidden `Submitted` marker field so a genuine blank Search click now shows the validation message while a first visit stays silent. Added a companion regression test.
+
+**Build:** 0 errors. **Tests:** 282 total, 281 pass, 1 skipped.
+
+**Files changed:** [src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml](../src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml), [src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml.cs](../src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml.cs), [tests/Histo.Tests/Unit/SearchValidationTests.cs](../tests/Histo.Tests/Unit/SearchValidationTests.cs).
+
+---
+
+## Prompt 147 — SearchArchiveLocation Slide archive alignment check against legacy `ProcessSelectedArchiveSearch` (2026-09-12)
+
+> Slide archive is not working in the SearchArchiveLocation.cshtml page when the archive type When i looked legacy code base here is button search for the SearchArchiveLocation.aspx.vb, it has ProcessSelectedArchiveSearch() method can you please check is it aligned iwth new implmentation ... Why it was missed in migration ? why this gap ?
+
+Compared the supplied legacy `ProcessSelectedArchiveSearch`/`clsAnimal.GetAnimalSlideArchiveInformation` VB source directly against `BlockRepository.GetSlideArchiveAsync`. Confirmed the migrated method only called `GetAnimalStainArchiveInformation` (Special Stain rows) — a "SIMPLIFIED" shortcut already noted in a code comment from the original migration run, but never reproducing legacy's 3-way merge (`GetAnimalStainArchiveInformation` + `GetAnimalBatches`/per-batch `GetAnimalAntibodiesArchiveInformation` + `GetAnimalHistologyArchiveInformation`, excluding rows already covered). Verified all 3 additional stored procedures exist with the expected parameters via live `sp_helptext` against LocalDB, then rewrote the method to reproduce the full fan-out and sort by `BlockRef`. Explained the root cause of the migration gap: the shortcut was documented in a code comment but never escalated to the Parity Audit Report/Traceability Matrix (which only tracked the page's separate UI-hierarchy simplification), and this SP is a structural outlier — every other archive search page is a clean 1-SP-to-1-page mapping, making the true 3-way merge easy to under-scope.
+
+**Build:** 0 errors. **Tests:** 284 total, 281 pass, 1 skipped.
+
+**Files changed:** [src/Histo.Histology/Repositories/BlockRepository.cs](../src/Histo.Histology/Repositories/BlockRepository.cs), [src/Histo.Histology/Interfaces/IBlockRepository.cs](../src/Histo.Histology/Interfaces/IBlockRepository.cs), [src/Histo.Histology/Models/ArchiveModels.cs](../src/Histo.Histology/Models/ArchiveModels.cs).
+
+---
+
+## Prompt 148 — ViewSamples "not both" validation error on entering both Sender ref and Histology ref (2026-09-12)
+
+> I entred Sender ref or Histology ref or both in view sample search should work, but after entering both values it giveing below error messge ... Enter either the Sender Ref or the Histology Ref, not both.
+
+Confirmed via `sp_helptext` that `GetAnimalBatchTissues` (Tissue mode) and `GetAnimalBlockTissues` (Block mode) both tolerate either/both refs being supplied — same class of over-strict UI-invented validation already relaxed on `SearchArchiveLocation`/`SearchBlockRefs`. Relaxed `ViewSamplesModel.Validate()` to only reject when neither ref is supplied, and applied the same `NullIfEmpty` empty-string-vs-NULL fix to `SenderRef`/`HistologyRef`/`TissueCode`/`ProjectDesc`. Added 3 new unit tests.
+
+**Build:** 0 errors.
+
+**Files changed:** [src/Histo.Web/Pages/Search/ViewSamples.cshtml.cs](../src/Histo.Web/Pages/Search/ViewSamples.cshtml.cs), [tests/Histo.Tests/Unit/SearchValidationTests.cs](../tests/Histo.Tests/Unit/SearchValidationTests.cs).
+
+---
+
+## Prompt 149 — SearchSubmissions empty results table on initial load; is it GDS standard? (2026-09-12)
+
+> can searchsbumssiion.cshtml SearchSubmissions Search Submissions The results table is not displayed on initial page load. ... It's legacy applicatin behaviour, it's not GDS standing to show the record inital page load withouth any search fitler ?
+
+Confirmed `SearchSubmissionsModel.OnGetAsync` never runs a search on first load (only populates filter dropdowns) — the same deliberate pattern used by every other Search page in the module, and matching legacy `SearchSubmissions.aspx`'s own `Page_Load` (no grid binding until Search is clicked). Confirmed this is also the GDS-recommended search pattern, not a violation — GOV.UK Design System guidance directs services to let the user submit a search rather than pre-rendering a full/default result set. No code changes.
+
+---
+
+## Prompt 150 — Button spacing issue across the application, GDS button-group reference sample (2026-09-12)
+
+> Button spacing has issue in all the page for in new application for eampl ViewImportedData.cshtml has below two line ... these buttons already working if you are chaning anything it should not break it ... Here is sample reference from the GDS page, how to fix it ?
+
+Audited every `govuk-button--secondary` occurrence app-wide not already wrapped in `govuk-button-group` and identified 14 genuine bare-adjacent-button cases (vs. pages already correct, and 2 deliberately-skipped cases — `CopySamples.cshtml`'s two independent full-width forms, and `QualityData.cshtml`'s "Apply filters"/"Clear" which already had an ad-hoc margin-based spacing fix inside a constrained grid column). Wrapped each in `<div class="govuk-button-group">`, matching the convention already established in `BlockDetails.cshtml` — no button `type`, `asp-page`, `asp-page-handler`, or form attributes touched, preserving existing functionality exactly as requested.
+
+**Build:** 0 errors. **Tests:** 285 total, 284 pass, 1 skipped (after stopping a stray locked `Histo.Web` process that was blocking the build/test copy step).
+
+**Files changed:** [src/Histo.Web/Pages/Search/ViewImportedData.cshtml](../src/Histo.Web/Pages/Search/ViewImportedData.cshtml), [src/Histo.Web/Pages/Admin/AddUser.cshtml](../src/Histo.Web/Pages/Admin/AddUser.cshtml), [src/Histo.Web/Pages/Admin/EditUser.cshtml](../src/Histo.Web/Pages/Admin/EditUser.cshtml), [src/Histo.Web/Pages/Archive/ArchiveBlocks.cshtml](../src/Histo.Web/Pages/Archive/ArchiveBlocks.cshtml), [src/Histo.Web/Pages/AuditLog/AuditLogByDate.cshtml](../src/Histo.Web/Pages/AuditLog/AuditLogByDate.cshtml), [src/Histo.Web/Pages/AuditLog/AuditLogBySubmission.cshtml](../src/Histo.Web/Pages/AuditLog/AuditLogBySubmission.cshtml), [src/Histo.Web/Pages/AuditLog/AuditLogByUser.cshtml](../src/Histo.Web/Pages/AuditLog/AuditLogByUser.cshtml), [src/Histo.Web/Pages/Blocks/CopyBlocks.cshtml](../src/Histo.Web/Pages/Blocks/CopyBlocks.cshtml), [src/Histo.Web/Pages/Blocks/CopySamplesSummary.cshtml](../src/Histo.Web/Pages/Blocks/CopySamplesSummary.cshtml), [src/Histo.Web/Pages/Bookings/EditHistologyRef.cshtml](../src/Histo.Web/Pages/Bookings/EditHistologyRef.cshtml), [src/Histo.Web/Pages/QC/AddQCNote.cshtml](../src/Histo.Web/Pages/QC/AddQCNote.cshtml), [src/Histo.Web/Pages/QC/EditQCNote.cshtml](../src/Histo.Web/Pages/QC/EditQCNote.cshtml), [src/Histo.Web/Pages/QC/QCNotes.cshtml](../src/Histo.Web/Pages/QC/QCNotes.cshtml), [src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml).
+
 

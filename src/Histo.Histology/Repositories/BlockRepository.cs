@@ -163,10 +163,53 @@ public sealed class BlockRepository : IBlockRepository
         string? senderRef, string? histologyRef, string? archiveLocation, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<SlideArchiveInfo>(
+        var results = new List<SlideArchiveInfo>();
+
+        var stainRows = await conn.QueryAsync<SlideArchiveInfo>(
             "GetAnimalStainArchiveInformation",
             new { SenderRef = senderRef, HistologyRef = histologyRef, ArchiveLocation = archiveLocation },
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+        results.AddRange(stainRows);
+
+        // Legacy (clsAnimal.GetAnimalSlideArchiveInformation) also merges in Antibodies archive
+        // data per batch/submission-type, and Histology archive data (excluding the descriptions
+        // already covered by the Stain/Antibodies calls above) — Special Stain rows alone are only
+        // a subset of everything archived against a submission.
+        var batches = await conn.QueryAsync<AnimalBatch>(
+            "GetAnimalBatches",
+            new { SenderRef = senderRef, HistologyRef = histologyRef },
+            commandType: System.Data.CommandType.StoredProcedure);
+
+        foreach (var batch in batches)
+        {
+            var antibodyRows = await conn.QueryAsync<SlideArchiveInfo>(
+                "GetAnimalAntibodiesArchiveInformation",
+                new
+                {
+                    SenderRef = senderRef,
+                    HistologyRef = histologyRef,
+                    ArchiveLocation = archiveLocation,
+                    batch.BatchID,
+                    batch.SubmissionType,
+                },
+                commandType: System.Data.CommandType.StoredProcedure);
+            results.AddRange(antibodyRows);
+        }
+
+        var histologyRows = await conn.QueryAsync<SlideArchiveInfo>(
+            "GetAnimalHistologyArchiveInformation",
+            new { SenderRef = senderRef, HistologyRef = histologyRef, ArchiveLocation = archiveLocation },
+            commandType: System.Data.CommandType.StoredProcedure);
+        results.AddRange(histologyRows.Where(r =>
+            r.Description != "Special Stain" && r.Description != "IHC - PrP" && r.Description != "IHC - Other"));
+
+        return results.OrderBy(r => r.BlockRef, StringComparer.Ordinal).ToList();
+    }
+
+    /// <summary>Row shape of <c>GetAnimalBatches</c> — the batch/submission-type list a slide archive search fans out over.</summary>
+    private sealed class AnimalBatch
+    {
+        public int BatchID { get; init; }
+        public int SubmissionType { get; init; }
     }
 }

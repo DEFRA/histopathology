@@ -141,7 +141,12 @@
             <label class="govuk-label" for="Comment">Comment</label>
             <textarea class="govuk-textarea" id="Comment" name="Comment" rows="4">@Model.Comment</textarea>
         </div>
-        <button type="submit" class="govuk-button" data-module="govuk-button">Update selected</button>
     }
-    <a asp-page="/Archive/ArchiveMenu" asp-route-batchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
+    <div class="govuk-button-group">
+        @if (!Model.IsViewMode)
+        {
+            <button type="submit" class="govuk-button" data-module="govuk-button">Update selected</button>
+        }
+        <a asp-page="/Archive/ArchiveMenu" asp-route-batchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
+    </div>
 </form>

@@ -70,9 +70,11 @@
         </fieldset>
     </div>
 
-    @if (Model.TargetAnimals.Any())
-    {
-        <button type="submit" class="govuk-button" data-module="govuk-button">Copy blocks</button>
-    }
-    <a asp-page="/Batches/BatchBlocks" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    <div class="govuk-button-group">
+        @if (Model.TargetAnimals.Any())
+        {
+            <button type="submit" class="govuk-button" data-module="govuk-button">Copy blocks</button>
+        }
+        <a asp-page="/Batches/BatchBlocks" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    </div>
 </form>
