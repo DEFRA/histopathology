@@ -322,4 +322,54 @@ public class SearchValidationTests
         Assert.True(sut.Errors.ContainsKey(nameof(sut.SenderRef)));
         Assert.False(sut.Searched);
     }
+
+    // ── ViewSamples ──────────────────────────────────────────────────────────────
+
+    private ViewSamplesModel CreateViewSamples() =>
+        new(_session.Object, _submissions.Object, _lookups.Object) { PageContext = NewPageContext() };
+
+    [Fact]
+    public async Task ViewSamples_BothRefsSupplied_SearchesSuccessfully()
+    {
+        // GetAnimalBatchTissues/GetAnimalBlockTissues tolerate both being supplied — each
+        // branches internally on one ref and ignores the other, no error either way.
+        _submissions.Setup(s => s.GetAnimalTissuesAsync("S1", "H1", null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<AnimalTissueSearchResult>)[]);
+        var sut = CreateViewSamples();
+        sut.SenderRef = "S1";
+        sut.HistologyRef = "H1";
+
+        await sut.OnPostSearchAsync();
+
+        Assert.Empty(sut.Errors);
+        Assert.True(sut.Searched);
+    }
+
+    [Fact]
+    public async Task ViewSamples_NoCriteria_ShowsValidationError()
+    {
+        var sut = CreateViewSamples();
+
+        await sut.OnPostSearchAsync();
+
+        Assert.True(sut.Errors.ContainsKey(nameof(sut.SenderRef)));
+        Assert.False(sut.Searched);
+    }
+
+    [Fact]
+    public async Task ViewSamples_BlankSenderRefWithHistologyRef_PassesNullNotEmptyString()
+    {
+        // Blank text input posts "", not null — must be converted before the SP call or the
+        // "@SenderRef IS NULL" branch check silently fails to match.
+        _submissions.Setup(s => s.GetAnimalTissuesAsync(null, "H1", null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<AnimalTissueSearchResult>)[]);
+        var sut = CreateViewSamples();
+        sut.SenderRef = "";
+        sut.HistologyRef = "H1";
+
+        await sut.OnPostSearchAsync();
+
+        Assert.Empty(sut.Errors);
+        _submissions.Verify(s => s.GetAnimalTissuesAsync(null, "H1", null, null, It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

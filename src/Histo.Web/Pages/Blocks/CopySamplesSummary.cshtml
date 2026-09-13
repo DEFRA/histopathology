@@ -27,7 +27,9 @@
     </div>
 </dl>
 
-<form method="post" asp-page-handler="Done">
-    <button type="submit" class="govuk-button" data-module="govuk-button">Done</button>
-</form>
-<a asp-page="/Blocks/CopySamples" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy more samples</a>
+<div class="govuk-button-group">
+    <form method="post" asp-page-handler="Done">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Done</button>
+    </form>
+    <a asp-page="/Blocks/CopySamples" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy more samples</a>
+</div>

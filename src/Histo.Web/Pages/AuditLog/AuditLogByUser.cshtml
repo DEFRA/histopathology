@@ -70,11 +70,13 @@
         }
         <input class="govuk-input govuk-input--width-10 @(Model.Errors.Any(e => e.Contains("end")) ? "govuk-input--error" : "")" type="date" asp-for="EndDate" />
     </div>
-    <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
-    @if (Model.Results.Any())
-    {
-        <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</button>
-    }
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
+        @if (Model.Results.Any())
+        {
+            <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</button>
+        }
+    </div>
 </form>
 
 @if (Model.Results.Any())

@@ -65,11 +65,13 @@
         <label class="govuk-label" for="BlockRef">Block ref (Block archive only)</label>
         <input class="govuk-input  govuk-input--width-5" asp-for="BlockRef" />
     </div>
-    <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
-    @if (Model.Searched && Model.Errors.Count == 0)
-    {
-        <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</button>
-    }
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
+        @if (Model.Searched && Model.Errors.Count == 0)
+        {
+            <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</button>
+        }
+    </div>
 </form>
 
 @* Legacy's result grids have no sorting or paging \u2014 rendered as plain tables. *@
