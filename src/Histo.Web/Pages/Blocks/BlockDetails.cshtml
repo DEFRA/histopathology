@@ -238,12 +238,13 @@ else
             <div class="govuk-form-group">
                 <fieldset class="govuk-fieldset">
                     <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Histology</legend>
-                    <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                    <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes" id="block-histology-checkboxes">
                         @foreach (var opt in Model.HistologyOptions)
                         {
                             <div class="govuk-checkboxes__item">
                                 <input class="govuk-checkboxes__input" type="checkbox" name="SelectedHistologyCodes"
-                                       id="hist-@opt.Code" value="@opt.Code" checked="@Model.ExistingHistologyCodes.Contains(opt.Code ?? "")" />
+                                       id="hist-@opt.Code" value="@opt.Code" data-histology-code="@opt.Code"
+                                       checked="@Model.ExistingHistologyCodes.Contains(opt.Code ?? "")" />
                                 <label class="govuk-label govuk-checkboxes__label" for="hist-@opt.Code">@opt.Name</label>
                             </div>
                         }
@@ -311,5 +312,34 @@ else
             <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Next block</button>
         </form>
     }
+
+@section Scripts {
+    <script>
+        // Legacy-matching behaviour (SubmissionDetailsBlock chkblHistology_SelectedIndexChanged):
+        // EO and Archive are mutually exclusive with every other Histology test. Selecting either
+        // one auto-deselects all other Histology checkboxes so the user doesn't hit a validation
+        // error round-trip.
+        (function () {
+            var group = document.getElementById('block-histology-checkboxes');
+            if (!group) return;
+            var exclusiveCodes = ['1', '7']; // EO, Archive
+            group.addEventListener('change', function (e) {
+                var target = e.target;
+                if (!target || !target.matches('input[type="checkbox"]')) return;
+                var checkboxes = group.querySelectorAll('input[type="checkbox"]');
+                var isExclusive = exclusiveCodes.indexOf(target.getAttribute('data-histology-code')) !== -1;
+                if (target.checked && isExclusive) {
+                    checkboxes.forEach(function (cb) {
+                        if (cb !== target) cb.checked = false;
+                    });
+                } else if (target.checked && !isExclusive) {
+                    checkboxes.forEach(function (cb) {
+                        if (cb !== target && exclusiveCodes.indexOf(cb.getAttribute('data-histology-code')) !== -1) cb.checked = false;
+                    });
+                }
+            });
+        })();
+    </script>
+}
 
 }

@@ -222,6 +222,36 @@ public class SampleSummaryModel : HistoPageModel
     }
 
     /// <summary>
+    /// Finalises the in-progress submission — the equivalent of legacy's <c>btSubmit_Click</c>
+    /// (<c>BatchBlocks.aspx.vb</c> / <c>BatchSummary.aspx.vb</c> / <c>BatchBlockSummary.aspx.vb</c>),
+    /// which only proceeded once <c>dtBatch.Rows.Count &gt; 0</c> and then redirected to
+    /// <c>FinalPrintBatch.aspx</c>. Until this step, the batch record persisted eagerly by
+    /// <c>BatchDetails.OnPostCreateAsync</c> is treated as a draft: this handler is the actual
+    /// "submission created" business gate, restoring the legacy rule that a submission must have
+    /// at least one sample before it is considered finished.
+    ///
+    /// <c>FinalPrintBatch.aspx</c> itself remains unmigrated (blocked on the Phase 2 Reporting
+    /// work — see <c>docs/Parity-Audit-Report.md</c>), so on success this mirrors the same
+    /// accepted redirect target already used by <c>BatchBlocks.cshtml.cs</c>::<c>OnPostDoneAsync</c>
+    /// (<c>/Batches/BatchesNotReceived</c>) rather than a non-functional Print Submission stub.
+    /// </summary>
+    public async Task<IActionResult> OnPostFinishAsync()
+    {
+        var batchId = BatchId ?? Session.BatchID;
+        if (batchId is null or <= 0) return RedirectToPage("/Index");
+
+        var animals = await _submissions.GetAnimalsByBatchAsync(batchId.Value);
+        if (animals.Count == 0)
+        {
+            TempData["SampleSummary_Error"] = "You must add at least one sample before finishing this submission.";
+            return RedirectToPage(new { batchId });
+        }
+
+        await _batches.UpdateStatusAsync(batchId.Value, BatchStatus.InProgress, Session.UserID);
+        return RedirectToPage("/Batches/BatchesNotReceived");
+    }
+
+    /// <summary>
     /// Toggles the ByPassSort flag on the batch and reloads.
     /// Legacy source: <c>BatchBlockSummary.aspx.vb</c>::<c>chkByPassSort_CheckedChanged</c>.
     /// </summary>

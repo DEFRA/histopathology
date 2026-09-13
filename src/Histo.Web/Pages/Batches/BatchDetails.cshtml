@@ -310,14 +310,17 @@
     @* Show/hide antibody and stain sections when histology checkboxes change *@
     <script>
     (function () {
-        var archiveCode = '@Histo.Submissions.Models.HistologyCode.Archive';
+        // Legacy-matching behaviour (SubmissionDetailsBlock chkblHistology_SelectedIndexChanged):
+        // EO and Archive are both mutually exclusive with every other Histology test.
+        var exclusiveCodes = ['@Histo.Submissions.Models.HistologyCode.EO', '@Histo.Submissions.Models.HistologyCode.Archive'];
         var checkboxes  = document.querySelectorAll('#create-histology-checkboxes input[type=checkbox]');
 
-        function enforceArchiveExclusivity(changed) {
-            if (changed.value === archiveCode && changed.checked) {
+        function enforceExclusivity(changed) {
+            var isExclusive = exclusiveCodes.indexOf(changed.value) >= 0;
+            if (isExclusive && changed.checked) {
                 checkboxes.forEach(function (cb) { if (cb !== changed) cb.checked = false; });
-            } else if (changed.value !== archiveCode && changed.checked) {
-                checkboxes.forEach(function (cb) { if (cb.value === archiveCode) cb.checked = false; });
+            } else if (!isExclusive && changed.checked) {
+                checkboxes.forEach(function (cb) { if (exclusiveCodes.indexOf(cb.value) >= 0) cb.checked = false; });
             }
         }
 
@@ -328,7 +331,7 @@
                 document.getElementById('create-stains-section').style.display     = codes.indexOf('@Histo.Submissions.Models.HistologyCode.SpecialStain') >= 0 ? '' : 'none';
         }
         document.getElementById('create-histology-checkboxes').addEventListener('change', function (e) {
-            enforceArchiveExclusivity(e.target);
+            enforceExclusivity(e.target);
             syncTestSections();
         });
     })();

@@ -47,6 +47,14 @@
     <div class="govuk-button-group">
         <a asp-page="/Submissions/AddSubmission" asp-route-BatchId="@Model.BatchId" asp-route-batchSubmissionId="@Model.BatchSubmissionId" class="govuk-button" data-module="govuk-button">Add sample</a>
     </div>
+
+    @* "Finish" — replaces legacy btSubmit/Done (BatchBlocks.aspx.vb / BatchSummary.aspx.vb /
+       BatchBlockSummary.aspx.vb): finalises the submission once at least one sample exists.
+       Validated server-side (OnPostFinishAsync) rather than disabled client-side, for accessibility. *@
+    <form method="post" asp-page-handler="Finish" class="govuk-!-margin-bottom-4">
+        <input type="hidden" asp-for="BatchId" />
+        <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Finish</button>
+    </form>
 }
 
 @* Inline GOV.UK confirmation panel — replaces the browser confirm() dialog for Delete sample. *@

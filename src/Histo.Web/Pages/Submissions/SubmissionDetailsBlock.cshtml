@@ -280,9 +280,12 @@ else
             @if (!Model.IsViewMode)
             {
                 <a asp-page="/Blocks/BlockDetails" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" class="govuk-button" data-module="govuk-button">Add block</a>
-                <button type="submit" formaction="?handler=EditBlockSelect" class="govuk-button govuk-button--secondary" data-module="govuk-button">Edit block</button>
-                <button type="submit" formaction="?handler=Delete" class="govuk-button govuk-button--warning" data-module="govuk-button">Delete block</button>
-                <button type="submit" formaction="?handler=Copy" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy to samples</button>
+                @if (Model.Blocks.Any())
+                {
+                    <button type="submit" formaction="?handler=EditBlockSelect" class="govuk-button govuk-button--secondary" data-module="govuk-button">Edit block</button>
+                    <button type="submit" formaction="?handler=Delete" class="govuk-button govuk-button--warning" data-module="govuk-button">Delete block</button>
+                    <button type="submit" formaction="?handler=Copy" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy to samples</button>
+                }
             }
             <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back</a>
         </div>
