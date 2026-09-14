@@ -12,122 +12,148 @@
 <partial name="_ErrorSummary" model="Model.Errors" />
 
 <form method="post" asp-page-handler="Search">
-    <div class="govuk-form-group @(Model.Errors.ContainsKey("SubmissionNumber") ? "govuk-form-group--error" : "")">
-        <label class="govuk-label" for="SubmissionNumber">Submission number</label>
-        @if (Model.Errors.TryGetValue("SubmissionNumber", out var subNumErr))
-        {
-            <p id="SubmissionNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @subNumErr</p>
-        }
-        <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("SubmissionNumber") ? "govuk-input--error" : "")"
-               asp-for="SubmissionNumber"
-               aria-describedby="@(Model.Errors.ContainsKey("SubmissionNumber") ? "SubmissionNumber-error" : null)" />
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group @(Model.Errors.ContainsKey("SubmissionNumber") ? "govuk-form-group--error" : "")">
+                <label class="govuk-label" for="SubmissionNumber">Submission number</label>
+                @if (Model.Errors.TryGetValue("SubmissionNumber", out var subNumErr))
+                {
+                    <p id="SubmissionNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @subNumErr</p>
+                }
+                <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("SubmissionNumber") ? "govuk-input--error" : "")"
+                       asp-for="SubmissionNumber"
+                       aria-describedby="@(Model.Errors.ContainsKey("SubmissionNumber") ? "SubmissionNumber-error" : null)" />
+            </div>
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="Status">Status</label>
+                <select class="govuk-select" asp-for="Status">
+                    <option value="">-- Any --</option>
+                    <option value="@Histo.Core.Domain.BatchStatus.Submitted">Not started</option>
+                    <option value="@Histo.Core.Domain.BatchStatus.Received">Received</option>
+                    <option value="@Histo.Core.Domain.BatchStatus.Rejected">Rejected</option>
+                    <option value="@Histo.Core.Domain.BatchStatus.Completed">Completed</option>
+                    <option value="@Histo.Core.Domain.BatchStatus.OnHold">On hold</option>
+                    <option value="@Histo.Core.Domain.BatchStatus.InProgress">In progress</option>
+                </select>
+            </div>
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="ProjectContractCode">Project or contract code</label>
+                <select class="govuk-select" asp-for="ProjectContractCode">
+                    <option value="">-- Any --</option>
+                    @foreach (var p in Model.Projects)
+                    {
+                        <option value="@p.Name">@p.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="ContactName">Pathologist</label>
+                <select class="govuk-select" asp-for="ContactName">
+                    <option value="">-- Any --</option>
+                    @foreach (var c in Model.Contacts)
+                    {
+                        <option value="@c.Name">@c.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="Species">Species</label>
+                @* GetSearchBatchDetails filters Batch.Species, which stores tlkpSpecies.SpeciesID (an int FK), not the species name. *@
+                <select class="govuk-select" asp-for="Species">
+                    <option value="">-- Any --</option>
+                    @foreach (var s in Model.SpeciesList)
+                    {
+                        <option value="@s.ID">@s.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="Fixation">Fixation</label>
+                @* GetSearchBatchDetails joins luFixatives ON luFixatives.Code = Batch.Fixation — filter on Code, not Description. *@
+                <select class="govuk-select" asp-for="Fixation">
+                    <option value="">-- Any --</option>
+                    @foreach (var f in Model.Fixations)
+                    {
+                        <option value="@f.Code">@f.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="SubmittedArea">Submitted area</label>
+                @* GetSearchBatchDetails joins luUserArea ON luUserArea.Code = Batch.OtherSubmittedArea — filter on Code, not the surrogate ID. *@
+                <select class="govuk-select" asp-for="SubmittedArea">
+                    <option value="">-- Any --</option>
+                    @foreach (var a in Model.UserAreas)
+                    {
+                        <option value="@a.Code">@a.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="SubmittedBy">Submitted by</label>
+                <select class="govuk-select" asp-for="SubmittedBy">
+                    <option value="">-- Any --</option>
+                    @foreach (var u in Model.Users)
+                    {
+                        <option value="@u.UserID">@u.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="EnteredBy">Entered by</label>
+                <select class="govuk-select" asp-for="EnteredBy">
+                    <option value="">-- Any --</option>
+                    @foreach (var u in Model.Users)
+                    {
+                        <option value="@u.UserID">@u.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="HistologyRef">Histology ref</label>
+                <input class="govuk-input govuk-input--width-20" asp-for="HistologyRef" />
+            </div>
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="SenderRef">Sender ref</label>
+                <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" />
+            </div>
+        </div>
     </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="Status">Status</label>
-        <select class="govuk-select" asp-for="Status">
-            <option value="">-- Any --</option>
-            <option value="@Histo.Core.Domain.BatchStatus.Submitted">Not started</option>
-            <option value="@Histo.Core.Domain.BatchStatus.Received">Received</option>
-            <option value="@Histo.Core.Domain.BatchStatus.Rejected">Rejected</option>
-            <option value="@Histo.Core.Domain.BatchStatus.Completed">Completed</option>
-            <option value="@Histo.Core.Domain.BatchStatus.OnHold">On hold</option>
-            <option value="@Histo.Core.Domain.BatchStatus.InProgress">In progress</option>
-        </select>
+
+    @* Legacy layout: "Submitted Date Between X and Y" / "Received Date Between X and Y" pairs. *@
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-half">
+            <partial name="_DateInput" model="@(new DateInputViewModel {
+                Name = "SubmittedDateFrom", Legend = "Submitted date from", Hint = "For example, 27 3 2026",
+                Value = Model.SubmittedDateFrom, Error = Model.Errors.GetValueOrDefault("SubmittedDateFrom-day") })" />
+        </div>
+        <div class="govuk-grid-column-one-half">
+            <partial name="_DateInput" model="@(new DateInputViewModel {
+                Name = "SubmittedDateTo", Legend = "Submitted date to", Hint = "For example, 27 3 2026",
+                Value = Model.SubmittedDateTo, Error = Model.Errors.GetValueOrDefault("SubmittedDateTo-day") })" />
+        </div>
     </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="ProjectContractCode">Project or contract code</label>
-        <select class="govuk-select" asp-for="ProjectContractCode">
-            <option value="">-- Any --</option>
-            @foreach (var p in Model.Projects)
-            {
-                <option value="@p.Name">@p.Name</option>
-            }
-        </select>
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-half">
+            <partial name="_DateInput" model="@(new DateInputViewModel {
+                Name = "ReceivedDateFrom", Legend = "Received date from", Hint = "For example, 27 3 2026",
+                Value = Model.ReceivedDateFrom, Error = Model.Errors.GetValueOrDefault("ReceivedDateFrom-day") })" />
+        </div>
+        <div class="govuk-grid-column-one-half">
+            <partial name="_DateInput" model="@(new DateInputViewModel {
+                Name = "ReceivedDateTo", Legend = "Received date to", Hint = "For example, 27 3 2026",
+                Value = Model.ReceivedDateTo, Error = Model.Errors.GetValueOrDefault("ReceivedDateTo-day") })" />
+        </div>
     </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="ContactName">Pathologist</label>
-        <select class="govuk-select" asp-for="ContactName">
-            <option value="">-- Any --</option>
-            @foreach (var c in Model.Contacts)
-            {
-                <option value="@c.Name">@c.Name</option>
-            }
-        </select>
+
+    @* Legacy button row: Search / Clear Search / Done. *@
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
+        <a asp-page="/Search/SearchSubmissions" class="govuk-button govuk-button--secondary" data-module="govuk-button">Clear search</a>
+        <a asp-page="/Search/SearchMenu" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
     </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="Species">Species</label>
-        @* GetSearchBatchDetails filters Batch.Species, which stores tlkpSpecies.SpeciesID (an int FK), not the species name. *@
-        <select class="govuk-select" asp-for="Species">
-            <option value="">-- Any --</option>
-            @foreach (var s in Model.SpeciesList)
-            {
-                <option value="@s.ID">@s.Name</option>
-            }
-        </select>
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="Fixation">Fixation</label>
-        @* GetSearchBatchDetails joins luFixatives ON luFixatives.Code = Batch.Fixation — filter on Code, not Description. *@
-        <select class="govuk-select" asp-for="Fixation">
-            <option value="">-- Any --</option>
-            @foreach (var f in Model.Fixations)
-            {
-                <option value="@f.Code">@f.Name</option>
-            }
-        </select>
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="SubmittedArea">Submitted area</label>
-        @* GetSearchBatchDetails joins luUserArea ON luUserArea.Code = Batch.OtherSubmittedArea — filter on Code, not the surrogate ID. *@
-        <select class="govuk-select" asp-for="SubmittedArea">
-            <option value="">-- Any --</option>
-            @foreach (var a in Model.UserAreas)
-            {
-                <option value="@a.Code">@a.Name</option>
-            }
-        </select>
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="SubmittedBy">Submitted by</label>
-        <select class="govuk-select" asp-for="SubmittedBy">
-            <option value="">-- Any --</option>
-            @foreach (var u in Model.Users)
-            {
-                <option value="@u.UserID">@u.Name</option>
-            }
-        </select>
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="EnteredBy">Entered by</label>
-        <select class="govuk-select" asp-for="EnteredBy">
-            <option value="">-- Any --</option>
-            @foreach (var u in Model.Users)
-            {
-                <option value="@u.UserID">@u.Name</option>
-            }
-        </select>
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="HistologyRef">Histology ref</label>
-        <input class="govuk-input govuk-input--width-20" asp-for="HistologyRef" />
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="SenderRef">Sender ref</label>
-        <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" />
-    </div>
-    <partial name="_DateInput" model="@(new DateInputViewModel {
-        Name = "SubmittedDateFrom", Legend = "Submitted date from", Hint = "For example, 27 3 2026",
-        Value = Model.SubmittedDateFrom, Error = Model.Errors.GetValueOrDefault("SubmittedDateFrom-day") })" />
-    <partial name="_DateInput" model="@(new DateInputViewModel {
-        Name = "SubmittedDateTo", Legend = "Submitted date to", Hint = "For example, 27 3 2026",
-        Value = Model.SubmittedDateTo, Error = Model.Errors.GetValueOrDefault("SubmittedDateTo-day") })" />
-    <partial name="_DateInput" model="@(new DateInputViewModel {
-        Name = "ReceivedDateFrom", Legend = "Received date from", Hint = "For example, 27 3 2026",
-        Value = Model.ReceivedDateFrom, Error = Model.Errors.GetValueOrDefault("ReceivedDateFrom-day") })" />
-    <partial name="_DateInput" model="@(new DateInputViewModel {
-        Name = "ReceivedDateTo", Legend = "Received date to", Hint = "For example, 27 3 2026",
-        Value = Model.ReceivedDateTo, Error = Model.Errors.GetValueOrDefault("ReceivedDateTo-day") })" />
-    <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
 </form>
 
 @if (Model.Searched)

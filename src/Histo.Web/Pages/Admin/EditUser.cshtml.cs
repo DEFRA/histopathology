@@ -105,7 +105,6 @@ public class EditUserModel : HistoPageModel
 
     private void Validate()
     {
-        if (string.IsNullOrWhiteSpace(NtLogin)) Errors.Add("Enter the NT login.");
         if (string.IsNullOrWhiteSpace(Name)) Errors.Add("Enter the user's name.");
         if (GroupCode <= 0) Errors.Add("Select a user group.");
         if (AreaCode <= 0) Errors.Add("Select a user area.");

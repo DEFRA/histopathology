@@ -22,7 +22,6 @@ public class AddUserModel : HistoPageModel
         _lookups = lookups;
     }
 
-    [BindProperty] public string NtLogin { get; set; } = string.Empty;
     [BindProperty] public string Name { get; set; } = string.Empty;
     [BindProperty] public string Email { get; set; } = string.Empty;
     [BindProperty] public int GroupCode { get; set; }
@@ -56,9 +55,12 @@ public class AddUserModel : HistoPageModel
         Validate();
         if (Errors.Count > 0) return Page();
 
+        // NT login is no longer shown or entered in the UI — Entra ID email is now the
+        // sole identity key (see HistopathologyClaimsTransformation), so the legacy
+        // NOT NULL NtLogin column is populated from Email rather than collected here.
         var user = new User
         {
-            NtLogin   = NtLogin.Trim(),
+            NtLogin   = Email.Trim(),
             Name      = Name.Trim(),
             Email     = Email.Trim(),
             GroupCode = GroupCode,
@@ -79,7 +81,6 @@ public class AddUserModel : HistoPageModel
 
     private void Validate()
     {
-        if (string.IsNullOrWhiteSpace(NtLogin)) Errors.Add("Enter the NT login.");
         if (string.IsNullOrWhiteSpace(Name)) Errors.Add("Enter the user's name.");
         if (GroupCode <= 0) Errors.Add("Select a user group.");
         if (AreaCode <= 0) Errors.Add("Select a user area.");
