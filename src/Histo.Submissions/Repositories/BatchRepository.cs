@@ -386,7 +386,7 @@ public sealed class BatchRepository : IBatchRepository
         p.Add("StatusComments",  (string?)null);
         p.Add("PostFixationOther", (string?)null);
 
-        await conn.ExecuteAsync("EditBatchStatus", p, commandType: System.Data.CommandType.StoredProcedure);
+        await conn.ExecuteAsync("EditBatchStatus_temp", p, commandType: System.Data.CommandType.StoredProcedure);
 
         var returnValue = p.Get<int>("RETURN_VALUE");
         // SP returns -1 when no rows were updated (concurrency conflict or batch not found).

@@ -54,7 +54,7 @@ else
 
     @* "Or Pick" — assigns the next unused histology ref for a type and saves it immediately,
        replacing legacy's AutoPostBack dropdown with an explicit button per WCAG 3.2.2 (On Input). *@
-    @if (!Model.IsViewMode)
+   @*  @if (!Model.IsViewMode)
     {
         <form method="post" asp-page-handler="GetNextHistologyRef" class="govuk-!-margin-bottom-6">
             <input type="hidden" asp-for="BatchId" />
@@ -75,7 +75,7 @@ else
             </div>
             <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Get next ref</button>
         </form>
-    }
+    } *@
 
     <h2 class="govuk-heading-m">Blocks</h2>
 
@@ -280,10 +280,16 @@ else
             @if (!Model.IsViewMode)
             {
                 <a asp-page="/Blocks/BlockDetails" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" class="govuk-button" data-module="govuk-button">Add block</a>
-                <button type="submit" formaction="?handler=EditBlockSelect" class="govuk-button govuk-button--secondary" data-module="govuk-button">Edit block</button>
-                <button type="submit" formaction="?handler=Delete" class="govuk-button govuk-button--warning" data-module="govuk-button">Delete block</button>
-                <button type="submit" formaction="?handler=Copy" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy to samples</button>
+                @if (Model.Blocks.Any())
+                {
+                    <button type="submit" formaction="?handler=EditBlockSelect" class="govuk-button govuk-button--secondary" data-module="govuk-button">Edit block</button>
+                    <button type="submit" formaction="?handler=Delete" class="govuk-button govuk-button--warning" data-module="govuk-button">Delete block</button>
+                    <button type="submit" formaction="?handler=Copy" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy to samples</button>
+                }
             }
+            @* "Block ref search" — legacy btnBlockRefSearch, navigates to SearchBlockRefs.aspx?HistologyRef=... *@
+            <a asp-page="/Search/SearchBlockRefs" asp-route-SenderRef="@Model.Animal?.SenderRef" asp-route-HistologyRef="@Model.Animal?.HistologyRef"
+               class="govuk-button govuk-button--secondary" data-module="govuk-button">Block ref search</a>
             <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back</a>
         </div>
     </form>

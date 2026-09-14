@@ -28,21 +28,13 @@
     <input type="hidden" id="icc-filter" name="Filter" value="" />
     <div class="govuk-form-group">
         <label class="govuk-label" for="SenderRef">Sender reference</label>
+        <div class="govuk-hint">Enter the reference for the sample you are submitting tissue for, then click Add sample. It is recommended that the sender reference does not exceed 10 characters.</div>
         <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" required />
     </div>
     <p class="govuk-body">
         <a asp-page="/Search/SearchSender" asp-route-returnPage="/Submissions/AddSubmission" asp-route-SenderRef="@Model.SenderRef" class="govuk-link">
             Search for a previously used sender reference
         </a>
-    </p>
-    <p class="govuk-body">
-        @* Contextual lookup, pre-filled with the sender ref entered above — a plain submit
-           button with formmethod/formaction so it doesn't need its own nested <form>. *@
-        <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button"
-                formmethod="get" formaction="@Url.Page("/Search/ViewImportedData")" formnovalidate
-                onclick="document.getElementById('icc-filter').value = document.getElementById('SenderRef').value;">
-            Check historical data for this sender ref
-        </button>
     </p>
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Add sample</button>

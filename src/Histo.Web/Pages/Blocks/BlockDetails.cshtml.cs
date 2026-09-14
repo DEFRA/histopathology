@@ -53,6 +53,16 @@ public class BlockDetailsModel : HistoPageModel
 
     public bool IsEditMode => BlockId is > 0;
 
+    /// <summary>
+    /// True while still inside the initial "Add block" workflow. Legacy: BlockDetails.aspx.vb
+    /// provisionally creates the block in an in-memory session dataset on page load, so tissues
+    /// and tests can be assigned before the user explicitly saves. The migrated page persists
+    /// directly to the database, so the block is created for real on first load and this flag
+    /// carries the "still adding" title/button-label/Number-of-blocks state across the redirects
+    /// used by the tissue/test actions, until the user clicks the final Add/Save button.
+    /// </summary>
+    [BindProperty(SupportsGet = true)] public bool IsAddFlow { get; set; }
+
     [BindProperty] public string? NewBlockRef { get; set; }
     [BindProperty] public string? NewCustomerRef { get; set; }
     [BindProperty] public bool NewRepeatBlock { get; set; }
@@ -129,13 +139,27 @@ public class BlockDetailsModel : HistoPageModel
         }
         else
         {
-            // Default the Block ref the same way legacy's CreateNewRecord does: the next pre-booked
-            // ref for pre-cassetted submissions, otherwise the next free two-digit ref for this
-            // animal. Always a free-text default — legacy never renders Block Ref as a dropdown.
+            // Legacy: BlockDetails.aspx.vb Page_Load -> CreateNewRecord() provisionally creates the
+            // block immediately (in an in-memory dataset there; directly in the DB here) so tissues
+            // and tests can be assigned from the very first page load, without an explicit Save
+            // first. isAddFlow=true carries the "still adding" state across the redirects the
+            // tissue/test actions below use to return to this page. Set up-front so the Add-mode
+            // labelling (title/button/Number of blocks) is still correct even on the fallback
+            // render paths below (e.g. no pre-booked refs left for a pre-cassetted submission).
+            IsAddFlow = true;
             NewBlockRef = IsPreCassetted
                 ? PreBookedBlockRefs.FirstOrDefault()?.BlockRef
                 : BlockHelpers.ComputeNextBlockRef(
                     (await _blocks.GetByBatchAsync(BatchId ?? 0)).Where(b => b.AnimalID == Animal.ID).Select(b => b.BlockRef));
+
+            if (string.IsNullOrWhiteSpace(NewBlockRef)) return Page();
+
+            var existingOrders = (await _blocks.GetByBatchAsync(BatchId ?? 0)).Select(b => b.Order).ToList();
+            var newId = await _blocks.AddBlockAsync(BatchId ?? 0, Animal.ID, NewBlockRef, existingOrders, Session.UserID,
+                customerRef: null, comment: null, repeatBlock: false);
+            if (newId <= 0) return Page();
+
+            return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = newId, isAddFlow = true });
         }
 
         return Page();
@@ -151,7 +175,8 @@ public class BlockDetailsModel : HistoPageModel
         await LoadSupportingDataAsync();
         var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
 
-        if (IsEditMode)
+        // Reached via a genuine Edit link (not the auto-provisioned add-flow) — plain update, no bulk-duplicate.
+        if (!IsAddFlow)
         {
             var existing = allBlocks.FirstOrDefault(b => b.ID == BlockId);
             if (existing is null || string.IsNullOrWhiteSpace(NewBlockRef))
@@ -176,6 +201,12 @@ public class BlockDetailsModel : HistoPageModel
             return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
         }
 
+        // Add flow — legacy: UpdateBlockDetails() + CreateMultiBlocks(). Block #1 already exists
+        // (auto-created on first load so tissues/tests could be assigned immediately); Save updates
+        // that record, then optionally creates NewNumberOfBlocks-1 more sibling blocks.
+        var current = allBlocks.FirstOrDefault(b => b.ID == BlockId);
+        if (current is null || string.IsNullOrWhiteSpace(NewBlockRef)) return Page();
+
         var preBookedIndex = -1;
         if (IsPreCassetted)
         {
@@ -193,52 +224,62 @@ public class BlockDetailsModel : HistoPageModel
             }
         }
 
-        if (string.IsNullOrWhiteSpace(NewBlockRef)) return Page();
-
         if (!CanUseAdditionalRequest)
         {
             NewRepeatBlock = false;
             // Legacy: ValidateRequiredData "You can only enter a used Block Ref if you tick the
             // additional request box" — collapses to a plain duplicate check for submission types
-            // where Additional Request is never offered.
-            if (allBlocks.Any(b => b.AnimalID == Animal.ID && b.BlockRef == NewBlockRef))
+            // where Additional Request is never offered. Excludes this block's own (unchanged) row.
+            if (allBlocks.Any(b => b.ID != BlockId && b.AnimalID == Animal.ID && b.BlockRef == NewBlockRef))
             {
                 ErrorMessage = "This block reference has already been used for this sample.";
                 return Page();
             }
         }
 
-        var existingOrders = allBlocks.Select(b => b.Order).ToList();
-        var existingRefs = allBlocks.Select(b => b.BlockRef).ToList();
-        var preBookedRefsForCreate = IsPreCassetted ? PreBookedBlockRefs.Select(b => b.BlockRef).ToList() : null;
-        var count = Math.Max(1, NewNumberOfBlocks);
-        var blockRef = NewBlockRef;
-        var firstNewBlockId = 0;
-
-        for (var i = 0; i < count; i++)
+        await _blocks.UpdateBlockAsync(new Block
         {
-            var newId = await _blocks.AddBlockAsync(
-                BatchId ?? 0, Animal.ID, blockRef, existingOrders, Session.UserID,
-                NewCustomerRef, comment: NewComment, repeatBlock: NewRepeatBlock);
-            if (i == 0) firstNewBlockId = newId;
+            ID = current.ID,
+            BatchID = current.BatchID,
+            AnimalID = current.AnimalID,
+            BlockRef = NewBlockRef,
+            CustomerRef = NewCustomerRef,
+            Comment = NewComment,
+            RepeatBlock = NewRepeatBlock,
+            Status = current.Status,
+            Order = current.Order,
+            RowStamp = current.RowStamp,
+        }, Session.UserID);
 
-            existingRefs.Add(blockRef);
-            existingOrders.Add(BlockHelpers.ComputeNextOrder(existingOrders));
+        var count = Math.Max(1, NewNumberOfBlocks);
+        if (count > 1)
+        {
+            var existingOrders = allBlocks.Select(b => b.Order).ToList();
+            var existingRefs = allBlocks.Where(b => b.ID != current.ID).Select(b => b.BlockRef).ToList();
+            existingRefs.Add(NewBlockRef);
+            var preBookedRefsForCreate = IsPreCassetted ? PreBookedBlockRefs.Select(b => b.BlockRef).ToList() : null;
+            var blockRef = NewBlockRef;
 
-            if (i + 1 < count)
+            for (var i = 1; i < count; i++)
             {
                 // Pre-cassetted blocks must use the next pre-booked ref, not the free-text auto-increment scheme.
                 blockRef = IsPreCassetted
-                    ? preBookedRefsForCreate![preBookedIndex + i + 1]
+                    ? preBookedRefsForCreate![preBookedIndex + i]
                     : BlockHelpers.ComputeNextBlockRef(existingRefs);
+
+                await _blocks.AddBlockAsync(
+                    BatchId ?? 0, Animal.ID, blockRef, existingOrders, Session.UserID,
+                    customerRef: null, comment: null, repeatBlock: false);
+
+                existingRefs.Add(blockRef);
+                existingOrders.Add(BlockHelpers.ComputeNextOrder(existingOrders));
             }
+
+            // Bulk-created siblings have no single block to continue editing — return to the grid.
+            return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId = BatchId, animalId = AnimalId });
         }
 
-        // Bulk-created blocks (count > 1) have no single block to continue editing — return to
-        // the grid. A single new block continues into edit mode so tissues/tests can be added.
-        return count > 1 || firstNewBlockId <= 0
-            ? RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId = BatchId, animalId = AnimalId })
-            : RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = firstNewBlockId });
+        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
     }
 
     public async Task<IActionResult> OnPostAddTissueAsync()
@@ -260,13 +301,13 @@ public class BlockDetailsModel : HistoPageModel
             await _submissions.AddTissueAsync(tissue, Session.UserID);
         }
 
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
+        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
     }
 
     public async Task<IActionResult> OnPostDeleteTissueAsync(int tissueId)
     {
         await _submissions.DeleteTissueAsync(tissueId, TissueOwner.Block, Session.UserID);
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
+        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
     }
 
     public async Task<IActionResult> OnPostUpdateTissueAsync()
@@ -292,7 +333,7 @@ public class BlockDetailsModel : HistoPageModel
             RowStamp = existing.RowStamp,
         };
         await _submissions.UpdateTissueAsync(updated, Session.UserID);
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
+        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
     }
 
     /// <summary>Delta-saves this block's Histology/Antibodies/Stain test-type selections.</summary>
@@ -318,7 +359,7 @@ public class BlockDetailsModel : HistoPageModel
         await _blockTests.SaveTestSelectionsAsync(
             BatchId ?? 0, BlockId.Value, SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes, Session.UserID);
 
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
+        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
     }
 
     /// <summary>
@@ -433,7 +474,9 @@ public class BlockDetailsModel : HistoPageModel
             TissueOptions = fullTissueList.Where(o => o.Code is not null && usedCodes.Contains(o.Code)).ToList();
         }
 
-        if (IsPreCassetted && !IsEditMode)
+        // Loaded for the initial provisioning request (BlockId not yet assigned) and for every
+        // re-render while still mid add-flow — true edits of an already-established block never need it.
+        if (IsPreCassetted && (!IsEditMode || IsAddFlow))
             PreBookedBlockRefs = await _blocks.GetPreBookedByAnimalAsync(Animal?.ID ?? AnimalId ?? 0);
         if (IsEditMode)
             await LoadTestOptionsAsync();
@@ -470,6 +513,17 @@ public class BlockDetailsModel : HistoPageModel
         ExistingHistologyCodes = allTests.Where(t => t.BlockID == Block.ID && t.TestType == BlockTestType.Histology).Select(t => t.Code).ToList();
         ExistingAntibodyCodes = allTests.Where(t => t.BlockID == Block.ID && t.TestType == BlockTestType.Antibodies).Select(t => t.Code).ToList();
         ExistingStainCodes = allTests.Where(t => t.BlockID == Block.ID && t.TestType == BlockTestType.Stain).Select(t => t.Code).ToList();
+
+        // Legacy: DisplayBatchLevelTests (Page_Load, new-block branch) — a brand-new block with no
+        // test selections of its own yet defaults to the batch-level Histology/Antibody/Stain
+        // choices made when the submission was created, instead of forcing a re-pick per block.
+        if (IsAddFlow && ExistingHistologyCodes.Count == 0 && ExistingAntibodyCodes.Count == 0 && ExistingStainCodes.Count == 0)
+        {
+            var batchDefaults = await _batches.GetBatchTestSelectionsAsync(BatchId ?? 0);
+            ExistingHistologyCodes = batchDefaults.Histology.Select(r => r.Code).ToList();
+            ExistingAntibodyCodes = batchDefaults.Antibodies.Select(r => r.Code).ToList();
+            ExistingStainCodes = batchDefaults.Stains.Select(r => r.Code).ToList();
+        }
         return true;
     }
 

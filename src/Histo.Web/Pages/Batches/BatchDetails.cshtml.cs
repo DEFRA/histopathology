@@ -494,6 +494,8 @@ public class BatchDetailsModel : HistoPageModel
             errors["Create_Histology"] = "Select at least one histology type.";
         else if (Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.Archive) && Create_SelectedHistologyCodes.Count > 1)
             errors["Create_Histology"] = "Archive cannot be combined with other histology types.";
+        else if (Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.EO) && Create_SelectedHistologyCodes.Count > 1)
+            errors["Create_Histology"] = "EO cannot be combined with other histology types.";
 
         if (!Create_SafeToHandle)
             errors["Create_SafeToHandle"] = "Confirm the submission is adequately fixed.";

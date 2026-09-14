@@ -78,7 +78,8 @@ public interface IBatchRepository
     Task CompleteBlockAssignmentAsync(int batchId, bool allTissuesAssigned, int userId, CancellationToken ct = default);
 
     /// <summary>
-    /// Updates batch status. Maps to <c>EditBatchStatus</c>.
+    /// Updates batch status. Maps to <c>EditBatchStatus_temp</c> (the only such procedure
+    /// present in the database — there is no plain <c>EditBatchStatus</c>).
     /// Throws <see cref="BatchConcurrencyException"/> on rowstamp mismatch.
     /// </summary>
     Task<bool> UpdateStatusAsync(int batchId, string newStatus, int userId, CancellationToken ct = default);

@@ -77,7 +77,8 @@ public class ViewSubmissionsModel : HistoPageModel
             "DateCompleted"      => SortDesc ? Results.OrderByDescending(r => r.DateCompleted)       : Results.OrderBy(r => r.DateCompleted),
             "CustomerReceivedDate" => SortDesc ? Results.OrderByDescending(r => r.CustomerReceivedDate) : Results.OrderBy(r => r.CustomerReceivedDate),
             "Status"             => SortDesc ? Results.OrderByDescending(r => r.Status)              : Results.OrderBy(r => r.Status),
-            _                    => SortDesc ? Results.OrderByDescending(r => r.ID)                  : Results.OrderBy(r => r.ID),
+            // No column clicked yet — legacy default: dvBatchesView.Sort = "ID DESC" (newest first).
+            _                    => Results.OrderByDescending(r => r.ID),
         })
         .Skip((PageNumber - 1) * PageSize)
         .Take(PageSize)
