@@ -7,7 +7,12 @@
 @section BeforeHeading {
     @if (Model.IsPickerMode && Model.ReturnId.HasValue)
     {
+        @* Only CopyBatch currently passes ReturnId, and it expects the sourceBatchId route param. *@
         <a asp-page="/Batches/CopyBatch" asp-route-sourceBatchId="@Model.ReturnId" class="govuk-back-link">Back</a>
+    }
+    else if (Model.IsPickerMode)
+    {
+        <a asp-page="@Model.ReturnPage" class="govuk-back-link">Back</a>
     }
     else
     {
@@ -25,6 +30,7 @@
     }
     <div class="govuk-form-group">
         <label class="govuk-label" for="SenderRef">Sender ref</label>
+        <div class="govuk-hint">Leave this blank to browse all sender references.</div>
         <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" />
     </div>
     <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
@@ -32,6 +38,10 @@
 
 @if (Model.Results.Any())
 {
+    @if (Model.IsPickerMode)
+    {
+        <p class="govuk-body">The following matches were found for your sample reference. Select the required reference, or click Back to return to the previous page.</p>
+    }
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
@@ -44,7 +54,7 @@
             </tr>
         </thead>
         <tbody class="govuk-table__body">
-            @foreach (var r in Model.Results)
+            @foreach (var r in Model.PagedResults)
             {
                 <tr class="govuk-table__row">
                     <td class="govuk-table__cell">@r.SenderRef</td>
@@ -64,6 +74,7 @@
             }
         </tbody>
     </table>
+    <partial name="_Pagination" />
 }
 else if (Model.HasSearched)
 {
