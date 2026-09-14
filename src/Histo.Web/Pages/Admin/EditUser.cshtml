@@ -28,10 +28,9 @@
 
 <form method="post">
     <input type="hidden" asp-for="ReturnUrl" />
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="NtLogin">NT login</label>
-        <input class="govuk-input" asp-for="NtLogin" spellcheck="false" />
-    </div>
+    @* NT login is legacy/unused post-Entra ID (email is now the identity key) — kept as a
+       hidden field so the existing value round-trips unchanged on save rather than being lost. *@
+    <input type="hidden" asp-for="NtLogin" />
     <div class="govuk-form-group">
         <label class="govuk-label" for="Name">Name</label>
         <input class="govuk-input" asp-for="Name" />
