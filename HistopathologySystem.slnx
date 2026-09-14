@@ -12,6 +12,9 @@
     <Project Path="src/Histo.WebJobs/Histo.WebJobs.csproj" />
   </Folder>
   <Folder Name="/src/Database/" />
+  <Folder Name="/src/Database/DeploymentScripts/">
+    <File Path="V20260914_01_User_Email_NotNull_NTLogin_Nullable.sql" />
+  </Folder>
   <Folder Name="/src/Database/Permissions/">
     <File Path="GrantPermissions.sql" />
   </Folder>
