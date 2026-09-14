@@ -90,11 +90,9 @@
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
         <a href="@Model.ReturnUrl" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        @* Legacy EditBatch.aspx btnSamplesOnHold — the only entry point to the on-hold list.
+           Kept in the same button-group row as Save/Cancel per GDS button alignment. *@
+        <a asp-page="/Batches/SubmissionsOnHold" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples on hold</a>
+        <a asp-page="/Batches/EditBatch" class="govuk-button govuk-button--secondary" data-module="govuk-button">Continue to edit submission</a>
     </div>
 </form>
-
-<div class="govuk-button-group">
-    @* Legacy EditBatch.aspx btnSamplesOnHold — the only entry point to the on-hold list. *@
-    <a asp-page="/Batches/SubmissionsOnHold" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples on hold</a>
-    <a asp-page="/Batches/EditBatch" class="govuk-button govuk-button--secondary" data-module="govuk-button">Continue to edit submission</a>
-</div>

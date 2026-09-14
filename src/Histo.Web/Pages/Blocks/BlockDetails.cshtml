@@ -44,6 +44,12 @@ else
                 </div>
             </div>
         </div>
+        @if (Model.NoPreBookedRefsAvailable)
+        {
+            <p class="govuk-body">
+                <a asp-page="/Bookings/BookBlockRef" class="govuk-link">Book a block reference</a>
+            </p>
+        }
     }
 
     <dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-6">

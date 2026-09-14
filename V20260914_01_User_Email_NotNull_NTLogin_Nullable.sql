@@ -1,0 +1,24 @@
+﻿BEGIN TRANSACTION;
+
+UPDATE dbo.[User]
+SET Email = CONCAT('unknown.user.', ID, '@dummy.local')
+WHERE Email IS NULL;
+
+IF EXISTS (
+    SELECT 1
+    FROM dbo.[User]
+    WHERE Email IS NULL
+)
+BEGIN
+    RAISERROR('NULL emails still exist.', 16, 1);
+    ROLLBACK TRANSACTION;
+    RETURN;
+END;
+
+ALTER TABLE dbo.[User]
+ALTER COLUMN Email VARCHAR(60) NOT NULL;
+
+ALTER TABLE dbo.[User]
+ALTER COLUMN NTLogin VARCHAR(25) NULL;
+
+COMMIT TRANSACTION;

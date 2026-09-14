@@ -55,12 +55,12 @@ public class AddUserModel : HistoPageModel
         Validate();
         if (Errors.Count > 0) return Page();
 
-        // NT login is no longer shown or entered in the UI — Entra ID email is now the
-        // sole identity key (see HistopathologyClaimsTransformation), so the legacy
-        // NOT NULL NtLogin column is populated from Email rather than collected here.
+        // NT login is no longer shown, entered, or derived in the UI — Entra ID email is now
+        // the sole identity key (see HistopathologyClaimsTransformation). The legacy NtLogin
+        // column is left blank for new users rather than mapped from any other field.
         var user = new User
         {
-            NtLogin   = Email.Trim(),
+            NtLogin   = string.Empty,
             Name      = Name.Trim(),
             Email     = Email.Trim(),
             GroupCode = GroupCode,

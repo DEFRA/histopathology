@@ -205,6 +205,14 @@ public class SearchSubmissionsModel : HistoPageModel
         ViewData["Title"] = "Search Submissions";
         ViewData["PageTitle"] = "Search Submissions";
         await LoadLookupsAsync();
+
+        // Show the unfiltered result set by default on first load — all filter-criteria
+        // properties are POST-only [BindProperty] (no SupportsGet), so BuildCriteria() is
+        // all-null here and returns every submission. Filters only take effect once the
+        // user submits the Search form (OnPostSearchAsync).
+        Results = await _batches.SearchAsync(BuildCriteria());
+        Searched = true;
+        PopulateGridViewData();
     }
 
     public async Task<IActionResult> OnPostSearchAsync()

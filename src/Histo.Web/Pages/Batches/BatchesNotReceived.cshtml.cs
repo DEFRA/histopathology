@@ -15,7 +15,12 @@ public class BatchesNotReceivedModel : GridPageModel
     private readonly IBatchService _batches;
 
     public BatchesNotReceivedModel(ISessionService session, IBatchService batches)
-        : base(session) => _batches = batches;
+        : base(session)
+    {
+        _batches = batches;
+        // Legacy default view was newest submission first when no sort had been chosen.
+        SortDesc = true;
+    }
 
     public IReadOnlyList<BatchListResult> Batches { get; private set; } = [];
 

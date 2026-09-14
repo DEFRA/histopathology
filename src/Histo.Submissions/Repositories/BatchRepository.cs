@@ -368,33 +368,6 @@ public sealed class BatchRepository : IBatchRepository
     }
 
     /// <inheritdoc/>
-    public async Task<bool> UpdateStatusAsync(int batchId, string newStatus, int userId, CancellationToken ct = default)
-    {
-        if (!int.TryParse(newStatus, out var batchStatusInt)) batchStatusInt = 1;
-
-        // When marking as Received, auto-populate DateReceived (mirrors legacy ReceiveBatch.aspx).
-        DateTime? dateReceived = newStatus == BatchStatus.Received ? DateTime.Now : null;
-
-        using var conn = _db.CreateConnection();
-        var p = new DynamicParameters();
-        p.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
-        p.Add("ID",              batchId);
-        p.Add("BatchStatus",     batchStatusInt);
-        p.Add("DateReceived",    dateReceived);
-        p.Add("TimeReceived",    (int?)null);
-        p.Add("ReceivedBy",      userId);
-        p.Add("StatusComments",  (string?)null);
-        p.Add("PostFixationOther", (string?)null);
-
-        await conn.ExecuteAsync("EditBatchStatus_temp", p, commandType: System.Data.CommandType.StoredProcedure);
-
-        var returnValue = p.Get<int>("RETURN_VALUE");
-        // SP returns -1 when no rows were updated (concurrency conflict or batch not found).
-        if (returnValue == -1) throw new BatchConcurrencyException();
-        return returnValue == 0;
-    }
-
-    /// <inheritdoc/>
     public async Task<IReadOnlyList<string>> GetCommentsAsync(int batchId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();

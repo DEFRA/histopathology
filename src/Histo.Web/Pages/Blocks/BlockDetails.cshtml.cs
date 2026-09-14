@@ -117,6 +117,9 @@ public class BlockDetailsModel : HistoPageModel
 
     public string? ErrorMessage { get; private set; }
 
+    /// <summary>True when a pre-cassetted submission has no pre-booked block references left for this animal — the view offers a link to book one.</summary>
+    public bool NoPreBookedRefsAvailable { get; private set; }
+
     /// <summary>Legacy: EnableDisableAdditionalRequest — disabled for Wet Tissue/Stained Section/Pre Cassetted submissions (SubmittedAs codes 1/3/5).</summary>
     public bool CanUseAdditionalRequest { get; private set; } = true;
 
@@ -152,12 +155,36 @@ public class BlockDetailsModel : HistoPageModel
                 : BlockHelpers.ComputeNextBlockRef(
                     (await _blocks.GetByBatchAsync(BatchId ?? 0)).Where(b => b.AnimalID == Animal.ID).Select(b => b.BlockRef));
 
-            if (string.IsNullOrWhiteSpace(NewBlockRef)) return Page();
+            if (string.IsNullOrWhiteSpace(NewBlockRef))
+            {
+                // Pre-cassetted submissions can only create a block from a pre-booked reference
+                // (legacy: clsBlock.NewBlock -> GetPreBookedBlock). If none remain for this animal,
+                // there is nothing to auto-provision — tell the user why instead of silently
+                // rendering a form with no Tissues/Add tissue section and no visible explanation.
+                if (IsPreCassetted)
+                {
+                    ErrorMessage = "No pre-booked block references are available for this animal. Book a block reference for this sender before adding a block.";
+                    NoPreBookedRefsAvailable = true;
+                }
+                else
+                {
+                    ErrorMessage = "Could not determine the next block reference. Please try again or contact support if the problem continues.";
+                }
+                return Page();
+            }
 
             var existingOrders = (await _blocks.GetByBatchAsync(BatchId ?? 0)).Select(b => b.Order).ToList();
             var newId = await _blocks.AddBlockAsync(BatchId ?? 0, Animal.ID, NewBlockRef, existingOrders, Session.UserID,
                 customerRef: null, comment: null, repeatBlock: false);
-            if (newId <= 0) return Page();
+            if (newId <= 0)
+            {
+                // AddBlockAsync swallows its own exceptions and logs them, returning 0 on failure —
+                // without this, the page silently re-rendered the "Add block" form with no Tissues/
+                // Add tissue section and no visible error, making a genuine DB failure look like a
+                // missing feature. Surface it so the real cause shows up instead of a blank result.
+                ErrorMessage = "Could not create the block. Please try again or contact support if the problem continues.";
+                return Page();
+            }
 
             return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = newId, isAddFlow = true });
         }
