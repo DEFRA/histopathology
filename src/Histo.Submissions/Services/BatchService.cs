@@ -173,16 +173,6 @@ public sealed class BatchService : IBatchService
         catch (Exception ex) { _logger.LogError("Failed to copy batch {BatchId}.", ex, source.ID); return 0; }
     }
 
-    /// <summary>
-    /// Updates batch status. Throws <see cref="BatchConcurrencyException"/> on
-    /// concurrent modification.
-    /// </summary>
-    public async Task<bool> UpdateStatusAsync(int batchId, string newStatus, int userId, CancellationToken ct = default)
-    {
-        // BatchConcurrencyException propagates — the UI must handle it
-        return await _batches.UpdateStatusAsync(batchId, newStatus, userId, ct);
-    }
-
     // -----------------------------------------------------------------------
     // Search (read-only)
     // -----------------------------------------------------------------------

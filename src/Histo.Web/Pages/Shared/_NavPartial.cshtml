@@ -19,10 +19,6 @@
     var helpHref = "/Help/Index" + (helpAnchor is not null ? $"#{helpAnchor}" : "");
 }
 
-<li class="govuk-service-navigation__item">
-    <a class="govuk-service-navigation__link" asp-page="/Index">Home</a>
-</li>
-
 @if (isHisto || isMaint)
 {
     <li class="govuk-service-navigation__item">
@@ -33,7 +29,16 @@
 @if (isMaint)
 {
     <li class="govuk-service-navigation__item">
-        <a class="govuk-service-navigation__link" asp-page="/Admin/UserMaintenance">Admin</a>
+        <a class="govuk-service-navigation__link" asp-page="/Admin/UserMaintenance">User maintenance</a>
+    </li>
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Admin/PickListMaintenance">Pick list maintenance</a>
+    </li>
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Admin/EditAnimalRef">Edit Sender/Histology Ref</a>
+    </li>
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Bookings/EditHistologyRef">Edit histology ref counter</a>
     </li>
 }
 

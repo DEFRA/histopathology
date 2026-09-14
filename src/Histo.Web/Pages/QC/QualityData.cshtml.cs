@@ -49,6 +49,15 @@ public class QualityDataModel : GridPageModel
     public int BatchID => Session.BatchID ?? 0;
     public Batch? BatchSummary { get; private set; }
 
+    /// <summary>
+    /// Back-link target — honours <see cref="ISessionService.ReturnPage"/> so users arriving via
+    /// Search submissions / View submissions ("View quality data") return there, not always to
+    /// BatchesForDispatch (the only entry point the legacy hardcoded link assumed).
+    /// </summary>
+    public string BackLinkPage => string.IsNullOrWhiteSpace(Session.ReturnPage)
+        ? "/Batches/BatchesForDispatch"
+        : Session.ReturnPage;
+
     // Resolved display names for batch summary header
     public string? ProjectName { get; private set; }
     public string? PathologistName { get; private set; }

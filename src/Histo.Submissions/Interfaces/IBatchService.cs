@@ -28,9 +28,6 @@ public interface IBatchService
     /// <summary>Creates a new batch header copied from an existing one. Returns the new ID, or 0 on failure.</summary>
     Task<int> CopyBatchHeaderAsync(Batch source, int userId, CancellationToken ct = default);
 
-    /// <summary>Updates batch status. Throws <see cref="BatchConcurrencyException"/> on concurrent modification.</summary>
-    Task<bool> UpdateStatusAsync(int batchId, string newStatus, int userId, CancellationToken ct = default);
-
     /// <summary>
     /// Persists the ByPassSort flag on a batch.
     /// Legacy source: <c>BatchBlockSummary.aspx.vb</c>::<c>chkByPassSort_CheckedChanged</c>.

@@ -6,7 +6,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Batches/BatchesForDispatch" class="govuk-back-link">Back</a>
+    <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
 }
 
 @* Batch summary — mirrors legacy Batch.ascx header *@
@@ -94,11 +94,13 @@
             </div>
         </div>
         <div class="govuk-grid-column-one-quarter" style="padding-top: 2rem;">
-            <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Apply filters</button>
-            @if (!string.IsNullOrEmpty(Model.FilterHistologyRef) || !string.IsNullOrEmpty(Model.FilterTest))
-            {
-                <a asp-page="/QC/QualityData" class="govuk-link govuk-!-margin-left-3">Clear</a>
-            }
+            <div class="govuk-button-group">
+                <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Apply filters</button>
+                @if (!string.IsNullOrEmpty(Model.FilterHistologyRef) || !string.IsNullOrEmpty(Model.FilterTest))
+                {
+                    <a asp-page="/QC/QualityData" class="govuk-link">Clear</a>
+                }
+            </div>
         </div>
     </div>
 </form>

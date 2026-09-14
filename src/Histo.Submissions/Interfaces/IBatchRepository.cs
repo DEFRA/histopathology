@@ -78,13 +78,6 @@ public interface IBatchRepository
     Task CompleteBlockAssignmentAsync(int batchId, bool allTissuesAssigned, int userId, CancellationToken ct = default);
 
     /// <summary>
-    /// Updates batch status. Maps to <c>EditBatchStatus_temp</c> (the only such procedure
-    /// present in the database — there is no plain <c>EditBatchStatus</c>).
-    /// Throws <see cref="BatchConcurrencyException"/> on rowstamp mismatch.
-    /// </summary>
-    Task<bool> UpdateStatusAsync(int batchId, string newStatus, int userId, CancellationToken ct = default);
-
-    /// <summary>
     /// Persists the ByPassSort flag. Reloads current batch to supply the full EditBatch parameter set.
     /// Legacy source: <c>BatchBlockSummary.aspx.vb</c>::<c>chkByPassSort_CheckedChanged</c>.
     /// </summary>
