@@ -1,5 +1,7 @@
 using Histo.Administration.Interfaces;
 using Histo.Core.Domain;
+using Histo.Histology.Interfaces;
+using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.Submissions;
@@ -24,16 +26,19 @@ public class SampleSummaryModelTests
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<ISubmissionService> _submissions = new();
     private readonly Mock<IBatchService> _batches = new();
+    private readonly Mock<IBlockService> _blocks = new();
     private readonly Mock<ILookupService> _lookups = new();
 
     public SampleSummaryModelTests()
     {
         _session.SetupProperty(s => s.BatchID);
         _session.Setup(s => s.UserID).Returns(42);
+        _blocks.Setup(b => b.GetByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[]);
     }
 
     private SampleSummaryModel CreateSut() =>
-        new(_session.Object, _submissions.Object, _batches.Object, _lookups.Object)
+        new(_session.Object, _submissions.Object, _batches.Object, _blocks.Object, _lookups.Object)
         {
             PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
             TempData = new TempDataDictionary(new DefaultHttpContext(), Mock.Of<Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataProvider>()),
@@ -52,7 +57,7 @@ public class SampleSummaryModelTests
         var redirect = Assert.IsType<RedirectToPageResult>(result);
         Assert.Null(redirect.PageName);
         Assert.Equal("You must add at least one sample before finishing this submission.", sut.TempData["SampleSummary_Error"]);
-        _batches.Verify(b => b.UpdateStatusAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _batches.Verify(b => b.CompleteBlockAssignmentAsync(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -60,7 +65,7 @@ public class SampleSummaryModelTests
     {
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1, SenderRef = "S1" }]);
-        _batches.Setup(b => b.UpdateStatusAsync(5, BatchStatus.InProgress, 42, It.IsAny<CancellationToken>()))
+        _batches.Setup(b => b.CompleteBlockAssignmentAsync(5, It.IsAny<bool>(), 42, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         var sut = CreateSut();
@@ -68,6 +73,6 @@ public class SampleSummaryModelTests
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
         Assert.Equal("/Batches/BatchesNotReceived", redirect.PageName);
-        _batches.Verify(b => b.UpdateStatusAsync(5, BatchStatus.InProgress, 42, It.IsAny<CancellationToken>()), Times.Once);
+        _batches.Verify(b => b.CompleteBlockAssignmentAsync(5, It.IsAny<bool>(), 42, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

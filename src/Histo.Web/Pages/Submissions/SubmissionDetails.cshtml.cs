@@ -39,7 +39,6 @@ public class SubmissionDetailsModel : HistoPageModel
     [BindProperty(SupportsGet = true)] public int? EditTissueId { get; set; }
 
     [BindProperty] public string? PMDate { get; set; }
-    [BindProperty] public string? HistologyRef { get; set; }
 
     [BindProperty] public int TissueId { get; set; }
     [BindProperty] public string TissueCode { get; set; } = string.Empty;
@@ -72,7 +71,6 @@ public class SubmissionDetailsModel : HistoPageModel
         if (Animal is null) return Page();
 
         PMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
-        HistologyRef = Animal.HistologyRef;
         Tissues = await _submissions.GetTissuesBySubmissionAsync(BatchId ?? 0, Animal.BatchSubmissionID);
         TissueOptions = await _lookups.GetLookupDataAsync(LookupTissueCode);
 
@@ -106,8 +104,11 @@ public class SubmissionDetailsModel : HistoPageModel
             BatchSubmissionID = Animal.BatchSubmissionID,
             SenderRef = Animal.SenderRef,
             NextBlockRef = Animal.NextBlockRef,
-            HistoRefSet = !string.IsNullOrWhiteSpace(HistologyRef),
-            HistologyRef = HistologyRef,
+            // Legacy: ctlHistologyDiv.Visible = False on this (Wet Tissue) page — Histology ref is
+            // never editable here, so the existing value/flag is carried through unchanged rather
+            // than read from a form field that no longer exists.
+            HistoRefSet = Animal.HistoRefSet,
+            HistologyRef = Animal.HistologyRef,
             OnHold = Animal.OnHold,
             PMDate = DateFormatHelpers.ToLegacyDate(PMDate),
             PMDateSet = !string.IsNullOrWhiteSpace(PMDate),

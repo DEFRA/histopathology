@@ -513,6 +513,17 @@ public class BlockDetailsModel : HistoPageModel
         ExistingHistologyCodes = allTests.Where(t => t.BlockID == Block.ID && t.TestType == BlockTestType.Histology).Select(t => t.Code).ToList();
         ExistingAntibodyCodes = allTests.Where(t => t.BlockID == Block.ID && t.TestType == BlockTestType.Antibodies).Select(t => t.Code).ToList();
         ExistingStainCodes = allTests.Where(t => t.BlockID == Block.ID && t.TestType == BlockTestType.Stain).Select(t => t.Code).ToList();
+
+        // Legacy: DisplayBatchLevelTests (Page_Load, new-block branch) — a brand-new block with no
+        // test selections of its own yet defaults to the batch-level Histology/Antibody/Stain
+        // choices made when the submission was created, instead of forcing a re-pick per block.
+        if (IsAddFlow && ExistingHistologyCodes.Count == 0 && ExistingAntibodyCodes.Count == 0 && ExistingStainCodes.Count == 0)
+        {
+            var batchDefaults = await _batches.GetBatchTestSelectionsAsync(BatchId ?? 0);
+            ExistingHistologyCodes = batchDefaults.Histology.Select(r => r.Code).ToList();
+            ExistingAntibodyCodes = batchDefaults.Antibodies.Select(r => r.Code).ToList();
+            ExistingStainCodes = batchDefaults.Stains.Select(r => r.Code).ToList();
+        }
         return true;
     }
 

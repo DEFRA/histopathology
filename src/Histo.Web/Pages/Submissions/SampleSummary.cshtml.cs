@@ -1,5 +1,6 @@
 using Histo.Administration.Interfaces;
 using Histo.Core.Domain;
+using Histo.Histology.Interfaces;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -26,13 +27,15 @@ public class SampleSummaryModel : HistoPageModel
 {
     private readonly ISubmissionService _submissions;
     private readonly IBatchService _batches;
+    private readonly IBlockService _blocks;
     private readonly ILookupService _lookups;
 
-    public SampleSummaryModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups)
+    public SampleSummaryModel(ISessionService session, ISubmissionService submissions, IBatchService batches, IBlockService blocks, ILookupService lookups)
         : base(session)
     {
         _submissions = submissions;
         _batches = batches;
+        _blocks = blocks;
         _lookups = lookups;
     }
 
@@ -230,6 +233,13 @@ public class SampleSummaryModel : HistoPageModel
     /// "submission created" business gate, restoring the legacy rule that a submission must have
     /// at least one sample before it is considered finished.
     ///
+    /// Uses <see cref="IBatchService.CompleteBlockAssignmentAsync"/> — the same call
+    /// <c>BatchBlocks.cshtml.cs::OnPostDoneAsync</c> uses for the verified legacy source
+    /// (<c>BatchBlocks.aspx.vb::btSubmit_Click</c>: sets IsBlocked=True, status In progress,
+    /// and AllTissuesAssigned) — NOT <c>UpdateStatusAsync</c>/<c>EditBatchStatus</c>, which
+    /// doesn't appear anywhere in the legacy source and whose backing procedure never sets
+    /// IsBlocked/AllTissuesAssigned at all.
+    ///
     /// <c>FinalPrintBatch.aspx</c> itself remains unmigrated (blocked on the Phase 2 Reporting
     /// work — see <c>docs/Parity-Audit-Report.md</c>), so on success this mirrors the same
     /// accepted redirect target already used by <c>BatchBlocks.cshtml.cs</c>::<c>OnPostDoneAsync</c>
@@ -247,7 +257,12 @@ public class SampleSummaryModel : HistoPageModel
             return RedirectToPage(new { batchId });
         }
 
-        await _batches.UpdateStatusAsync(batchId.Value, BatchStatus.InProgress, Session.UserID);
+        // AllTissuesAssigned has no meaning for Wet Tissue (no Block table rows exist at all),
+        // so it naturally computes false there — harmless, since nothing reads it for that type.
+        var blocks = await _blocks.GetByBatchAsync(batchId.Value);
+        var allTissuesAssigned = animals.All(a => blocks.Any(b => b.AnimalID == a.ID));
+
+        await _batches.CompleteBlockAssignmentAsync(batchId.Value, allTissuesAssigned, Session.UserID);
         return RedirectToPage("/Batches/BatchesNotReceived");
     }
 
