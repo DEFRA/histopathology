@@ -157,7 +157,15 @@ public class BlockDetailsModel : HistoPageModel
             var existingOrders = (await _blocks.GetByBatchAsync(BatchId ?? 0)).Select(b => b.Order).ToList();
             var newId = await _blocks.AddBlockAsync(BatchId ?? 0, Animal.ID, NewBlockRef, existingOrders, Session.UserID,
                 customerRef: null, comment: null, repeatBlock: false);
-            if (newId <= 0) return Page();
+            if (newId <= 0)
+            {
+                // AddBlockAsync swallows its own exceptions and logs them, returning 0 on failure —
+                // without this, the page silently re-rendered the "Add block" form with no Tissues/
+                // Add tissue section and no visible error, making a genuine DB failure look like a
+                // missing feature. Surface it so the real cause shows up instead of a blank result.
+                ErrorMessage = "Could not create the block. Please try again or contact support if the problem continues.";
+                return Page();
+            }
 
             return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = newId, isAddFlow = true });
         }

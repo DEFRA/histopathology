@@ -28,7 +28,7 @@
                 <label class="govuk-label" for="Status">Status</label>
                 <select class="govuk-select" asp-for="Status">
                     <option value="">-- Any --</option>
-                    <option value="@Histo.Core.Domain.BatchStatus.Submitted">Not started</option>
+                    <option value="@Histo.Core.Domain.BatchStatus.Submitted">Not received</option>
                     <option value="@Histo.Core.Domain.BatchStatus.Received">Received</option>
                     <option value="@Histo.Core.Domain.BatchStatus.Rejected">Rejected</option>
                     <option value="@Histo.Core.Domain.BatchStatus.Completed">Completed</option>
@@ -287,7 +287,7 @@
             }
             else
             {
-                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Not available for submissions in Not started status">View submission</button>
+                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Not available for submissions in Not received status">View submission</button>
             }
 
             @* View quality data — Completed / Received / On Hold / In Progress *@
@@ -317,7 +317,7 @@
             }
             else
             {
-                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Not available for submissions in Not started status">View receipt</button>
+                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Not available for submissions in Not received status">View receipt</button>
             }
           
         </div>
