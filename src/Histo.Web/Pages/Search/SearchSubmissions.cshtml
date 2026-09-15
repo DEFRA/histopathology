@@ -125,26 +125,40 @@
     @* Legacy layout: "Submitted Date Between X and Y" / "Received Date Between X and Y" pairs. *@
     <div class="govuk-grid-row">
         <div class="govuk-grid-column-one-half">
-            <partial name="_DateInput" model="@(new DateInputViewModel {
-                Name = "SubmittedDateFrom", Legend = "Submitted date from", Hint = "For example, 27 3 2026",
-                Value = Model.SubmittedDateFrom, Error = Model.Errors.GetValueOrDefault("SubmittedDateFrom-day") })" />
+            <div class="govuk-form-group @(Model.Errors.ContainsKey("SubmittedDateFrom") ? "govuk-form-group--error" : "")">
+                <label class="govuk-label" for="SubmittedDateFrom">Submitted date from</label>
+                @if (Model.Errors.TryGetValue("SubmittedDateFrom", out var submittedFromErr))
+                {
+                    <p id="SubmittedDateFrom-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @submittedFromErr</p>
+                }
+                <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("SubmittedDateFrom") ? "govuk-input--error" : "")"
+                       type="date" asp-for="SubmittedDateFrom" aria-describedby="@(Model.Errors.ContainsKey("SubmittedDateFrom") ? "SubmittedDateFrom-error" : null)" />
+            </div>
         </div>
         <div class="govuk-grid-column-one-half">
-            <partial name="_DateInput" model="@(new DateInputViewModel {
-                Name = "SubmittedDateTo", Legend = "Submitted date to", Hint = "For example, 27 3 2026",
-                Value = Model.SubmittedDateTo, Error = Model.Errors.GetValueOrDefault("SubmittedDateTo-day") })" />
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="SubmittedDateTo">Submitted date to</label>
+                <input class="govuk-input govuk-input--width-10" type="date" asp-for="SubmittedDateTo" />
+            </div>
         </div>
     </div>
     <div class="govuk-grid-row">
         <div class="govuk-grid-column-one-half">
-            <partial name="_DateInput" model="@(new DateInputViewModel {
-                Name = "ReceivedDateFrom", Legend = "Received date from", Hint = "For example, 27 3 2026",
-                Value = Model.ReceivedDateFrom, Error = Model.Errors.GetValueOrDefault("ReceivedDateFrom-day") })" />
+            <div class="govuk-form-group @(Model.Errors.ContainsKey("ReceivedDateFrom") ? "govuk-form-group--error" : "")">
+                <label class="govuk-label" for="ReceivedDateFrom">Received date from</label>
+                @if (Model.Errors.TryGetValue("ReceivedDateFrom", out var receivedFromErr))
+                {
+                    <p id="ReceivedDateFrom-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @receivedFromErr</p>
+                }
+                <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("ReceivedDateFrom") ? "govuk-input--error" : "")"
+                       type="date" asp-for="ReceivedDateFrom" aria-describedby="@(Model.Errors.ContainsKey("ReceivedDateFrom") ? "ReceivedDateFrom-error" : null)" />
+            </div>
         </div>
         <div class="govuk-grid-column-one-half">
-            <partial name="_DateInput" model="@(new DateInputViewModel {
-                Name = "ReceivedDateTo", Legend = "Received date to", Hint = "For example, 27 3 2026",
-                Value = Model.ReceivedDateTo, Error = Model.Errors.GetValueOrDefault("ReceivedDateTo-day") })" />
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="ReceivedDateTo">Received date to</label>
+                <input class="govuk-input govuk-input--width-10" type="date" asp-for="ReceivedDateTo" />
+            </div>
         </div>
     </div>
 
@@ -180,18 +194,10 @@
             <input type="hidden" name="EnteredBy"           value="@Model.EnteredBy" />
             <input type="hidden" name="HistologyRef"        value="@Model.HistologyRef" />
             <input type="hidden" name="SenderRef"           value="@Model.SenderRef" />
-            <input type="hidden" name="SubmittedDateFrom.Day"   value="@Model.SubmittedDateFrom.Day" />
-            <input type="hidden" name="SubmittedDateFrom.Month" value="@Model.SubmittedDateFrom.Month" />
-            <input type="hidden" name="SubmittedDateFrom.Year"  value="@Model.SubmittedDateFrom.Year" />
-            <input type="hidden" name="SubmittedDateTo.Day"     value="@Model.SubmittedDateTo.Day" />
-            <input type="hidden" name="SubmittedDateTo.Month"   value="@Model.SubmittedDateTo.Month" />
-            <input type="hidden" name="SubmittedDateTo.Year"    value="@Model.SubmittedDateTo.Year" />
-            <input type="hidden" name="ReceivedDateFrom.Day"    value="@Model.ReceivedDateFrom.Day" />
-            <input type="hidden" name="ReceivedDateFrom.Month"  value="@Model.ReceivedDateFrom.Month" />
-            <input type="hidden" name="ReceivedDateFrom.Year"   value="@Model.ReceivedDateFrom.Year" />
-            <input type="hidden" name="ReceivedDateTo.Day"      value="@Model.ReceivedDateTo.Day" />
-            <input type="hidden" name="ReceivedDateTo.Month"    value="@Model.ReceivedDateTo.Month" />
-            <input type="hidden" name="ReceivedDateTo.Year"     value="@Model.ReceivedDateTo.Year" />
+            <input type="hidden" name="SubmittedDateFrom"   value="@Model.SubmittedDateFrom?.ToString("yyyy-MM-dd")" />
+            <input type="hidden" name="SubmittedDateTo"     value="@Model.SubmittedDateTo?.ToString("yyyy-MM-dd")" />
+            <input type="hidden" name="ReceivedDateFrom"    value="@Model.ReceivedDateFrom?.ToString("yyyy-MM-dd")" />
+            <input type="hidden" name="ReceivedDateTo"      value="@Model.ReceivedDateTo?.ToString("yyyy-MM-dd")" />
         </form>
 
         <table class="govuk-table">
@@ -268,7 +274,7 @@
         <div class="govuk-button-group">
 
               @* Print submission *@
-            <button class="govuk-button govuk-button--secondary" title="Print submission will be available in Phase 2">Print submission</button>
+            <a asp-page="/Reports/HistologyReport" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission</a>
             
             @* Edit submission — available for Received / On Hold / In Progress only *@
             @if (Model.CanEditSubmission)

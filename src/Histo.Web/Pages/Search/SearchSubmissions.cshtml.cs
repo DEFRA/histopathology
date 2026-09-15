@@ -55,10 +55,10 @@ public class SearchSubmissionsModel : HistoPageModel
     [BindProperty] public int? EnteredBy { get; set; }
     [BindProperty] public string? HistologyRef { get; set; }
     [BindProperty] public string? SenderRef { get; set; }
-    [BindProperty] public DateParts SubmittedDateFrom { get; set; } = new();
-    [BindProperty] public DateParts SubmittedDateTo { get; set; } = new();
-    [BindProperty] public DateParts ReceivedDateFrom { get; set; } = new();
-    [BindProperty] public DateParts ReceivedDateTo { get; set; } = new();
+    [BindProperty] public DateTime? SubmittedDateFrom { get; set; }
+    [BindProperty] public DateTime? SubmittedDateTo { get; set; }
+    [BindProperty] public DateTime? ReceivedDateFrom { get; set; }
+    [BindProperty] public DateTime? ReceivedDateTo { get; set; }
 
     /// <summary>
     /// ID of the currently selected search result row.
@@ -179,25 +179,18 @@ public class SearchSubmissionsModel : HistoPageModel
         if (SubmissionNumber is <= 0)
             Errors[nameof(SubmissionNumber)] = "Submission number must be a whole number greater than zero.";
 
-        var submittedFrom = ParseDate(SubmittedDateFrom, "SubmittedDateFrom-day", "Submitted date from");
-        var submittedTo = ParseDate(SubmittedDateTo, "SubmittedDateTo-day", "Submitted date to");
-        var receivedFrom = ParseDate(ReceivedDateFrom, "ReceivedDateFrom-day", "Received date from");
-        var receivedTo = ParseDate(ReceivedDateTo, "ReceivedDateTo-day", "Received date to");
+        var submittedFrom = SubmittedDateFrom;
+        var submittedTo = SubmittedDateTo;
+        var receivedFrom = ReceivedDateFrom;
+        var receivedTo = ReceivedDateTo;
 
         if (submittedFrom.HasValue && submittedTo.HasValue && submittedFrom > submittedTo)
-            Errors["SubmittedDateFrom-day"] = "Submitted date from must not be later than submitted date to.";
+            Errors["SubmittedDateFrom"] = "Submitted date from must not be later than submitted date to.";
 
         if (receivedFrom.HasValue && receivedTo.HasValue && receivedFrom > receivedTo)
-            Errors["ReceivedDateFrom-day"] = "Received date from must not be later than received date to.";
+            Errors["ReceivedDateFrom"] = "Received date from must not be later than received date to.";
 
         return Errors.Count == 0;
-    }
-
-    private DateTime? ParseDate(DateParts parts, string errorKey, string label)
-    {
-        if (parts.TryGetDate(out var value)) return value;
-        Errors[errorKey] = $"{label} must be a real date.";
-        return null;
     }
 
     public async Task OnGetAsync()
@@ -289,13 +282,11 @@ public class SearchSubmissionsModel : HistoPageModel
         EnteredBy           = EnteredBy,
         HistologyRef        = NullIfEmpty(HistologyRef),
         SenderRef           = NullIfEmpty(SenderRef),
-        SubmittedDateFrom   = ToDate(SubmittedDateFrom),
-        SubmittedDateTo     = ToDate(SubmittedDateTo),
-        ReceivedDateFrom    = ToDate(ReceivedDateFrom),
-        ReceivedDateTo      = ToDate(ReceivedDateTo),
+        SubmittedDateFrom   = SubmittedDateFrom,
+        SubmittedDateTo     = SubmittedDateTo,
+        ReceivedDateFrom    = ReceivedDateFrom,
+        ReceivedDateTo      = ReceivedDateTo,
     };
-
-    private static DateTime? ToDate(DateParts parts) => parts.TryGetDate(out var value) ? value : null;
 
     // Hidden form sends empty string for null-valued fields; the SP treats "" as a real
     // filter value and returns 0 rows. Convert to null so the SP applies no filter.
