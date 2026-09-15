@@ -6,7 +6,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Admin/LookupItems" asp-route-tableId="@Model.TableId" class="govuk-back-link">Back</a>
+    <a asp-page="/Admin/LookupItems" asp-route-tableId="@Model.TableId" asp-route-ReturnUrl="@Model.ReturnUrl" class="govuk-back-link">Back</a>
 }
 
 <h2 class="govuk-heading-m">@Model.TableName</h2>
@@ -31,6 +31,7 @@
     <input type="hidden" asp-for="TableId" />
     <input type="hidden" asp-for="ItemId" />
     <input type="hidden" asp-for="OriginalCode" />
+    <input type="hidden" asp-for="ReturnUrl" />
 
     @* Area dropdown — only for Contacts (table 18) and Projects (table 19) *@
     @if (Model.ShowAreaColumn)

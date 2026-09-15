@@ -6,7 +6,14 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Admin/PickListMaintenance" class="govuk-back-link">Back</a>
+    @if (Model.SafeReturnUrl is not null)
+    {
+        <a href="@Model.SafeReturnUrl" class="govuk-back-link">Back</a>
+    }
+    else
+    {
+        <a asp-page="/Admin/PickListMaintenance" class="govuk-back-link">Back</a>
+    }
 }
 
 <h2 class="govuk-heading-m">@Model.TableName</h2>
@@ -25,6 +32,7 @@
 
 <form method="get" class="govuk-!-margin-bottom-4">
     <input type="hidden" name="tableId" value="@Model.TableId" />
+    <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
     <div class="govuk-checkboxes" data-module="govuk-checkboxes">
         <div class="govuk-checkboxes__item">
             <input class="govuk-checkboxes__input" type="checkbox" id="showDeactivated"
@@ -59,11 +67,11 @@
                 <td class="govuk-table__cell govuk-table__cell--numeric">
                     @if (Model.TableHasCodes)
                     {
-                        <a asp-page="/Admin/EditLookupItem" asp-route-tableId="@Model.TableId" asp-route-itemCode="@i.Code" class="govuk-link">Change<span class="govuk-visually-hidden"> @i.Name</span></a>
+                        <a asp-page="/Admin/EditLookupItem" asp-route-tableId="@Model.TableId" asp-route-itemCode="@i.Code" asp-route-ReturnUrl="@Model.ReturnUrl" class="govuk-link">Change<span class="govuk-visually-hidden"> @i.Name</span></a>
                     }
                     else
                     {
-                        <a asp-page="/Admin/EditLookupItem" asp-route-tableId="@Model.TableId" asp-route-itemId="@i.ID" class="govuk-link">Change<span class="govuk-visually-hidden"> @i.Name</span></a>
+                        <a asp-page="/Admin/EditLookupItem" asp-route-tableId="@Model.TableId" asp-route-itemId="@i.ID" asp-route-ReturnUrl="@Model.ReturnUrl" class="govuk-link">Change<span class="govuk-visually-hidden"> @i.Name</span></a>
                     }
                 </td>
             </tr>
@@ -76,4 +84,4 @@
 </table>
 <partial name="_Pagination" />
 
-<a asp-page="/Admin/AddLookupItem" asp-route-tableId="@Model.TableId" class="govuk-button" data-module="govuk-button">Add item</a>
+<a asp-page="/Admin/AddLookupItem" asp-route-tableId="@Model.TableId" asp-route-ReturnUrl="@Model.ReturnUrl" class="govuk-button" data-module="govuk-button">Add item</a>

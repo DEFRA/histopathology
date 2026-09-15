@@ -67,8 +67,6 @@
 <table class="govuk-table">
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
-            @{ ViewData["Label"] = "NT Login"; ViewData["Column"] = "NtLogin"; }
-            <partial name="_SortableHeader" />
             @{ ViewData["Label"] = "Name"; ViewData["Column"] = "Name"; }
             <partial name="_SortableHeader" />
             @{ ViewData["Label"] = "Email"; ViewData["Column"] = "Email"; }
@@ -86,7 +84,6 @@
         @foreach (var u in Model.PagedEntries)
         {
             <tr class="govuk-table__row">
-                <td class="govuk-table__cell">@u.NtLogin</td>
                 <td class="govuk-table__cell">@u.Name</td>
                 <td class="govuk-table__cell">@u.Email</td>
                 <td class="govuk-table__cell">@Model.ResolveGroupName(u)</td>
@@ -99,7 +96,7 @@
         }
         @if (!Model.Users.Any())
         {
-            <tr class="govuk-table__row"><td colspan="7" class="govuk-table__cell">No users found.</td></tr>
+            <tr class="govuk-table__row"><td colspan="6" class="govuk-table__cell">No users found.</td></tr>
         }
     </tbody>
 </table>

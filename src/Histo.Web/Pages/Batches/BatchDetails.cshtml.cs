@@ -102,6 +102,14 @@ public class BatchDetailsModel : HistoPageModel
 
     public Batch? Batch { get; private set; }
 
+    /// <summary>Manage project/contract codes pick list, returning here afterwards (view mode).</summary>
+    public string? ProjectPickListUrl =>
+        Url.Page("/Admin/LookupItems", new { tableId = LookupProjects, ReturnUrl = Url.Page("/Batches/BatchDetails", new { batchId = BatchId }) });
+
+    /// <summary>Manage pathologists pick list, returning here afterwards (view mode).</summary>
+    public string? PathologistPickListUrl =>
+        Url.Page("/Admin/LookupItems", new { tableId = LookupContacts, ReturnUrl = Url.Page("/Batches/BatchDetails", new { batchId = BatchId }) });
+
     /// <summary>Number of samples added so far — shown as a hint on the "Samples" button.</summary>
     public int SampleCount { get; private set; }
 
@@ -255,8 +263,8 @@ public class BatchDetailsModel : HistoPageModel
         return field switch
         {
             "submittedBy" => RedirectToPage("/Admin/UserMaintenance", new { returnUrl }),
-            "project"     => RedirectToPage("/Admin/PickListUserArea", new { tableId = LookupProjects, returnUrl }),
-            "pathologist" => RedirectToPage("/Admin/PickListUserArea", new { tableId = LookupContacts, returnUrl }),
+            "project"     => RedirectToPage("/Admin/LookupItems", new { tableId = LookupProjects, ReturnUrl = returnUrl }),
+            "pathologist" => RedirectToPage("/Admin/LookupItems", new { tableId = LookupContacts, ReturnUrl = returnUrl }),
             _             => RedirectToPage("/Batches/BatchDetails", new { mode = "create" }),
         };
     }
@@ -342,8 +350,10 @@ public class BatchDetailsModel : HistoPageModel
 
             var selectionsTask     = _batches.GetBatchTestSelectionsAsync(batchId);
             var histologyTask      = _lookups.GetHistologyTypesAsync();
-            var antibodyTask       = _lookups.GetLookupDataAsync(antibodyTableId);
-            var stainTask          = _lookups.GetLookupDataAsync(6);   // LOOKUP_SPECIAL_STAIN = 6
+            // includeInactive: true — a saved Antibody/Stain code may since have been deactivated;
+            // without this the raw code is shown instead of its name (same issue as Project/Pathologist below).
+            var antibodyTask       = _lookups.GetLookupDataAsync(antibodyTableId, includeInactive: true);
+            var stainTask          = _lookups.GetLookupDataAsync(6, includeInactive: true);   // LOOKUP_SPECIAL_STAIN = 6
             var speciesTask        = _lookups.GetSpeciesLookupAsync();
             var usersTask          = _users.GetAllUsersAsync();
             var userAreasTask      = _lookups.GetUserAreasAsync();
@@ -572,8 +582,8 @@ public class BatchDetailsModel : HistoPageModel
         // Projects and Contacts must be scoped to the current user's area, not all items from the
         // entire database — otherwise items added via PickListUserArea won't appear in the dropdowns
         // since they're inserted with a specific area but queried non-scoped here.
-        var projectsTask  = _lookups.GetUserAreaDataAsync(LookupProjects, Session.UserArea);
-        var contactsTask  = _lookups.GetUserAreaDataAsync(LookupContacts, Session.UserArea);
+        var projectsTask  = _lookups.GetProjectsByAreaAsync(Session.UserArea);
+        var contactsTask  = _lookups.GetContactsByAreaAsync(Session.UserArea);
         var speciesTask   = _lookups.GetSpeciesLookupAsync();
         var fixationTask  = _lookups.GetLookupDataAsync(LookupFixation);
         var areaTask      = _lookups.GetLookupDataAsync(LookupUserArea);
