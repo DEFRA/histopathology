@@ -24,6 +24,15 @@ public class PrintSubmissionModel : HistoPageModel
     /// <summary>Mirrors legacy <c>EnableSubmissionNotes</c> — only offered when notes exist.</summary>
     public bool HasNotes { get; private set; }
 
+    /// <summary>
+    /// "Continue" target — legacy <c>SV_RedirectAfterPrint</c> returns the user to wherever this
+    /// print step was reached from (Receive submission or Assign tissues to blocks). Falls back to
+    /// Batches awaiting receipt, matching the original single-entry-point behaviour.
+    /// </summary>
+    public string ContinuePage => string.IsNullOrWhiteSpace(Session.ReturnPage)
+        ? "/Batches/BatchesNotReceived"
+        : Session.ReturnPage;
+
     public async Task<IActionResult> OnGetAsync()
     {
         ViewData["Title"] = "Print submission";

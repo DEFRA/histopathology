@@ -165,10 +165,9 @@ public class BatchBlocksModel : HistoPageModel
     /// "Done" — legacy source: <c>BatchBlocks.aspx.vb::btSubmit_Click</c>. Marks the batch blocked,
     /// transitions status to In progress, and records whether every sample has at least one block
     /// (a simplified stand-in for legacy's per-tissue "green star" indicator, which tracked at
-    /// individual tissue-piece granularity). Legacy then redirects to <c>FinalPrintBatch.aspx</c>;
-    /// that report page is not yet migrated (deferred to the Reporting phase per
-    /// <c>docs/Migration-Plan.md</c>), so this redirects to Batches received instead, matching
-    /// legacy's own eventual post-print destination (<c>SV_RedirectAfterPrint</c>).
+    /// individual tissue-piece granularity). Legacy then redirects to <c>FinalPrintBatch.aspx</c>,
+    /// now <see cref="Histo.Web.Pages.Batches.PrintSubmissionModel"/>; <see cref="ISessionService.ReturnPage"/>
+    /// is set so that page's "Continue" button returns here, matching legacy's <c>SV_RedirectAfterPrint</c>.
     /// </summary>
     public async Task<IActionResult> OnPostDoneAsync()
     {
@@ -180,7 +179,8 @@ public class BatchBlocksModel : HistoPageModel
         var allTissuesAssigned = animals.Count > 0 && animals.All(a => blocks.Any(b => b.AnimalID == a.ID));
 
         await _batches.CompleteBlockAssignmentAsync(BatchId ?? 0, allTissuesAssigned, Session.UserID);
-        return RedirectToPage("/Batches/BatchesReceived");
+        Session.ReturnPage = "/Batches/BatchesReceived";
+        return RedirectToPage("/Batches/PrintSubmission");
     }
 
     /// <summary>Loads the grid (blocks + sender/histology refs) and supporting lookup data — shared by <see cref="OnGetAsync"/> and the select-handlers' validation-error fallback.</summary>

@@ -6,7 +6,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Archive/ArchiveMenu" asp-route-batchId="@Model.BatchId" class="govuk-back-link">Back</a>
+    <a asp-page="@Model.BackLinkPage" asp-route-batchId="@Model.BatchId" class="govuk-back-link">Back</a>
 }
 
 @if (Model.Batch is not null)
@@ -61,7 +61,7 @@
         <div role="alert">
             <h2 class="govuk-error-summary__title">There is a problem</h2>
             <div class="govuk-error-summary__body">
-                <ul class="govuk-list govuk-error-summary__list"><li>@Model.Error</li></ul>
+                <ul class="govuk-list govuk-error-summary__list"><li><a href="#ArchiveLocationCode">@Model.Error</a></li></ul>
             </div>
         </div>
     </div>

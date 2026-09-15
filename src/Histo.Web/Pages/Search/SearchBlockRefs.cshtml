@@ -6,7 +6,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Search/SearchMenu" class="govuk-back-link">Back</a>
+    <a asp-page="@Model.BackLinkPage" class="govuk-back-link">Back</a>
 }
 
 <partial name="_ErrorSummary" model="Model.Errors" />
@@ -16,6 +16,7 @@
    links below preserve the criteria. *@
 <form method="get">
     <input type="hidden" name="Submitted" value="true" />
+    <input type="hidden" name="ReturnPage" value="@Model.ReturnPage" />
     <div class="govuk-form-group @(Model.Errors.ContainsKey("SenderRef") ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="SenderRef">Sender ref</label>
         @if (Model.Errors.TryGetValue("SenderRef", out var senderErr))
@@ -64,7 +65,7 @@
 
     <div class="govuk-button-group">
         <a asp-page="/Search/SearchBlockRefs" asp-page-handler="ExportCsv"
-           asp-route-SenderRef="@Model.SenderRef" asp-route-HistologyRef="@Model.HistologyRef"
+           asp-route-SenderRef="@Model.SenderRef" asp-route-HistologyRef="@Model.HistologyRef" asp-route-ReturnPage="@Model.ReturnPage"
                class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</a>
         @* Legacy lbViewImportedData opened ViewImportedData.aspx?SearchString=<ref> in a popup.
            The migrated page names that parameter Filter and needs a table chosen there. *@

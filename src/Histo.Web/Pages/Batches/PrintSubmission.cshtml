@@ -37,6 +37,6 @@ else
             <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="No submission notes have been recorded">Print submission notes</button>
         }
 
-        <a asp-page="/Batches/BatchesNotReceived" class="govuk-button govuk-button--secondary" data-module="govuk-button">Continue</a>
+        <a asp-page="@Model.ContinuePage" class="govuk-button govuk-button--secondary" data-module="govuk-button">Continue</a>
     </div>
 }

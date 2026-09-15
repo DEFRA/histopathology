@@ -148,11 +148,11 @@
         </div>
     </div>
 
-    @* Legacy button row: Search / Clear Search / Done. *@
+    @* Legacy button row: Search / Clear Search. "Done" removed — it duplicated the Back link,
+       both returning to Search menu. *@
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
         <a asp-page="/Search/SearchSubmissions" class="govuk-button govuk-button--secondary" data-module="govuk-button">Clear search</a>
-        <a asp-page="/Search/SearchMenu" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
     </div>
 </form>
 

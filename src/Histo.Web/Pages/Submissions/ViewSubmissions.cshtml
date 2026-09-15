@@ -10,6 +10,8 @@
     <a asp-page="/Index" class="govuk-back-link">Back</a>
 }
 
+<partial name="_ErrorSummary" model="Model.Errors" />
+
 <form method="post" asp-page-handler="Search">
     <div class="govuk-grid-row">
         <div class="govuk-grid-column-one-half">
@@ -105,30 +107,26 @@
     @* Legacy layout: "Submitted Date Between X and Y" / "Received Date Between X and Y" pairs. *@
     <div class="govuk-grid-row">
         <div class="govuk-grid-column-one-half">
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="SubmittedDateFrom">Submitted date from</label>
-                <input class="govuk-input govuk-input--width-10" type="date" asp-for="SubmittedDateFrom" />
-            </div>
+            <partial name="_DateInput" model="@(new DateInputViewModel {
+                Name = "SubmittedDateFrom", Legend = "Submitted date from", Hint = "For example, 27 3 2026",
+                Value = Model.SubmittedDateFrom, Error = Model.Errors.GetValueOrDefault("SubmittedDateFrom-day") })" />
         </div>
         <div class="govuk-grid-column-one-half">
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="SubmittedDateTo">Submitted date to</label>
-                <input class="govuk-input govuk-input--width-10" type="date" asp-for="SubmittedDateTo" />
-            </div>
+            <partial name="_DateInput" model="@(new DateInputViewModel {
+                Name = "SubmittedDateTo", Legend = "Submitted date to", Hint = "For example, 27 3 2026",
+                Value = Model.SubmittedDateTo, Error = Model.Errors.GetValueOrDefault("SubmittedDateTo-day") })" />
         </div>
     </div>
     <div class="govuk-grid-row">
         <div class="govuk-grid-column-one-half">
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="ReceivedDateFrom">Received date from</label>
-                <input class="govuk-input govuk-input--width-10" type="date" asp-for="ReceivedDateFrom" />
-            </div>
+            <partial name="_DateInput" model="@(new DateInputViewModel {
+                Name = "ReceivedDateFrom", Legend = "Received date from", Hint = "For example, 27 3 2026",
+                Value = Model.ReceivedDateFrom, Error = Model.Errors.GetValueOrDefault("ReceivedDateFrom-day") })" />
         </div>
         <div class="govuk-grid-column-one-half">
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="ReceivedDateTo">Received date to</label>
-                <input class="govuk-input govuk-input--width-10" type="date" asp-for="ReceivedDateTo" />
-            </div>
+            <partial name="_DateInput" model="@(new DateInputViewModel {
+                Name = "ReceivedDateTo", Legend = "Received date to", Hint = "For example, 27 3 2026",
+                Value = Model.ReceivedDateTo, Error = Model.Errors.GetValueOrDefault("ReceivedDateTo-day") })" />
         </div>
     </div>
     <div class="govuk-button-group">
@@ -159,10 +157,18 @@
             <input type="hidden" name="EnteredBy"           value="@Model.EnteredBy" />
             <input type="hidden" name="HistologyRef"        value="@Model.HistologyRef" />
             <input type="hidden" name="SenderRef"           value="@Model.SenderRef" />
-            <input type="hidden" name="SubmittedDateFrom"   value="@Model.SubmittedDateFrom?.ToString("yyyy-MM-dd")" />
-            <input type="hidden" name="SubmittedDateTo"     value="@Model.SubmittedDateTo?.ToString("yyyy-MM-dd")" />
-            <input type="hidden" name="ReceivedDateFrom"    value="@Model.ReceivedDateFrom?.ToString("yyyy-MM-dd")" />
-            <input type="hidden" name="ReceivedDateTo"      value="@Model.ReceivedDateTo?.ToString("yyyy-MM-dd")" />
+            <input type="hidden" name="SubmittedDateFrom.Day"   value="@Model.SubmittedDateFrom.Day" />
+            <input type="hidden" name="SubmittedDateFrom.Month" value="@Model.SubmittedDateFrom.Month" />
+            <input type="hidden" name="SubmittedDateFrom.Year"  value="@Model.SubmittedDateFrom.Year" />
+            <input type="hidden" name="SubmittedDateTo.Day"     value="@Model.SubmittedDateTo.Day" />
+            <input type="hidden" name="SubmittedDateTo.Month"   value="@Model.SubmittedDateTo.Month" />
+            <input type="hidden" name="SubmittedDateTo.Year"    value="@Model.SubmittedDateTo.Year" />
+            <input type="hidden" name="ReceivedDateFrom.Day"    value="@Model.ReceivedDateFrom.Day" />
+            <input type="hidden" name="ReceivedDateFrom.Month"  value="@Model.ReceivedDateFrom.Month" />
+            <input type="hidden" name="ReceivedDateFrom.Year"   value="@Model.ReceivedDateFrom.Year" />
+            <input type="hidden" name="ReceivedDateTo.Day"      value="@Model.ReceivedDateTo.Day" />
+            <input type="hidden" name="ReceivedDateTo.Month"    value="@Model.ReceivedDateTo.Month" />
+            <input type="hidden" name="ReceivedDateTo.Year"     value="@Model.ReceivedDateTo.Year" />
         </form>
 
         <table class="govuk-table">

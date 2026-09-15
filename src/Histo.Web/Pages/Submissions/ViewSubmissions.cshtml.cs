@@ -51,10 +51,12 @@ public class ViewSubmissionsModel : HistoPageModel
     [BindProperty] public int?      EnteredBy           { get; set; }
     [BindProperty] public string?   HistologyRef        { get; set; }
     [BindProperty] public string?   SenderRef           { get; set; }
-    [BindProperty] public DateTime? SubmittedDateFrom   { get; set; }
-    [BindProperty] public DateTime? SubmittedDateTo     { get; set; }
-    [BindProperty] public DateTime? ReceivedDateFrom    { get; set; }
-    [BindProperty] public DateTime? ReceivedDateTo      { get; set; }
+    [BindProperty] public DateParts SubmittedDateFrom   { get; set; } = new();
+    [BindProperty] public DateParts SubmittedDateTo     { get; set; } = new();
+    [BindProperty] public DateParts ReceivedDateFrom    { get; set; } = new();
+    [BindProperty] public DateParts ReceivedDateTo      { get; set; } = new();
+
+    public Dictionary<string, string> Errors { get; } = [];
 
     // Sort/page state is bound the same way as the filter criteria above — [BindProperty]
     // binds from route/query/form on any non-GET request, so these survive the POST-based
@@ -254,11 +256,18 @@ public class ViewSubmissionsModel : HistoPageModel
         EnteredBy           = EnteredBy,
         HistologyRef        = NullIfEmpty(HistologyRef),
         SenderRef           = NullIfEmpty(SenderRef),
-        SubmittedDateFrom   = SubmittedDateFrom,
-        SubmittedDateTo     = SubmittedDateTo,
-        ReceivedDateFrom    = ReceivedDateFrom,
-        ReceivedDateTo      = ReceivedDateTo,
+        SubmittedDateFrom   = ParseDate(SubmittedDateFrom, "SubmittedDateFrom-day", "Submitted date from"),
+        SubmittedDateTo     = ParseDate(SubmittedDateTo, "SubmittedDateTo-day", "Submitted date to"),
+        ReceivedDateFrom    = ParseDate(ReceivedDateFrom, "ReceivedDateFrom-day", "Received date from"),
+        ReceivedDateTo      = ParseDate(ReceivedDateTo, "ReceivedDateTo-day", "Received date to"),
     };
+
+    private DateTime? ParseDate(DateParts parts, string errorKey, string label)
+    {
+        if (parts.TryGetDate(out var value)) return value;
+        Errors[errorKey] = $"{label} must be a real date.";
+        return null;
+    }
 
     // Hidden form sends empty string for null-valued fields; the SP treats "" as a real
     // filter value and returns 0 rows. Convert to null so the SP applies no filter.

@@ -115,6 +115,15 @@ public class BlockDetailsModel : HistoPageModel
     public IReadOnlyList<string> ExistingAntibodyCodes { get; private set; } = [];
     public IReadOnlyList<string> ExistingStainCodes { get; private set; } = [];
 
+    /// <summary>Legacy <c>BlockDetails.aspx</c> only lists the tests selected/updated during Create/Edit
+    /// Submission — not every test in the pick list — so the Test section is filtered to those here.</summary>
+    public IReadOnlyList<LookupItem> DisplayedHistologyOptions =>
+        HistologyOptions.Where(o => ExistingHistologyCodes.Contains(o.Code ?? "")).ToList();
+    public IReadOnlyList<LookupItem> DisplayedAntibodyOptions =>
+        AntibodyOptions.Where(o => ExistingAntibodyCodes.Contains(o.Code ?? "")).ToList();
+    public IReadOnlyList<LookupItem> DisplayedStainOptions =>
+        StainOptions.Where(o => ExistingStainCodes.Contains(o.Code ?? "")).ToList();
+
     public string? ErrorMessage { get; private set; }
 
     /// <summary>True when a pre-cassetted submission has no pre-booked block references left for this animal — the view offers a link to book one.</summary>

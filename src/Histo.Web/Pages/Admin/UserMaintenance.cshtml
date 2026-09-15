@@ -93,7 +93,7 @@
                 <td class="govuk-table__cell">@Model.ResolveAreaName(u)</td>
                 <td class="govuk-table__cell">@(u.Active ? "Yes" : "No")</td>
                 <td class="govuk-table__cell">
-                    <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-page="/Admin/EditUser" asp-route-userId="@u.UserID" asp-route-returnUrl="@Model.SafeReturnUrl">Change<span class="govuk-visually-hidden"> @u.Name</span></a>
+                    <a class="govuk-link" asp-page="/Admin/EditUser" asp-route-userId="@u.UserID" asp-route-returnUrl="@Model.SafeReturnUrl">Change<span class="govuk-visually-hidden"> @u.Name</span></a>
                 </td>
             </tr>
         }
