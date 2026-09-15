@@ -3,20 +3,43 @@
  * (tables, forms, buttons, selects) are now rendered with real govuk-frontend
  * markup/classes throughout the application.
 
-/* User context in service navigation header.
+/* User context + "Menu" toggle, grouped on the right of the service navigation bar.
  * The govuk-service-navigation__container uses display:flex — margin-left:auto
- * pushes this element to the far right of the navigation bar.
+ * pushes this group to the far right, regardless of viewport width.
  */
-.app-header-user {
+.app-header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
     margin-left: auto;
+}
+
+.app-header-user {
     white-space: nowrap;
-    align-self: center;
+    margin-bottom: 0;
+}
+
+/* "Menu" toggle is always visible (desktop and mobile) — the nav list starts hidden
+ * and is only revealed on click, via nav-toggle.js. This overrides govuk-frontend's
+ * default Service Navigation behaviour, which force-shows the list above the tablet
+ * breakpoint; [hidden] needs !important here to win against that unconditional
+ * display:flex rule. */
+.app-nav-toggle {
+    white-space: nowrap;
+}
+
+.govuk-service-navigation__list[hidden] {
+    display: none !important;
+}
+
+.app-nav-wrapper {
+    border-top: 1px solid var(--govuk-border-colour, #b1b4b6);
 }
 
 /* APHA departmental logo replacing the GOV.UK crown mark. Kept in its own row
  * (not squeezed inline with the licence text) so the wordmark stays legible per WCAG 1.4.5. */
 .govuk-footer__logo {
-    margin-bottom: 25px;
+    margin-bottom: 5px;
 }
 
 /* Resets native <button> chrome so POST-based sort/pagination controls (which must

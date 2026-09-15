@@ -163,6 +163,18 @@ public class CopyBatchModel : HistoPageModel
             return Page();
         }
 
+        // Copy batch-level Histology/Antibody/Special Stain test selections onto the new
+        // batch — legacy's CopyBatch() (clsBatch.vb) always copies these tables alongside
+        // the batch header; the new batch acts as a template for its blocks/samples the
+        // same way the original does.
+        var sourceSelections = await _batches.GetBatchTestSelectionsAsync(SourceBatchId);
+        await _batches.SaveBatchTestSelectionsAsync(
+            newBatchId,
+            sourceSelections.Histology.Select(h => h.Code).ToList(),
+            sourceSelections.Antibodies.Select(a => a.Code).ToList(),
+            sourceSelections.Stains.Select(s => s.Code).ToList(),
+            userId);
+
         var submissions = await _submissions.GetSubmissionsByBatchAsync(SourceBatchId);
         var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(SourceBatchId);
         var animals = blockAnimals.Count > 0 ? blockAnimals : await _submissions.GetAnimalsByBatchAsync(SourceBatchId);

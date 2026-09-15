@@ -13,7 +13,7 @@ namespace Histo.Web.Pages.Search;
 /// Reports; reads <c>LookupData.GetImportedtables</c> for the table drop-down and
 /// <c>clsAnimal.GetImportedData</c> for the selected table's rows.
 /// </summary>
-public class ViewImportedDataModel : HistoPageModel
+public class ViewImportedDataModel : GridPageModel
 {
     private readonly ILookupService _lookups;
     private readonly ISubmissionService _submissions;
@@ -31,6 +31,22 @@ public class ViewImportedDataModel : HistoPageModel
     public IReadOnlyList<LookupItem> Tables { get; private set; } = [];
     public IReadOnlyList<ImportedDataRow> Results { get; private set; } = [];
 
+    public IReadOnlyList<ImportedDataRow> PagedResults =>
+        (SortColumn switch
+        {
+            "HistologyRef"  => SortDesc ? Results.OrderByDescending(r => r.HistologyRef)  : Results.OrderBy(r => r.HistologyRef),
+            "BlockRef"      => SortDesc ? Results.OrderByDescending(r => r.BlockRef)      : Results.OrderBy(r => r.BlockRef),
+            "Project"       => SortDesc ? Results.OrderByDescending(r => r.Project)       : Results.OrderBy(r => r.Project),
+            "DateSubmitted" => SortDesc ? Results.OrderByDescending(r => r.DateSubmitted) : Results.OrderBy(r => r.DateSubmitted),
+            "Species"       => SortDesc ? Results.OrderByDescending(r => r.Species)       : Results.OrderBy(r => r.Species),
+            "Tissue"        => SortDesc ? Results.OrderByDescending(r => r.Tissue)        : Results.OrderBy(r => r.Tissue),
+            "Comments" => SortDesc ? Results.OrderByDescending(r => r.Comments) : Results.OrderBy(r => r.Comments),
+            _               => SortDesc ? Results.OrderByDescending(r => r.SenderRef)     : Results.OrderBy(r => r.SenderRef),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
+
     public async Task OnGetAsync()
     {
         ViewData["Title"] = "View Old ICC_Sub Data";
@@ -43,6 +59,8 @@ public class ViewImportedDataModel : HistoPageModel
             var rows = await _submissions.GetImportedDataAsync(SelectedTable);
             Results = ApplyFilter(rows, Filter);
         }
+
+        PopulateGridViewData(Results.Count);
     }
 
     /// <summary>Replaces the legacy ExcelExport.aspx link — exports the current results as CSV.</summary>

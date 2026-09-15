@@ -16,7 +16,11 @@ public class SearchUnUsedHistologyRefsModel : GridPageModel
     public IReadOnlyList<HistologyRef> Results { get; private set; } = [];
 
     public IReadOnlyList<HistologyRef> PagedResults =>
-        (SortDesc ? Results.OrderByDescending(r => r.Ref) : Results.OrderBy(r => r.Ref))
+        (SortColumn switch
+        {
+            //"SenderRef" => SortDesc ? Results.OrderByDescending(r => r.SenderRef) : Results.OrderBy(r => r.SenderRef),
+            _           => SortDesc ? Results.OrderByDescending(r => r.Ref)       : Results.OrderBy(r => r.Ref),
+        })
         .Skip((PageNumber - 1) * PageSize)
         .Take(PageSize)
         .ToList();
@@ -32,10 +36,16 @@ public class SearchUnUsedHistologyRefsModel : GridPageModel
     /// <summary>Replaces the legacy <c>hlExcelExport</c> link. Exports every row, not just the current page.</summary>
     public async Task<IActionResult> OnGetExportCsvAsync()
     {
+        //var results = await _histologyRefs.GetAllUnusedRefsAsync();
+        //return CsvExportHelper.BuildCsv(
+        //    "unused-histology-refs.csv",
+        //    ["Histology ref", "Sender ref"],
+        //    results.Select(r => (IReadOnlyList<string?>)new string?[] { r.Ref, r.SenderRef }));
+
         var results = await _histologyRefs.GetAllUnusedRefsAsync();
         return CsvExportHelper.BuildCsv(
             "unused-histology-refs.csv",
             ["Histology ref"],
-            results.Select(r => (IReadOnlyList<string?>)new string?[] { r.Ref }));
+            results.Select(r => (IReadOnlyList<string?>)new string?[] { r.Ref}));
     }
 }

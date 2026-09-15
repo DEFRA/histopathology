@@ -25,5 +25,5 @@ public sealed class User
     /// The Windows NT login (DOMAIN\username) used by the legacy GetUserByNTLogin SP.
     /// Populated from the <c>NTLogin</c> column returned by <c>GetUsers</c>.
     /// </summary>
-    public string NtLogin { get; init; } = string.Empty;
+    public string? NtLogin { get; init; } = string.Empty;
 }

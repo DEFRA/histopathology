@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Histo.WebJobs</RootNamespace>
+    <UserSecretsId>histo-webjobs-dev-secrets</UserSecretsId>
+    <Description>Azure WebJobs for Histo.Web — Histology Reset scheduled job (annual on 1 January).</Description>
+    <!-- WebJobs packaging directives -->
+    <WebJobType>Triggered</WebJobType>
+    <UseAppHost>false</UseAppHost>
+    <!-- Console application (executable) for WebJobs hosting -->
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Azure WebJobs SDK -->
+    <PackageReference Include="Microsoft.Azure.WebJobs" Version="3.0.44" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Extensions" Version="5.1.2" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.Storage" Version="5.2.0" />
+    
+    <!-- Configuration and Logging -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+    <!-- Same App Insights connection string as Histo.Web (APPLICATIONINSIGHTS_CONNECTION_STRING) -->
+    <PackageReference Include="Microsoft.ApplicationInsights.WorkerService" Version="2.22.0" />
+    
+    <!-- Database — Managed Identity support -->
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
+    <PackageReference Include="Azure.Identity" Version="1.11.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Histo.Infrastructure\Histo.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- Copy appsettings to output directory -->
+  <ItemGroup>
+    <None Update="appsettings*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

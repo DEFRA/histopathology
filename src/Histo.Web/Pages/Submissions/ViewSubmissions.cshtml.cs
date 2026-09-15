@@ -61,9 +61,9 @@ public class ViewSubmissionsModel : HistoPageModel
     // sort/page buttons (see _SortableHeaderPost/_PaginationPost) without needing GridPageModel's
     // GET-oriented SupportsGet mechanism, which this POST-only search page cannot use.
     private const int PageSize = 10;
-    [BindProperty] public string? SortColumn { get; set; }
-    [BindProperty] public bool    SortDesc   { get; set; }
-    [BindProperty] public int     PageNumber { get; set; } = 1;
+    [BindProperty(SupportsGet = true)] public string? SortColumn { get; set; }
+    [BindProperty(SupportsGet = true)] public bool    SortDesc   { get; set; }
+    [BindProperty(SupportsGet = true)] public int     PageNumber { get; set; } = 1;
 
     public IReadOnlyList<BatchSearchResult> PagedResults =>
         (SortColumn switch
@@ -77,7 +77,8 @@ public class ViewSubmissionsModel : HistoPageModel
             "DateCompleted"      => SortDesc ? Results.OrderByDescending(r => r.DateCompleted)       : Results.OrderBy(r => r.DateCompleted),
             "CustomerReceivedDate" => SortDesc ? Results.OrderByDescending(r => r.CustomerReceivedDate) : Results.OrderBy(r => r.CustomerReceivedDate),
             "Status"             => SortDesc ? Results.OrderByDescending(r => r.Status)              : Results.OrderBy(r => r.Status),
-            _                    => SortDesc ? Results.OrderByDescending(r => r.ID)                  : Results.OrderBy(r => r.ID),
+            // No column clicked yet — legacy default: dvBatchesView.Sort = "ID DESC" (newest first).
+            _                    => Results.OrderByDescending(r => r.ID),
         })
         .Skip((PageNumber - 1) * PageSize)
         .Take(PageSize)

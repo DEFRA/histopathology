@@ -42,17 +42,8 @@ else
                 <input class="govuk-input govuk-input--width-10" type="date" asp-for="PMDate" />
             }
         </div>
-        <div class="govuk-form-group">
-            <label class="govuk-label" for="HistologyRef">Histology reference</label>
-            @if (Model.IsViewMode)
-            {
-                <input class="govuk-input govuk-input--width-20" asp-for="HistologyRef" readonly disabled />
-            }
-            else
-            {
-                <input class="govuk-input govuk-input--width-20" asp-for="HistologyRef" />
-            }
-        </div>
+        @* Histology reference is never shown here — legacy (ctlHistologyDiv) always hides it on
+           this Wet Tissue page; it's set via Booking/EditAnimalRef instead. *@
         @if (!Model.IsViewMode)
         {
             <button type="submit" class="govuk-button" data-module="govuk-button">Save details</button>

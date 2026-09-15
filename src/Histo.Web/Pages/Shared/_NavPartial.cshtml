@@ -1,9 +1,9 @@
 @* _NavPartial.cshtml
-   Role-based navigation — replaces the VLAHeader.ascx hyperlink show/hide logic.
+   Minimal top-level header nav — task links live on the Index.cshtml home page
+   grid menu instead, per GDS pattern (header = global wayfinding only).
    Visible links are determined by the user's GroupName stored in ISessionService.
    Emits <li class="govuk-service-navigation__item"> items only — the enclosing
    <ul id="navigation" class="govuk-service-navigation__list"> lives in _Layout.cshtml.
-   Phase 2: Replace @User.Identity?.Name with session group from Entra ID claims.
 *@
 @inject Histo.Web.Services.ISessionService SessionSvc
 
@@ -11,7 +11,6 @@
     var group = SessionSvc.GroupName;
     bool isHisto = group == "Histopathology User";
     bool isMaint = group == "Maintenance";
-    bool isCustomer = group == "Customer" || (!isHisto && !isMaint);
 
     // Context-sensitive help — deep-links into the relevant Help/Index.cshtml section for the
     // page the user is currently on, instead of always opening at the top of the page.
@@ -20,50 +19,13 @@
     var helpHref = "/Help/Index" + (helpAnchor is not null ? $"#{helpAnchor}" : "");
 }
 
-@* ── Links available to ALL groups ──────────────────────────────────── *@
-<li class="govuk-service-navigation__item">
-    <a class="govuk-service-navigation__link" asp-page="/Submissions/ViewSubmissions">View submissions</a>
-</li>
-
-@if (isCustomer || isHisto || isMaint)
-{
-    <li class="govuk-service-navigation__item">
-        <a class="govuk-service-navigation__link" asp-page="/Batches/Cassetted">New submission</a>
-    </li>
-}
-
-@* ── Histopathology User + Maintenance ──────────────────────────────── *@
 @if (isHisto || isMaint)
 {
     <li class="govuk-service-navigation__item">
-        <a class="govuk-service-navigation__link" asp-page="/Batches/BatchesNotReceived">Receive submissions</a>
-    </li>
-    <li class="govuk-service-navigation__item">
-        <a class="govuk-service-navigation__link" asp-page="/Batches/BatchesForEditing">Edit submission status</a>
-    </li>
-    <li class="govuk-service-navigation__item">
-        <a class="govuk-service-navigation__link" asp-page="/Batches/BatchesForDispatch">Enter quality data</a>
-    </li>
-    <li class="govuk-service-navigation__item">
         <a class="govuk-service-navigation__link" asp-page="/Search/SearchMenu">Search</a>
-    </li>
-    <li class="govuk-service-navigation__item">
-        <a class="govuk-service-navigation__link" asp-page="/QC/QCNotes">Edit QC notes</a>
-    </li>
-    <li class="govuk-service-navigation__item">
-        <a class="govuk-service-navigation__link" asp-page="/Bookings/BookingMenu">Booking</a>
-    </li>
-    <li class="govuk-service-navigation__item">
-        @* Points at the grid (batch-selection landing page), not /Archive/ArchiveMenu, which
-           has no batch-selection UI of its own and needs Session.BatchID already set. *@
-        <a class="govuk-service-navigation__link" asp-page="/Batches/BatchesForArchiving">Archive</a>
-    </li>
-    <li class="govuk-service-navigation__item">
-        <a class="govuk-service-navigation__link" asp-page="/AuditLog/AuditLogMenu">Audit log</a>
     </li>
 }
 
-@* ── Maintenance only ───────────────────────────────────────────────── *@
 @if (isMaint)
 {
     <li class="govuk-service-navigation__item">
@@ -72,9 +34,14 @@
     <li class="govuk-service-navigation__item">
         <a class="govuk-service-navigation__link" asp-page="/Admin/PickListMaintenance">Pick list maintenance</a>
     </li>
+@*     <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Admin/EditAnimalRef">Edit Sender/Histology Ref</a>
+    </li> *@
+@*     <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Bookings/EditHistologyRef">Edit histology ref counter</a>
+    </li> *@
 }
 
-@* ── Help — available to all groups ─────────────────────────────────── *@
 <li class="govuk-service-navigation__item">
     <a class="govuk-service-navigation__link" href="@helpHref"
        target="_blank" rel="noreferrer noopener">Help</a>

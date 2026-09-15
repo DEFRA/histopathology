@@ -21,9 +21,12 @@ namespace Histo.Web.Pages.Search;
 /// <c>BatchBlockSummary</c> and creating this page to reproduce the real
 /// <c>ViewSamples.aspx</c> feature.
 ///
-/// Legacy validation (<c>btnSearch_Click</c>): exactly one of Sender Ref /
-/// Histology Ref must be supplied — an error is shown if both or neither are
-/// filled in. Two mutually exclusive search modes (legacy <c>rbWetTissue</c> /
+/// Validation: at least one of Sender Ref / Histology Ref must be supplied — both
+/// stored procedures tolerate both being given (each branches internally on one
+/// ref, ignoring the other; confirmed via <c>sp_helptext</c> — <c>GetAnimalBatchTissues</c>
+/// (Tissue mode) prefers Sender Ref, <c>GetAnimalBlockTissues</c> (Block mode) prefers
+/// Histology Ref), so an exactly-one-only rule was an unnecessarily strict UI
+/// invention. Two mutually exclusive search modes (legacy <c>rbWetTissue</c> /
 /// <c>rbBlockInformation</c> radio buttons) select between
 /// <c>clsAnimal.GetAnimalTissues</c> (SP <c>GetAnimalBatchTissues</c>,
 /// "Tissue Information") and <c>GetAnimalBlockTissues</c> (SP
@@ -56,6 +59,14 @@ public class ViewSamplesModel : HistoPageModel
     /// <summary>"Tissue" = legacy "Tissue Information" mode (default); "Block" = "Block Information" mode.</summary>
     [BindProperty] public string Mode { get; set; } = "Tissue";
 
+    // Sort/page state bound the same way as the filter criteria — [BindProperty] carries it
+    // through the POST-based sort/page buttons (see _SortableHeaderPost/_PaginationPost), which
+    // resubmit this same form rather than navigating via a GET link.
+    private const int PageSize = 10;
+    [BindProperty] public string? SortColumn { get; set; }
+    [BindProperty] public bool SortDesc { get; set; }
+    [BindProperty] public int PageNumber { get; set; } = 1;
+
     public Dictionary<string, string> Errors { get; } = [];
     public bool Searched { get; private set; }
 
@@ -63,13 +74,43 @@ public class ViewSamplesModel : HistoPageModel
     public IReadOnlyList<LookupItem> Projects { get; private set; } = [];
     public IReadOnlyList<AnimalTissueSearchResult> Results { get; private set; } = [];
 
+    public IReadOnlyList<AnimalTissueSearchResult> PagedResults =>
+        (SortColumn switch
+        {
+            "DateSubmitted"  => SortDesc ? Results.OrderByDescending(r => r.DateSubmitted)  : Results.OrderBy(r => r.DateSubmitted),
+            "DateReceived"   => SortDesc ? Results.OrderByDescending(r => r.DateReceived)   : Results.OrderBy(r => r.DateReceived),
+            "TimeReceived" => SortDesc ? Results.OrderByDescending(r => r.TimeReceived) : Results.OrderBy(r => r.TimeReceived),
+            "DateCompleted"  => SortDesc ? Results.OrderByDescending(r => r.DateCompleted)  : Results.OrderBy(r => r.DateCompleted),
+            "SubmittedAs"    => SortDesc ? Results.OrderByDescending(r => r.SubmittedAs)    : Results.OrderBy(r => r.SubmittedAs),
+            "NoPieces" => SortDesc ? Results.OrderByDescending(r => r.NoPieces) : Results.OrderBy(r => r.NoPieces),
+            "CustomerReceivedDate" => SortDesc ? Results.OrderByDescending(r => r.CustomerReceivedDate) : Results.OrderBy(r => r.CustomerReceivedDate),
+            "TissueDescription" => SortDesc ? Results.OrderByDescending(r => r.TissueDescription) : Results.OrderBy(r => r.TissueDescription),
+            _                => SortDesc ? Results.OrderByDescending(r => r.ID) : Results.OrderBy(r => r.ID),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
+
+    private void PopulateGridViewData()
+    {
+        var totalPages = Results.Count == 0 ? 1 : (int)Math.Ceiling(Results.Count / (double)PageSize);
+        if (PageNumber < 1) PageNumber = 1;
+        else if (PageNumber > totalPages) PageNumber = totalPages;
+        ViewData["SortColumn"] = SortColumn;
+        ViewData["SortDesc"] = SortDesc;
+        ViewData["CurrentPage"] = PageNumber;
+        ViewData["TotalPages"] = totalPages;
+        ViewData["FormId"] = "view-samples-form";
+        ViewData["Handler"] = "Search";
+    }
+
     public async Task OnGetAsync()
     {
         SetTitle();
         await LoadLookupsAsync();
     }
 
-    public async Task<IActionResult> OnPostAsync()
+    public async Task<IActionResult> OnPostSearchAsync()
     {
         SetTitle();
         await LoadLookupsAsync();
@@ -79,6 +120,7 @@ public class ViewSamplesModel : HistoPageModel
 
         Searched = true;
         Results = await SearchAsync();
+        PopulateGridViewData();
 
         return Page();
     }
@@ -114,10 +156,22 @@ public class ViewSamplesModel : HistoPageModel
         return CsvExportHelper.BuildCsv(isBlockMode ? "BlockInformation.csv" : "TissueInformation.csv", headers, rows);
     }
 
-    private Task<IReadOnlyList<AnimalTissueSearchResult>> SearchAsync() =>
-        Mode == "Block"
-            ? _submissions.GetAnimalBlockTissuesAsync(SenderRef, HistologyRef, TissueCode, ProjectDesc)
-            : _submissions.GetAnimalTissuesAsync(SenderRef, HistologyRef, TissueCode, ProjectDesc);
+    private Task<IReadOnlyList<AnimalTissueSearchResult>> SearchAsync()
+    {
+        var senderRef = NullIfEmpty(SenderRef);
+        var histologyRef = NullIfEmpty(HistologyRef);
+        var tissueCode = NullIfEmpty(TissueCode);
+        var projectDesc = NullIfEmpty(ProjectDesc);
+
+        return Mode == "Block"
+            ? _submissions.GetAnimalBlockTissuesAsync(senderRef, histologyRef, tissueCode, projectDesc)
+            : _submissions.GetAnimalTissuesAsync(senderRef, histologyRef, tissueCode, projectDesc);
+    }
+
+    // The stored procedures treat an unapplied filter as "@Param IS NULL" — an empty string
+    // (what a blank text input actually posts) never satisfies that check, so it silently
+    // filters out every row instead of being ignored.
+    private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
     private bool Validate()
     {
@@ -136,7 +190,9 @@ public class ViewSamplesModel : HistoPageModel
         var hasSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
         var hasHistologyRef = !string.IsNullOrWhiteSpace(HistologyRef);
 
-        if (hasSenderRef == hasHistologyRef)
+        // Both stored procedures tolerate both being supplied (each ignores the other, with its
+        // own internal precedence) — only reject when NEITHER is given.
+        if (!hasSenderRef && !hasHistologyRef)
         {
             Errors[RefType == "Sender" ? nameof(SenderRef) : nameof(HistologyRef)] =
                 RefType == "Sender" ? "Enter the Sender ref." : "Enter the Histology ref.";

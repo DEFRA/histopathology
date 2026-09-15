@@ -1,3 +1,5 @@
+using Histo.Infrastructure.Exceptions;
+
 namespace Histo.QualityControl.Models;
 
 /// <summary>
@@ -9,7 +11,7 @@ namespace Histo.QualityControl.Models;
 /// <c>Exception("Another user has altered the QC Note record.")</c>. This
 /// typed exception replaces that pattern.
 /// </summary>
-public sealed class QCNoteConcurrencyException : Exception
+public sealed class QCNoteConcurrencyException : HistoConcurrencyException
 {
     public QCNoteConcurrencyException()
         : base("Another user has altered the QC Note record.") { }

@@ -132,11 +132,22 @@ public sealed class LookupRepository : ILookupRepository
     /// <inheritdoc/>
     public async Task<IReadOnlyList<LookupItem>> GetImportedTablesAsync(CancellationToken ct = default)
     {
+        // GetluImportedTables returns ID + Name (not Description), so MapDescriptionIsActive
+        // (which only reads "Description") left every item's Name blank — the dropdown
+        // rendered 15 empty options, indistinguishable from "not loading".
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<dynamic>(
             "GetluImportedTables",
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.Select(MapDescriptionIsActive).ToList();
+        return rows.Select(r =>
+        {
+            var d = (IDictionary<string, object>)r;
+            return new LookupItem
+            {
+                ID   = d.TryGetValue("ID", out var id) ? ToIntSafe(id) : 0,
+                Name = d.TryGetValue("Name", out var name) ? Convert.ToString(name) ?? "" : "",
+            };
+        }).ToList();
     }
 
     /// <inheritdoc/>

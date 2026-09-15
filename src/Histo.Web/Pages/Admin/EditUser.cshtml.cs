@@ -24,7 +24,7 @@ public class EditUserModel : HistoPageModel
     }
 
     [BindProperty(SupportsGet = true)] public int UserId { get; set; }
-    [BindProperty] public string NtLogin { get; set; } = string.Empty;
+    [BindProperty] public string? NtLogin { get; set; } = string.Empty;
     [BindProperty] public string Name { get; set; } = string.Empty;
     [BindProperty] public string Email { get; set; } = string.Empty;
     [BindProperty] public int GroupCode { get; set; }
@@ -84,7 +84,7 @@ public class EditUserModel : HistoPageModel
         var user = new User
         {
             UserID = UserId,
-            NtLogin = NtLogin.Trim(),
+            NtLogin = NtLogin?.Trim(),
             Name = Name.Trim(),
             Email = Email.Trim(),
             GroupCode = GroupCode,
@@ -105,7 +105,6 @@ public class EditUserModel : HistoPageModel
 
     private void Validate()
     {
-        if (string.IsNullOrWhiteSpace(NtLogin)) Errors.Add("Enter the NT login.");
         if (string.IsNullOrWhiteSpace(Name)) Errors.Add("Enter the user's name.");
         if (GroupCode <= 0) Errors.Add("Select a user group.");
         if (AreaCode <= 0) Errors.Add("Select a user area.");

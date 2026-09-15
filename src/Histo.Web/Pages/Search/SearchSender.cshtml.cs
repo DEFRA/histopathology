@@ -14,8 +14,10 @@ namespace Histo.Web.Pages.Search;
 /// does not yet exist in the migrated system, so this page is reimplemented as
 /// a standalone read-only sender-ref search using the same repository method
 /// that already backs SearchSample.aspx (<c>GetAnimalsBySenderRefAsync</c>).
+/// GetAnimalsBySenderRef matches via <c>LIKE '%' + @SenderRef + '%'</c>, so an
+/// empty filter returns every sender ref — used to list all of them on load.
 /// </summary>
-public class SearchSenderModel : HistoPageModel
+public class SearchSenderModel : GridPageModel
 {
     private readonly ISubmissionService _submissions;
 
@@ -34,7 +36,11 @@ public class SearchSenderModel : HistoPageModel
 
     public IReadOnlyList<SenderSearchResult> Results { get; private set; } = [];
 
-    /// <summary>True once the user has submitted a non-empty search so the view knows
+    /// <summary>Current page of <see cref="Results"/> for the GDS pagination component.</summary>
+    public IReadOnlyList<SenderSearchResult> PagedResults =>
+        Results.Skip((PageNumber - 1) * PageSize).Take(PageSize).ToList();
+
+    /// <summary>True once a search has run (always, after GET/POST) so the view knows
     /// to show the 'no results' message rather than leaving the page blank.</summary>
     public bool HasSearched { get; private set; }
 
@@ -42,29 +48,27 @@ public class SearchSenderModel : HistoPageModel
     {
         ViewData["Title"]     = IsPickerMode ? "Select sender ref" : "Search by Sender";
         ViewData["PageTitle"] = IsPickerMode ? "Select sender ref" : "Search by Sender";
-
-        // Mirrors legacy lbLookup_Click on AddSubmission.aspx: the sender ref already typed on
-        // the calling page is carried over and the search runs immediately, landing the user on
-        // a populated results grid rather than a second blank search box.
-        if (!string.IsNullOrWhiteSpace(SenderRef))
-        {
-            HasSearched = true;
-            Results = await _submissions.GetAnimalsBySenderRefAsync(SenderRef.Trim());
-        }
+        await RunSearchAsync();
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
         ViewData["Title"]     = IsPickerMode ? "Select sender ref" : "Search by Sender";
         ViewData["PageTitle"] = IsPickerMode ? "Select sender ref" : "Search by Sender";
-
-        if (!string.IsNullOrWhiteSpace(SenderRef))
-        {
-            HasSearched = true;
-            Results = await _submissions.GetAnimalsBySenderRefAsync(SenderRef.Trim());
-        }
-
+        await RunSearchAsync();
         return Page();
+    }
+
+    /// <summary>
+    /// Runs the sender-ref search — blank <see cref="SenderRef"/> matches every row (see
+    /// class summary), so this both populates the initial "browse all" view and re-runs
+    /// after a filtered search or a page change.
+    /// </summary>
+    private async Task RunSearchAsync()
+    {
+        HasSearched = true;
+        Results = await _submissions.GetAnimalsBySenderRefAsync(SenderRef?.Trim() ?? string.Empty);
+        PopulateGridViewData(Results.Count);
     }
 
     /// <summary>

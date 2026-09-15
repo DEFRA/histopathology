@@ -19,6 +19,10 @@ public class SearchBlockRefsModel : GridPageModel
     [BindProperty(SupportsGet = true)] public string? SenderRef { get; set; }
     [BindProperty(SupportsGet = true)] public string? HistologyRef { get; set; }
 
+    // Distinguishes "user clicked Search with nothing filled in" from a first, bare page visit —
+    // both look identical otherwise, since a GET form with empty fields submits no query string.
+    [BindProperty(SupportsGet = true)] public bool Submitted { get; set; }
+
     public Dictionary<string, string> Errors { get; } = [];
     public IReadOnlyList<BlockRefRangeHelpers.BlockRefRangeRow> Results { get; private set; } = [];
     public bool Searched { get; private set; }
@@ -44,21 +48,27 @@ public class SearchBlockRefsModel : GridPageModel
         var hasSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
         var hasHistologyRef = !string.IsNullOrWhiteSpace(HistologyRef);
 
-        // Nothing supplied yet — first visit, so show the empty form without an error.
+        // Nothing supplied yet. On a genuine Search click, show the validation error; on a bare
+        // first visit (no Submitted marker), just show the empty form without one.
         if (!hasSenderRef && !hasHistologyRef)
         {
+            if (Submitted)
+                Errors[nameof(SenderRef)] = "Enter the Sender Ref or the Histology Ref.";
             PopulateGridViewData(TotalCount);
             return;
         }
 
-        if (hasSenderRef && hasHistologyRef)
+        // GetBlocksForHistoRef/GetBlocksForSenderRef tolerate both being supplied (Sender ref
+        // takes precedence) — only reject when NEITHER is given, there's nothing to search on.
+
+        // Default to Used block refs descending until the user explicitly picks a column.
+        if (string.IsNullOrEmpty(SortColumn))
         {
-            Errors[nameof(SenderRef)] = "Enter either the Sender Ref or the Histology Ref, not both.";
-            PopulateGridViewData(TotalCount);
-            return;
+            SortColumn = "UsedBlockRefs";
+            SortDesc = true;
         }
 
-        Results = await SearchAsync(hasHistologyRef);
+        Results = await SearchAsync(byHistologyRef: hasHistologyRef && !hasSenderRef);
         Searched = true;
         PopulateGridViewData(TotalCount);
     }
@@ -66,11 +76,12 @@ public class SearchBlockRefsModel : GridPageModel
     /// <summary>Replaces the legacy <c>hlExcelExport</c> link. Exports every range row, not just the current page.</summary>
     public async Task<IActionResult> OnGetExportCsvAsync()
     {
+        var hasSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
         var hasHistologyRef = !string.IsNullOrWhiteSpace(HistologyRef);
-        if (!hasHistologyRef && string.IsNullOrWhiteSpace(SenderRef))
+        if (!hasSenderRef && !hasHistologyRef)
             return RedirectToPage("/Search/SearchBlockRefs");
 
-        var results = await SearchAsync(hasHistologyRef);
+        var results = await SearchAsync(byHistologyRef: hasHistologyRef && !hasSenderRef);
         return CsvExportHelper.BuildCsv(
             "search-block-refs.csv",
             ["Used block refs", "Unused block refs", "Pre booked block refs"],

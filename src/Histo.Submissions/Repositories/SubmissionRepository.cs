@@ -1,4 +1,5 @@
 using Dapper;
+using Histo.Core.Domain;
 using Histo.Infrastructure;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
@@ -141,6 +142,19 @@ public sealed class SubmissionRepository : ISubmissionRepository
     public async Task UpdateAnimalAsync(Animal animal, int userId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
+        // EditAnimal declares only ID/SenderRef/HistologyRef/NextBlockRef/OnHold/PMDate/RowStamp/
+        // UserID — passing PMDateSet/IsPGNumber (not SP parameters) throws "too many arguments
+        // specified", which SubmissionService.UpdateAnimalAsync swallows and reports as false, so
+        // the update silently no-ops (Sender/Histology Ref/PM Date/OnHold never actually saved).
+        // @PMDate is a real `datetime` parameter — Animal.PMDate is the legacy dd/MM/yyyy display
+        // string, so it must be parsed to an actual DateTime rather than handed to Dapper as a raw
+        // nvarchar, or SQL Server throws "Error converting data type nvarchar to datetime" (always
+        // for an empty string), which fails the whole UPDATE — dropping every other field too.
+        var isoPmDate = DateFormatHelpers.ToIsoDate(animal.PMDate);
+        object pmDateParam = isoPmDate is not null && DateTime.TryParse(isoPmDate, out var parsedPmDate)
+            ? parsedPmDate
+            : DBNull.Value;
+
         await conn.ExecuteAsync(
             "EditAnimal",
             new
@@ -150,9 +164,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
                 animal.NextBlockRef,
                 HistologyRef = (object?)animal.HistologyRef ?? DBNull.Value,
                 animal.OnHold,
-                PMDate = (object?)animal.PMDate ?? DBNull.Value,
-                animal.PMDateSet,
-                animal.IsPGNumber,
+                PMDate = pmDateParam,
                 animal.RowStamp,
                 UserID = userId,
             },
@@ -368,7 +380,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
     // -----------------------------------------------------------------------
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<PmDateSearchResult>> GetByPmDateRangeAsync(DateTime fromDate, DateTime toDate, CancellationToken ct = default)
+    public async Task<IReadOnlyList<PmDateSearchResult>> GetByPmDateRangeAsync(DateTime? fromDate, DateTime? toDate, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<PmDateSearchResult>(
@@ -497,10 +509,15 @@ public sealed class SubmissionRepository : ISubmissionRepository
     {
         var procName = owner == TissueOwner.Submission ? "DeleteTissue" : "DeleteBlockTissue";
 
+        // Both SPs declare only @ID — passing @UserID throws "too many arguments specified",
+        // which SubmissionService.DeleteTissueAsync swallows and reports as false. The caller
+        // (BlockDetailsModel/SubmissionDetailsModel) doesn't check that result, so the delete
+        // silently no-ops and the row remains. userId is accepted for interface/audit-call
+        // symmetry with the other CRUD methods but isn't a parameter either SP supports.
         using var conn = _db.CreateConnection();
         await conn.ExecuteAsync(
             procName,
-            new { ID = tissueId, UserID = userId },
+            new { ID = tissueId },
             commandType: System.Data.CommandType.StoredProcedure);
     }
 }

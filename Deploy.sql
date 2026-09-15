@@ -37,6 +37,12 @@ PRINT '--- Applying permissions ---';
 :r .\Permissions\GrantPermissions.sql
 GO
 
+-- Step 4: Deployment script to used to alter/create tables, columns etc
+PRINT '--- Create or Alter Table, Column  ---';
+:r .\DeploymentScripts\V20260914_01_User_Email_NotNull_NTLogin_Nullable.sql
+GO
+
+
 -- Step 4: Log successful deployment (optional)
 IF OBJECT_ID('[dbo].[DeploymentLog]', 'U') IS NOT NULL
 BEGIN

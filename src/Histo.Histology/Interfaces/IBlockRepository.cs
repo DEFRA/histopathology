@@ -73,11 +73,11 @@ public interface IBlockRepository
 
     /// <summary>
     /// Returns archived slide records matching the given (optional) filters.
-    /// Maps to <c>GetAnimalStainArchiveInformation</c>. Legacy source: SearchArchiveLocation.aspx (Slide Archive mode).
-    ///
-    /// SIMPLIFIED: the legacy method (<c>clsAnimal.GetAnimalSlideArchiveInformation</c>)
-    /// additionally merges in <c>GetAnimalBatches</c> and per-batch-type data — that
-    /// merge is not reproduced. See the search module report for details.
+    /// Maps to <c>clsAnimal.GetAnimalSlideArchiveInformation</c>. Legacy source: SearchArchiveLocation.aspx
+    /// (Slide Archive mode) — fans out across <c>GetAnimalStainArchiveInformation</c>,
+    /// <c>GetAnimalBatches</c> + per-batch <c>GetAnimalAntibodiesArchiveInformation</c>, and
+    /// <c>GetAnimalHistologyArchiveInformation</c> (excluding rows already covered by the Stain/
+    /// Antibodies calls), matching the legacy merge exactly.
     /// </summary>
     Task<IReadOnlyList<SlideArchiveInfo>> GetSlideArchiveAsync(
         string? senderRef, string? histologyRef, string? archiveLocation, CancellationToken ct = default);

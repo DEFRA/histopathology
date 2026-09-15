@@ -17,6 +17,8 @@
             <tr class="govuk-table__row">
                 @{ ViewData["Label"] = "Histology ref"; ViewData["Column"] = "Ref"; }
                 <partial name="_SortableHeader" />
+               @*  @{ ViewData["Label"] = "Sender ref"; ViewData["Column"] = "SenderRef"; }
+                <partial name="_SortableHeader" /> *@
             </tr>
         </thead>
         <tbody class="govuk-table__body">
@@ -24,6 +26,7 @@
             {
                 <tr class="govuk-table__row">
                     <td class="govuk-table__cell">@r.Ref</td>
+                  @*   <td class="govuk-table__cell">@r.SenderRef</td> *@
                 </tr>
             }
         </tbody>
@@ -31,7 +34,7 @@
     <partial name="_Pagination" />
 
     <a asp-page="/Search/SearchUnUsedHistologyRefs" asp-page-handler="ExportCsv"
-       class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to CSV</a>
+       class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</a>
 }
 else
 {

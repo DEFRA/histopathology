@@ -50,30 +50,34 @@
                 </div>
             </div>
         </div>
-        <section class="govuk-service-navigation" data-module="govuk-service-navigation" aria-label="Service information">
+        <section class="govuk-service-navigation" aria-label="Service information">
             <div class="govuk-width-container">
                 <div class="govuk-service-navigation__container">
                     <span class="govuk-service-navigation__service-name">
                         <a class="govuk-service-navigation__link" asp-page="/Index">Histopathology System</a>
                     </span>
-                    <nav aria-label="Menu" class="govuk-service-navigation__wrapper">
-                        <button type="button" class="govuk-service-navigation__toggle govuk-js-service-navigation-toggle"
-                                aria-controls="navigation" hidden>Menu</button>
-                        <ul class="govuk-service-navigation__list" id="navigation">
-                            @if (hasAppSession)
-                            {
-                                @await Html.PartialAsync("_NavPartial")
-                            }
-                        </ul>
-                    </nav>
-                    <p class="govuk-body-s app-header-user govuk-!-margin-bottom-0">
-                        @if (hasAppSession)
-                        {
-                            @await Html.PartialAsync("_UserContextPartial")
-                        }
-                    </p>
+                    @if (hasAppSession)
+                    {
+                        <div class="app-header-right">
+                            <p class="govuk-body-s app-header-user govuk-!-margin-bottom-0">
+                                @await Html.PartialAsync("_UserContextPartial")
+                            </p>
+                            <button type="button" class="govuk-service-navigation__toggle app-nav-toggle"
+                                    aria-controls="navigation" aria-expanded="false">Menu</button>
+                        </div>
+                    }
                 </div>
             </div>
+            @if (hasAppSession)
+            {
+                <nav aria-label="Menu" class="govuk-service-navigation__wrapper app-nav-wrapper">
+                    <div class="govuk-width-container">
+                        <ul class="govuk-service-navigation__list" id="navigation" hidden>
+                            @await Html.PartialAsync("_NavPartial")
+                        </ul>
+                    </div>
+                </nav>
+            }
         </section>
     </header>
 
@@ -133,6 +137,7 @@
         import { initAll } from '/govuk/govuk-frontend.min.js'
         initAll()
     </script>
+    <script src="~/js/nav-toggle.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
