@@ -24,6 +24,10 @@ public class EditLookupItemModel : HistoPageModel
     // string code because these tables have no integer ID column.
     [BindProperty(SupportsGet = true)] public string? ItemCode { get; set; }
 
+    /// <summary>Page this edit was opened from (Pick list items page's own ReturnUrl), so the
+    /// round-trip back to LookupItems can continue returning there.</summary>
+    [BindProperty(SupportsGet = true)] public string? ReturnUrl { get; set; }
+
     [BindProperty] public string Code { get; set; } = string.Empty;
     // Round-tripped via hidden field on POST so UpdateLookupItemAsync receives @Original_Code.
     [BindProperty] public string OriginalCode { get; set; } = string.Empty;
@@ -53,7 +57,7 @@ public class EditLookupItemModel : HistoPageModel
             ? _existingItems.FirstOrDefault(i => string.Equals(i.Code, ItemCode, StringComparison.OrdinalIgnoreCase))
             : ItemId is int id ? _existingItems.FirstOrDefault(i => i.ID == id) : null;
 
-        if (item is null) return RedirectToPage("/Admin/LookupItems", new { tableId = TableId });
+        if (item is null) return RedirectToPage("/Admin/LookupItems", new { tableId = TableId, ReturnUrl });
 
         Description = item.Name;
         Active = item.Active;
@@ -92,7 +96,7 @@ public class EditLookupItemModel : HistoPageModel
         }
 
         TempData["StatusMessage"] = $"'{Description.Trim()}' was updated.";
-        return RedirectToPage("/Admin/LookupItems", new { tableId = TableId });
+        return RedirectToPage("/Admin/LookupItems", new { tableId = TableId, ReturnUrl });
     }
 
     private void Validate()

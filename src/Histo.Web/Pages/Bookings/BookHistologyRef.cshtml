@@ -17,7 +17,7 @@
         <div role="alert">
             <h2 class="govuk-error-summary__title">There is a problem</h2>
             <div class="govuk-error-summary__body">
-                <ul class="govuk-list govuk-error-summary__list"><li>@Model.Error</li></ul>
+                <ul class="govuk-list govuk-error-summary__list"><li><a href="#HistologyType">@Model.Error</a></li></ul>
             </div>
         </div>
     </div>
@@ -67,4 +67,4 @@
     <button type="submit" class="govuk-button" data-module="govuk-button">Book</button>
 </form>
 
-<p class="govuk-body"><a asp-page="/Search/SearchBlockRefs" class="govuk-link">Check used block refs</a></p>
+<p class="govuk-body"><a asp-page="/Search/SearchBlockRefs" asp-route-ReturnPage="/Bookings/BookHistologyRef" class="govuk-link">Check used block refs</a></p>

@@ -15,13 +15,13 @@
         <div role="alert">
             <h2 class="govuk-error-summary__title">There is a problem</h2>
             <div class="govuk-error-summary__body">
-                <ul class="govuk-list govuk-error-summary__list"><li>@Model.ModelError</li></ul>
+                <ul class="govuk-list govuk-error-summary__list"><li><a href="#SenderRef">@Model.ModelError</a></li></ul>
             </div>
         </div>
     </div>
 }
 
-<form method="post">
+<form method="post" asp-antiforgery="true">
     <input type="hidden" asp-for="BatchId" />
     <input type="hidden" asp-for="BatchSubmissionId" />
     <input type="hidden" asp-for="SourceAnimalId" />

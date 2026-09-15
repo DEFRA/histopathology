@@ -181,9 +181,11 @@
             <input type="hidden" name="FilterTest" value="@Model.FilterTest" />
             <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
             <input type="hidden" name="SortDesc" value="@Model.SortDesc" />
-            <label class="govuk-label govuk-!-display-inline" for="GoToPage">Go to page (1 to @Model.TotalPages)</label>
-            <input class="govuk-input govuk-input--width-3 govuk-!-display-inline govuk-!-margin-left-2" id="GoToPage" name="PageNumber" type="number" min="1" max="@Model.TotalPages" value="@Model.PageNumber" />
-            <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0 govuk-!-margin-left-2">Go</button>
+            <label class="govuk-label" for="GoToPage">Go to page (1 to @Model.TotalPages)</label>
+            <div class="app-field-with-button">
+                <input class="govuk-input govuk-input--width-3" id="GoToPage" name="PageNumber" type="number" min="1" max="@Model.TotalPages" value="@Model.PageNumber" />
+                <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Go</button>
+            </div>
         </form>
     }
 }

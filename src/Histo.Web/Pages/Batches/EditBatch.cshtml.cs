@@ -190,8 +190,8 @@ public class EditBatchModel : HistoPageModel
         return field switch
         {
             "submittedBy" => RedirectToPage("/Admin/UserMaintenance", new { returnUrl }),
-            "project"     => RedirectToPage("/Admin/PickListUserArea", new { tableId = LookupProjects, returnUrl }),
-            "pathologist" => RedirectToPage("/Admin/PickListUserArea", new { tableId = LookupContacts, returnUrl }),
+            "project"     => RedirectToPage("/Admin/LookupItems", new { tableId = LookupProjects, ReturnUrl = returnUrl }),
+            "pathologist" => RedirectToPage("/Admin/LookupItems", new { tableId = LookupContacts, ReturnUrl = returnUrl }),
             _             => RedirectToPage("/Batches/EditBatch"),
         };
     }

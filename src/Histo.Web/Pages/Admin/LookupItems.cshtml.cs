@@ -19,7 +19,16 @@ public class LookupItemsModel : GridPageModel
         : base(session) => _lookups = lookups;
 
     [BindProperty(SupportsGet = true)] public int TableId { get; set; }
-    [BindProperty(SupportsGet = true)] public bool ShowDeactivated { get; set; }
+
+    /// <summary>Page this list was opened from (e.g. Create/Edit submission), so Back and the
+    /// Add/Change round-trip return there instead of always going to Pick list maintenance.</summary>
+    [BindProperty(SupportsGet = true)] public string? ReturnUrl { get; set; }
+
+    /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
+    public string? SafeReturnUrl => !string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : null;
+
+    /// <summary>Defaults to checked on first load, matching legacy's "show all" default.</summary>
+    [BindProperty(SupportsGet = true)] public bool ShowDeactivated { get; set; } = true;
 
     public string TableName { get; private set; } = string.Empty;
     public IReadOnlyList<LookupItem> Items { get; private set; } = [];

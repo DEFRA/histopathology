@@ -73,6 +73,34 @@ public sealed class LookupService : ILookupService
         }
     }
 
+    /// <summary>Returns contacts for the given area.</summary>
+    public async Task<IReadOnlyList<LookupItem>> GetContactsByAreaAsync(string area, CancellationToken ct = default)
+    {
+        try
+        {
+            return await _lookups.GetContactsByAreaAsync(area, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get contacts for area {Area}.", ex, area);
+            return [];
+        }
+    }
+
+    /// <summary>Returns projects for the given area.</summary>
+    public async Task<IReadOnlyList<LookupItem>> GetProjectsByAreaAsync(string area, CancellationToken ct = default)
+    {
+        try
+        {
+            return await _lookups.GetProjectsByAreaAsync(area, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get projects for area {Area}.", ex, area);
+            return [];
+        }
+    }
+
     /// <summary>Returns the user group pick-list for the User Maintenance form.</summary>
     public async Task<IReadOnlyList<LookupItem>> GetUserGroupsAsync(CancellationToken ct = default)
     {

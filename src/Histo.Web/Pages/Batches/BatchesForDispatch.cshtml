@@ -24,9 +24,11 @@
         </div>
     }
     <form method="post" asp-page-handler="Go">
-        <label class="govuk-label govuk-!-display-inline" asp-for="QuickGoId">Go directly to submission number</label>
-        <input class="govuk-input govuk-input--width-10 govuk-!-display-inline govuk-!-margin-left-2" type="number" asp-for="QuickGoId" min="1" />
-        <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0 govuk-!-margin-left-2">Go</button>
+        <label class="govuk-label" asp-for="QuickGoId">Go directly to submission number</label>
+        <div class="app-field-with-button">
+            <input class="govuk-input govuk-input--width-10" type="number" asp-for="QuickGoId" min="1" />
+            <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Go</button>
+        </div>
     </form>
 </div>
 

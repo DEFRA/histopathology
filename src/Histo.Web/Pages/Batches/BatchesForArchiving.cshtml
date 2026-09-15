@@ -24,18 +24,20 @@
         </div>
     }
     <form method="post" asp-page-handler="Go">
-        <label class="govuk-label govuk-!-display-inline" asp-for="QuickGoId">Go directly to submission number</label>
-        <input class="govuk-input govuk-input--width-10 govuk-!-display-inline govuk-!-margin-left-2" type="number" asp-for="QuickGoId" min="1" />
-        <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0 govuk-!-margin-left-2">Go</button>
+        <label class="govuk-label" asp-for="QuickGoId">Go directly to submission number</label>
+        <div class="app-field-with-button">
+            <input class="govuk-input govuk-input--width-10" type="number" asp-for="QuickGoId" min="1" />
+            <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Go</button>
+        </div>
     </form>
 </div>
 
 <table class="govuk-table">
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
-            @{ ViewData["Label"] = "Batch ID"; ViewData["Column"] = "ID"; }
+            @{ ViewData["Label"] = "Submission Number"; ViewData["Column"] = "ID"; }
             <partial name="_SortableHeader" />
-            @{ ViewData["Label"] = "Project"; ViewData["Column"] = "ProjectDescription"; }
+            @{ ViewData["Label"] = "Project Code"; ViewData["Column"] = "ProjectDescription"; }
             <partial name="_SortableHeader" />
             @{ ViewData["Label"] = "Pathologist"; ViewData["Column"] = "ContactDescription"; }
             <partial name="_SortableHeader" />
@@ -43,7 +45,7 @@
             <partial name="_SortableHeader" />
             @{ ViewData["Label"] = "Customer ref"; ViewData["Column"] = "OtherSubmittedBy"; }
             <partial name="_SortableHeader" />
-            @{ ViewData["Label"] = "Completed date"; ViewData["Column"] = "CompletedDate"; }
+            @{ ViewData["Label"] = "Submitted Date"; ViewData["Column"] = "CompletedDate"; }
             <partial name="_SortableHeader" />
             <th scope="col" class="govuk-table__header">Actions</th>
         </tr>
@@ -61,10 +63,12 @@
                 <td class="govuk-table__cell">
                     <form method="post">
                         <input type="hidden" name="batchId" value="@b.ID" />
-                        <a asp-page="/Archive/ArchiveBlocks"
-                           asp-route-batchId="@b.ID" class="govuk-button govuk-button--warning govuk-!-margin-bottom-0" data-module="govuk-button">Archive blocks</a>
-                        <a asp-page="/Archive/ArchiveTissues"
-                           asp-route-batchId="@b.ID" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Archive tissues</a>
+                        <div class="govuk-button-group">
+                            <a asp-page="/Archive/ArchiveBlocks"
+                               asp-route-batchId="@b.ID" class="govuk-button govuk-button--warning govuk-!-margin-bottom-0" data-module="govuk-button">Archive blocks</a>
+                            <a asp-page="/Archive/ArchiveTissues"
+                               asp-route-batchId="@b.ID" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Archive tissues</a>
+                        </div>
                     </form>
                 </td>
             </tr>

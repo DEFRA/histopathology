@@ -28,6 +28,12 @@ public class ViewImportedDataModel : GridPageModel
     [BindProperty(SupportsGet = true)] public string? SelectedTable { get; set; }
     [BindProperty(SupportsGet = true)] public string? Filter { get; set; }
 
+    // Page this search was launched from (Search menu, Home, or Search block refs) so Back
+    // returns there instead of always going to Search menu.
+    [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
+
+    public string BackLinkPage => string.IsNullOrWhiteSpace(ReturnPage) ? "/Search/SearchMenu" : ReturnPage;
+
     public IReadOnlyList<LookupItem> Tables { get; private set; } = [];
     public IReadOnlyList<ImportedDataRow> Results { get; private set; } = [];
 

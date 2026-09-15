@@ -47,6 +47,15 @@ public class ArchiveBlocksModel : GridPageModel
     [BindProperty(SupportsGet = true)]
     public int? BatchId { get; set; }
 
+    /// <summary>
+    /// Back/Done target — honours <see cref="ISessionService.ReturnPage"/> (set on entry to this
+    /// page) so a direct grid link from BatchesForArchiving skips the redundant ArchiveMenu detour.
+    /// Falls back to ArchiveMenu for the menu/SearchSubmissions "View archive" entry points.
+    /// </summary>
+    public string BackLinkPage => string.IsNullOrWhiteSpace(Session.ReturnPage)
+        ? "/Archive/ArchiveMenu"
+        : Session.ReturnPage;
+
     public Batch? Batch { get; private set; }
     public IReadOnlyList<ArchiveBlockRow> Rows { get; private set; } = [];
     public IReadOnlyList<LookupItem> ArchiveLocations { get; private set; } = [];

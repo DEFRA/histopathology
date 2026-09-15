@@ -203,6 +203,7 @@ public class ReceiveBatchModel : HistoPageModel
             return Page();
         }
 
+        Session.ReturnPage = "/Batches/BatchesNotReceived";
         return RedirectToPage("/Batches/PrintSubmission");
     }
 

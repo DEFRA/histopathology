@@ -47,7 +47,6 @@ public class UserMaintenanceModel : GridPageModel
     public IReadOnlyList<User> PagedEntries =>
         (SortColumn switch
         {
-            "NtLogin" => SortDesc ? Users.OrderByDescending(u => u.NtLogin) : Users.OrderBy(u => u.NtLogin),
             "Group"   => SortDesc ? Users.OrderByDescending(u => ResolveGroupName(u)) : Users.OrderBy(u => ResolveGroupName(u)),
             "Area"    => SortDesc ? Users.OrderByDescending(u => ResolveAreaName(u))  : Users.OrderBy(u => ResolveAreaName(u)),
             "Email"   => SortDesc ? Users.OrderByDescending(u => u.Email)   : Users.OrderBy(u => u.Email),

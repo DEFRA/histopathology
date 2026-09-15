@@ -68,125 +68,125 @@
         <input type="hidden" asp-for="BatchTypeField" />
     </div>
 
-    @* Project / contract code *@
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="ProjectContractCode">Project / contract code</label>
-        <div class="app-field-with-button">
-            <select class="govuk-select" asp-for="ProjectContractCode">
-                <option value="">-- Not specified --</option>
-                @foreach (var p in Model.Projects)
-                {
-                    <option value="@p.ID" selected="@(Model.ProjectContractCode == p.ID.ToString())">@p.Name</option>
-                }
-            </select>
-            @* Replaces legacy btnNewProject — opens the Projects pick list (LOOKUP_PROJECTS = 19). *@
-            <button type="submit" asp-page-handler="ManagePickList" name="field" value="project" formnovalidate
-                    class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">
-                Manage project / contract codes
-            </button>
-        </div>
-    </div>
+    @* Two-column layout mirrors the Create submission field pairing (left/right dropdown pairs). *@
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-half">
+            @* Project / contract code *@
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="ProjectContractCode">Project / contract code</label>
+                <select class="govuk-select" asp-for="ProjectContractCode">
+                    <option value="">-- Not specified --</option>
+                    @foreach (var p in Model.Projects)
+                    {
+                        <option value="@p.ID" selected="@(Model.ProjectContractCode == p.ID.ToString())">@p.Name</option>
+                    }
+                </select>
+                @* Replaces legacy btnNewProject — opens the Projects pick list (LOOKUP_PROJECTS = 19). *@
+                <button type="submit" asp-page-handler="ManagePickList" name="field" value="project" formnovalidate
+                        class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+                    Manage project / contract codes
+                </button>
+            </div>
 
-    @* Pathologist *@
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="ContactName">Pathologist</label>
-        <div class="app-field-with-button">
-            <select class="govuk-select" asp-for="ContactName">
-                <option value="">-- Not specified --</option>
-                @foreach (var c in Model.Contacts)
-                {
-                    <option value="@c.ID" selected="@(Model.ContactName == c.ID.ToString())">@c.Name</option>
-                }
-            </select>
-            @* Replaces legacy btnNewContact — opens the Contacts pick list (LOOKUP_CONTACTS = 18). *@
-            <button type="submit" asp-page-handler="ManagePickList" name="field" value="pathologist" formnovalidate
-                    class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">
-                Manage pathologists
-            </button>
-        </div>
-    </div>
+            @* Pathologist *@
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="ContactName">Pathologist</label>
+                <select class="govuk-select" asp-for="ContactName">
+                    <option value="">-- Not specified --</option>
+                    @foreach (var c in Model.Contacts)
+                    {
+                        <option value="@c.ID" selected="@(Model.ContactName == c.ID.ToString())">@c.Name</option>
+                    }
+                </select>
+                @* Replaces legacy btnNewContact — opens the Contacts pick list (LOOKUP_CONTACTS = 18). *@
+                <button type="submit" asp-page-handler="ManagePickList" name="field" value="pathologist" formnovalidate
+                        class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+                    Manage pathologists
+                </button>
+            </div>
 
-    @* Species *@
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="SpeciesId">Species</label>
-        <select class="govuk-select" asp-for="SpeciesId">
-            <option value="">-- Not specified --</option>
-            @foreach (var s in Model.SpeciesList)
-            {
-                <option value="@s.ID" selected="@(Model.SpeciesId == s.ID.ToString())">@s.Name</option>
-            }
-        </select>
-    </div>
+            @* Species *@
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="SpeciesId">Species</label>
+                <select class="govuk-select" asp-for="SpeciesId">
+                    <option value="">-- Not specified --</option>
+                    @foreach (var s in Model.SpeciesList)
+                    {
+                        <option value="@s.ID" selected="@(Model.SpeciesId == s.ID.ToString())">@s.Name</option>
+                    }
+                </select>
+            </div>
 
-    @* Submission date *@
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="BatchDateStr">Date of submission</label>
-        <div class="govuk-hint">For example, 27/03/2025</div>
-        <input class="govuk-input govuk-input--width-10" asp-for="BatchDateStr" autocomplete="off" />
-    </div>
-
-    @* Fixation *@
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="Fixation">Fixation</label>
-        <select class="govuk-select" asp-for="Fixation">
-            <option value="">-- Not specified --</option>
-            @foreach (var f in Model.Fixations)
-            {
-                <option value="@(f.Code ?? f.ID.ToString())" selected="@(Model.Fixation == (f.Code ?? f.ID.ToString()))">@f.Name</option>
-            }
-        </select>
-    </div>
-
-    @* Is it adequately fixed? *@
-    <div class="govuk-form-group">
-        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-            <div class="govuk-checkboxes__item">
-                <input class="govuk-checkboxes__input" asp-for="SafeToHandle" type="checkbox" />
-                <label class="govuk-label govuk-checkboxes__label" for="SafeToHandle">Is it adequately fixed?</label>
+            @* External submitter *@
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="OtherSubmittedBy">Submitted by (external)</label>
+                <select class="govuk-select" asp-for="OtherSubmittedBy">
+                    <option value="">-- None --</option>
+                    @foreach (var u in Model.AllUsers)
+                    {
+                        <option value="@u.UserID" selected="@(Model.OtherSubmittedBy == u.UserID)">@u.Name</option>
+                    }
+                </select>
+                @* Replaces legacy btnNewSubmittedBy — the "Submitted by" list is user-backed, so it is
+                   maintained on User maintenance rather than a lookup table. *@
+                <button type="submit" asp-page-handler="ManagePickList" name="field" value="submittedBy" formnovalidate
+                        class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+                    Manage submitted by list
+                </button>
             </div>
         </div>
-    </div>
-
-    @* Pre-cassetted *@
-    <div class="govuk-form-group">
-        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-            <div class="govuk-checkboxes__item">
-                <input class="govuk-checkboxes__input" asp-for="IsPreCassetted" type="checkbox" />
-                <label class="govuk-label govuk-checkboxes__label" for="IsPreCassetted">Pre-cassetted</label>
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="OtherSubmittedAreaDisplay">Submitted area (external)</label>
+                <select class="govuk-select" id="OtherSubmittedAreaDisplay" disabled>
+                    <option value="">-- None --</option>
+                    @foreach (var a in Model.UserAreas)
+                    {
+                        <option value="@a.ID" selected="@(Model.OtherSubmittedArea == a.ID.ToString())">@a.Name</option>
+                    }
+                </select>
+                <input type="hidden" asp-for="OtherSubmittedArea" />
             </div>
-        </div>
-    </div>
 
-    @* External submitter *@
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="OtherSubmittedBy">Submitted by (external)</label>
-        <div class="app-field-with-button">
-            <select class="govuk-select" asp-for="OtherSubmittedBy">
-                <option value="">-- None --</option>
-                @foreach (var u in Model.AllUsers)
-                {
-                    <option value="@u.UserID" selected="@(Model.OtherSubmittedBy == u.UserID)">@u.Name</option>
-                }
-            </select>
-            @* Replaces legacy btnNewSubmittedBy — the "Submitted by" list is user-backed, so it is
-               maintained on User maintenance rather than a lookup table. *@
-            <button type="submit" asp-page-handler="ManagePickList" name="field" value="submittedBy" formnovalidate
-                    class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">
-                Manage submitted by list
-            </button>
-        </div>
-    </div>
+            @* Submission date *@
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="BatchDateStr">Date of submission</label>
+                <div class="govuk-hint">For example, 27/03/2025</div>
+                <input class="govuk-input govuk-input--width-10" asp-for="BatchDateStr" autocomplete="off" />
+            </div>
 
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="OtherSubmittedAreaDisplay">Submitted area (external)</label>
-        <select class="govuk-select" id="OtherSubmittedAreaDisplay" disabled>
-            <option value="">-- None --</option>
-            @foreach (var a in Model.UserAreas)
-            {
-                <option value="@a.ID" selected="@(Model.OtherSubmittedArea == a.ID.ToString())">@a.Name</option>
-            }
-        </select>
-        <input type="hidden" asp-for="OtherSubmittedArea" />
+            @* Fixation *@
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="Fixation">Fixation</label>
+                <select class="govuk-select" asp-for="Fixation">
+                    <option value="">-- Not specified --</option>
+                    @foreach (var f in Model.Fixations)
+                    {
+                        <option value="@(f.Code ?? f.ID.ToString())" selected="@(Model.Fixation == (f.Code ?? f.ID.ToString()))">@f.Name</option>
+                    }
+                </select>
+            </div>
+
+            @* Is it adequately fixed? *@
+            <div class="govuk-form-group">
+                <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                    <div class="govuk-checkboxes__item">
+                        <input class="govuk-checkboxes__input" asp-for="SafeToHandle" type="checkbox" />
+                        <label class="govuk-label govuk-checkboxes__label" for="SafeToHandle">Is it adequately fixed?</label>
+                    </div>
+                </div>
+            </div>
+
+            @* Pre-cassetted *@
+            @* <div class="govuk-form-group">
+                <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                    <div class="govuk-checkboxes__item">
+                        <input class="govuk-checkboxes__input" asp-for="IsPreCassetted" type="checkbox" />
+                        <label class="govuk-label govuk-checkboxes__label" for="IsPreCassetted">Pre-cassetted</label>
+                    </div>
+                </div>
+            </div> *@
+        </div>
     </div>
 
     @* Histology, antibodies and special stains — merged from the former EditBatchTests page for a
@@ -251,64 +251,71 @@
         </dl>
     </div>
 
-    <div class="govuk-form-group @(Model.SaveError != null && Model.SelectedHistologyCodes.Count == 0 ? "govuk-form-group--error" : "")">
-        <fieldset class="govuk-fieldset">
-            <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Histology</legend>
-            <div class="govuk-hint">Select at least one histology type.</div>
-            <div class="govuk-checkboxes" data-module="govuk-checkboxes" id="edit-histology-checkboxes">
-                @foreach (var item in Model.HistologyOptions)
-                {
-                    var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
-                    var checkboxId = $"edit-histology-{code}";
-                    <div class="govuk-checkboxes__item">
-                        <input class="govuk-checkboxes__input" id="@checkboxId" name="SelectedHistologyCodes"
-                               type="checkbox" value="@code" data-histology-code="@code"
-                               @(Model.SelectedHistologyCodes.Contains(code) ? "checked" : "") />
-                        <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+    @* ── Histology, antibody and stain checkboxes — mirrors the Create submission 3-column layout ── *@
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-third">
+            <div class="govuk-form-group @(Model.SaveError != null && Model.SelectedHistologyCodes.Count == 0 ? "govuk-form-group--error" : "")">
+                <fieldset class="govuk-fieldset">
+                    <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Histology</legend>
+                    <div class="govuk-hint">Select at least one histology type.</div>
+                    <div class="govuk-checkboxes" data-module="govuk-checkboxes" id="edit-histology-checkboxes">
+                        @foreach (var item in Model.HistologyOptions)
+                        {
+                            var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
+                            var checkboxId = $"edit-histology-{code}";
+                            <div class="govuk-checkboxes__item">
+                                <input class="govuk-checkboxes__input" id="@checkboxId" name="SelectedHistologyCodes"
+                                       type="checkbox" value="@code" data-histology-code="@code"
+                                       @(Model.SelectedHistologyCodes.Contains(code) ? "checked" : "") />
+                                <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+                            </div>
+                        }
                     </div>
-                }
+                </fieldset>
             </div>
-        </fieldset>
-    </div>
-
-    <div class="govuk-form-group" id="edit-antibodies-section" style="@(Model.ShowAntibodies ? "" : "display:none")">
-        <fieldset class="govuk-fieldset">
-            <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Antibodies</legend>
-            <div class="govuk-hint">Required when IHC is selected above.</div>
-            <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-                @foreach (var item in Model.AntibodyOptions)
-                {
-                    var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
-                    var checkboxId = $"edit-antibody-{code}";
-                    <div class="govuk-checkboxes__item">
-                        <input class="govuk-checkboxes__input" id="@checkboxId" name="SelectedAntibodyCodes"
-                               type="checkbox" value="@code"
-                               @(Model.SelectedAntibodyCodes.Contains(code) ? "checked" : "") />
-                        <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+        </div>
+        <div class="govuk-grid-column-one-third">
+            <div class="govuk-form-group" id="edit-antibodies-section" style="@(Model.ShowAntibodies ? "" : "display:none")">
+                <fieldset class="govuk-fieldset">
+                    <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Antibodies</legend>
+                    <div class="govuk-hint">Required when IHC is selected above.</div>
+                    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                        @foreach (var item in Model.AntibodyOptions)
+                        {
+                            var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
+                            var checkboxId = $"edit-antibody-{code}";
+                            <div class="govuk-checkboxes__item">
+                                <input class="govuk-checkboxes__input" id="@checkboxId" name="SelectedAntibodyCodes"
+                                       type="checkbox" value="@code"
+                                       @(Model.SelectedAntibodyCodes.Contains(code) ? "checked" : "") />
+                                <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+                            </div>
+                        }
                     </div>
-                }
+                </fieldset>
             </div>
-        </fieldset>
-    </div>
-
-    <div class="govuk-form-group" id="edit-stains-section" style="@(Model.ShowStains ? "" : "display:none")">
-        <fieldset class="govuk-fieldset">
-            <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Special stains</legend>
-            <div class="govuk-hint">Required when Special Stain is selected above.</div>
-            <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-                @foreach (var item in Model.StainOptions)
-                {
-                    var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
-                    var checkboxId = $"edit-stain-{code}";
-                    <div class="govuk-checkboxes__item">
-                        <input class="govuk-checkboxes__input" id="@checkboxId" name="SelectedStainCodes"
-                               type="checkbox" value="@code"
-                               @(Model.SelectedStainCodes.Contains(code) ? "checked" : "") />
-                        <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+        </div>
+        <div class="govuk-grid-column-one-third">
+            <div class="govuk-form-group" id="edit-stains-section" style="@(Model.ShowStains ? "" : "display:none")">
+                <fieldset class="govuk-fieldset">
+                    <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Special stains</legend>
+                    <div class="govuk-hint">Required when Special Stain is selected above.</div>
+                    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                        @foreach (var item in Model.StainOptions)
+                        {
+                            var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
+                            var checkboxId = $"edit-stain-{code}";
+                            <div class="govuk-checkboxes__item">
+                                <input class="govuk-checkboxes__input" id="@checkboxId" name="SelectedStainCodes"
+                                       type="checkbox" value="@code"
+                                       @(Model.SelectedStainCodes.Contains(code) ? "checked" : "") />
+                                <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+                            </div>
+                        }
                     </div>
-                }
+                </fieldset>
             </div>
-        </fieldset>
+        </div>
     </div>
 
     <div class="govuk-form-group">
@@ -348,8 +355,16 @@
 
     function syncTestSections() {
         var codes = Array.from(checkboxes).filter(function (cb) { return cb.checked; }).map(function (cb) { return cb.value; });
-        document.getElementById('edit-antibodies-section').style.display = codes.some(function (c) { return ihcCodes.indexOf(c) >= 0; }) ? '' : 'none';
-        document.getElementById('edit-stains-section').style.display     = codes.indexOf(stainCode) >= 0 ? '' : 'none';
+        var showAntibodies = codes.some(function (c) { return ihcCodes.indexOf(c) >= 0; });
+        var showStains = codes.indexOf(stainCode) >= 0;
+
+        document.getElementById('edit-antibodies-section').style.display = showAntibodies ? '' : 'none';
+        // Hidden checkboxes are still real form fields — clear them so a deselected IHC type
+        // doesn't leave stale antibody codes checked (submitted on Save, and still shown above).
+        if (!showAntibodies) antibodyCheckboxes.forEach(function (cb) { cb.checked = false; });
+
+        document.getElementById('edit-stains-section').style.display = showStains ? '' : 'none';
+        if (!showStains) stainCheckboxes.forEach(function (cb) { cb.checked = false; });
     }
 
     function renderTags(container, checkedBoxes) {

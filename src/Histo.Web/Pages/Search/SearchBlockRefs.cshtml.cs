@@ -23,6 +23,12 @@ public class SearchBlockRefsModel : GridPageModel
     // both look identical otherwise, since a GET form with empty fields submits no query string.
     [BindProperty(SupportsGet = true)] public bool Submitted { get; set; }
 
+    // Page this search was launched from (e.g. Book block ref, Book histology ref, Edit
+    // sender/histology ref) so Back returns there instead of always going to Search menu.
+    [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
+
+    public string BackLinkPage => string.IsNullOrWhiteSpace(ReturnPage) ? "/Search/SearchMenu" : ReturnPage;
+
     public Dictionary<string, string> Errors { get; } = [];
     public IReadOnlyList<BlockRefRangeHelpers.BlockRefRangeRow> Results { get; private set; } = [];
     public bool Searched { get; private set; }
