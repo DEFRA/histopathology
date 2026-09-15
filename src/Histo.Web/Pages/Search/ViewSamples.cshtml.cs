@@ -175,27 +175,16 @@ public class ViewSamplesModel : HistoPageModel
 
     private bool Validate()
     {
-        // Only the field matching the selected RefType is used — the other is a hidden,
-        // revealed-by-JS conditional panel and is cleared here so a stray value left over
-        // from switching options can't trigger the "both filled" case below.
-        if (RefType == "Sender") HistologyRef = null;
-        else if (RefType == "Histology") SenderRef = null;
-
-        if (string.IsNullOrEmpty(RefType))
-        {
-            Errors["ref-type-sender"] = "Select whether you want to search by Sender ref or Histology ref.";
-            return false;
-        }
-
+        // RefType only drives which conditional panel the radios reveal — the underlying stored
+        // procedures tolerate both Sender ref and Histology ref being supplied (each branches
+        // internally on one and ignores the other), so both are passed through unmodified;
+        // only reject when neither is given.
         var hasSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
         var hasHistologyRef = !string.IsNullOrWhiteSpace(HistologyRef);
 
-        // Both stored procedures tolerate both being supplied (each ignores the other, with its
-        // own internal precedence) — only reject when NEITHER is given.
         if (!hasSenderRef && !hasHistologyRef)
         {
-            Errors[RefType == "Sender" ? nameof(SenderRef) : nameof(HistologyRef)] =
-                RefType == "Sender" ? "Enter the Sender ref." : "Enter the Histology ref.";
+            Errors[nameof(SenderRef)] = "Enter the Sender Ref or the Histology Ref.";
             return false;
         }
 

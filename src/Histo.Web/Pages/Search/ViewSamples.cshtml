@@ -12,15 +12,11 @@
 <partial name="_ErrorSummary" model="Model.Errors" />
 
 <form method="post" asp-antiforgery="true" asp-page-handler="Search" id="view-samples-form">
-    <div class="govuk-form-group @(Model.Errors.ContainsKey("ref-type-sender") ? "govuk-form-group--error" : "")">
-        <fieldset class="govuk-fieldset" aria-describedby="@(Model.Errors.ContainsKey("ref-type-sender") ? "ref-type-error" : null)">
+    <div class="govuk-form-group">
+        <fieldset class="govuk-fieldset">
             <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">
                 Which reference do you want to search by?
             </legend>
-            @if (Model.Errors.TryGetValue("ref-type-sender", out var refTypeError))
-            {
-                <p id="ref-type-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @refTypeError</p>
-            }
             <div class="govuk-radios" data-module="govuk-radios">
                 <div class="govuk-radios__item">
                     <input class="govuk-radios__input" type="radio" asp-for="RefType" value="Sender" id="ref-type-sender" data-aria-controls="ref-type-sender-conditional" />
