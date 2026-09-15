@@ -148,14 +148,14 @@
     </div>
 
     @* Pre-cassetted *@
-    <div class="govuk-form-group">
+    @* <div class="govuk-form-group">
         <div class="govuk-checkboxes" data-module="govuk-checkboxes">
             <div class="govuk-checkboxes__item">
                 <input class="govuk-checkboxes__input" asp-for="IsPreCassetted" type="checkbox" />
                 <label class="govuk-label govuk-checkboxes__label" for="IsPreCassetted">Pre-cassetted</label>
             </div>
         </div>
-    </div>
+    </div> *@
 
     @* External submitter *@
     <div class="govuk-form-group">
@@ -348,8 +348,16 @@
 
     function syncTestSections() {
         var codes = Array.from(checkboxes).filter(function (cb) { return cb.checked; }).map(function (cb) { return cb.value; });
-        document.getElementById('edit-antibodies-section').style.display = codes.some(function (c) { return ihcCodes.indexOf(c) >= 0; }) ? '' : 'none';
-        document.getElementById('edit-stains-section').style.display     = codes.indexOf(stainCode) >= 0 ? '' : 'none';
+        var showAntibodies = codes.some(function (c) { return ihcCodes.indexOf(c) >= 0; });
+        var showStains = codes.indexOf(stainCode) >= 0;
+
+        document.getElementById('edit-antibodies-section').style.display = showAntibodies ? '' : 'none';
+        // Hidden checkboxes are still real form fields — clear them so a deselected IHC type
+        // doesn't leave stale antibody codes checked (submitted on Save, and still shown above).
+        if (!showAntibodies) antibodyCheckboxes.forEach(function (cb) { cb.checked = false; });
+
+        document.getElementById('edit-stains-section').style.display = showStains ? '' : 'none';
+        if (!showStains) stainCheckboxes.forEach(function (cb) { cb.checked = false; });
     }
 
     function renderTags(container, checkedBoxes) {
