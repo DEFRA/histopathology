@@ -55,13 +55,14 @@ public class EditAnimalRefModel : HistoPageModel
     {
         SetTitle();
 
-        OriginalSenderRef = OriginalSenderRef.Trim();
-        if (string.IsNullOrEmpty(OriginalSenderRef))
+        if (string.IsNullOrWhiteSpace(OriginalSenderRef))
         {
             Error = "You must enter a Sample Ref.";
             ErrorField = "OriginalSenderRef";
             return Page();
         }
+
+        OriginalSenderRef = OriginalSenderRef.Trim();
 
         // Use GetAnimalBySender (exact match) rather than GetAnimalsBySenderRef (partial search),
         // matching the legacy EditHistologyRef.aspx::getHistologyRef behaviour which called
@@ -85,22 +86,22 @@ public class EditAnimalRefModel : HistoPageModel
     {
         SetTitle();
 
-        OriginalSenderRef = OriginalSenderRef.Trim();
-        NewSenderRef = NewSenderRef.Trim();
-
-        if (string.IsNullOrEmpty(OriginalSenderRef))
+        if (string.IsNullOrWhiteSpace(OriginalSenderRef))
         {
             Error = "You must enter a Sample Ref.";
             ErrorField = "OriginalSenderRef";
             return Page();
         }
 
-        if (string.IsNullOrEmpty(NewSenderRef))
+        if (string.IsNullOrWhiteSpace(NewSenderRef))
         {
             Error = "You must enter a New Sample Ref.";
             ErrorField = "NewSenderRef";
             return Page();
         }
+
+        OriginalSenderRef = OriginalSenderRef.Trim();
+        NewSenderRef = NewSenderRef.Trim();
 
         try
         {
@@ -124,15 +125,17 @@ public class EditAnimalRefModel : HistoPageModel
     {
         SetTitle();
 
-        OriginalSenderRef = OriginalSenderRef.Trim();
-        NewHistologyRef = NewHistologyRef.Trim();
-
-        if (string.IsNullOrEmpty(OriginalSenderRef))
+        if (string.IsNullOrWhiteSpace(OriginalSenderRef))
         {
             Error = "You must enter a Sample Ref.";
             ErrorField = "OriginalSenderRef";
             return Page();
         }
+
+        OriginalSenderRef = OriginalSenderRef.Trim();
+        NewHistologyRef = string.IsNullOrWhiteSpace(NewHistologyRef)
+            ? string.Empty
+            : NewHistologyRef.Trim();
 
         // If the Sample Ref is a PG number, the Histology Ref must be its reverse-format equivalent.
         var pgReversedRef = AnimalHelpers.ComputePgAutoHistologyRef(OriginalSenderRef, isNeuropath: true);

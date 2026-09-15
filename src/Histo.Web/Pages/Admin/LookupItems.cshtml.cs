@@ -19,7 +19,9 @@ public class LookupItemsModel : GridPageModel
         : base(session) => _lookups = lookups;
 
     [BindProperty(SupportsGet = true)] public int TableId { get; set; }
-    [BindProperty(SupportsGet = true)] public bool ShowDeactivated { get; set; }
+
+    /// <summary>Defaults to checked on first load, matching legacy's "show all" default.</summary>
+    [BindProperty(SupportsGet = true)] public bool ShowDeactivated { get; set; } = true;
 
     public string TableName { get; private set; } = string.Empty;
     public IReadOnlyList<LookupItem> Items { get; private set; } = [];

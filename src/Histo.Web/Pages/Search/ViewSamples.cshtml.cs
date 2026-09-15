@@ -47,6 +47,9 @@ public class ViewSamplesModel : HistoPageModel
 
     [BindProperty] public string? SenderRef { get; set; }
     [BindProperty] public string? HistologyRef { get; set; }
+
+    /// <summary>"Sender" or "Histology" — which of the two mutually exclusive ref fields is revealed and used.</summary>
+    [BindProperty] public string? RefType { get; set; }
     [BindProperty] public string? TissueCode { get; set; }
     [BindProperty] public string? ProjectDesc { get; set; }
 
@@ -118,12 +121,25 @@ public class ViewSamplesModel : HistoPageModel
 
     private bool Validate()
     {
+        // Only the field matching the selected RefType is used — the other is a hidden,
+        // revealed-by-JS conditional panel and is cleared here so a stray value left over
+        // from switching options can't trigger the "both filled" case below.
+        if (RefType == "Sender") HistologyRef = null;
+        else if (RefType == "Histology") SenderRef = null;
+
+        if (string.IsNullOrEmpty(RefType))
+        {
+            Errors["ref-type-sender"] = "Select whether you want to search by Sender ref or Histology ref.";
+            return false;
+        }
+
         var hasSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
         var hasHistologyRef = !string.IsNullOrWhiteSpace(HistologyRef);
 
         if (hasSenderRef == hasHistologyRef)
         {
-            Errors[nameof(SenderRef)] = "Enter either the Sender Ref or the Histology Ref, not both.";
+            Errors[RefType == "Sender" ? nameof(SenderRef) : nameof(HistologyRef)] =
+                RefType == "Sender" ? "Enter the Sender ref." : "Enter the Histology ref.";
             return false;
         }
 

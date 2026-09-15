@@ -14,7 +14,7 @@
         <tr class="govuk-table__row">
             @{ ViewData["Label"] = "Pick list name"; ViewData["Column"] = "TableName"; }
             <partial name="_SortableHeader" />
-            <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
+            <th scope="col" class="govuk-table__header govuk-table__header--numeric"><span class="govuk-visually-hidden">Actions</span></th>
         </tr>
     </thead>
     <tbody class="govuk-table__body">
@@ -22,7 +22,7 @@
         {
             <tr class="govuk-table__row">
                 <td class="govuk-table__cell">@l.TableName</td>
-                <td class="govuk-table__cell">
+                <td class="govuk-table__cell govuk-table__cell--numeric">
                     <a asp-page="/Admin/LookupItems" asp-route-tableId="@l.ID" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Edit items</a>
                 </td>
             </tr>
