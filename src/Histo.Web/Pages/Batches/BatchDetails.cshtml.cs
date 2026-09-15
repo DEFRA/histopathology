@@ -569,8 +569,11 @@ public class BatchDetailsModel : HistoPageModel
 
     private async Task LoadCreateLookupsAsync()
     {
-        var projectsTask  = _lookups.GetLookupDataAsync(LookupProjects);
-        var contactsTask  = _lookups.GetLookupDataAsync(LookupContacts);
+        // Projects and Contacts must be scoped to the current user's area, not all items from the
+        // entire database — otherwise items added via PickListUserArea won't appear in the dropdowns
+        // since they're inserted with a specific area but queried non-scoped here.
+        var projectsTask  = _lookups.GetUserAreaDataAsync(LookupProjects, Session.UserArea);
+        var contactsTask  = _lookups.GetUserAreaDataAsync(LookupContacts, Session.UserArea);
         var speciesTask   = _lookups.GetSpeciesLookupAsync();
         var fixationTask  = _lookups.GetLookupDataAsync(LookupFixation);
         var areaTask      = _lookups.GetLookupDataAsync(LookupUserArea);

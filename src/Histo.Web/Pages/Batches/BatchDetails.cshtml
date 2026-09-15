@@ -339,8 +339,18 @@
         function syncTestSections() {
             var codes = Array.from(document.querySelectorAll('#create-histology-checkboxes input:checked')).map(function(cb){ return cb.value; });
                 var ihc   = ['@Histo.Submissions.Models.HistologyCode.IhcPrp','@Histo.Submissions.Models.HistologyCode.IhcOther'];
-            document.getElementById('create-antibodies-section').style.display = codes.some(function(c){ return ihc.indexOf(c) >= 0; }) ? '' : 'none';
-                document.getElementById('create-stains-section').style.display     = codes.indexOf('@Histo.Submissions.Models.HistologyCode.SpecialStain') >= 0 ? '' : 'none';
+            var showAntibodies = codes.some(function(c){ return ihc.indexOf(c) >= 0; });
+            var showStains     = codes.indexOf('@Histo.Submissions.Models.HistologyCode.SpecialStain') >= 0;
+            document.getElementById('create-antibodies-section').style.display = showAntibodies ? '' : 'none';
+            document.getElementById('create-stains-section').style.display     = showStains ? '' : 'none';
+            // Clear stale selections in sections that are now hidden, so they don't persist
+            // in the "Selected test types" summary or get submitted on Save.
+            if (!showAntibodies) {
+                document.querySelectorAll('#create-antibodies-section input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
+            }
+            if (!showStains) {
+                document.querySelectorAll('#create-stains-section input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
+            }
         }
         document.getElementById('create-histology-checkboxes').addEventListener('change', function (e) {
             enforceExclusivity(e.target);

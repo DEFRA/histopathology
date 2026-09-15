@@ -253,7 +253,7 @@ else
                 <fieldset class="govuk-fieldset">
                     <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Histology</legend>
                     <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes" id="block-histology-checkboxes">
-                        @foreach (var opt in Model.DisplayedHistologyOptions)
+                        @foreach (var opt in Model.HistologyOptions)
                         {
                             <div class="govuk-checkboxes__item">
                                 <input class="govuk-checkboxes__input" type="checkbox" name="SelectedHistologyCodes"
@@ -269,7 +269,7 @@ else
                 <fieldset class="govuk-fieldset">
                     <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Antibodies</legend>
                     <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
-                        @foreach (var opt in Model.DisplayedAntibodyOptions)
+                        @foreach (var opt in Model.AntibodyOptions)
                         {
                             <div class="govuk-checkboxes__item">
                                 <input class="govuk-checkboxes__input" type="checkbox" name="SelectedAntibodyCodes"
@@ -284,7 +284,7 @@ else
                 <fieldset class="govuk-fieldset">
                     <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Special stain</legend>
                     <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
-                        @foreach (var opt in Model.DisplayedStainOptions)
+                        @foreach (var opt in Model.StainOptions)
                         {
                             <div class="govuk-checkboxes__item">
                                 <input class="govuk-checkboxes__input" type="checkbox" name="SelectedStainCodes"

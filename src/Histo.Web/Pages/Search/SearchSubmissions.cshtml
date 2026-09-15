@@ -273,8 +273,15 @@
 
         <div class="govuk-button-group">
 
-              @* Print submission *@
-            <a asp-page="/Reports/HistologyReport" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission</a>
+              @* Print submission — Rejected submissions have no printable form *@
+            @if (Model.CanPrintSubmission)
+            {
+                <a asp-page="/Reports/HistologyReport" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission</a>
+            }
+            else
+            {
+                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Not available for submissions in Rejected status">Print submission</button>
+            }
             
             @* Edit submission — available for Received / On Hold / In Progress only *@
             @if (Model.CanEditSubmission)

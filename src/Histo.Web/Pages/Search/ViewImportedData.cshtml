@@ -6,10 +6,11 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Search/SearchMenu" class="govuk-back-link">Back</a>
+    <a asp-page="@Model.BackLinkPage" class="govuk-back-link">Back</a>
 }
 
 <form method="get">
+    <input type="hidden" name="ReturnPage" value="@Model.ReturnPage" />
     <div class="govuk-form-group">
         <label class="govuk-label" for="SelectedTable">Table</label>
         <select class="govuk-select" asp-for="SelectedTable">
@@ -26,7 +27,7 @@
     </div>
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Go</button>
-        <a class="govuk-button govuk-button--secondary" asp-page="/Search/ViewImportedData">Clear</a>
+        <a class="govuk-button govuk-button--secondary" asp-page="/Search/ViewImportedData" asp-route-ReturnPage="@Model.ReturnPage">Clear</a>
         @if (!string.IsNullOrEmpty(Model.SelectedTable) && Model.Results.Any())
         {
             <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</button>
