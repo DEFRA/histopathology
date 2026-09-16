@@ -184,6 +184,15 @@ public class SearchSubmissionsModel : HistoPageModel
         var receivedFrom = ReceivedDateFrom;
         var receivedTo = ReceivedDateTo;
 
+        if (ModelState[nameof(SubmittedDateFrom)]?.Errors.Count > 0)
+            Errors[nameof(SubmittedDateFrom)] = "Submitted date from must be a real date.";
+        if (ModelState[nameof(SubmittedDateTo)]?.Errors.Count > 0)
+            Errors[nameof(SubmittedDateTo)] = "Submitted date to must be a real date.";
+        if (ModelState[nameof(ReceivedDateFrom)]?.Errors.Count > 0)
+            Errors[nameof(ReceivedDateFrom)] = "Received date from must be a real date.";
+        if (ModelState[nameof(ReceivedDateTo)]?.Errors.Count > 0)
+            Errors[nameof(ReceivedDateTo)] = "Received date to must be a real date."
+
         if (submittedFrom.HasValue && submittedTo.HasValue && submittedFrom > submittedTo)
             Errors["SubmittedDateFrom"] = "Submitted date from must not be later than submitted date to.";
 
