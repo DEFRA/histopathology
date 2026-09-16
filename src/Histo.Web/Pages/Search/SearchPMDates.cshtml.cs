@@ -117,6 +117,12 @@ public class SearchPMDatesModel : HistoPageModel
         from = StartDate;
         to = EndDate;
 
+        if (ModelState[nameof(StartDate)]?.Errors.Count > 0)
+            Errors[nameof(StartDate)] = "PM from date must be a real date.";
+        if (ModelState[nameof(EndDate)]?.Errors.Count > 0)
+            Errors[nameof(EndDate)] = "PM to date must be a real date.";
+        if (Errors.Count > 0) return false;
+
         if (from.HasValue && to.HasValue && from > to)
         {
             Errors["StartDate"] = "PM from date must not be later than PM to date.";
