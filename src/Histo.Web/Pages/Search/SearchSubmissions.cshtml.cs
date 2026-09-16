@@ -191,7 +191,7 @@ public class SearchSubmissionsModel : HistoPageModel
         if (ModelState[nameof(ReceivedDateFrom)]?.Errors.Count > 0)
             Errors[nameof(ReceivedDateFrom)] = "Received date from must be a real date.";
         if (ModelState[nameof(ReceivedDateTo)]?.Errors.Count > 0)
-            Errors[nameof(ReceivedDateTo)] = "Received date to must be a real date."
+            Errors[nameof(ReceivedDateTo)] = "Received date to must be a real date.";
 
         if (submittedFrom.HasValue && submittedTo.HasValue && submittedFrom > submittedTo)
             Errors["SubmittedDateFrom"] = "Submitted date from must not be later than submitted date to.";

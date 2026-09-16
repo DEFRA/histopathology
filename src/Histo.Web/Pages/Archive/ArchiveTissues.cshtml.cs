@@ -50,6 +50,15 @@ public class ArchiveTissuesModel : GridPageModel
     public int? BatchId { get; set; }
 
     /// <summary>
+    /// Origin page to return to once archiving is done. Set explicitly by <c>ArchiveMenu</c>, which
+    /// itself forwards whatever navigated to it (BatchesForArchiving or SearchSubmissions) — without
+    /// this, <see cref="OnGetAsync"/> could only guess "BatchesForArchiving" for every entry route,
+    /// even when reached via SearchSubmissions' "View archive" link.
+    /// </summary>
+    [BindProperty(SupportsGet = true)]
+    public string? ReturnPage { get; set; }
+
+    /// <summary>
     /// Back target — honours <see cref="ISessionService.ReturnPage"/> (set on entry to this page)
     /// so a direct grid link from BatchesForArchiving skips the redundant ArchiveMenu detour.
     /// Falls back to ArchiveMenu for the menu/SearchSubmissions "View archive" entry points.
@@ -102,7 +111,9 @@ public class ArchiveTissuesModel : GridPageModel
         if (BatchId is > 0)
         {
             Session.BatchID = BatchId;
-            Session.ReturnPage = "/Batches/BatchesForArchiving";
+            // Only the BatchesForArchiving grid link reaches here with no ReturnPage — ArchiveMenu
+            // always supplies its own resolved back link, so this fallback never overrides it.
+            Session.ReturnPage = string.IsNullOrWhiteSpace(ReturnPage) ? "/Batches/BatchesForArchiving" : ReturnPage;
         }
         await LoadAsync();
     }
