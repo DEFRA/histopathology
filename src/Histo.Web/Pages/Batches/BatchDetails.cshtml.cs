@@ -582,8 +582,11 @@ public class BatchDetailsModel : HistoPageModel
         // Projects and Contacts must be scoped to the current user's area, not all items from the
         // entire database — otherwise items added via PickListUserArea won't appear in the dropdowns
         // since they're inserted with a specific area but queried non-scoped here.
-        var projectsTask  = _lookups.GetProjectsByAreaAsync(Session.UserArea);
-        var contactsTask  = _lookups.GetContactsByAreaAsync(Session.UserArea);
+        // GetProjectsArea/GetContactsArea filter on luProjects/luContacts.Area, which stores the
+        // numeric UserAreaID (legacy: LoadUserAreaSpecificLists(SV_HeaderUserAreaID)) — not the area
+        // display name, so Session.UserAreaID must be used here rather than Session.UserArea.
+        var projectsTask  = _lookups.GetProjectsByAreaAsync(Session.UserAreaID.ToString());
+        var contactsTask  = _lookups.GetContactsByAreaAsync(Session.UserAreaID.ToString());
         var speciesTask   = _lookups.GetSpeciesLookupAsync();
         var fixationTask  = _lookups.GetLookupDataAsync(LookupFixation);
         var areaTask      = _lookups.GetLookupDataAsync(LookupUserArea);
