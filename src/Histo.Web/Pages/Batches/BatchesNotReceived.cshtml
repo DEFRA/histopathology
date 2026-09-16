@@ -49,7 +49,9 @@ else
                 <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "Species"; ViewData["Column"] = "Species"; }
                 <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Batch date"; ViewData["Column"] = "SubmissionDate"; }
+                @{
+                    ViewData["Label"] = "Submission date"; ViewData["Column"] = "SubmissionDate";
+                }
                 <partial name="_SortableHeader" />
                 <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
             </tr>

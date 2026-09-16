@@ -74,6 +74,12 @@ public class ViewSamplesModel : HistoPageModel
     public IReadOnlyList<LookupItem> Projects { get; private set; } = [];
     public IReadOnlyList<AnimalTissueSearchResult> Results { get; private set; } = [];
 
+    [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
+
+    /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
+    public string BackLinkPage =>
+        !string.IsNullOrWhiteSpace(ReturnPage) && Url.IsLocalUrl(ReturnPage) ? ReturnPage : "/Search/SearchMenu";
+
     public IReadOnlyList<AnimalTissueSearchResult> PagedResults =>
         (SortColumn switch
         {

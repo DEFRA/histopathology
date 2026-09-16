@@ -39,7 +39,6 @@ public class EditUserModel : HistoPageModel
 
     public IReadOnlyList<LookupItem> Groups { get; private set; } = [];
     public IReadOnlyList<LookupItem> Areas { get; private set; } = [];
-    public List<string> Errors { get; } = [];
 
     /// <summary>
     /// SelectList for the Group dropdown — ensures the current <see cref="GroupCode"/>
@@ -53,6 +52,12 @@ public class EditUserModel : HistoPageModel
     /// value is pre-selected when the form loads.
     /// </summary>
     public SelectList AreaSelectList => new(Areas, nameof(LookupItem.ID), nameof(LookupItem.Name), AreaCode);
+
+    /// <summary>Field id → message, rendered via the shared clickable _ErrorSummary partial.</summary>
+    public Dictionary<string, string> Errors { get; } = new();
+
+    /// <summary>Not tied to a specific field, so shown separately (matches EditQualityDataTest's ConcurrencyError convention).</summary>
+    public string? SaveError { get; private set; }
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -95,7 +100,7 @@ public class EditUserModel : HistoPageModel
         var ok = await _users.UpdateUserAsync(user, Session.UserID);
         if (!ok)
         {
-            Errors.Add("Failed to save changes. Please try again.");
+           SaveError= "Failed to save changes. Please try again.";
             return Page();
         }
 
@@ -105,9 +110,11 @@ public class EditUserModel : HistoPageModel
 
     private void Validate()
     {
-        if (string.IsNullOrWhiteSpace(Name)) Errors.Add("Enter the user's name.");
-        if (GroupCode <= 0) Errors.Add("Select a user group.");
-        if (AreaCode <= 0) Errors.Add("Select a user area.");
+        if (string.IsNullOrWhiteSpace(Name)) Errors["Name"] = "Enter the user's name.";
+        if (string.IsNullOrWhiteSpace(Email)) Errors["Email"] = "Enter the user's email.";
+
+        if (GroupCode <= 0) Errors["GroupCode"] = "Select a user group.";
+        if (AreaCode <= 0) Errors["AreaCode"] = "Select a user area.";
     }
 
     private async Task LoadLookupsAsync()
