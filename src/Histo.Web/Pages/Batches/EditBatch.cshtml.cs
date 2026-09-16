@@ -48,7 +48,6 @@ public class EditBatchModel : HistoPageModel
     // ---- Optional editable fields ----
     [BindProperty] public string? Fixation            { get; set; }
     [BindProperty] public bool    SafeToHandle        { get; set; }
-    [BindProperty] public bool    IsPreCassetted      { get; set; }
     [BindProperty] public string? Comments            { get; set; }
     [BindProperty] public int?    OtherSubmittedBy    { get; set; }
     [BindProperty] public string? OtherSubmittedArea  { get; set; }
@@ -125,7 +124,6 @@ public class EditBatchModel : HistoPageModel
         BatchTypeField      = Batch.BatchType;
         Fixation            = Batch.Fixation;
         SafeToHandle        = Batch.SafeToHandle ?? false;
-        IsPreCassetted      = Batch.IsPreCassetted;
         Comments            = Batch.Comments;
         OtherSubmittedBy    = Batch.OtherSubmittedBy;
         OtherSubmittedArea  = Batch.OtherSubmittedArea;
@@ -165,7 +163,6 @@ public class EditBatchModel : HistoPageModel
         int BatchTypeField,
         string? Fixation,
         bool SafeToHandle,
-        bool IsPreCassetted,
         string? Comments,
         int? OtherSubmittedBy,
         string? OtherSubmittedArea,
@@ -182,7 +179,7 @@ public class EditBatchModel : HistoPageModel
     {
         TempData[DraftKey] = System.Text.Json.JsonSerializer.Serialize(new EditDraft(
             ProjectContractCode, ContactName, SpeciesId, BatchDateStr, BatchTypeField,
-            Fixation, SafeToHandle, IsPreCassetted, Comments, OtherSubmittedBy,
+            Fixation, SafeToHandle, Comments, OtherSubmittedBy,
             OtherSubmittedArea, SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes));
 
         var returnUrl = Url.Page("/Batches/EditBatch");
@@ -212,7 +209,6 @@ public class EditBatchModel : HistoPageModel
         BatchTypeField      = draft.BatchTypeField;
         Fixation            = draft.Fixation;
         SafeToHandle        = draft.SafeToHandle;
-        IsPreCassetted      = draft.IsPreCassetted;
         Comments            = draft.Comments;
         OtherSubmittedBy    = draft.OtherSubmittedBy;
         OtherSubmittedArea  = draft.OtherSubmittedArea;
@@ -283,7 +279,9 @@ public class EditBatchModel : HistoPageModel
             CompletedDate       = Batch.CompletedDate,
             SubmittedByUserID   = Batch.SubmittedByUserID,
             UserAreaCode        = Batch.UserAreaCode,
-            IsPreCassetted      = IsPreCassetted,
+            // Not editable here (its checkbox was removed) — always persist the existing value so
+            // saving never silently resets a pre-cassetted submission back to false.
+            IsPreCassetted      = Batch.IsPreCassetted,
             ByPassSort          = Batch.ByPassSort,
             RowStamp            = Batch.RowStamp,
             // Submission category is fixed at creation (legacy's Cassetted.aspx type-selection
