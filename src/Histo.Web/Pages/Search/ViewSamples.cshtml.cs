@@ -50,6 +50,9 @@ public class ViewSamplesModel : HistoPageModel
 
     [BindProperty] public string? SenderRef { get; set; }
     [BindProperty] public string? HistologyRef { get; set; }
+
+    /// <summary>"Sender" or "Histology" — which of the two mutually exclusive ref fields is revealed and used.</summary>
+    [BindProperty] public string? RefType { get; set; }
     [BindProperty] public string? TissueCode { get; set; }
     [BindProperty] public string? ProjectDesc { get; set; }
 
@@ -172,11 +175,13 @@ public class ViewSamplesModel : HistoPageModel
 
     private bool Validate()
     {
+        // RefType only drives which conditional panel the radios reveal — the underlying stored
+        // procedures tolerate both Sender ref and Histology ref being supplied (each branches
+        // internally on one and ignores the other), so both are passed through unmodified;
+        // only reject when neither is given.
         var hasSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
         var hasHistologyRef = !string.IsNullOrWhiteSpace(HistologyRef);
 
-        // Both stored procedures tolerate both being supplied (each ignores the other, with its
-        // own internal precedence) — only reject when NEITHER is given.
         if (!hasSenderRef && !hasHistologyRef)
         {
             Errors[nameof(SenderRef)] = "Enter the Sender Ref or the Histology Ref.";

@@ -12,12 +12,19 @@
 <partial name="_ErrorSummary" model="Model.Errors" />
 
 <form method="post" asp-page-handler="Search">
-    <partial name="_DateInput" model="@(new DateInputViewModel {
-        Name = "StartDate", Legend = "PM from date", Hint = "For example, 27 3 2026",
-        Value = Model.StartDate, Error = Model.Errors.GetValueOrDefault("StartDate-day") })" />
-    <partial name="_DateInput" model="@(new DateInputViewModel {
-        Name = "EndDate", Legend = "PM to date", Hint = "For example, 27 3 2026",
-        Value = Model.EndDate, Error = Model.Errors.GetValueOrDefault("EndDate-day") })" />
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("StartDate") ? "govuk-form-group--error" : "")">
+        <label class="govuk-label" for="StartDate">PM from date</label>
+        @if (Model.Errors.TryGetValue("StartDate", out var startErr))
+        {
+            <p id="StartDate-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @startErr</p>
+        }
+        <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("StartDate") ? "govuk-input--error" : "")"
+               type="date" asp-for="StartDate" aria-describedby="@(Model.Errors.ContainsKey("StartDate") ? "StartDate-error" : null)" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="EndDate">PM to date</label>
+        <input class="govuk-input govuk-input--width-10" type="date" asp-for="EndDate" />
+    </div>
     <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
 </form>
 
@@ -26,12 +33,8 @@
     @* Carrier form holding the current criteria so sort/page/export re-run the same search.
        asp-page triggers FormTagHelper to inject the antiforgery token. *@
     <form id="pmdates-action-form" method="post" asp-page="/Search/SearchPMDates">
-        <input type="hidden" name="StartDate.Day"   value="@Model.StartDate.Day" />
-        <input type="hidden" name="StartDate.Month" value="@Model.StartDate.Month" />
-        <input type="hidden" name="StartDate.Year"  value="@Model.StartDate.Year" />
-        <input type="hidden" name="EndDate.Day"     value="@Model.EndDate.Day" />
-        <input type="hidden" name="EndDate.Month"   value="@Model.EndDate.Month" />
-        <input type="hidden" name="EndDate.Year"    value="@Model.EndDate.Year" />
+        <input type="hidden" name="StartDate" value="@Model.StartDate?.ToString("yyyy-MM-dd")" />
+        <input type="hidden" name="EndDate"   value="@Model.EndDate?.ToString("yyyy-MM-dd")" />
     </form>
 
     <table class="govuk-table">

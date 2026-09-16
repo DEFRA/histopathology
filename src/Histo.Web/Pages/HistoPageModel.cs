@@ -25,6 +25,7 @@ namespace Histo.Web.Pages;
 /// the HTTP session from claims baked into the auth cookie at ACS time, so that the rest of
 /// the application can continue reading from <see cref="ISessionService"/> without change.
 /// </summary>
+/// 
 public abstract class HistoPageModel : PageModel
 {
     public ISessionService Session { get; }

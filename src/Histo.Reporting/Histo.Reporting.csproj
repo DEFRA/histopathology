@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Histo.Infrastructure\Histo.Infrastructure.csproj" />
     <ProjectReference Include="..\Histo.Submissions\Histo.Submissions.csproj" />
+    <ProjectReference Include="..\Histo.Administration\Histo.Administration.csproj" />
   </ItemGroup>
 
 </Project>

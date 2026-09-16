@@ -19,6 +19,10 @@ public class AddLookupItemModel : HistoPageModel
 
     [BindProperty(SupportsGet = true)] public int TableId { get; set; }
 
+    /// <summary>Page this add was opened from (Pick list items page's own ReturnUrl), so the
+    /// round-trip back to LookupItems can continue returning there.</summary>
+    [BindProperty(SupportsGet = true)] public string? ReturnUrl { get; set; }
+
     [BindProperty] public string Code { get; set; } = string.Empty;
     [BindProperty] public string Description { get; set; } = string.Empty;
     [BindProperty] public bool Active { get; set; } = true;
@@ -71,7 +75,7 @@ public class AddLookupItemModel : HistoPageModel
         }
 
         TempData["StatusMessage"] = $"'{Description.Trim()}' was added.";
-        return RedirectToPage("/Admin/LookupItems", new { tableId = TableId });
+        return RedirectToPage("/Admin/LookupItems", new { tableId = TableId, ReturnUrl });
     }
 
     private void Validate()

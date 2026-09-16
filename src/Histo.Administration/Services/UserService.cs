@@ -83,12 +83,14 @@ public sealed class UserService : IUserService
     {
         try
         {
+            // v To-Be Removed
+            _logger.LogInfo("AI_TEST_CREATE_USER");
             await _users.CreateUserAsync(user, ct);
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError("Failed to create user {NtLogin}.", ex, user.NtLogin);
+            _logger.LogError("Failed to create user {Email}.", ex, user.Email);
             return false;
         }
     }

@@ -44,7 +44,7 @@
     </tbody>
 </table>
 
-<form method="post">
+<form method="post" asp-antiforgery="true">
     <input type="hidden" asp-for="BatchId" />
     @foreach (var b in Model.SourceBlocks)
     {

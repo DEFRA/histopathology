@@ -15,8 +15,8 @@ public class SearchPMDatesModel : HistoPageModel
 
     // Legacy ctlFromDate/ctlToDate were CalendarDate controls and both were mandatory
     // (IsDateRangeValid). Blank on first load, matching the legacy page.
-    [BindProperty] public DateParts StartDate { get; set; } = new();
-    [BindProperty] public DateParts EndDate { get; set; } = new();
+    [BindProperty] public DateTime? StartDate { get; set; }
+    [BindProperty] public DateTime? EndDate { get; set; }
 
     public IReadOnlyList<PmDateSearchResult> Results { get; private set; } = [];
     public bool Searched { get; private set; }
@@ -110,28 +110,25 @@ public class SearchPMDatesModel : HistoPageModel
     }
 
     /// <summary>Both dates are optional — an unselected date is treated as an open bound, matching
-    /// GetSearchPMDates' own NULL-safe defaults. Only real-date and from ≤ to are enforced.</summary>
+    /// GetSearchPMDates' own NULL-safe defaults. Only from ≤ to is enforced (the browser date
+    /// picker only ever submits a real date or nothing).</summary>
     private bool TryBuildRange(out DateTime? from, out DateTime? to)
     {
-        from = null;
-        to = null;
+        from = StartDate;
+        to = EndDate;
 
-        if (!StartDate.TryGetDate(out var fromValue))
-            Errors["StartDate-day"] = "PM from date must be a real date.";
-
-        if (!EndDate.TryGetDate(out var toValue))
-            Errors["EndDate-day"] = "PM to date must be a real date.";
-
+        if (ModelState[nameof(StartDate)]?.Errors.Count > 0)
+            Errors[nameof(StartDate)] = "PM from date must be a real date.";
+        if (ModelState[nameof(EndDate)]?.Errors.Count > 0)
+            Errors[nameof(EndDate)] = "PM to date must be a real date.";
         if (Errors.Count > 0) return false;
 
-        if (fromValue.HasValue && toValue.HasValue && fromValue > toValue)
+        if (from.HasValue && to.HasValue && from > to)
         {
-            Errors["StartDate-day"] = "PM from date must not be later than PM to date.";
+            Errors["StartDate"] = "PM from date must not be later than PM to date.";
             return false;
         }
 
-        from = fromValue;
-        to = toValue;
         return true;
     }
 }

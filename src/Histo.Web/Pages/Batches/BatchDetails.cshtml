@@ -26,7 +26,7 @@
         <div class="govuk-error-summary" data-module="govuk-error-summary">
             <div role="alert">
                 <h2 class="govuk-error-summary__title">There is a problem</h2>
-                <div class="govuk-error-summary__body"><ul class="govuk-list govuk-error-summary__list"><li>@Model.Errors["Create_Save"]</li></ul></div>
+                <div class="govuk-error-summary__body"><ul class="govuk-list govuk-error-summary__list"><li><a href="#Create_OtherSubmittedBy">@Model.Errors["Create_Save"]</a></li></ul></div>
             </div>
         </div>
     }
@@ -339,8 +339,18 @@
         function syncTestSections() {
             var codes = Array.from(document.querySelectorAll('#create-histology-checkboxes input:checked')).map(function(cb){ return cb.value; });
                 var ihc   = ['@Histo.Submissions.Models.HistologyCode.IhcPrp','@Histo.Submissions.Models.HistologyCode.IhcOther'];
-            document.getElementById('create-antibodies-section').style.display = codes.some(function(c){ return ihc.indexOf(c) >= 0; }) ? '' : 'none';
-                document.getElementById('create-stains-section').style.display     = codes.indexOf('@Histo.Submissions.Models.HistologyCode.SpecialStain') >= 0 ? '' : 'none';
+            var showAntibodies = codes.some(function(c){ return ihc.indexOf(c) >= 0; });
+            var showStains     = codes.indexOf('@Histo.Submissions.Models.HistologyCode.SpecialStain') >= 0;
+            document.getElementById('create-antibodies-section').style.display = showAntibodies ? '' : 'none';
+            document.getElementById('create-stains-section').style.display     = showStains ? '' : 'none';
+            // Clear stale selections in sections that are now hidden, so they don't persist
+            // in the "Selected test types" summary or get submitted on Save.
+            if (!showAntibodies) {
+                document.querySelectorAll('#create-antibodies-section input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
+            }
+            if (!showStains) {
+                document.querySelectorAll('#create-stains-section input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
+            }
         }
         document.getElementById('create-histology-checkboxes').addEventListener('change', function (e) {
             enforceExclusivity(e.target);
@@ -421,11 +431,19 @@
         </div>
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Project / contract code</dt>
-            <dd class="govuk-summary-list__value">@Model.ProjectName</dd>
+            <dd class="govuk-summary-list__value">
+                @Model.ProjectName
+                <br />
+                <a href="@Model.ProjectPickListUrl" class="govuk-link">Manage project / contract codes</a>
+            </dd>
         </div>
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Pathologist</dt>
-            <dd class="govuk-summary-list__value">@Model.PathologistName</dd>
+            <dd class="govuk-summary-list__value">
+                @Model.PathologistName
+                <br />
+                <a href="@Model.PathologistPickListUrl" class="govuk-link">Manage pathologists</a>
+            </dd>
         </div>
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Species</dt>

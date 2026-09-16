@@ -134,10 +134,17 @@ public class AddSubmissionModel : HistoPageModel
                     foreach (var tissue in sourceTissues)
                         await _submissions.CopyTissueAsync(tissue, ownSubmissionId, Session.UserID);
                 }
+
+                // Copy sample started from Sample Summary — return there so it's clear the new
+                // sample was added, rather than continuing straight into its (empty) detail page.
+                return RedirectToPage("/Submissions/SampleSummary", new { batchId });
             }
 
             return RedirectToPage("/Submissions/SubmissionDetails", new { batchId, animalId = newAnimalId });
         }
+
+        if (SourceAnimalId is > 0)
+            return RedirectToPage("/Submissions/SampleSummary", new { batchId });
 
         return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = newAnimalId });
     }

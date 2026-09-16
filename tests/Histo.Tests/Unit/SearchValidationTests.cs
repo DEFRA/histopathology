@@ -62,8 +62,7 @@ public class SearchValidationTests
     private SearchPMDatesModel CreateSearchPmDates() =>
         new(_session.Object, _submissions.Object) { PageContext = NewPageContext() };
 
-    private static DateParts Parts(int day, int month, int year) =>
-        new() { Day = day.ToString(), Month = month.ToString(), Year = year.ToString() };
+    private static DateTime Parts(int day, int month, int year) => new(year, month, day);
 
     // ── SearchPMDates ────────────────────────────────────────────────────────────
 
@@ -76,7 +75,7 @@ public class SearchValidationTests
 
         await sut.OnPostSearchAsync();
 
-        Assert.True(sut.Errors.ContainsKey("StartDate-day"));
+        Assert.True(sut.Errors.ContainsKey("StartDate"));
         Assert.False(sut.Searched);
         _submissions.Verify(s => s.GetByPmDateRangeAsync(It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -108,32 +107,6 @@ public class SearchValidationTests
         _submissions.Verify(s => s.GetByPmDateRangeAsync(null, null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    [Fact]
-    public async Task SearchPMDates_ImpossibleDate_IsRejected()
-    {
-        var sut = CreateSearchPmDates();
-        sut.StartDate = Parts(31, 2, 2026);
-        sut.EndDate = Parts(1, 5, 2026);
-
-        await sut.OnPostSearchAsync();
-
-        Assert.Equal("PM from date must be a real date.", sut.Errors["StartDate-day"]);
-        Assert.False(sut.Searched);
-    }
-
-    [Fact]
-    public async Task SearchPMDates_PartiallyEnteredDate_IsRejected()
-    {
-        var sut = CreateSearchPmDates();
-        sut.StartDate = new DateParts { Day = "1", Month = "5" };
-        sut.EndDate = Parts(1, 5, 2026);
-
-        await sut.OnPostSearchAsync();
-
-        Assert.Equal("PM from date must be a real date.", sut.Errors["StartDate-day"]);
-        Assert.False(sut.Searched);
-    }
-
     // ── SearchSubmissions ────────────────────────────────────────────────────────
 
     [Fact]
@@ -145,7 +118,7 @@ public class SearchValidationTests
 
         await sut.OnPostSearchAsync();
 
-        Assert.True(sut.Errors.ContainsKey("SubmittedDateFrom-day"));
+        Assert.True(sut.Errors.ContainsKey("SubmittedDateFrom"));
         Assert.False(sut.Searched);
         _batches.Verify(b => b.SearchAsync(It.IsAny<BatchSearchCriteria>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -159,7 +132,7 @@ public class SearchValidationTests
 
         await sut.OnPostSearchAsync();
 
-        Assert.True(sut.Errors.ContainsKey("ReceivedDateFrom-day"));
+        Assert.True(sut.Errors.ContainsKey("ReceivedDateFrom"));
         Assert.False(sut.Searched);
     }
 

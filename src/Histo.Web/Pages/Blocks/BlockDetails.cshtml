@@ -52,17 +52,6 @@ else
         }
     }
 
-    <dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-6">
-        <div class="govuk-summary-list__row">
-            <dt class="govuk-summary-list__key">Sender ref</dt>
-            <dd class="govuk-summary-list__value">@Model.Animal.SenderRef</dd>
-        </div>
-        <div class="govuk-summary-list__row">
-            <dt class="govuk-summary-list__key">Histology reference</dt>
-            <dd class="govuk-summary-list__value">@(Model.Animal.HistologyRef ?? "Not recorded")</dd>
-        </div>
-    </dl>
-
     <form method="post" asp-page-handler="Save">
         <input type="hidden" asp-for="BatchId" />
         <input type="hidden" asp-for="AnimalId" />
@@ -71,45 +60,59 @@ else
         {
             <input type="hidden" asp-for="BlockId" />
         }
-        <div class="govuk-form-group">
-            <label class="govuk-label" for="NewBlockRef">Block ref</label>
-            @if (Model.IsPreCassetted && Model.IsAddFlow)
-            {
-                <div class="govuk-hint">Pre-cassetted submission — defaults to the next pre-booked block reference. Change it if you need to use a different pre-booked reference.</div>
-            }
-            <input class="govuk-input govuk-input--width-3" asp-for="NewBlockRef" maxlength="3" />
-        </div>
-        <div class="govuk-form-group">
-            <label class="govuk-label" for="NewCustomerRef">Customer reference</label>
-            <input class="govuk-input govuk-input--width-20" asp-for="NewCustomerRef" />
-        </div>
-        @if (Model.IsAddFlow)
-        {
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="NewNumberOfBlocks">Number of blocks</label>
-                <div class="govuk-hint">Creates this many identical blocks, with auto-incrementing block refs.</div>
-                <input class="govuk-input govuk-input--width-3" asp-for="NewNumberOfBlocks" />
-            </div>
-        }
-        <div class="govuk-form-group">
-            <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-                <div class="govuk-checkboxes__item">
-                    @if (Model.CanUseAdditionalRequest)
+        <div class="govuk-grid-row">
+            <div class="govuk-grid-column-one-half">
+                <div class="govuk-form-group">
+                    <label class="govuk-label">Sender ref</label>
+                    <p class="govuk-body govuk-!-font-weight-bold">@Model.Animal.SenderRef</p>
+                </div>
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="NewBlockRef">Block ref</label>
+                    @if (Model.IsPreCassetted && Model.IsAddFlow)
                     {
-                        <input class="govuk-checkboxes__input" asp-for="NewRepeatBlock" type="checkbox" />
+                        <div class="govuk-hint">Pre-cassetted submission — defaults to the next pre-booked block reference. Change it if you need to use a different pre-booked reference.</div>
                     }
-                    else
+                    <input class="govuk-input govuk-input--width-3" asp-for="NewBlockRef" maxlength="3" />
+                </div>
+                <div class="govuk-form-group">
+                    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                        <div class="govuk-checkboxes__item">
+                            @if (Model.CanUseAdditionalRequest)
+                            {
+                                <input class="govuk-checkboxes__input" asp-for="NewRepeatBlock" type="checkbox" />
+                            }
+                            else
+                            {
+                                <input class="govuk-checkboxes__input" type="checkbox" disabled />
+                                <input type="hidden" asp-for="NewRepeatBlock" value="false" />
+                            }
+                            <label class="govuk-label govuk-checkboxes__label" for="NewRepeatBlock">Additional request (repeat block)</label>
+                        </div>
+                    </div>
+                    @if (!Model.CanUseAdditionalRequest)
                     {
-                        <input class="govuk-checkboxes__input" type="checkbox" disabled />
-                        <input type="hidden" asp-for="NewRepeatBlock" value="false" />
+                        <div class="govuk-hint">Not available for this submission type.</div>
                     }
-                    <label class="govuk-label govuk-checkboxes__label" for="NewRepeatBlock">Additional request (repeat block)</label>
                 </div>
             </div>
-            @if (!Model.CanUseAdditionalRequest)
-            {
-                <div class="govuk-hint">Not available for this submission type.</div>
-            }
+            <div class="govuk-grid-column-one-half">
+                <div class="govuk-form-group">
+                    <label class="govuk-label">Histology reference</label>
+                    <p class="govuk-body govuk-!-font-weight-bold">@(Model.Animal.HistologyRef ?? "Not recorded")</p>
+                </div>
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="NewCustomerRef">Customer reference</label>
+                    <input class="govuk-input govuk-input--width-20" asp-for="NewCustomerRef" />
+                </div>
+                @if (Model.IsAddFlow)
+                {
+                    <div class="govuk-form-group">
+                        <label class="govuk-label" for="NewNumberOfBlocks">Number of blocks</label>
+                        <div class="govuk-hint">Creates this many identical blocks, with auto-incrementing block refs.</div>
+                        <input class="govuk-input govuk-input--width-3" asp-for="NewNumberOfBlocks" />
+                    </div>
+                }
+            </div>
         </div>
         <div class="govuk-form-group">
             <label class="govuk-label" for="NewComment">Comments and details of other tests</label>
