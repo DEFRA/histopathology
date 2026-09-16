@@ -69,4 +69,36 @@ public static class BatchStatus
             _                                                 => rawText
         };
     }
+
+    /// <summary>
+    /// Returns the GOV.UK Design System tag colour modifier (e.g. "grey", "turquoise") for the
+    /// given status code, for rendering the status as a <c>govuk-tag</c> in grids/summaries.
+    /// Restricted to modifiers actually shipped in this app's govuk-frontend build:
+    /// grey, green, turquoise, teal, purple, pink, red, orange, yellow, magenta.
+    /// </summary>
+    public static string TagClass(string status) => status switch
+    {
+        Submitted  => "grey",
+        Received   => "turquoise",
+        InProgress => "teal",
+        OnHold     => "orange",
+        Completed  => "green",
+        Rejected   => "red",
+        _          => "grey"
+    };
+
+    /// <summary>
+    /// Same colour mapping as <see cref="TagClass"/>, but for callers that only have the free-text
+    /// status description (e.g. a legacy stored procedure result) rather than the status code.
+    /// </summary>
+    public static string TagClassForText(string? rawText) => NormalizeDisplayText(rawText) switch
+    {
+        "Not received" => "grey",
+        "Received"     => "turquoise",
+        "In progress"  => "teal",
+        "On hold"      => "orange",
+        "Completed"    => "green",
+        "Rejected"     => "red",
+        _              => "grey"
+    };
 }

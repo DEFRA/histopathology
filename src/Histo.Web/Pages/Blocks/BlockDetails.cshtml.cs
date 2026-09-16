@@ -115,6 +115,14 @@ public class BlockDetailsModel : HistoPageModel
     public IReadOnlyList<string> ExistingAntibodyCodes { get; private set; } = [];
     public IReadOnlyList<string> ExistingStainCodes { get; private set; } = [];
 
+    /// <summary>
+    /// True when this block already has its own saved test selections (as opposed to a brand-new
+    /// block merely pre-checked with the batch-level defaults). Only then do the Tests checkboxes
+    /// narrow down to the selected codes — a new/untested block still shows the full option list
+    /// so additional tests can be picked for the first time.
+    /// </summary>
+    public bool HasSavedTests { get; private set; }
+
     public string? ErrorMessage { get; private set; }
 
     /// <summary>True when a pre-cassetted submission has no pre-booked block references left for this animal — the view offers a link to book one.</summary>
@@ -540,6 +548,7 @@ public class BlockDetailsModel : HistoPageModel
         ExistingHistologyCodes = allTests.Where(t => t.BlockID == Block.ID && t.TestType == BlockTestType.Histology).Select(t => t.Code).ToList();
         ExistingAntibodyCodes = allTests.Where(t => t.BlockID == Block.ID && t.TestType == BlockTestType.Antibodies).Select(t => t.Code).ToList();
         ExistingStainCodes = allTests.Where(t => t.BlockID == Block.ID && t.TestType == BlockTestType.Stain).Select(t => t.Code).ToList();
+        HasSavedTests = ExistingHistologyCodes.Count > 0 || ExistingAntibodyCodes.Count > 0 || ExistingStainCodes.Count > 0;
 
         // Legacy: DisplayBatchLevelTests (Page_Load, new-block branch) — a brand-new block with no
         // test selections of its own yet defaults to the batch-level Histology/Antibody/Stain

@@ -24,10 +24,14 @@ public class SearchBlockRefsModel : GridPageModel
     [BindProperty(SupportsGet = true)] public bool Submitted { get; set; }
 
     // Page this search was launched from (e.g. Book block ref, Book histology ref, Edit
-    // sender/histology ref) so Back returns there instead of always going to Search menu.
+    // sender/histology ref, or Submission details block) so Back returns there instead of
+    // always going to Search menu. May include a query string (e.g. BatchId/AnimalId), so
+    // rendered as a plain href rather than an asp-page tag helper target.
     [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
 
-    public string BackLinkPage => string.IsNullOrWhiteSpace(ReturnPage) ? "/Search/SearchMenu" : ReturnPage;
+    /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
+    public string BackLinkPage =>
+        !string.IsNullOrWhiteSpace(ReturnPage) && Url.IsLocalUrl(ReturnPage) ? ReturnPage : "/Search/SearchMenu";
 
     public Dictionary<string, string> Errors { get; } = [];
     public IReadOnlyList<BlockRefRangeHelpers.BlockRefRangeRow> Results { get; private set; } = [];

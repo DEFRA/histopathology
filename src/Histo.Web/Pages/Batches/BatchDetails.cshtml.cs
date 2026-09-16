@@ -102,14 +102,6 @@ public class BatchDetailsModel : HistoPageModel
 
     public Batch? Batch { get; private set; }
 
-    /// <summary>Manage project/contract codes pick list, returning here afterwards (view mode).</summary>
-    public string? ProjectPickListUrl =>
-        Url.Page("/Admin/LookupItems", new { tableId = LookupProjects, ReturnUrl = Url.Page("/Batches/BatchDetails", new { batchId = BatchId }) });
-
-    /// <summary>Manage pathologists pick list, returning here afterwards (view mode).</summary>
-    public string? PathologistPickListUrl =>
-        Url.Page("/Admin/LookupItems", new { tableId = LookupContacts, ReturnUrl = Url.Page("/Batches/BatchDetails", new { batchId = BatchId }) });
-
     /// <summary>Number of samples added so far — shown as a hint on the "Samples" button.</summary>
     public int SampleCount { get; private set; }
 

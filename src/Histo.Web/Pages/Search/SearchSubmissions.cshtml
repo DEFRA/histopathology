@@ -242,7 +242,9 @@
                         <td class="govuk-table__cell">@r.ContactDescription</td>
                         <td class="govuk-table__cell">@r.Species</td>
                         <td class="govuk-table__cell">@r.BatchDate?.ToShortDateString()</td>
-                        <td class="govuk-table__cell">@Histo.Core.Domain.BatchStatus.DisplayName(r.Status ?? string.Empty)</td>
+                        <td class="govuk-table__cell">
+                            <partial name="_StatusTag" model='(Histo.Core.Domain.BatchStatus.TagClass(r.Status ?? string.Empty), Histo.Core.Domain.BatchStatus.DisplayName(r.Status ?? string.Empty))' />
+                        </td>
                     </tr>
                 }
             </tbody>

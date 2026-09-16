@@ -1,0 +1,4 @@
+@model (string TagClass, string Text)
+@* Centralised submission-status tag — single source of truth for markup so every grid renders
+   the same GDS tag structure and picks up the uniform-width styling in Styles.css. *@
+<strong class="govuk-tag govuk-tag--@Model.TagClass app-status-tag">@Model.Text</strong>

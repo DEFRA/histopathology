@@ -65,7 +65,9 @@ else
                     <td class="govuk-table__cell">@b.ContactDescription</td>
                     <td class="govuk-table__cell">@b.Species</td>
                     <td class="govuk-table__cell">@b.BatchDate?.ToShortDateString()</td>
-                    <td class="govuk-table__cell">@Histo.Core.Domain.BatchStatus.NormalizeDisplayText(b.Status)</td>
+                    <td class="govuk-table__cell">
+                        <partial name="_StatusTag" model='(Histo.Core.Domain.BatchStatus.TagClassForText(b.Status), Histo.Core.Domain.BatchStatus.NormalizeDisplayText(b.Status))' />
+                    </td>
                     <td class="govuk-table__cell">
                         <form method="post" asp-antiforgery="true">
                             <input type="hidden" name="batchId" value="@b.ID" />
