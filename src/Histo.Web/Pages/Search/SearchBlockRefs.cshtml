@@ -71,7 +71,7 @@
            The migrated page names that parameter Filter and needs a table chosen there. *@
         <a asp-page="/Search/ViewImportedData"
            asp-route-Filter="@(Model.SenderRef ?? Model.HistologyRef)"
-           asp-route-ReturnPage="/Search/SearchBlockRefs"
+           asp-route-ReturnPage="@Model.ReturnPage"
            class="govuk-link">View old ICC_Sub data</a>
     </div>
     }
