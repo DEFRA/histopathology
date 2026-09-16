@@ -77,6 +77,12 @@ public class SearchSubmissionsModel : HistoPageModel
     [BindProperty] public bool SortDesc { get; set; } = true;
     [BindProperty] public int PageNumber { get; set; } = 1;
 
+    [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
+
+    /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
+    public string BackLinkPage =>
+        !string.IsNullOrWhiteSpace(ReturnPage) && Url.IsLocalUrl(ReturnPage) ? ReturnPage : "/Search/SearchMenu";
+
     public IReadOnlyList<BatchSearchResult> PagedResults =>
         (SortColumn switch
         {

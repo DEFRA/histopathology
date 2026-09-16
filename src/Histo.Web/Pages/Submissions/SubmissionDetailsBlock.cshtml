@@ -289,6 +289,7 @@ else
             }
             @* "Block ref search" — legacy btnBlockRefSearch, navigates to SearchBlockRefs.aspx?HistologyRef=... *@
             <a asp-page="/Search/SearchBlockRefs" asp-route-SenderRef="@Model.Animal?.SenderRef" asp-route-HistologyRef="@Model.Animal?.HistologyRef"
+               asp-route-ReturnPage="@Url.Page("/Submissions/SubmissionDetailsBlock", new { batchId = Model.BatchId, animalId = Model.AnimalId })"
                class="govuk-button govuk-button--secondary" data-module="govuk-button">Block ref search</a>
             <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back</a>
         </div>

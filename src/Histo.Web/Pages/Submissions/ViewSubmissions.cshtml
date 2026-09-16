@@ -202,7 +202,9 @@
                         <td class="govuk-table__cell">@r.DateReceived?.ToShortDateString()</td>
                         <td class="govuk-table__cell">@r.DateCompleted?.ToShortDateString()</td>
                         <td class="govuk-table__cell">@r.CustomerReceivedDate?.ToShortDateString()</td>
-                        <td class="govuk-table__cell">@BatchStatus.DisplayName(r.Status ?? "")</td>
+                        <td class="govuk-table__cell">
+                            <partial name="_StatusTag" model='(BatchStatus.TagClass(r.Status ?? ""), BatchStatus.DisplayName(r.Status ?? ""))' />
+                        </td>
                         <td class="govuk-table__cell govuk-table__cell--numeric">
                             <button form="view-action-form"
                                     formaction="@Model.SelectFormAction"

@@ -46,6 +46,13 @@ public class SearchTestModel : HistoPageModel
     public IReadOnlyList<TestItemRow> Results { get; private set; } = [];
     public bool Searched { get; private set; }
 
+    [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
+
+    /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
+    public string BackLinkPage =>
+        !string.IsNullOrWhiteSpace(ReturnPage) && Url.IsLocalUrl(ReturnPage) ? ReturnPage : "/Search/SearchMenu";
+
+
     public async Task OnGetAsync()
     {
         ViewData["Title"] = "Search Test Totals";

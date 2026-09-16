@@ -15,6 +15,12 @@ public class SearchUnUsedHistologyRefsModel : GridPageModel
 
     public IReadOnlyList<HistologyRef> Results { get; private set; } = [];
 
+    [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
+
+    /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
+    public string BackLinkPage =>
+        !string.IsNullOrWhiteSpace(ReturnPage) && Url.IsLocalUrl(ReturnPage) ? ReturnPage : "/Search/SearchMenu";
+
     public IReadOnlyList<HistologyRef> PagedResults =>
         (SortColumn switch
         {

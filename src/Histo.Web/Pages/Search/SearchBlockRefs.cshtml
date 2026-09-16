@@ -6,7 +6,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="@Model.BackLinkPage" class="govuk-back-link">Back</a>
+    <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
 }
 
 <partial name="_ErrorSummary" model="Model.Errors" />
@@ -31,7 +31,15 @@
         <label class="govuk-label" for="HistologyRef">Histology ref</label>
         <input class="govuk-input govuk-input--width-20" asp-for="HistologyRef" />
     </div>
-    <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
+        @* Legacy lbViewImportedData opened ViewImportedData.aspx?SearchString=<ref> in a popup.
+       The migrated page names that parameter Filter and needs a table chosen there. *@
+        <a asp-page="/Search/ViewImportedData"
+           asp-route-Filter="@(Model.SenderRef ?? Model.HistologyRef)"
+           asp-route-ReturnPage="@Model.ReturnPage"
+           class="govuk-button govuk-button--secondary" data-module="govuk-button">View old ICC_Sub data</a>
+    </div>
 </form>
 
 @if (Model.Errors.Count == 0)

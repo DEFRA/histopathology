@@ -58,6 +58,11 @@ public class SearchArchiveLocationModel : HistoPageModel
     public IReadOnlyList<BlockArchiveInfo> BlockResults { get; private set; } = [];
     public IReadOnlyList<SlideArchiveInfo> SlideResults { get; private set; } = [];
 
+    [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
+
+    /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
+    public string BackLinkPage =>
+        !string.IsNullOrWhiteSpace(ReturnPage) && Url.IsLocalUrl(ReturnPage) ? ReturnPage : "/Search/SearchMenu";
     public async Task OnGetAsync()
     {
         ViewData["Title"] = "Search Archive Location";

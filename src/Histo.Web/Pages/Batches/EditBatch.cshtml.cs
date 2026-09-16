@@ -47,7 +47,7 @@ public class EditBatchModel : HistoPageModel
 
     // ---- Optional editable fields ----
     [BindProperty] public string? Fixation            { get; set; }
-    [BindProperty] public bool    SafeToHandle        { get; set; }
+    [BindProperty] public bool?   SafeToHandle        { get; set; }
     [BindProperty] public string? Comments            { get; set; }
     [BindProperty] public int?    OtherSubmittedBy    { get; set; }
     [BindProperty] public string? OtherSubmittedArea  { get; set; }
@@ -123,7 +123,7 @@ public class EditBatchModel : HistoPageModel
         BatchDateStr        = Batch.BatchDate?.ToString("dd/MM/yyyy") ?? DateTime.Today.ToString("dd/MM/yyyy");
         BatchTypeField      = Batch.BatchType;
         Fixation            = Batch.Fixation;
-        SafeToHandle        = Batch.SafeToHandle ?? false;
+        SafeToHandle        = Batch.SafeToHandle;
         Comments            = Batch.Comments;
         OtherSubmittedBy    = Batch.OtherSubmittedBy;
         OtherSubmittedArea  = Batch.OtherSubmittedArea;
@@ -162,7 +162,7 @@ public class EditBatchModel : HistoPageModel
         string? BatchDateStr,
         int BatchTypeField,
         string? Fixation,
-        bool SafeToHandle,
+        bool? SafeToHandle,
         string? Comments,
         int? OtherSubmittedBy,
         string? OtherSubmittedArea,
@@ -251,6 +251,12 @@ public class EditBatchModel : HistoPageModel
         if (ihcSelected && SelectedAntibodyCodes.Count == 0)
         {
             SaveError = "IHC is selected — you must also select at least one antibody.";
+            return Page();
+        }
+        // Legacy: rfvSafeToHandle — mandatory on both New and Edit (BatchDetails.aspx.vb ValidateMandatoryFields).
+        if (SafeToHandle is null)
+        {
+            SaveError = "Select whether the submission is adequately fixed.";
             return Page();
         }
 

@@ -21,7 +21,8 @@
                 <ul class="govuk-list govuk-error-summary__list">
                     @foreach (var e in Model.Errors)
                     {
-                        <li><a href="#@e.Key" class="govuk-link">@e.Value</a></li>
+                        var anchor = e.Key == "BatchType" ? "batchType-tse" : e.Key;
+                        <li><a href="#@anchor" class="govuk-link">@e.Value</a></li>
                     }
                 </ul>
             </div>
