@@ -35,8 +35,8 @@
         @if (Model.Errors.TryGetValue("Name", out var nameError))
         {
             <p id="name-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @nameError</p>
-        }
-        <input class="govuk-input @(Model.Errors.ContainsKey("Name") ? "govuk-input--error" : "")" asp-for="Name" aria-describedby="@(Model.Errors.ContainsKey("Name") ? "Name-error" : null)" />
+        } 
+        <input class="govuk-input @(Model.Errors.ContainsKey("Name") ? "govuk-input--error" : "")" asp-for="Name" aria-describedby="@(Model.Errors.ContainsKey("Name") ? "Name-error" : null)" maxlength="35" />
     </div>
     <div class="govuk-form-group @(Model.Errors.ContainsKey("Email") ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="Email">Email</label>
@@ -44,7 +44,7 @@
         {
             <p id="email-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @emailError</p>
         }
-        <input class="govuk-input @(Model.Errors.ContainsKey("Email") ? "govuk-input--error" : "")" asp-for="Email" type="email" aria-describedby="@(Model.Errors.ContainsKey("Email") ? "Email-error" : null)" />
+        <input class="govuk-input @(Model.Errors.ContainsKey("Email") ? "govuk-input--error" : "")" asp-for="Email" type="email" aria-describedby="@(Model.Errors.ContainsKey("Email") ? "Email-error" : null)" maxlength="60" />
     </div>
     <div class="govuk-form-group @(Model.Errors.ContainsKey("GroupCode") ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="GroupCode">Group</label>
