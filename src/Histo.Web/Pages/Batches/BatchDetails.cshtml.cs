@@ -69,7 +69,7 @@ public class BatchDetailsModel : HistoPageModel
     [BindProperty] public string? Create_SpeciesId           { get; set; }
     [BindProperty] public string? Create_BatchDateStr        { get; set; }
     [BindProperty] public string? Create_Fixation            { get; set; }
-    [BindProperty] public bool    Create_SafeToHandle        { get; set; }
+    [BindProperty] public bool?   Create_SafeToHandle        { get; set; }
     [BindProperty] public int?    Create_OtherSubmittedBy    { get; set; }
     [BindProperty] public string? Create_OtherSubmittedArea  { get; set; }
     [BindProperty] public string? Create_Comments            { get; set; }
@@ -221,7 +221,7 @@ public class BatchDetailsModel : HistoPageModel
         string? SpeciesId,
         string? BatchDateStr,
         string? Fixation,
-        bool SafeToHandle,
+        bool? SafeToHandle,
         int? OtherSubmittedBy,
         string? OtherSubmittedArea,
         string? Comments,
@@ -499,8 +499,8 @@ public class BatchDetailsModel : HistoPageModel
         else if (Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.EO) && Create_SelectedHistologyCodes.Count > 1)
             errors["Create_Histology"] = "EO cannot be combined with other histology types.";
 
-        if (!Create_SafeToHandle)
-            errors["Create_SafeToHandle"] = "Confirm the submission is adequately fixed.";
+        if (Create_SafeToHandle is null)
+            errors["Create_SafeToHandle"] = "Select whether the submission is adequately fixed.";
 
         // Antibody required when IHC-PrP or IHC-Other is selected
         var needsAntibodies = Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcPrp)
@@ -566,7 +566,13 @@ public class BatchDetailsModel : HistoPageModel
             needsStains     ? Create_SelectedStainCodes    : new List<string>(),
             Session.UserID);
 
-        return RedirectToPage("/Batches/BatchDetails");
+        // Legacy continues straight into the sample-adding screen (BatchSummary.aspx /
+        // BatchBlockSummary.aspx) after BatchDetails.aspx — landing on the read-only view page
+        // here instead made "add a sample" an extra, easy-to-miss detour via the Samples button,
+        // and let a zero-sample submission look finished. SampleSummary.OnPostFinishAsync is the
+        // actual completion gate (requires >=1 sample) — this redirect just puts the user there
+        // immediately instead of on the summary/view page first.
+        return RedirectToPage("/Submissions/SampleSummary", new { batchId });
     }
 
     private async Task LoadCreateLookupsAsync()

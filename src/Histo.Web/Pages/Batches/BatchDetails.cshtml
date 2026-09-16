@@ -200,7 +200,8 @@
                     </select>
                 </div>
 
-                @* Is it adequately fixed? — legacy ddlSafeToHandle rfvSafeToHandle *@
+                @* Is it adequately fixed? — legacy ddlSafeToHandle (Yes/No dropdown), migrated to
+                   GDS radios: a native select isn't recommended for a binary choice. *@
                 <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_SafeToHandle") ? "govuk-form-group--error" : "")">
                     <fieldset class="govuk-fieldset">
                         <legend class="govuk-fieldset__legend">Is it adequately fixed?</legend>
@@ -208,10 +209,14 @@
                         {
                             <p id="Create_SafeToHandle-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @safeErr</p>
                         }
-                        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-                            <div class="govuk-checkboxes__item">
-                                <input class="govuk-checkboxes__input" asp-for="Create_SafeToHandle" type="checkbox" id="Create_SafeToHandle" />
-                                <label class="govuk-label govuk-checkboxes__label" for="Create_SafeToHandle">Yes</label>
+                        <div class="govuk-radios govuk-radios--inline" data-module="govuk-radios">
+                            <div class="govuk-radios__item">
+                                <input class="govuk-radios__input" type="radio" id="Create_SafeToHandle" name="Create_SafeToHandle" value="true" checked="@(Model.Create_SafeToHandle == true)" />
+                                <label class="govuk-label govuk-radios__label" for="Create_SafeToHandle">Yes</label>
+                            </div>
+                            <div class="govuk-radios__item">
+                                <input class="govuk-radios__input" type="radio" id="Create_SafeToHandle-no" name="Create_SafeToHandle" value="false" checked="@(Model.Create_SafeToHandle == false)" />
+                                <label class="govuk-label govuk-radios__label" for="Create_SafeToHandle-no">No</label>
                             </div>
                         </div>
                     </fieldset>

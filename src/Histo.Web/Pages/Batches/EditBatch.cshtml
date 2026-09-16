@@ -167,14 +167,22 @@
                 </select>
             </div>
 
-            @* Is it adequately fixed? *@
+            @* Is it adequately fixed? — legacy ddlSafeToHandle (Yes/No dropdown), migrated to
+               GDS radios: a native select isn't recommended for a binary choice. *@
             <div class="govuk-form-group">
-                <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-                    <div class="govuk-checkboxes__item">
-                        <input class="govuk-checkboxes__input" asp-for="SafeToHandle" type="checkbox" />
-                        <label class="govuk-label govuk-checkboxes__label" for="SafeToHandle">Is it adequately fixed?</label>
+                <fieldset class="govuk-fieldset">
+                    <legend class="govuk-fieldset__legend">Is it adequately fixed?</legend>
+                    <div class="govuk-radios govuk-radios--inline" data-module="govuk-radios">
+                        <div class="govuk-radios__item">
+                            <input class="govuk-radios__input" type="radio" id="SafeToHandle" name="SafeToHandle" value="true" checked="@(Model.SafeToHandle == true)" />
+                            <label class="govuk-label govuk-radios__label" for="SafeToHandle">Yes</label>
+                        </div>
+                        <div class="govuk-radios__item">
+                            <input class="govuk-radios__input" type="radio" id="SafeToHandle-no" name="SafeToHandle" value="false" checked="@(Model.SafeToHandle == false)" />
+                            <label class="govuk-label govuk-radios__label" for="SafeToHandle-no">No</label>
+                        </div>
                     </div>
-                </div>
+                </fieldset>
             </div>
         </div>
     </div>
