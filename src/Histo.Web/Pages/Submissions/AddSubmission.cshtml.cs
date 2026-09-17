@@ -89,10 +89,7 @@ public class AddSubmissionModel : HistoPageModel
 
         Session.BatchSubmissionID = submissionId;
 
-        // Legacy source: AddSubmission.aspx.vb — bNeuropath is derived from the user's area
-        // (SV_HeaderUserArea = "Neuropath"), never from a manual form control.
-        var isNeuropath = Session.UserArea == "Neuropath";
-        var newAnimalId = await _submissions.AddAnimalAsync(submissionId.Value, SenderRef, isNeuropath, Session.UserID);
+        var newAnimalId = await _submissions.AddAnimalAsync(submissionId.Value, SenderRef, Session.UserID);
         if (newAnimalId <= 0)
         {
             // AddAnimalAsync swallows the underlying SQL exception and returns 0 on failure —

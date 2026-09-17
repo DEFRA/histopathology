@@ -42,8 +42,13 @@ PRINT '--- Create or Alter Table, Column  ---';
 :r .\DeploymentScripts\V20260914_01_User_Email_NotNull_NTLogin_Nullable.sql
 GO
 
+-- Step 5: Deactivate the Mouse Bioassay / Neuropath user areas
+PRINT '--- Deactivating Mouse Bioassay / Neuropath user areas ---';
+:r .\DeploymentScripts\V20260917_01_Deactivate_MouseBioassay_Neuropath_UserAreas.sql
+GO
 
--- Step 4: Log successful deployment (optional)
+
+-- Step 6: Log successful deployment (optional)
 IF OBJECT_ID('[dbo].[DeploymentLog]', 'U') IS NOT NULL
 BEGIN
 	INSERT INTO [dbo].[DeploymentLog] ([ScriptName], [Environment], [Status])

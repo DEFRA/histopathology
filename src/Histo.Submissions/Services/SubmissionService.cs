@@ -1,4 +1,3 @@
-using Histo.Core.Domain;
 using Histo.Infrastructure;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
@@ -10,8 +9,6 @@ namespace Histo.Submissions.Services;
 ///
 /// Replaces direct use of <c>clsBatchSubmission.vb</c>, <c>clsAnimal.vb</c>, and
 /// <c>clsTissue.vb</c> from ASPX code-behind files.
-///
-/// PG-number auto-reversal logic is delegated to <see cref="AnimalHelpers.ComputePgAutoHistologyRef"/>.
 /// </summary>
 public sealed class SubmissionService : ISubmissionService
 {
@@ -80,35 +77,26 @@ public sealed class SubmissionService : ISubmissionService
 
     /// <summary>
     /// Adds a new animal record.
-    ///
-    /// If <paramref name="isNeuropath"/> is <see langword="true"/> and
-    /// <paramref name="senderRef"/> is in PG-number format, the histology
-    /// reference is auto-computed via <see cref="AnimalHelpers.ComputePgAutoHistologyRef"/>
-    /// before persisting.
     /// </summary>
     public async Task<int> AddAnimalAsync(
         int batchSubmissionId,
         string senderRef,
-        bool isNeuropath,
         int userId,
         string? pmDate = null,
         bool pmDateSet = false,
         CancellationToken ct = default)
     {
-        // Apply PG-number auto-reversal — mirrors NewRecord() in clsAnimal.vb
-        var autoHistologyRef = AnimalHelpers.ComputePgAutoHistologyRef(senderRef, isNeuropath);
-
         var animal = new Animal
         {
             BatchSubmissionID = batchSubmissionId,
             SenderRef         = senderRef,
             NextBlockRef      = "01",
-            HistologyRef      = autoHistologyRef,
+            HistologyRef      = null,
             HistoRefSet       = false,
             OnHold            = false,
             PMDate            = pmDate,
             PMDateSet         = pmDateSet,
-            IsPGNumber        = autoHistologyRef is not null,
+            IsPGNumber        = false,
             BookedHistologyRef = false,
         };
 

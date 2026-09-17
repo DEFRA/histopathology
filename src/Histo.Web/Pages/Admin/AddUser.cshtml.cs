@@ -1,5 +1,6 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
+using Histo.Core.Domain;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -92,6 +93,14 @@ public class AddUserModel : HistoPageModel
 
         if (GroupCode <= 0) Errors["GroupCode"] = "Select a user group.";
         if (AreaCode <= 0) Errors["AreaCode"] = "Select a user area.";
+
+        if (GroupCode > 0 && AreaCode > 0)
+        {
+            var groupName = Groups.FirstOrDefault(g => g.ID == GroupCode)?.Name;
+            var areaName = Areas.FirstOrDefault(a => a.ID == AreaCode)?.Name;
+            if (!GroupAreaMappingHelpers.IsAllowedCombination(groupName, areaName))
+                Errors["AreaCode"] = "The selected area is not valid for the selected group.";
+        }
     }
 
     private async Task LoadLookupsAsync()
