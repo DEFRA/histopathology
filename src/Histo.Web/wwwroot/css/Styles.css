@@ -3,13 +3,56 @@
  * (tables, forms, buttons, selects) are now rendered with real govuk-frontend
  * markup/classes throughout the application.
 
-/* User context, shown alongside the standard govuk-frontend Service Navigation
- * toggle/list — layout, responsive show/hide, and toggle behaviour are all handled
- * natively by govuk-frontend's Service Navigation module (data-module="govuk-service-navigation").
+/* GOV.UK's govuk-service-navigation__container doesn't set align-items, so its flex
+ * children (service-name span, our app-header-right div) can end up vertically
+ * misaligned relative to each other depending on their own padding/margin. Forcing
+ * center alignment here keeps "Histopathology System" and the user-context/Menu
+ * group on a single visually-aligned row at all viewport widths.
  */
+.govuk-service-navigation__container {
+    align-items: center;
+}
+
+/* User context + "Menu" toggle, grouped on the right of the service navigation bar.
+ * The govuk-service-navigation__container uses display:flex — margin-left:auto
+ * pushes this group to the far right, regardless of viewport width.
+ */
+.app-header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-left: auto;
+}
+
 .app-header-user {
-    white-space: nowrap;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 15px;
+    row-gap: 0;
+    white-space: normal;
     margin-bottom: 0;
+}
+
+.app-header-user-item {
+    white-space: nowrap;
+}
+
+/* "Menu" toggle is always visible (desktop and mobile) — the nav list starts hidden
+ * and is only revealed on click, via nav-toggle.js. This overrides govuk-frontend's
+ * default Service Navigation behaviour, which force-shows the list above the tablet
+ * breakpoint; [hidden] needs !important here to win against that unconditional
+ * display:flex rule. */
+.app-nav-toggle {
+    white-space: nowrap;
+}
+
+.govuk-service-navigation__list[hidden] {
+    display: none !important;
+}
+
+.app-nav-wrapper {
+    border-top: 1px solid var(--govuk-border-colour, #b1b4b6);
 }
 
 /* APHA departmental logo replacing the GOV.UK crown mark. Kept in its own row
