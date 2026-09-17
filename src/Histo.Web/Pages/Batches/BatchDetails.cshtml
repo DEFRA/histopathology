@@ -335,7 +335,8 @@
         <div class="govuk-button-group">
             <button type="submit" class="govuk-button" data-module="govuk-button">Create submission</button>
             <a asp-page="/Batches/Cassetted" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back</a>
-            <a asp-page="/Index" class="govuk-link">Cancel</a>
+            <a asp-page="/Index" class="govuk-link"
+               onclick="return confirm('Are you sure you want to cancel? Any information you have entered will be lost.');">Cancel</a>
         </div>
     </form>
 

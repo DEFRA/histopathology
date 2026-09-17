@@ -64,6 +64,7 @@
     <a asp-page="/Admin/AddUser" asp-route-returnUrl="@Model.SafeReturnUrl" class="govuk-button" data-module="govuk-button">Add user</a>
 </p>
 
+<div class="app-table-responsive">
 <table class="govuk-table">
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
@@ -100,6 +101,7 @@
         }
     </tbody>
 </table>
+</div>
 <partial name="_Pagination" />
 
 @if (Model.SafeReturnUrl is not null)

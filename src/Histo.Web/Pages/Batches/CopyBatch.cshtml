@@ -28,6 +28,18 @@
     <form method="post">
         <input type="hidden" asp-for="SourceBatchId" />
         <input type="hidden" asp-for="IsCassetted" />
+        <input type="hidden" name="Confirm" value="@(Model.ShowConfirmPanel ? "true" : "false")" />
+
+        @if (Model.ShowConfirmPanel)
+        {
+            <div class="govuk-warning-text">
+                <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+                <strong class="govuk-warning-text__text">
+                    <span class="govuk-visually-hidden">Warning</span>
+                    Select Finish again to confirm creating a copy of this submission.
+                </strong>
+            </div>
+        }
 
         <p class="govuk-body">The following table shows the samples in this submission.
         To change a sender reference, edit the value in the <strong>New sender ref</strong> column before clicking Finish.

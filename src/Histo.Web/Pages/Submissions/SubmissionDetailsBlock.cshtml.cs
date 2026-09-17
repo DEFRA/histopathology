@@ -148,6 +148,17 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     }
 
     /// <summary>
+    /// Shows the inline "Are you sure?" confirmation panel for the checked blocks — the
+    /// "Delete block" button posted straight to <see cref="OnPostDeleteAsync"/> with no
+    /// confirmation step, deleting immediately; this restores the confirm step ahead of it.
+    /// </summary>
+    public async Task<IActionResult> OnPostConfirmDeleteAsync(List<int>? blockIds)
+    {
+        ConfirmDeleteBlockIds = blockIds ?? [];
+        return await OnGetAsync();
+    }
+
+    /// <summary>
     /// Deletes the checked blocks. Legacy source: <c>SubmissionDetailsBlock.aspx.vb</c>::
     /// <c>btnDeleteBlock_Click</c> — reads every checked <c>cbSelected</c> row and deletes each.
     /// </summary>

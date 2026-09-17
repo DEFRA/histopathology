@@ -93,6 +93,12 @@
     width: 100%;
 }
 
+/* Wraps a wide table (many columns/long content) in a horizontally scrollable container instead
+ * of letting it overflow past the page width — govuk-table has no built-in responsive behaviour. */
+.app-table-responsive {
+    overflow-x: auto;
+}
+
 /* Uniform-width submission status tag (SearchSubmissions/ViewSubmissions/BatchesForEditing grids)
  * — govuk-tag sizes to its text by default, so "On hold" and "Not received" render as different
  * widths; fixing a min-width and centring the text keeps the status column visually aligned. */

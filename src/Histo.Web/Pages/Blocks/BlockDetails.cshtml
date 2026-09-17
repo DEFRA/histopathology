@@ -183,7 +183,9 @@ else
                                 <div class="govuk-button-group govuk-!-margin-bottom-0">
                                     <a asp-page="/Blocks/BlockDetails" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-BlockId="@Model.BlockId"
                                        asp-route-EditTissueId="@t.ID" asp-route-IsAddFlow="@Model.IsAddFlow" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Edit</a>
-                                    <form method="post" asp-page-handler="DeleteTissue" class="govuk-!-display-inline">
+                                    @* display:contents removes the form from the flex layout so the button
+                                       itself is the flex item, aligning it with the Edit link. *@
+                                    <form method="post" asp-page-handler="DeleteTissue" style="display:contents">
                                         <input type="hidden" name="BatchId" value="@Model.BatchId" />
                                         <input type="hidden" name="AnimalId" value="@Model.AnimalId" />
                                         <input type="hidden" name="BlockId" value="@Model.BlockId" />
