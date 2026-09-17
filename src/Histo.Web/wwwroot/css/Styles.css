@@ -12,15 +12,40 @@
     margin-bottom: 0;
 }
 
-/* Keeps the "Histopathology System" service name and the User/Group/Area text on the same
- * row, with the user text pushed to the right — the nav menu row (below) is unaffected. */
-.app-header-title-row {
+/* GOV.UK's govuk-service-navigation__container doesn't set align-items, so its flex
+ * children (service-name span, our app-header-right div) can end up vertically
+ * misaligned relative to each other depending on their own padding/margin. Forcing
+ * center alignment here keeps "Histopathology System" and the user-context/Menu
+ * group on a single visually-aligned row at all viewport widths.
+ */
+.govuk-service-navigation__container {
+    align-items: center;
+}
+
+/* Groups the user-context text and "Menu" toggle button together, and margin-left: auto
+ * pushes this group to the far right, regardless of viewport width.
+ */
+.app-header-right {
     display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    flex: 1 1 auto;
+    align-items: center;
     gap: 15px;
+    margin-left: auto;
+}
+
+/* Our "Menu" toggle is shown unconditionally (desktop and mobile) — govuk-frontend's own
+ * .govuk-service-navigation__toggle is hidden above the tablet breakpoint by a CSS media
+ * breakpoint; [hidden] needs !important here to win against that unconditional
+ * display:flex rule. */
+.app-nav-toggle {
+    white-space: nowrap;
+}
+
+.govuk-service-navigation__list[hidden] {
+    display: none !important;
+}
+
+.app-nav-wrapper {
+    border-top: 1px solid var(--govuk-border-colour, #b1b4b6);
 }
 
 /* APHA departmental logo replacing the GOV.UK crown mark. Kept in its own row

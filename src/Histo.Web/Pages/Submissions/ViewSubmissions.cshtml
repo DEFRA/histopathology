@@ -165,7 +165,6 @@
             <input type="hidden" name="ReceivedDateTo"      value="@Model.ReceivedDateTo?.ToString("yyyy-MM-dd")" />
         </form>
 
-        <div class="app-table-responsive">
         <table class="govuk-table">
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
@@ -210,7 +209,6 @@
                 }
             </tbody>
         </table>
-        </div>
         <partial name="_PaginationPost" />
 
         @* Export to CSV — mirrors legacy lbExportExcel (all result rows). *@
