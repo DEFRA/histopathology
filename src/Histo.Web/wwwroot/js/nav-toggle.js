@@ -12,6 +12,9 @@
         menu.hidden = !expanded;
     }
 
+    // Progressive enhancement: collapse the menu once JS is active.
+    setExpanded(false);
+
     toggle.addEventListener('click', function () {
         setExpanded(toggle.getAttribute('aria-expanded') !== 'true');
     });
