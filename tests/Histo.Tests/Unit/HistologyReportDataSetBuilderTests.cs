@@ -112,7 +112,7 @@ public class HistologyReportDataSetBuilderTests
     }
 
     [Fact]
-    public void BuildBatchTable_ProjectCodeResolvesToName_ViaLookup()
+    public void BuildBatchTable_ProjectCodeNotInLookup_FallsBackToRawCode()
     {
         var projectsById = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["19"] = "Defra research" };
         var table = HistologyReportDataSetBuilder.BuildBatchTable(
