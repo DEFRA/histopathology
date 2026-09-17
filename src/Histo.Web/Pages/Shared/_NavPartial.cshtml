@@ -17,25 +17,22 @@
     var currentPage = ViewContext.RouteData.Values["page"] as string;
     var helpAnchor = Histo.Core.Domain.HelpSectionMap.Resolve(currentPage);
     var helpHref = "/Help/Index" + (helpAnchor is not null ? $"#{helpAnchor}" : "");
-
-    // GDS: mark the nav item matching the current page with aria-current="page".
-    string? CurrentAttr(string page) => string.Equals(currentPage, page, StringComparison.OrdinalIgnoreCase) ? "page" : null;
 }
 
 @if (isHisto || isMaint)
 {
-    <li class="govuk-service-navigation__item @(CurrentAttr("/Search/SearchMenu") is not null ? "govuk-service-navigation__item--active" : "")">
-        <a class="govuk-service-navigation__link" asp-page="/Search/SearchMenu" aria-current="@CurrentAttr("/Search/SearchMenu")">Search</a>
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Search/SearchMenu">Search</a>
     </li>
 }
 
 @if (isMaint)
 {
-    <li class="govuk-service-navigation__item @(CurrentAttr("/Admin/UserMaintenance") is not null ? "govuk-service-navigation__item--active" : "")">
-        <a class="govuk-service-navigation__link" asp-page="/Admin/UserMaintenance" aria-current="@CurrentAttr("/Admin/UserMaintenance")">User maintenance</a>
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Admin/UserMaintenance">User maintenance</a>
     </li>
-    <li class="govuk-service-navigation__item @(CurrentAttr("/Admin/PickListMaintenance") is not null ? "govuk-service-navigation__item--active" : "")">
-        <a class="govuk-service-navigation__link" asp-page="/Admin/PickListMaintenance" aria-current="@CurrentAttr("/Admin/PickListMaintenance")">Pick list maintenance</a>
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Admin/PickListMaintenance">Pick list maintenance</a>
     </li>
 @*     <li class="govuk-service-navigation__item">
         <a class="govuk-service-navigation__link" asp-page="/Admin/EditAnimalRef">Edit Sender/Histology Ref</a>
