@@ -28,6 +28,20 @@ public class ViewSubmissionsModel : HistoPageModel
     private readonly IUserService    _users;
     private readonly ILookupService  _lookups;
 
+    /// <summary>Single source of truth for the results table header — (display label, sort key) pairs, in column order.</summary>
+    public static readonly IReadOnlyList<(string Label, string Column)> GridColumns =
+    [
+        ("Sub. Number",              "ID"),
+        ("Project Code",             "ProjectDescription"),
+        ("Pathologist",              "ContactDescription"),
+        ("Species",                  "Species"),
+        ("Date Submitted",           "BatchDate"),
+        ("Date Received / Rejected", "DateReceived"),
+        ("Date Completed",           "DateCompleted"),
+        ("Customer Received Date",   "CustomerReceivedDate"),
+        ("Status",                   "Status"),
+    ];
+
     // Constants matching Common.vb
     private const int LookupFixative = 10;
     private const int LookupContacts = 18;

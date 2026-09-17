@@ -89,6 +89,7 @@ public class CopyBatchModelTests
 
         var sut = CreateSut();
         sut.SourceBatchId = 10;
+        sut.Confirm = true;
 
         var result = await sut.OnPostAsync();
 
@@ -100,6 +101,22 @@ public class CopyBatchModelTests
             It.Is<IReadOnlyList<string>>(l => l.Count == 1 && l[0] == "ST1"),
             42,
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_NotConfirmed_ShowsConfirmPanelWithoutCopying()
+    {
+        var sourceBatch = MakeSourceBatch();
+        _batches.Setup(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(sourceBatch);
+
+        var sut = CreateSut();
+        sut.SourceBatchId = 10;
+        sut.Confirm = false;
+
+        await sut.OnPostAsync();
+
+        Assert.True(sut.ShowConfirmPanel);
+        _batches.Verify(b => b.CopyBatchHeaderAsync(It.IsAny<Batch>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

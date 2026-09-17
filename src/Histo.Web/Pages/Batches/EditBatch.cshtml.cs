@@ -261,10 +261,12 @@ public class EditBatchModel : HistoPageModel
         }
 
         // ---- Parse BatchDate ----
+        // Accepts both the manual DD/MM/YYYY format and the native date picker's ISO
+        // yyyy-MM-dd format (the browser submits ISO regardless of display locale).
         DateTime? batchDate = Batch.BatchDate;
         if (!string.IsNullOrWhiteSpace(BatchDateStr))
         {
-            if (!DateTime.TryParseExact(BatchDateStr, ["dd/MM/yyyy", "d/M/yyyy"],
+            if (!DateTime.TryParseExact(BatchDateStr, ["dd/MM/yyyy", "d/M/yyyy", "yyyy-MM-dd"],
                     System.Globalization.CultureInfo.InvariantCulture,
                     System.Globalization.DateTimeStyles.None, out var parsedDate))
             {
@@ -390,15 +392,18 @@ public class EditBatchModel : HistoPageModel
         var antibodyTableId = batchType == BatchTypeConstants.NonTse ? LookupNonTseAntibodies : LookupTseAntibodies;
 
         var histologyTask = _lookups.GetHistologyTypesAsync();
-        var antibodyTask  = _lookups.GetLookupDataAsync(antibodyTableId);
-        var stainTask     = _lookups.GetLookupDataAsync(LookupSpecialStain);
+        var antibodyTask  = _lookups.GetLookupDataAsync(antibodyTableId, includeInactive: true);
+        var stainTask     = _lookups.GetLookupDataAsync(LookupSpecialStain, includeInactive: true);
         await Task.WhenAll(histologyTask, antibodyTask, stainTask);
 
         // TSE: hide IHC-Other. NonTSE: hide IHC-PrP and H&E (BSE). Legacy: BatchDetails.aspx.vb::HideOptions()
         HistologyOptions = batchType == BatchTypeConstants.NonTse
             ? histologyTask.Result.Where(i => i.Code != HistologyCode.IhcPrp && i.Code != HistologyCode.HeBse).ToList()
             : histologyTask.Result.Where(i => i.Code != HistologyCode.IhcOther).ToList();
-        AntibodyOptions = antibodyTask.Result;
-        StainOptions    = stainTask.Result;
+        // includeInactive:true surfaces a legacy "Others" row that would otherwise be hidden, but can
+        // also surface blank placeholder rows with no name — filter those out rather than render an
+        // unlabelled checkbox.
+        AntibodyOptions = antibodyTask.Result.Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList();
+        StainOptions    = stainTask.Result.Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList();
     }
 }

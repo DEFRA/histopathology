@@ -58,7 +58,7 @@
         <label class="govuk-label govuk-label--s" for="CurrentHistologyRef">Original histology ref</label>
         <div class="app-field-with-button">
             <input class="govuk-input govuk-input--width-10" id="CurrentHistologyRef" value="@Model.CurrentHistologyRef" disabled />
-            <button type="submit" asp-page-handler="GetHistologyRef" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Get histology ref</button>
+            <button type="submit" asp-page-handler="GetHistologyRef" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0 app-button-uniform" data-module="govuk-button">Get histology ref</button>
         </div>
     </div>
 
@@ -74,7 +74,7 @@
             <input class="govuk-input govuk-input--width-10 @(Model.ErrorField == "NewSenderRef" ? "govuk-input--error" : "")"
                    id="NewSenderRef" name="NewSenderRef" type="text" value="@Model.NewSenderRef"
                    aria-describedby="@(Model.ErrorField == "NewSenderRef" ? "NewSenderRef-error" : null)" />
-            <button type="submit" asp-page-handler="EditSenderRef" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button">Save sender ref</button>
+            <button type="submit" asp-page-handler="EditSenderRef" class="govuk-button govuk-!-margin-bottom-0 app-button-uniform" data-module="govuk-button">Save sender ref</button>
         </div>
     </div>
 
@@ -91,7 +91,7 @@
             <input class="govuk-input govuk-input--width-10 @(Model.ErrorField == "NewHistologyRef" ? "govuk-input--error" : "")"
                    id="NewHistologyRef" name="NewHistologyRef" type="text" value="@Model.NewHistologyRef"
                    aria-describedby="@(Model.ErrorField == "NewHistologyRef" ? "NewHistologyRef-error" : null)" />
-            <button type="submit" asp-page-handler="SaveHistologyRef" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button" data-prevent-double-click="true"
+            <button type="submit" asp-page-handler="SaveHistologyRef" class="govuk-button govuk-!-margin-bottom-0 app-button-uniform" data-module="govuk-button" data-prevent-double-click="true"
                     onclick="return document.getElementById('NewHistologyRef').value !== '' || confirm('You have not entered a Histology ref. This will delete any existing Histology Ref. Do you wish to continue?');">
                 Save histology ref
             </button>
@@ -100,5 +100,5 @@
 
     <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m" />
 
-    <a asp-page="/Index" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
+    <a asp-page="/Index" class="govuk-button govuk-button--secondary app-button-uniform" data-module="govuk-button">Done</a>
 </form>

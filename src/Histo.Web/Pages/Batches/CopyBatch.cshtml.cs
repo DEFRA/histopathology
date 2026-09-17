@@ -40,6 +40,12 @@ public class CopyBatchModel : HistoPageModel
     [BindProperty] public bool IsCassetted { get; set; }
     public string? Error { get; private set; }
 
+    /// <summary>First "Finish" click posts with this false, showing an inline confirmation
+    /// panel instead of creating the copy immediately — the Help page documents a confirm
+    /// step here, but none previously existed.</summary>
+    [BindProperty] public bool Confirm { get; set; }
+    public bool ShowConfirmPanel { get; private set; }
+
     public async Task<IActionResult> OnGetAsync(int sourceBatchId)
     {
         ViewData["Title"] = "Copy Submission";
@@ -135,6 +141,12 @@ public class CopyBatchModel : HistoPageModel
         if (SourceBatch is null)
         {
             Error = "The submission to copy could not be found.";
+            return Page();
+        }
+
+        if (!Confirm)
+        {
+            ShowConfirmPanel = true;
             return Page();
         }
 

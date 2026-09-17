@@ -34,13 +34,28 @@
     margin-bottom: 0;
 }
 
-.app-header-user-item {
-    white-space: nowrap;
+/* GOV.UK's govuk-service-navigation__container doesn't set align-items, so its flex
+ * children (service-name span, our app-header-right div) can end up vertically
+ * misaligned relative to each other depending on their own padding/margin. Forcing
+ * center alignment here keeps "Histopathology System" and the user-context/Menu
+ * group on a single visually-aligned row at all viewport widths.
+ */
+.govuk-service-navigation__container {
+    align-items: center;
 }
 
-/* "Menu" toggle is always visible (desktop and mobile) — the nav list starts hidden
- * and is only revealed on click, via nav-toggle.js. This overrides govuk-frontend's
- * default Service Navigation behaviour, which force-shows the list above the tablet
+/* Groups the user-context text and "Menu" toggle button together, and margin-left: auto
+ * pushes this group to the far right, regardless of viewport width.
+ */
+.app-header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-left: auto;
+}
+
+/* Our "Menu" toggle is shown unconditionally (desktop and mobile) — govuk-frontend's own
+ * .govuk-service-navigation__toggle is hidden above the tablet breakpoint by a CSS media
  * breakpoint; [hidden] needs !important here to win against that unconditional
  * display:flex rule. */
 .app-nav-toggle {
@@ -115,6 +130,22 @@
     flex: 0 1 auto;
 }
 
+/* Forces a pick-list <select> (Project/contract code, Pathologist, Submitted by (external) on
+ * EditBatch/BatchDetails) to full block width so its "Manage …" button always wraps onto its own
+ * line below, regardless of how short the select's option text is — without this, a select whose
+ * content is narrower than the column (e.g. Pathologist names) leaves enough room for the button
+ * to render beside it instead of stacking like the other two fields. */
+.app-select-stack {
+    display: block;
+    width: 100%;
+}
+
+/* Wraps a wide table (many columns/long content) in a horizontally scrollable container instead
+ * of letting it overflow past the page width — govuk-table has no built-in responsive behaviour. */
+.app-table-responsive {
+    overflow-x: auto;
+}
+
 /* Uniform-width submission status tag (SearchSubmissions/ViewSubmissions/BatchesForEditing grids)
  * — govuk-tag sizes to its text by default, so "On hold" and "Not received" render as different
  * widths; fixing a min-width and centring the text keeps the status column visually aligned. */
@@ -122,6 +153,16 @@
     min-width: 120px;
     text-align: center;
 }
+
+/* Uniform-width action buttons (Edit sender/histology ref, Batches for archiving) — govuk-button
+ * sizes to its label by default, so adjacent buttons with different label lengths ("Get histology
+ * ref" vs "Save sender ref", "Archive blocks" vs "Archive tissues") render at inconsistent widths;
+ * a fixed min-width keeps grouped buttons visually uniform. */
+.app-button-uniform {
+    min-width: 160px;
+    text-align: center;
+}
+
 
 
 

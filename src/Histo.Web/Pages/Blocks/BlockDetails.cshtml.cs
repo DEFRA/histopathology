@@ -567,8 +567,13 @@ public class BlockDetailsModel : HistoPageModel
     {
         var antibodyTableId = Batch?.BatchType == BatchTypeConstants.NonTse ? LookupNonTseAntibodies : LookupTseAntibodies;
         HistologyOptions = await _lookups.GetHistologyTypesAsync();
-        AntibodyOptions = await _lookups.GetLookupDataAsync(antibodyTableId);
-        StainOptions = await _lookups.GetLookupDataAsync(LookupSpecialStain);
+        // includeInactive:true surfaces a legacy "Others" row that would otherwise be hidden, but can
+        // also surface blank placeholder rows with no name — filter those out rather than render an
+        // unlabelled checkbox.
+        AntibodyOptions = (await _lookups.GetLookupDataAsync(antibodyTableId, includeInactive: true))
+            .Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList();
+        StainOptions = (await _lookups.GetLookupDataAsync(LookupSpecialStain, includeInactive: true))
+            .Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList();
     }
 
     /// <summary>Resolves <see cref="Animal"/> from the URL's batch/animal ID.</summary>

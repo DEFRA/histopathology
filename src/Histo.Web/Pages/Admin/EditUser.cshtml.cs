@@ -111,7 +111,10 @@ public class EditUserModel : HistoPageModel
     private void Validate()
     {
         if (string.IsNullOrWhiteSpace(Name)) Errors["Name"] = "Enter the user's name.";
+        else if (Name.Length > 35) Errors["Name"] = "Name must be 35 characters or less.";
+
         if (string.IsNullOrWhiteSpace(Email)) Errors["Email"] = "Enter the user's email.";
+        else if (Email.Length > 60) Errors["Email"] = "Email must be 60 characters or less.";
 
         if (GroupCode <= 0) Errors["GroupCode"] = "Select a user group.";
         if (AreaCode <= 0) Errors["AreaCode"] = "Select a user area.";

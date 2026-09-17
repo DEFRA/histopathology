@@ -56,8 +56,8 @@
 
     <form method="post" asp-page-handler="Create">
 
-        @* Read-only: Entered By and Entered Area set from current session user � legacy ddlEnteredBy (disabled) *@
-        <dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-4">
+        @* Read-only: Entered By and Entered Area set from current session user — legacy ddlEnteredBy (disabled) *@
+        <dl class="govuk-summary-list govuk-!-margin-bottom-4">
             <div class="govuk-summary-list__row">
                 <dt class="govuk-summary-list__key">Submission type</dt>
                 <dd class="govuk-summary-list__value">@(Model.Create_SubmittedAsName ?? "-")</dd>
@@ -72,9 +72,12 @@
             </div>
         </dl>
 
-        @* Two-column layout below mirrors legacy BatchDetails.aspx field pairing (left/right dropdown pairs). *@
+        @* Field pairing mirrors the Edit submission page — each pair is its own govuk-grid-row
+           using two-thirds/one-third columns so the right field lines up with the "Special
+           stains" column below, and a single tall pair (e.g. a "Manage ..." button under a
+           select) doesn't push every row below it out of alignment. *@
         <div class="govuk-grid-row">
-            <div class="govuk-grid-column-one-half">
+            <div class="govuk-grid-column-two-thirds">
                 @* Submitted By (external) — required, legacy ddlSubmittedBy rfvSubmittedBy *@
                 <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_OtherSubmittedBy") ? "govuk-form-group--error" : "")">
                     <label class="govuk-label" for="Create_OtherSubmittedBy">Submitted by</label>
@@ -82,7 +85,7 @@
                     {
                         <p id="Create_OtherSubmittedBy-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @subByErr</p>
                     }
-                    <select class="govuk-select @(Model.Errors.ContainsKey("Create_OtherSubmittedBy") ? "govuk-select--error" : "")"
+                    <select class="govuk-select app-select-stack @(Model.Errors.ContainsKey("Create_OtherSubmittedBy") ? "govuk-select--error" : "")"
                             asp-for="Create_OtherSubmittedBy" id="Create_OtherSubmittedBy">
                         <option value="">-- Select --</option>
                         @foreach (var u in Model.Create_AllUsers)
@@ -97,69 +100,8 @@
                         Manage submitted by list
                     </button>
                 </div>
-
-                @* Project / Contract Code — required, legacy ddlProjectCode rvfProjectContract *@
-                <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_ProjectContractCode") ? "govuk-form-group--error" : "")">
-                    <label class="govuk-label" for="Create_ProjectContractCode">Project / contract code</label>
-                    @if (Model.Errors.TryGetValue("Create_ProjectContractCode", out var projErr))
-                    {
-                        <p id="Create_ProjectContractCode-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @projErr</p>
-                    }
-                    <select class="govuk-select @(Model.Errors.ContainsKey("Create_ProjectContractCode") ? "govuk-select--error" : "")"
-                            asp-for="Create_ProjectContractCode" id="Create_ProjectContractCode">
-                        <option value="">-- Select --</option>
-                        @foreach (var p in Model.Create_Projects)
-                        {
-                            @if (Model.Create_ProjectContractCode == p.ID.ToString()) { <option value="@p.ID" selected>@p.Name</option> } else { <option value="@p.ID">@p.Name</option> }
-                        }
-                    </select>
-                    @* Replaces legacy btnNewProject — opens the Projects pick list (LOOKUP_PROJECTS = 19). *@
-                    <button type="submit" asp-page-handler="ManagePickList" name="field" value="project" formnovalidate
-                            class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
-                        Manage project / contract codes
-                    </button>
-                </div>
-
-                @* Pathologist — required, legacy ddlContactName rvfContact *@
-                <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_ContactName") ? "govuk-form-group--error" : "")">
-                    <label class="govuk-label" for="Create_ContactName">Pathologist</label>
-                    @if (Model.Errors.TryGetValue("Create_ContactName", out var cnErr))
-                    {
-                        <p id="Create_ContactName-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @cnErr</p>
-                    }
-                    <select class="govuk-select @(Model.Errors.ContainsKey("Create_ContactName") ? "govuk-select--error" : "")"
-                            asp-for="Create_ContactName" id="Create_ContactName">
-                        <option value="">-- Select --</option>
-                        @foreach (var c in Model.Create_Contacts)
-                        {
-                            @if (Model.Create_ContactName == c.ID.ToString()) { <option value="@c.ID" selected>@c.Name</option> } else { <option value="@c.ID">@c.Name</option> }
-                        }
-                    </select>
-                    @* Replaces legacy btnNewContact — opens the Contacts pick list (LOOKUP_CONTACTS = 18). *@
-                    <button type="submit" asp-page-handler="ManagePickList" name="field" value="pathologist" formnovalidate
-                            class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
-                        Manage pathologists
-                    </button>
-                </div>
-
-                @* Species — required, legacy ddlSpecies rvfSpecies *@
-                <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_SpeciesId") ? "govuk-form-group--error" : "")">
-                    <label class="govuk-label" for="Create_SpeciesId">Species</label>
-                    @if (Model.Errors.TryGetValue("Create_SpeciesId", out var spErr))
-                    {
-                        <p id="Create_SpeciesId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @spErr</p>
-                    }
-                    <select class="govuk-select @(Model.Errors.ContainsKey("Create_SpeciesId") ? "govuk-select--error" : "")"
-                            asp-for="Create_SpeciesId" id="Create_SpeciesId">
-                        <option value="">-- Select --</option>
-                        @foreach (var s in Model.Create_SpeciesList)
-                        {
-                            @if (Model.Create_SpeciesId == s.ID.ToString()) { <option value="@s.ID" selected>@s.Name</option> } else { <option value="@s.ID">@s.Name</option> }
-                        }
-                    </select>
-                </div>
             </div>
-            <div class="govuk-grid-column-one-half">
+            <div class="govuk-grid-column-one-third">
                 @* Submitted Area — required, legacy ddlUserArea rfvSubmittedArea *@
                 <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_OtherSubmittedArea") ? "govuk-form-group--error" : "")">
                     <label class="govuk-label" for="Create_OtherSubmittedArea">Submitted area</label>
@@ -176,7 +118,33 @@
                         }
                     </select>
                 </div>
-
+            </div>
+        </div>
+        <div class="govuk-grid-row">
+            <div class="govuk-grid-column-two-thirds">
+                @* Project / Contract Code — required, legacy ddlProjectCode rvfProjectContract *@
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_ProjectContractCode") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="Create_ProjectContractCode">Project / contract code</label>
+                    @if (Model.Errors.TryGetValue("Create_ProjectContractCode", out var projErr))
+                    {
+                        <p id="Create_ProjectContractCode-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @projErr</p>
+                    }
+                    <select class="govuk-select app-select-stack @(Model.Errors.ContainsKey("Create_ProjectContractCode") ? "govuk-select--error" : "")"
+                            asp-for="Create_ProjectContractCode" id="Create_ProjectContractCode">
+                        <option value="">-- Select --</option>
+                        @foreach (var p in Model.Create_Projects)
+                        {
+                            @if (Model.Create_ProjectContractCode == p.ID.ToString()) { <option value="@p.ID" selected>@p.Name</option> } else { <option value="@p.ID">@p.Name</option> }
+                        }
+                    </select>
+                    @* Replaces legacy btnNewProject — opens the Projects pick list (LOOKUP_PROJECTS = 19). *@
+                    <button type="submit" asp-page-handler="ManagePickList" name="field" value="project" formnovalidate
+                            class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+                        Manage project / contract codes
+                    </button>
+                </div>
+            </div>
+            <div class="govuk-grid-column-one-third">
                 @* Submission date — required, legacy ctlBatchDate *@
                 <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_BatchDateStr") ? "govuk-form-group--error" : "")">
                     <label class="govuk-label" for="Create_BatchDateStr">Submission date</label>
@@ -187,7 +155,33 @@
                     <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("Create_BatchDateStr") ? "govuk-input--error" : "")"
                            asp-for="Create_BatchDateStr" id="Create_BatchDateStr" type="date" max="@DateTime.Today.ToString("yyyy-MM-dd")" />
                 </div>
-
+            </div>
+        </div>
+        <div class="govuk-grid-row">
+            <div class="govuk-grid-column-two-thirds">
+                @* Pathologist — required, legacy ddlContactName rvfContact *@
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_ContactName") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="Create_ContactName">Pathologist</label>
+                    @if (Model.Errors.TryGetValue("Create_ContactName", out var cnErr))
+                    {
+                        <p id="Create_ContactName-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @cnErr</p>
+                    }
+                    <select class="govuk-select app-select-stack @(Model.Errors.ContainsKey("Create_ContactName") ? "govuk-select--error" : "")"
+                            asp-for="Create_ContactName" id="Create_ContactName">
+                        <option value="">-- Select --</option>
+                        @foreach (var c in Model.Create_Contacts)
+                        {
+                            @if (Model.Create_ContactName == c.ID.ToString()) { <option value="@c.ID" selected>@c.Name</option> } else { <option value="@c.ID">@c.Name</option> }
+                        }
+                    </select>
+                    @* Replaces legacy btnNewContact — opens the Contacts pick list (LOOKUP_CONTACTS = 18). *@
+                    <button type="submit" asp-page-handler="ManagePickList" name="field" value="pathologist" formnovalidate
+                            class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+                        Manage pathologists
+                    </button>
+                </div>
+            </div>
+            <div class="govuk-grid-column-one-third">
                 @* Fixation — optional, legacy ddlFixation *@
                 <div class="govuk-form-group">
                     <label class="govuk-label" for="Create_Fixation">Fixation</label>
@@ -199,7 +193,28 @@
                         }
                     </select>
                 </div>
-
+            </div>
+        </div>
+        <div class="govuk-grid-row">
+            <div class="govuk-grid-column-two-thirds">
+                @* Species — required, legacy ddlSpecies rvfSpecies *@
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_SpeciesId") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="Create_SpeciesId">Species</label>
+                    @if (Model.Errors.TryGetValue("Create_SpeciesId", out var spErr))
+                    {
+                        <p id="Create_SpeciesId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @spErr</p>
+                    }
+                    <select class="govuk-select app-select-stack @(Model.Errors.ContainsKey("Create_SpeciesId") ? "govuk-select--error" : "")"
+                            asp-for="Create_SpeciesId" id="Create_SpeciesId">
+                        <option value="">-- Select --</option>
+                        @foreach (var s in Model.Create_SpeciesList)
+                        {
+                            @if (Model.Create_SpeciesId == s.ID.ToString()) { <option value="@s.ID" selected>@s.Name</option> } else { <option value="@s.ID">@s.Name</option> }
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="govuk-grid-column-one-third">
                 @* Is it adequately fixed? — legacy ddlSafeToHandle (Yes/No dropdown), migrated to
                    GDS radios: a native select isn't recommended for a binary choice. *@
                 <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_SafeToHandle") ? "govuk-form-group--error" : "")">
@@ -320,7 +335,8 @@
         <div class="govuk-button-group">
             <button type="submit" class="govuk-button" data-module="govuk-button">Create submission</button>
             <a asp-page="/Batches/Cassetted" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back</a>
-            <a asp-page="/Index" class="govuk-link">Cancel</a>
+            <a asp-page="/Index" class="govuk-link"
+               onclick="return confirm('Are you sure you want to cancel? Any information you have entered will be lost.');">Cancel</a>
         </div>
     </form>
 

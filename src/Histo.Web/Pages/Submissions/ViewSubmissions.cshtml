@@ -62,12 +62,12 @@
         </div>
         <div class="govuk-grid-column-one-half">
             <div class="govuk-form-group">
-                <label class="govuk-label" for="EnteredBy">Entered by</label>
-                <select class="govuk-select" asp-for="EnteredBy">
+                <label class="govuk-label" for="Fixation">Fixation</label>
+                <select class="govuk-select" asp-for="Fixation">
                     <option value="">-- Any --</option>
-                    @foreach (var u in Model.Users)
+                    @foreach (var f in Model.Fixations.Where(f => !string.IsNullOrWhiteSpace(f.Name)))
                     {
-                        <option value="@u.UserID">@(string.IsNullOrWhiteSpace(u.Name) ? u.NtLogin : u.Name)</option>
+                        <option value="@f.Name">@f.Name</option>
                     }
                 </select>
             </div>
@@ -82,12 +82,12 @@
                 </select>
             </div>
             <div class="govuk-form-group">
-                <label class="govuk-label" for="Fixation">Fixation</label>
-                <select class="govuk-select" asp-for="Fixation">
+                <label class="govuk-label" for="EnteredBy">Entered by</label>
+                <select class="govuk-select" asp-for="EnteredBy">
                     <option value="">-- Any --</option>
-                    @foreach (var f in Model.Fixations.Where(f => !string.IsNullOrWhiteSpace(f.Name)))
+                    @foreach (var u in Model.Users)
                     {
-                        <option value="@f.Name">@f.Name</option>
+                        <option value="@u.UserID">@(string.IsNullOrWhiteSpace(u.Name) ? u.NtLogin : u.Name)</option>
                     }
                 </select>
             </div>
@@ -168,24 +168,13 @@
         <table class="govuk-table">
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
-                    @{ ViewData["Label"] = "Sub. Number"; ViewData["Column"] = "ID"; ViewData["FormId"] = "view-action-form"; ViewData["Handler"] = "Search"; }
-                    <partial name="_SortableHeaderPost" />
-                    @{ ViewData["Label"] = "Project Code"; ViewData["Column"] = "ProjectDescription"; }
-                    <partial name="_SortableHeaderPost" />
-                    @{ ViewData["Label"] = "Pathologist"; ViewData["Column"] = "ContactDescription"; }
-                    <partial name="_SortableHeaderPost" />
-                    @{ ViewData["Label"] = "Species"; ViewData["Column"] = "Species"; }
-                    <partial name="_SortableHeaderPost" />
-                    @{ ViewData["Label"] = "Date Submitted"; ViewData["Column"] = "BatchDate"; }
-                    <partial name="_SortableHeaderPost" />
-                    @{ ViewData["Label"] = "Date Received / Rejected"; ViewData["Column"] = "DateReceived"; }
-                    <partial name="_SortableHeaderPost" />
-                    @{ ViewData["Label"] = "Date Completed"; ViewData["Column"] = "DateCompleted"; }
-                    <partial name="_SortableHeaderPost" />
-                    @{ ViewData["Label"] = "Customer Received Date"; ViewData["Column"] = "CustomerReceivedDate"; }
-                    <partial name="_SortableHeaderPost" />
-                    @{ ViewData["Label"] = "Status"; ViewData["Column"] = "Status"; }
-                    <partial name="_SortableHeaderPost" />
+                    @{ ViewData["FormId"] = "view-action-form"; ViewData["Handler"] = "Search"; }
+                    @foreach (var col in ViewSubmissionsModel.GridColumns)
+                    {
+                        ViewData["Label"] = col.Label;
+                        ViewData["Column"] = col.Column;
+                        <partial name="_SortableHeaderPost" />
+                    }
                     <th scope="col" class="govuk-table__header govuk-table__header--numeric">Select</th>
                 </tr>
             </thead>

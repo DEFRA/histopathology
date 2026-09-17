@@ -112,6 +112,39 @@ public class HistologyReportDataSetBuilderTests
     }
 
     [Fact]
+    public void BuildBatchTable_ProjectCodeNotInLookup_FallsBackToRawCode()
+    {
+        var projectsById = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["19"] = "Defra research" };
+        var table = HistologyReportDataSetBuilder.BuildBatchTable(
+            rawBatch: [DefaultBatchRow()],
+            rawSubmittedAs: [],
+            batchId: 99,
+            projectsById: projectsById);
+
+        // DefaultBatchRow's ProjectContractCode is "TBA", which isn't in the lookup — should fall back to the raw code.
+        Assert.Equal("TBA", table.Rows[0]["ProjectContractCode"]);
+    }
+
+    [Fact]
+    public void BuildBatchTable_ProjectCodeWithPadding_StillResolvesToName()
+    {
+        // tblBatch.ProjectContractCode can carry fixed-width padding from the source column —
+        // the raw code must be trimmed before the dictionary lookup, or it silently falls back
+        // to displaying the padded raw ID instead of the resolved project name.
+        var row = DefaultBatchRow();
+        row["ProjectContractCode"] = " 19 ";
+        var projectsById = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["19"] = "Defra research" };
+
+        var table = HistologyReportDataSetBuilder.BuildBatchTable(
+            rawBatch: [row],
+            rawSubmittedAs: [],
+            batchId: 99,
+            projectsById: projectsById);
+
+        Assert.Equal("Defra research", table.Rows[0]["ProjectContractCode"]);
+    }
+
+    [Fact]
     public void BuildBatchTable_MultipleSubmittedAsRows_ConcatenatesDescriptions()
     {
         const int batchId = 99;
