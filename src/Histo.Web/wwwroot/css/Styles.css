@@ -12,6 +12,17 @@
     margin-bottom: 0;
 }
 
+/* Keeps the "Histopathology System" service name and the User/Group/Area text on the same
+ * row, with the user text pushed to the right — the nav menu row (below) is unaffected. */
+.app-header-title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    flex: 1 1 auto;
+    gap: 15px;
+}
+
 /* APHA departmental logo replacing the GOV.UK crown mark. Kept in its own row
  * (not squeezed inline with the licence text) so the wordmark stays legible per WCAG 1.4.5. */
 .govuk-footer__logo {
@@ -72,6 +83,16 @@
     flex: 0 1 auto;
 }
 
+/* Forces a pick-list <select> (Project/contract code, Pathologist, Submitted by (external) on
+ * EditBatch/BatchDetails) to full block width so its "Manage …" button always wraps onto its own
+ * line below, regardless of how short the select's option text is — without this, a select whose
+ * content is narrower than the column (e.g. Pathologist names) leaves enough room for the button
+ * to render beside it instead of stacking like the other two fields. */
+.app-select-stack {
+    display: block;
+    width: 100%;
+}
+
 /* Uniform-width submission status tag (SearchSubmissions/ViewSubmissions/BatchesForEditing grids)
  * — govuk-tag sizes to its text by default, so "On hold" and "Not received" render as different
  * widths; fixing a min-width and centring the text keeps the status column visually aligned. */
@@ -79,6 +100,16 @@
     min-width: 120px;
     text-align: center;
 }
+
+/* Uniform-width action buttons (Edit sender/histology ref, Batches for archiving) — govuk-button
+ * sizes to its label by default, so adjacent buttons with different label lengths ("Get histology
+ * ref" vs "Save sender ref", "Archive blocks" vs "Archive tissues") render at inconsistent widths;
+ * a fixed min-width keeps grouped buttons visually uniform. */
+.app-button-uniform {
+    min-width: 160px;
+    text-align: center;
+}
+
 
 
 

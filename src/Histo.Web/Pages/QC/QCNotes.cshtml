@@ -48,7 +48,9 @@
                     <td class="govuk-table__cell">@n.Species</td>
                     <td class="govuk-table__cell">
                         <div class="govuk-button-group govuk-!-margin-bottom-0">
-                            <form method="post" style="display:inline">
+                            @* display:contents removes the form from the flex layout so the button
+                               itself is the flex item, aligning it with the Print link. *@
+                            <form method="post" style="display:contents">
                                 <input type="hidden" name="noteId" value="@n.QCNoteRef" />
                                 <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-page-handler="Edit">Edit</button>
                             </form>

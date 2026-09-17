@@ -183,8 +183,8 @@ public class EditBatchTestsModel : HistoPageModel
             : LookupTseAntibodies;
 
         var histologyTask = _lookups.GetHistologyTypesAsync();
-        var antibodyTask  = _lookups.GetLookupDataAsync(antibodyTableId);
-        var stainTask     = _lookups.GetLookupDataAsync(LookupSpecialStain);
+        var antibodyTask  = _lookups.GetLookupDataAsync(antibodyTableId, includeInactive: true);
+        var stainTask     = _lookups.GetLookupDataAsync(LookupSpecialStain, includeInactive: true);
 
         await Task.WhenAll(histologyTask, antibodyTask, stainTask);
 
@@ -200,7 +200,7 @@ public class EditBatchTestsModel : HistoPageModel
                 .Where(i => i.Code != HistologyCode.IhcOther)
                 .ToList();
 
-        AntibodyOptions = antibodyTask.Result;
-        StainOptions    = stainTask.Result;
+        AntibodyOptions = antibodyTask.Result.Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList();
+        StainOptions    = stainTask.Result.Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList();
     }
 }

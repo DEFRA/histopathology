@@ -162,7 +162,10 @@ public sealed class HistologyReportDataSetBuilder
         // via the supplied lookup dictionaries, matching legacy's dropdown-bound display.
         // Falls back to the raw code when it cannot be resolved or no lookup was supplied.
         dr["ID"]               = Str(src, "ID",               batchId.ToString());
-        var rawProjectCode    = Str(src, "ProjectContractCode");
+        // Trimmed before lookup — tblBatch.ProjectContractCode can carry fixed-width padding from
+        // the source column, which otherwise fails the exact-string dictionary match and silently
+        // falls back to displaying the raw (padded) ID instead of the resolved project name.
+        var rawProjectCode    = Str(src, "ProjectContractCode").Trim();
         dr["ProjectContractCode"] = projectsById is not null && projectsById.TryGetValue(rawProjectCode, out var pn)
             ? pn : rawProjectCode;
         var rawContactCode    = Str(src, "ContactName");

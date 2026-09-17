@@ -591,8 +591,8 @@ public class BatchDetailsModel : HistoPageModel
         var usersTask     = _users.GetAllUsersAsync();
         var antibodyId    = Session.BatchType == BatchTypeConstants.NonTse ? LookupNonTseAntibodies : LookupTseAntibodies;
         var histologyTask = _lookups.GetHistologyTypesAsync();
-        var antibodyTask  = _lookups.GetLookupDataAsync(antibodyId);
-        var stainTask     = _lookups.GetLookupDataAsync(LookupSpecialStain);
+        var antibodyTask  = _lookups.GetLookupDataAsync(antibodyId, includeInactive: true);
+        var stainTask     = _lookups.GetLookupDataAsync(LookupSpecialStain, includeInactive: true);
         await Task.WhenAll(projectsTask, contactsTask, speciesTask, fixationTask, areaTask, usersTask,
                            histologyTask, antibodyTask, stainTask);
         Create_Projects    = projectsTask.Result;
@@ -606,7 +606,10 @@ public class BatchDetailsModel : HistoPageModel
         Create_HistologyOptions = Session.BatchType == BatchTypeConstants.NonTse
             ? histologyTask.Result.Where(i => i.Code != HistologyCode.IhcPrp && i.Code != HistologyCode.HeBse).ToList()
             : histologyTask.Result.Where(i => i.Code != HistologyCode.IhcOther).ToList();
-        Create_AntibodyOptions = antibodyTask.Result;
-        Create_StainOptions    = stainTask.Result;
+        // includeInactive:true surfaces a legacy "Others" row that would otherwise be hidden, but can
+        // also surface blank placeholder rows with no name — filter those out rather than render an
+        // unlabelled checkbox.
+        Create_AntibodyOptions = antibodyTask.Result.Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList();
+        Create_StainOptions    = stainTask.Result.Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList();
     }
 }

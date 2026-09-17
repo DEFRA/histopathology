@@ -68,59 +68,16 @@
         <input type="hidden" asp-for="BatchTypeField" />
     </div>
 
-    @* Two-column layout mirrors the Create submission field pairing (left/right dropdown pairs). *@
+    @* Two-column layout mirrors the Create submission field pairing (left/right dropdown pairs).
+       Each pair is its own govuk-grid-row so the two labels/controls line up on the same row —
+       a single tall pair (e.g. a "Manage ..." button under the select) no longer pushes every
+       row below it out of alignment with its right-column counterpart. *@
     <div class="govuk-grid-row">
-        <div class="govuk-grid-column-one-half">
-            @* Project / contract code *@
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="ProjectContractCode">Project / contract code</label>
-                <select class="govuk-select" asp-for="ProjectContractCode">
-                    <option value="">-- Not specified --</option>
-                    @foreach (var p in Model.Projects)
-                    {
-                        <option value="@p.ID" selected="@(Model.ProjectContractCode == p.ID.ToString())">@p.Name</option>
-                    }
-                </select>
-                @* Replaces legacy btnNewProject — opens the Projects pick list (LOOKUP_PROJECTS = 19). *@
-                <button type="submit" asp-page-handler="ManagePickList" name="field" value="project" formnovalidate
-                        class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
-                    Manage project / contract codes
-                </button>
-            </div>
-
-            @* Pathologist *@
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="ContactName">Pathologist</label>
-                <select class="govuk-select" asp-for="ContactName">
-                    <option value="">-- Not specified --</option>
-                    @foreach (var c in Model.Contacts)
-                    {
-                        <option value="@c.ID" selected="@(Model.ContactName == c.ID.ToString())">@c.Name</option>
-                    }
-                </select>
-                @* Replaces legacy btnNewContact — opens the Contacts pick list (LOOKUP_CONTACTS = 18). *@
-                <button type="submit" asp-page-handler="ManagePickList" name="field" value="pathologist" formnovalidate
-                        class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
-                    Manage pathologists
-                </button>
-            </div>
-
-            @* Species *@
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="SpeciesId">Species</label>
-                <select class="govuk-select" asp-for="SpeciesId">
-                    <option value="">-- Not specified --</option>
-                    @foreach (var s in Model.SpeciesList)
-                    {
-                        <option value="@s.ID" selected="@(Model.SpeciesId == s.ID.ToString())">@s.Name</option>
-                    }
-                </select>
-            </div>
-
+        <div class="govuk-grid-column-two-thirds">
             @* External submitter *@
             <div class="govuk-form-group">
                 <label class="govuk-label" for="OtherSubmittedBy">Submitted by (external)</label>
-                <select class="govuk-select" asp-for="OtherSubmittedBy">
+                <select class="govuk-select app-select-stack" asp-for="OtherSubmittedBy">
                     <option value="">-- None --</option>
                     @foreach (var u in Model.AllUsers)
                     {
@@ -135,7 +92,7 @@
                 </button>
             </div>
         </div>
-        <div class="govuk-grid-column-one-half">
+        <div class="govuk-grid-column-one-third">
             <div class="govuk-form-group">
                 <label class="govuk-label" for="OtherSubmittedAreaDisplay">Submitted area (external)</label>
                 <select class="govuk-select" id="OtherSubmittedAreaDisplay" disabled>
@@ -147,14 +104,62 @@
                 </select>
                 <input type="hidden" asp-for="OtherSubmittedArea" />
             </div>
-
+        </div>
+    </div>
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-two-thirds">
+            @* Project / contract code *@
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="ProjectContractCode">Project / contract code</label>
+                <select class="govuk-select app-select-stack" asp-for="ProjectContractCode">
+                    <option value="">-- Not specified --</option>
+                    @foreach (var p in Model.Projects)
+                    {
+                        <option value="@p.ID" selected="@(Model.ProjectContractCode == p.ID.ToString())">@p.Name</option>
+                    }
+                </select>
+                @* Replaces legacy btnNewProject — opens the Projects pick list (LOOKUP_PROJECTS = 19). *@
+                <button type="submit" asp-page-handler="ManagePickList" name="field" value="project" formnovalidate
+                        class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+                    Manage project / contract codes
+                </button>
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-third">
             @* Submission date *@
             <div class="govuk-form-group">
                 <label class="govuk-label" for="BatchDateStr">Date of submission</label>
-                <div class="govuk-hint">For example, 27/03/2025</div>
-                <input class="govuk-input govuk-input--width-10" asp-for="BatchDateStr" autocomplete="off" />
+                @{
+                    var batchDateIso = DateTime.TryParseExact(Model.BatchDateStr, ["dd/MM/yyyy", "d/M/yyyy", "yyyy-MM-dd"],
+                        System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var parsedBatchDate)
+                        ? parsedBatchDate.ToString("yyyy-MM-dd")
+                        : null;
+                }
+                <input class="govuk-input govuk-input--width-10" type="date" id="BatchDateStr" name="BatchDateStr"
+                       value="@batchDateIso" autocomplete="off" />
             </div>
-
+        </div>
+    </div>
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-two-thirds">
+            @* Pathologist *@
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="ContactName">Pathologist</label>
+                <select class="govuk-select app-select-stack" asp-for="ContactName">
+                    <option value="">-- Not specified --</option>
+                    @foreach (var c in Model.Contacts)
+                    {
+                        <option value="@c.ID" selected="@(Model.ContactName == c.ID.ToString())">@c.Name</option>
+                    }
+                </select>
+                @* Replaces legacy btnNewContact — opens the Contacts pick list (LOOKUP_CONTACTS = 18). *@
+                <button type="submit" asp-page-handler="ManagePickList" name="field" value="pathologist" formnovalidate
+                        class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+                    Manage pathologists
+                </button>
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-third">
             @* Fixation *@
             <div class="govuk-form-group">
                 <label class="govuk-label" for="Fixation">Fixation</label>
@@ -166,7 +171,23 @@
                     }
                 </select>
             </div>
-
+        </div>
+    </div>
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-two-thirds">
+            @* Species *@
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="SpeciesId">Species</label>
+                <select class="govuk-select app-select-stack" asp-for="SpeciesId">
+                    <option value="">-- Not specified --</option>
+                    @foreach (var s in Model.SpeciesList)
+                    {
+                        <option value="@s.ID" selected="@(Model.SpeciesId == s.ID.ToString())">@s.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-third">
             @* Is it adequately fixed? — legacy ddlSafeToHandle (Yes/No dropdown), migrated to
                GDS radios: a native select isn't recommended for a binary choice. *@
             <div class="govuk-form-group">
