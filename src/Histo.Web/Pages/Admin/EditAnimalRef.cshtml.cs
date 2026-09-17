@@ -137,18 +137,10 @@ public class EditAnimalRefModel : HistoPageModel
             ? string.Empty
             : NewHistologyRef.Trim();
 
-        // If the Sample Ref is a PG number, the Histology Ref must be its reverse-format equivalent.
-        var pgReversedRef = AnimalHelpers.ComputePgAutoHistologyRef(OriginalSenderRef, isNeuropath: true);
-        if (pgReversedRef is not null)
-        {
-            if (NewHistologyRef != pgReversedRef)
-            {
-                Error = "The Histology Ref is not correct for the PG Number entered.";
-                ErrorField = "NewHistologyRef";
-                return Page();
-            }
-        }
-        else if (NewHistologyRef.Length > 0 && !ValidationHelpers.ValidateHistoRef(NewHistologyRef, isHistologyUser: false))
+        // Note: the PG-number auto-reversal check (formerly hardcoded isNeuropath: true here,
+        // a pre-existing latent bug) was removed together with the Neuropath user area — see
+        // docs/Mouse-Bioassay-Neuropath-Removal-Analysis.md, section 3, item 4.
+        if (NewHistologyRef.Length > 0 && !ValidationHelpers.ValidateHistoRef(NewHistologyRef, isHistologyUser: false))
         {
             Error = "You must enter a valid Histology Ref.";
             ErrorField = "NewHistologyRef";
