@@ -13,21 +13,25 @@
 
 <form method="post" asp-antiforgery="true" asp-page-handler="Search" id="view-samples-form">
     <div class="govuk-form-group">
-        <h2 class="govuk-heading-s govuk-!-margin-bottom-2">Which reference do you want to search by?</h2>
-        <div class="govuk-hint">Enter either the sender ref or the histology ref — you do not need to fill in both.</div>
-    </div>
-    <div class="govuk-form-group @(Model.Errors.ContainsKey(nameof(Model.SenderRef)) ? "govuk-form-group--error" : "")">
-        <label class="govuk-label" for="SenderRef">Sender ref</label>
-        @if (Model.Errors.TryGetValue(nameof(Model.SenderRef), out var senderRefError))
-        {
-            <p id="SenderRef-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @senderRefError</p>
-        }
-        <input class="govuk-input govuk-input--width-20" asp-for="SenderRef"
-               aria-describedby="@(Model.Errors.ContainsKey(nameof(Model.SenderRef)) ? "SenderRef-error" : null)" />
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="HistologyRef">Histology ref</label>
-        <input class="govuk-input govuk-input--width-20" asp-for="HistologyRef" />
+        <fieldset class="govuk-fieldset" aria-describedby="reference-search-hint">
+            <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">
+                Which reference do you want to search by?
+            </legend>
+            <div id="reference-search-hint" class="govuk-hint">Enter either the sender ref or the histology ref — you do not need to fill in both.</div>
+            <div class="govuk-form-group @(Model.Errors.ContainsKey(nameof(Model.SenderRef)) ? "govuk-form-group--error" : "")">
+                <label class="govuk-label" for="SenderRef">Sender ref</label>
+                @if (Model.Errors.TryGetValue(nameof(Model.SenderRef), out var senderRefError))
+                {
+                    <p id="SenderRef-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @senderRefError</p>
+                }
+                <input class="govuk-input govuk-input--width-20" asp-for="SenderRef"
+                       aria-describedby="@(Model.Errors.ContainsKey(nameof(Model.SenderRef)) ? "SenderRef-error" : null)" />
+            </div>
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="HistologyRef">Histology ref</label>
+                <input class="govuk-input govuk-input--width-20" asp-for="HistologyRef" />
+            </div>
+        </fieldset>
     </div>
     <div class="govuk-form-group">
         <label class="govuk-label" for="TissueCode">Tissue</label>
