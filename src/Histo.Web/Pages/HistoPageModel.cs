@@ -26,6 +26,7 @@ namespace Histo.Web.Pages;
 /// the application can continue reading from <see cref="ISessionService"/> without change.
 /// </summary>
 /// 
+
 public abstract class HistoPageModel : PageModel
 {
     public ISessionService Session { get; }
