@@ -34,6 +34,8 @@ public class SearchValidationTests
     {
         _lookups.Setup(l => l.GetLookupDataAsync(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<LookupItem>)[]);
+        _lookups.Setup(l => l.GetUserAreasAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[]);
         _lookups.Setup(l => l.GetSpeciesLookupAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<LookupItem>)[]);
         _users.Setup(u => u.GetAllUsersAsync(It.IsAny<CancellationToken>()))
@@ -184,7 +186,9 @@ public class SearchValidationTests
         _lookups.Verify(l => l.GetLookupDataAsync(19, It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Once);
         _lookups.Verify(l => l.GetLookupDataAsync(18, It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Once);
         _lookups.Verify(l => l.GetLookupDataAsync(10, It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Once);
-        _lookups.Verify(l => l.GetLookupDataAsync(13, It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Once);
+        // UserArea filter uses the dedicated GetUserAreasAsync (includeInactive: true) so
+        // retired areas (Mouse Bioassay/Neuropath) remain selectable for historical filtering.
+        _lookups.Verify(l => l.GetUserAreasAsync(true, It.IsAny<CancellationToken>()), Times.Once);
         _lookups.Verify(l => l.GetSpeciesLookupAsync(It.IsAny<CancellationToken>()), Times.Once);
         _users.Verify(u => u.GetAllUsersAsync(It.IsAny<CancellationToken>()), Times.Once);
     }

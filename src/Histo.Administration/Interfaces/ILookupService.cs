@@ -27,7 +27,7 @@ public interface ILookupService
     Task<IReadOnlyList<LookupItem>> GetUserGroupsAsync(CancellationToken ct = default);
 
     /// <summary>Returns the user area pick-list.</summary>
-    Task<IReadOnlyList<LookupItem>> GetUserAreasAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<LookupItem>> GetUserAreasAsync(bool includeInactive = false, CancellationToken ct = default);
 
     /// <summary>Returns the legacy imported ICC_Sub table pick-list.</summary>
     Task<IReadOnlyList<LookupItem>> GetImportedTablesAsync(CancellationToken ct = default);
