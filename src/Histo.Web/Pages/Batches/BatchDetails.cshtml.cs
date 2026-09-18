@@ -348,7 +348,9 @@ public class BatchDetailsModel : HistoPageModel
             var stainTask          = _lookups.GetLookupDataAsync(6, includeInactive: true);   // LOOKUP_SPECIAL_STAIN = 6
             var speciesTask        = _lookups.GetSpeciesLookupAsync();
             var usersTask          = _users.GetAllUsersAsync();
-            var userAreasTask      = _lookups.GetUserAreasAsync();
+            // includeInactive: true — a batch entered under a since-retired area (e.g. Mouse
+            // Bioassay/Neuropath) must still resolve to a readable name, not "Not recorded".
+            var userAreasTask      = _lookups.GetUserAreasAsync(includeInactive: true);
             var submittedAsTask    = _batches.GetSubmittedAsCodeAsync(batchId);
             var submittedAsLookup  = _lookups.GetLookupDataAsync(11); // LOOKUP_SUBMITTEDAS = 11
             // includeInactive: true — an existing submission's saved Project/Pathologist may since

@@ -30,7 +30,9 @@ public static class BatchSummaryDisplayResolver
         var projectsTask  = lookups.GetLookupDataAsync(LookupProjects, includeInactive: true, ct);
         var contactsTask  = lookups.GetLookupDataAsync(LookupContacts, includeInactive: true, ct);
         var speciesTask   = lookups.GetSpeciesLookupAsync(ct);
-        var userAreasTask = lookups.GetUserAreasAsync(ct);
+        // includeInactive: true — a batch entered under a since-retired area (e.g. Mouse
+        // Bioassay/Neuropath) must still resolve to a readable name, not a raw code.
+        var userAreasTask = lookups.GetUserAreasAsync(includeInactive: true, ct);
         var usersTask     = users.GetAllUsersAsync(ct);
 
         await Task.WhenAll(projectsTask, contactsTask, speciesTask, userAreasTask, usersTask);

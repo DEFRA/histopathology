@@ -163,7 +163,9 @@ public class SearchSubmissionsModel : HistoPageModel
         var contactsTask = _lookups.GetLookupDataAsync(LookupContacts);
         var speciesTask = _lookups.GetSpeciesLookupAsync();
         var fixationsTask = _lookups.GetLookupDataAsync(LookupFixative);
-        var userAreasTask = _lookups.GetLookupDataAsync(LookupUserArea);
+        // includeInactive: true — Mouse Bioassay/Neuropath must remain selectable here so
+        // historical submissions entered under those areas can still be filtered/found.
+        var userAreasTask = _lookups.GetUserAreasAsync(includeInactive: true);
 
         await Task.WhenAll(usersTask, projectsTask, contactsTask, speciesTask, fixationsTask, userAreasTask);
 

@@ -60,6 +60,10 @@ public class EditUserModel : HistoPageModel
     /// <summary>Not tied to a specific field, so shown separately (matches EditQualityDataTest's ConcurrencyError convention).</summary>
     public string? SaveError { get; private set; }
 
+    /// <summary>The user's Area as originally stored — used so saving without touching a
+    /// since-retired Area (e.g. Mouse Bioassay/Neuropath) isn't treated as a new assignment.</summary>
+    private int _originalAreaCode;
+
     public async Task<IActionResult> OnGetAsync()
     {
         ViewData["Title"] = "Edit user";
@@ -75,6 +79,7 @@ public class EditUserModel : HistoPageModel
         GroupCode = user.GroupCode;
         AreaCode = user.AreaCode;
         Active = user.Active;
+        await EnsureCurrentAreaVisibleAsync(user.AreaCode);
         return Page();
     }
 
@@ -83,6 +88,10 @@ public class EditUserModel : HistoPageModel
         ViewData["Title"] = "Edit user";
         ViewData["PageTitle"] = "Edit user";
         await LoadLookupsAsync();
+
+        var existing = (await _users.GetAllUsersAsync()).FirstOrDefault(u => u.UserID == UserId);
+        _originalAreaCode = existing?.AreaCode ?? 0;
+        await EnsureCurrentAreaVisibleAsync(_originalAreaCode);
 
         Validate();
         if (Errors.Count > 0) return Page();
@@ -120,7 +129,10 @@ public class EditUserModel : HistoPageModel
         if (GroupCode <= 0) Errors["GroupCode"] = "Select a user group.";
         if (AreaCode <= 0) Errors["AreaCode"] = "Select a user area.";
 
-        if (GroupCode > 0 && AreaCode > 0)
+        // Skip the whitelist check when the Area is unchanged from what's already stored — this
+        // lets a user already on a since-retired area (Mouse Bioassay/Neuropath) keep being saved
+        // for unrelated edits, without letting anyone be newly assigned to a retired area.
+        if (GroupCode > 0 && AreaCode > 0 && AreaCode != _originalAreaCode)
         {
             var groupName = Groups.FirstOrDefault(g => g.ID == GroupCode)?.Name;
             var areaName = Areas.FirstOrDefault(a => a.ID == AreaCode)?.Name;
@@ -133,5 +145,19 @@ public class EditUserModel : HistoPageModel
     {
         Groups = await _lookups.GetUserGroupsAsync();
         Areas = await _lookups.GetUserAreasAsync();
+    }
+
+    /// <summary>
+    /// If the user's current Area isn't in the active list (i.e. it's a since-retired area like
+    /// Mouse Bioassay/Neuropath), fetches its name and adds it to <see cref="Areas"/> so the
+    /// dropdown displays/preserves the real value instead of silently defaulting to another option.
+    /// </summary>
+    private async Task EnsureCurrentAreaVisibleAsync(int currentAreaCode)
+    {
+        if (currentAreaCode <= 0 || Areas.Any(a => a.ID == currentAreaCode)) return;
+
+        var allAreas = await _lookups.GetUserAreasAsync(includeInactive: true);
+        var retired = allAreas.FirstOrDefault(a => a.ID == currentAreaCode);
+        if (retired is not null) Areas = [.. Areas, retired];
     }
 }

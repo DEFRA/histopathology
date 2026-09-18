@@ -84,8 +84,10 @@ public class UserMaintenanceModel : GridPageModel
 
             // Load lookup names as a fallback in case the GetUsers SP does not return
             // GroupName / AreaName columns (older SP versions return only integer codes).
+            // includeInactive: true — existing users on a since-retired area (Mouse
+            // Bioassay/Neuropath) must still show a readable Area in this list.
             var groupsTask = _lookups.GetUserGroupsAsync();
-            var areasTask = _lookups.GetUserAreasAsync();
+            var areasTask = _lookups.GetUserAreasAsync(includeInactive: true);
             await Task.WhenAll(groupsTask, areasTask);
 
             GroupNames = groupsTask.Result.ToDictionary(g => g.ID, g => g.Name);
