@@ -14,12 +14,12 @@
 
 -- Step 1: Load stored procedures
 PRINT '--- Deploying stored procedures ---';
-:r ..\StoredProcedures\dbo.GetUserByEmail.sql
+:r ../StoredProcedures/dbo.GetUserByEmail.sql
 GO
 
 -- Step 2: Deployment script to used to alter/create tables, columns etc
 PRINT '--- Create or Alter Table, Column  ---';
-:r ..\Migrations\V20260914_01_User_Email_NotNull_NTLogin_Nullable.sql
+:r ../Migrations/V20260914_01_User_Email_NotNull_NTLogin_Nullable.sql
 GO
 
 PRINT '=== Database deployment completed ===';
