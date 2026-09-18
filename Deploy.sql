@@ -22,8 +22,6 @@ PRINT '--- Create or Alter Table, Column  ---';
 :r ../Migrations/V20260914_01_User_Email_NotNull_NTLogin_Nullable.sql
 GO
 
-PRINT '=== Database deployment completed ===';
-
 -- Step 3: Deactivate the Mouse Bioassay / Neuropath user areas
 PRINT '--- Deactivating Mouse Bioassay / Neuropath user areas ---';
 :r ../DeploymentScripts/V20260917_01_Deactivate_MouseBioassay_Neuropath_UserAreas.sql
