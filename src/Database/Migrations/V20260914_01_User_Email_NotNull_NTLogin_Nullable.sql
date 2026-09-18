@@ -1,4 +1,11 @@
-﻿BEGIN TRANSACTION;
+﻿-- Required for the filtered indexes created below (Msg 1934) — set explicitly rather than
+-- relying on whatever a prior :r'd script (e.g. GetUserByEmail.sql sets ANSI_NULLS OFF)
+-- left the session in.
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+BEGIN TRANSACTION;
 
 UPDATE dbo.[User]
 SET Email = CONCAT('old_email_legacy', ID, '@apha.gov.uk')
