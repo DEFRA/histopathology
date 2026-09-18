@@ -71,6 +71,13 @@ stages:
               arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
               zipAfterPublish: true
 
+          - task: CopyFiles@2
+            displayName: 'Stage SQL scripts'
+            inputs:
+              sourceFolder: 'src/Database'
+              contents: '**/*.sql'
+              targetFolder: '$(Build.ArtifactStagingDirectory)/sql'
+
           - publish: '$(Build.ArtifactStagingDirectory)'
             artifact: drop
             displayName: 'Publish artifact'
@@ -88,6 +95,8 @@ stages:
       value: '89060d89-195d-47f4-a900-2f66fba81a75'
     - name: sqlServer
       value: 'devcdeinfsq1401.database.windows.net,1433'
+    - name: sqlServerHost
+      value: 'devcdeinfsq1401.database.windows.net'
     - name: dbName
       value: 'histopathology'      
     jobs:
@@ -101,6 +110,27 @@ stages:
               steps:
                 - download: current
                   artifact: drop
+
+                - task: AzureCLI@2
+                  displayName: 'Apply database scripts'
+                  inputs:
+                    azureSubscription: 'AZR-CDE-DEV1'
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+
+                      TOOLS="$(Agent.TempDirectory)/sqlcmd"
+                      mkdir -p "$TOOLS"
+                      curl -sSL --fail --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
+                        https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.2/sqlcmd-linux-amd64.tar.bz2
+                      tar -xjf "$TOOLS/sqlcmd.tar.bz2" -C "$TOOLS"
+
+                      cd "$(Pipeline.Workspace)/drop/sql/Deploy"
+                      echo "Applying Deploy.sql"
+                      "$TOOLS/sqlcmd" -S "$(sqlServerHost)" -d "$(dbName)" \
+                        --authentication-method ActiveDirectoryAzCli \
+                        -i "Deploy.sql" -b -t 0
 
                 - task: AzureWebApp@1
                   inputs:
@@ -132,6 +162,8 @@ stages:
       value: '2f7f564e-38a4-4cc7-aa92-0ee8c8cfc974'
     - name: sqlServer
       value: 'tstcdeinfsq1401.database.windows.net,1433'
+    - name: sqlServerHost
+      value: 'tstcdeinfsq1401.database.windows.net'
     - name: dbName
       value: 'histopathology'      
     jobs:
@@ -145,6 +177,27 @@ stages:
               steps:
                 - download: current
                   artifact: drop
+
+                - task: AzureCLI@2
+                  displayName: 'Apply database scripts'
+                  inputs:
+                    azureSubscription: 'AZR-CDE-TST1'
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+
+                      TOOLS="$(Agent.TempDirectory)/sqlcmd"
+                      mkdir -p "$TOOLS"
+                      curl -sSL --fail --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
+                        https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.2/sqlcmd-linux-amd64.tar.bz2
+                      tar -xjf "$TOOLS/sqlcmd.tar.bz2" -C "$TOOLS"
+
+                      cd "$(Pipeline.Workspace)/drop/sql/Deploy"
+                      echo "Applying Deploy.sql"
+                      "$TOOLS/sqlcmd" -S "$(sqlServerHost)" -d "$(dbName)" \
+                        --authentication-method ActiveDirectoryAzCli \
+                        -i "Deploy.sql" -b -t 0
 
                 - task: AzureWebApp@1
                   inputs:
