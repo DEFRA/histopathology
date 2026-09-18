@@ -18,7 +18,42 @@ END;
 ALTER TABLE dbo.[User]
 ALTER COLUMN Email VARCHAR(60) NOT NULL;
 
+-- Email is now the primary per-request user-resolution lookup (GetUserByEmail, called on
+-- every authenticated request) — index it. Unique because that lookup expects one row.
+IF EXISTS (
+    SELECT Email FROM dbo.[User]
+    GROUP BY Email
+    HAVING COUNT(*) > 1
+)
+BEGIN
+    RAISERROR('Duplicate emails exist - cannot create unique index on Email.', 16, 1);
+    ROLLBACK TRANSACTION;
+    RETURN;
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_User_Email' AND object_id = OBJECT_ID('dbo.[User]'))
+    CREATE UNIQUE NONCLUSTERED INDEX IX_User_Email ON dbo.[User] (Email);
+
+-- IX_User_NTLogin depends on NTLogin (Msg 5074) — must be dropped before ALTER COLUMN
+-- and recreated after. Recreated as a filtered unique index when it was unique, since a
+-- plain unique index tolerates only one NULL row and NTLogin can now be NULL for
+-- multiple Entra ID-only users.
+DECLARE @isUnique bit = NULL;
+
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_User_NTLogin' AND object_id = OBJECT_ID('dbo.[User]'))
+BEGIN
+    SELECT @isUnique = is_unique FROM sys.indexes
+    WHERE name = 'IX_User_NTLogin' AND object_id = OBJECT_ID('dbo.[User]');
+
+    DROP INDEX IX_User_NTLogin ON dbo.[User];
+END;
+
 ALTER TABLE dbo.[User]
 ALTER COLUMN NTLogin VARCHAR(25) NULL;
+
+IF @isUnique = 1
+    CREATE UNIQUE NONCLUSTERED INDEX IX_User_NTLogin ON dbo.[User] (NTLogin) WHERE NTLogin IS NOT NULL;
+ELSE IF @isUnique = 0
+    CREATE NONCLUSTERED INDEX IX_User_NTLogin ON dbo.[User] (NTLogin);
 
 COMMIT TRANSACTION;
