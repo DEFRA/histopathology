@@ -28,18 +28,12 @@ GO
 
 -- Step 2: Load stored procedures
 PRINT '--- Deploying stored procedures ---';
-:r .\StoredProcedures\usp_GetCustomer.sql
-:r .\dbo.GetUserByEmail.sql
+:r ..\StoredProcedures\dbo.GetUserByEmail.sql
 GO
 
--- Step 3: Apply permissions
-PRINT '--- Applying permissions ---';
-:r .\Permissions\GrantPermissions.sql
-GO
-
--- Step 4: Deployment script to used to alter/create tables, columns etc
+-- Step 3: Deployment script to used to alter/create tables, columns etc
 PRINT '--- Create or Alter Table, Column  ---';
-:r .\DeploymentScripts\V20260914_01_User_Email_NotNull_NTLogin_Nullable.sql
+:r ..\Migrations\V20260914_01_User_Email_NotNull_NTLogin_Nullable.sql
 GO
 
 

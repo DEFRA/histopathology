@@ -1,7 +1,7 @@
 ﻿BEGIN TRANSACTION;
 
 UPDATE dbo.[User]
-SET Email = CONCAT('unknown.user.', ID, '@dummy.local')
+SET Email = CONCAT('old_email_legacy', ID, '@apha.gov.uk')
 WHERE Email IS NULL;
 
 IF EXISTS (
