@@ -10,13 +10,13 @@ BEGIN TRANSACTION;
 
 UPDATE dbo.luUserArea
 SET IsActive = 0
-WHERE Name IN ('Mouse Bioassay', 'Neuropath')
+WHERE [Description] IN ('Mouse Bioassay', 'Neuropath')
   AND IsActive = 1;
 
 IF EXISTS (
 	SELECT 1
 	FROM dbo.luUserArea
-	WHERE Name IN ('Mouse Bioassay', 'Neuropath')
+	WHERE [Description] IN ('Mouse Bioassay', 'Neuropath')
 	  AND IsActive = 1
 )
 BEGIN

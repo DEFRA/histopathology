@@ -82,12 +82,14 @@
         <div class="govuk-grid-column-one-half">
             <div class="govuk-form-group">
                 <label class="govuk-label" for="SubmittedArea">Submitted area</label>
-                @* GetSearchBatchDetails joins luUserArea ON luUserArea.Code = Batch.OtherSubmittedArea — filter on Code, not the surrogate ID. *@
+                @* GetSearchBatchDetails joins luUserArea ON luUserArea.Code = Batch.OtherSubmittedArea.
+                   GetUserAreasAsync's MapCodeDescription maps that Code column onto LookupItem.ID
+                   (not LookupItem.Code, which is null for this SP shape) — bind to a.ID. *@
                 <select class="govuk-select" asp-for="SubmittedArea">
                     <option value="">-- Any --</option>
                     @foreach (var a in Model.UserAreas)
                     {
-                        <option value="@a.Code">@a.Name</option>
+                        <option value="@a.ID">@a.Name</option>
                     }
                 </select>
             </div>

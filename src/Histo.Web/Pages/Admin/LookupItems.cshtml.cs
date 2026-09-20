@@ -78,7 +78,9 @@ public class LookupItemsModel : GridPageModel
 
         if (ShowAreaColumn)
         {
-            var userAreas = await _lookups.GetUserAreasAsync();
+            // includeInactive: true — Contacts/Projects already linked to a since-retired
+            // area (Mouse Bioassay/Neuropath) must still display a readable Area name.
+            var userAreas = await _lookups.GetUserAreasAsync(includeInactive: true);
             AreaNameById = userAreas.ToDictionary(a => a.ID.ToString(), a => a.Name, StringComparer.OrdinalIgnoreCase);
         }
 
