@@ -6,7 +6,7 @@
 }
 
 @section BeforeHeading {
-    <a href="@Url.Page(Model.BackLinkPage)" class="govuk-back-link">Back</a>
+    <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
 }
 
 @if (Model.Animal is null)
@@ -82,7 +82,7 @@ else
 
     @* "Block ref search" — inline lookup pre-filled with this sample's sender ref, replacing
        legacy's navigate-away to SearchBlockRefs.aspx. *@
-    <details class="govuk-details">
+    <details class="govuk-details" @(Model.ShowUsedRefs ? "open" : "")>
         <summary class="govuk-details__summary">
             <span class="govuk-details__summary-text">Block ref search — check used block refs for this sample</span>
         </summary>
@@ -291,7 +291,6 @@ else
             <a asp-page="/Search/SearchBlockRefs" asp-route-SenderRef="@Model.Animal?.SenderRef" asp-route-HistologyRef="@Model.Animal?.HistologyRef"
                asp-route-ReturnPage="@Url.Page("/Submissions/SubmissionDetailsBlock", new { batchId = Model.BatchId, animalId = Model.AnimalId })"
                class="govuk-button govuk-button--secondary" data-module="govuk-button">Block ref search</a>
-            <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back</a>
         </div>
     </form>
 }

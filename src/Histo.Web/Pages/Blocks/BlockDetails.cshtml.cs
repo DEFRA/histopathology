@@ -212,8 +212,8 @@ public class BlockDetailsModel : HistoPageModel
         return Page();
     }
 
-    /// <summary>Creates a new block, or saves ref/customer ref/repeat changes to an existing one.</summary>
-    public async Task<IActionResult> OnPostSaveAsync()
+    /// <summary>Saves the block (ref/customer ref/repeat/comment) and its test selections together — replaces the former separate Save block/Save tests actions.</summary>
+    public async Task<IActionResult> OnPostDoneAsync()
     {
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
@@ -224,6 +224,19 @@ public class BlockDetailsModel : HistoPageModel
         if (histoRefError is not null)
         {
             ErrorMessage = histoRefError;
+            await LoadSupportingDataAsync();
+            await LoadEditModeDataAsync();
+            return Page();
+        }
+
+        // Validate test selections up front too, so nothing is saved at all if either half is invalid.
+        var testsError = ValidateTestSelections(SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes);
+        if (testsError is not null)
+        {
+            ErrorMessage = testsError;
+            ExistingHistologyCodes = SelectedHistologyCodes;
+            ExistingAntibodyCodes = SelectedAntibodyCodes;
+            ExistingStainCodes = SelectedStainCodes;
             await LoadSupportingDataAsync();
             await LoadEditModeDataAsync();
             return Page();
@@ -277,6 +290,8 @@ public class BlockDetailsModel : HistoPageModel
                 RowStamp = existing.RowStamp,
             };
             await _blocks.UpdateBlockAsync(updated, Session.UserID);
+            await _blockTests.SaveTestSelectionsAsync(
+                BatchId ?? 0, existing.ID, SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes, Session.UserID);
             return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
         }
 
@@ -329,6 +344,8 @@ public class BlockDetailsModel : HistoPageModel
             Order = current.Order,
             RowStamp = current.RowStamp,
         }, Session.UserID);
+        await _blockTests.SaveTestSelectionsAsync(
+            BatchId ?? 0, current.ID, SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes, Session.UserID);
 
         var count = Math.Max(1, NewNumberOfBlocks);
         if (count > 1)
@@ -412,32 +429,6 @@ public class BlockDetailsModel : HistoPageModel
             RowStamp = existing.RowStamp,
         };
         await _submissions.UpdateTissueAsync(updated, Session.UserID);
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
-    }
-
-    /// <summary>Delta-saves this block's Histology/Antibodies/Stain test-type selections.</summary>
-    public async Task<IActionResult> OnPostSaveTestsAsync()
-    {
-        var redirect = await LoadAnimalAsync();
-        if (redirect is not null) return redirect;
-        if (Animal is null || BlockId is not > 0) return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
-
-        var error = ValidateTestSelections(SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes);
-        if (error is not null)
-        {
-            ErrorMessage = error;
-            ExistingHistologyCodes = SelectedHistologyCodes;
-            ExistingAntibodyCodes = SelectedAntibodyCodes;
-            ExistingStainCodes = SelectedStainCodes;
-            await LoadSupportingDataAsync();
-            Block = (await _blocks.GetByBatchAsync(BatchId ?? 0)).FirstOrDefault(b => b.ID == BlockId);
-            Tissues = Block is null ? [] : await _submissions.GetTissuesByBlockAsync(Block.BatchID, Block.ID);
-            return Page();
-        }
-
-        await _blockTests.SaveTestSelectionsAsync(
-            BatchId ?? 0, BlockId.Value, SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes, Session.UserID);
-
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
     }
 
@@ -601,7 +592,9 @@ public class BlockDetailsModel : HistoPageModel
         // Legacy: DisplayBatchLevelTests (Page_Load, new-block branch) — a brand-new block with no
         // test selections of its own yet defaults to the batch-level Histology/Antibody/Stain
         // choices made when the submission was created, instead of forcing a re-pick per block.
-        if (IsAddFlow && ExistingHistologyCodes.Count == 0 && ExistingAntibodyCodes.Count == 0 && ExistingStainCodes.Count == 0)
+        // Not gated on IsAddFlow — a block reached via "Edit block" that has never had its own
+        // tests saved is just as untested as one reached via the auto-provisioned add flow.
+        if (ExistingHistologyCodes.Count == 0 && ExistingAntibodyCodes.Count == 0 && ExistingStainCodes.Count == 0)
         {
             var batchDefaults = await _batches.GetBatchTestSelectionsAsync(BatchId ?? 0);
             ExistingHistologyCodes = batchDefaults.Histology.Select(r => r.Code).ToList();

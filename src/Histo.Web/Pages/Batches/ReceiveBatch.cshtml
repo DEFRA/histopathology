@@ -7,7 +7,7 @@
 }
 
 @section BeforeHeading {
-    <a href="@Url.Page(Model.BackLinkPage)" class="govuk-back-link">Back</a>
+    <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
 }
 
 @if (Model.Batch is null)
@@ -129,7 +129,7 @@ else
         </dl>
 
         <div class="govuk-button-group govuk-!-margin-top-6">
-            <a href="@Url.Page(Model.BackLinkPage)" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back</a>
+            <a href="@Model.BackLinkPage" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back</a>
         </div>
     }
     else

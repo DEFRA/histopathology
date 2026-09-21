@@ -60,9 +60,9 @@ public class SubmissionDetailsModel : HistoPageModel
     /// <summary>Mirrors <see cref="SampleSummaryModel.IsViewMode"/> — hides edit/delete/add in View Submission journey.</summary>
     public bool IsViewMode => Session.IsViewSubmissionMode;
 
-    public string BackLinkPage => string.IsNullOrWhiteSpace(Session.ReturnPage)
+    public string BackLinkPage => string.IsNullOrWhiteSpace(Session.SampleDetailReturnPage)
         ? $"/Submissions/SampleSummary?batchId={BatchId ?? Session.BatchID ?? 0}"
-        : Session.ReturnPage;
+        : Session.SampleDetailReturnPage;
 
     public async Task<IActionResult> OnGetAsync()
     {
