@@ -95,6 +95,10 @@ public class SampleSummaryModel : HistoPageModel
     /// </summary>
     public bool IsViewMode => Session.IsViewSubmissionMode;
 
+    public string BackLinkPage => string.IsNullOrWhiteSpace(Session.ReturnPage)
+        ? $"/Batches/BatchDetails?batchId={BatchId ?? Session.BatchID ?? 0}"
+        : Session.ReturnPage;
+
     public async Task<IActionResult> OnGetAsync()
     {
         ViewData["Title"] = "Sample summary";
@@ -193,6 +197,10 @@ public class SampleSummaryModel : HistoPageModel
         //                BatchBlockSummary.aspx btnEditSubmission → SubmissionDetailsBlock.aspx.
         var batchId = BatchId ?? Session.BatchID;
         if (batchId is null or <= 0) return RedirectToPage("/Index");
+
+        // Preserve the current sample summary as the landing point when the user hits Back from
+        // the detail screen, rather than forcing a fixed jump back to the batch summary.
+        Session.ReturnPage = $"/Submissions/SampleSummary?batchId={batchId.Value}";
 
         // Re-resolve submission type server-side on POST.
         // Do not trust the hidden field from the view for routing decisions.
