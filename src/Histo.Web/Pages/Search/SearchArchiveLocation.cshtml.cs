@@ -120,7 +120,7 @@ public class SearchArchiveLocationModel : HistoPageModel
         Tissues = await _lookups.GetLookupDataAsync(LookupTissueCode);
     }
 
-    /// <summary>Replaces the legacy ExcelExport.aspx link — exports the current results as CSV.</summary>
+    /// <summary>Replaces the legacy ExcelExport.aspx link — exports the current results as .xlsx.</summary>
     public async Task<IActionResult> OnPostExportCsvAsync()
     {
         var senderRef = NullIfEmpty(SenderRef);
@@ -131,32 +131,32 @@ public class SearchArchiveLocationModel : HistoPageModel
         {
             case "Block":
                 var blockResults = await _blocks.GetBlockArchiveAsync(senderRef, histologyRef, NullIfEmpty(BlockRef), archiveLocation);
-                return CsvExportHelper.BuildCsv(
-                    "BlockArchive.csv",
+                return ExcelExportHelper.BuildXlsx(
+                    "BlockArchive.xlsx",
                     ["Submission number", "Block ref", "Archive location", "Archived date", "Tissue", "No pieces"],
-                    blockResults.Select(r => (IReadOnlyList<string?>)new string?[]
+                    blockResults.Select(r => (IReadOnlyList<object?>)new object?[]
                     {
-                        r.ID.ToString(), r.BlockRef, r.ArchiveLocation, r.ArchivedDate?.ToShortDateString(), r.TissueDescription, r.NoPieces?.ToString()
+                        r.ID, r.BlockRef, r.ArchiveLocation, r.ArchivedDate, r.TissueDescription, r.NoPieces
                     }));
 
             case "Slide":
                 var slideResults = await _blocks.GetSlideArchiveAsync(senderRef, histologyRef, archiveLocation);
-                return CsvExportHelper.BuildCsv(
-                    "SlideArchive.csv",
+                return ExcelExportHelper.BuildXlsx(
+                    "SlideArchive.xlsx",
                     ["Submission number", "Block ref", "Archive location", "Archived date", "Slide", "Tissue"],
-                    slideResults.Select(r => (IReadOnlyList<string?>)new string?[]
+                    slideResults.Select(r => (IReadOnlyList<object?>)new object?[]
                     {
-                        r.BatchID.ToString(), r.BlockRef, r.ArchiveLocation, r.ArchivedDate?.ToShortDateString(), r.Description, r.TissueDescription
+                        r.BatchID, r.BlockRef, r.ArchiveLocation, r.ArchivedDate, r.Description, r.TissueDescription
                     }));
 
             default:
                 var tissueResults = await _submissions.GetTissueArchiveAsync(senderRef, histologyRef, archiveLocation, NullIfEmpty(TissueCode));
-                return CsvExportHelper.BuildCsv(
-                    "TissueArchive.csv",
+                return ExcelExportHelper.BuildXlsx(
+                    "TissueArchive.xlsx",
                     ["Submission number", "Tissue", "Archive location", "Archived date", "No pieces"],
-                    tissueResults.Select(r => (IReadOnlyList<string?>)new string?[]
+                    tissueResults.Select(r => (IReadOnlyList<object?>)new object?[]
                     {
-                        r.BatchID.ToString(), r.TissueDescription, r.ArchiveLocation, r.ArchivedDate?.ToShortDateString(), r.NoPieces?.ToString()
+                        r.BatchID, r.TissueDescription, r.ArchiveLocation, r.ArchivedDate, r.NoPieces
                     }));
         }
     }

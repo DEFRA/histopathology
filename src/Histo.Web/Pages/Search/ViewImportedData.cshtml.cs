@@ -69,16 +69,16 @@ public class ViewImportedDataModel : GridPageModel
         PopulateGridViewData(Results.Count);
     }
 
-    /// <summary>Replaces the legacy ExcelExport.aspx link — exports the current results as CSV.</summary>
+    /// <summary>Replaces the legacy ExcelExport.aspx link — exports the current results as .xlsx.</summary>
     public async Task<IActionResult> OnGetExportCsvAsync()
     {
         var rows = ApplyFilter(await _submissions.GetImportedDataAsync(SelectedTable), Filter);
-        return CsvExportHelper.BuildCsv(
-            "ImportedData.csv",
+        return ExcelExportHelper.BuildXlsx(
+            "ImportedData.xlsx",
             ["Sender ref", "Histology ref", "Block ref", "Project", "Date submitted", "Species", "Tissue", "Comments"],
-            rows.Select(r => (IReadOnlyList<string?>)new string?[]
+            rows.Select(r => (IReadOnlyList<object?>)new object?[]
             {
-                r.SenderRef, r.HistologyRef, r.BlockRef, r.Project, r.DateSubmitted?.ToShortDateString(), r.Species, r.Tissue, r.Comments
+                r.SenderRef, r.HistologyRef, r.BlockRef, r.Project, r.DateSubmitted, r.Species, r.Tissue, r.Comments
             }));
     }
 

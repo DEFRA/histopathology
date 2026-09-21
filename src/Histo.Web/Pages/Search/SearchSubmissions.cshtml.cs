@@ -266,23 +266,36 @@ public class SearchSubmissionsModel : HistoPageModel
     }
 
     /// <summary>
-    /// Exports the current search results as a CSV download.
-    /// Replaces the legacy <c>lbExportExcel_Click</c> → <c>ExcelExport.aspx</c> pattern.
+    /// Exports the current search results as an Excel (.xlsx) download.
+    /// Replaces the legacy <c>lbExportExcel_Click</c> → <c>ExcelExport.aspx</c> pattern —
+    /// reproduces its dedicated 16-column export table exactly (same as <c>ViewSubmissions</c>).
     /// </summary>
     public async Task<IActionResult> OnPostExportCsvAsync()
     {
         var results = await _batches.SearchAsync(BuildCriteria());
-        return CsvExportHelper.BuildCsv(
-            "search-submissions.csv",
-            ["Submission number", "Project/Contract", "Pathologist", "Species", "Submitted date", "Status"],
-            results.Select(r => (IReadOnlyList<string?>)new string?[]
+        return ExcelExportHelper.BuildXlsx(
+            "search-submissions.xlsx",
+            ["Submission Number", "Project/Contract", "Pathologist", "Species", "Submitted Date",
+             "Submission Type", "Submitted By", "Safe To Handle", "Received Date", "Time Received/Rejected",
+             "Received By", "Other Submitted By", "Comments", "Customer Received Date", "Status", "Completed Date"],
+            results.Select(r => (IReadOnlyList<object?>)new object?[]
             {
-                r.ID.ToString(),
+                r.ID,
                 r.ProjectDescription,
                 r.ContactDescription,
                 r.Species,
-                r.BatchDate?.ToShortDateString(),
-                BatchStatus.DisplayName(r.Status ?? string.Empty)
+                r.BatchDate,
+                r.BatchType == "0" ? "TSE" : "NON TSE",
+                r.SubmittedBy,
+                r.SafeToHandle == "1" ? "Yes" : "No",
+                r.DateReceived,
+                r.ReceivedTime,
+                r.ReceivedBy,
+                r.OtherSubmittedBy,
+                r.Comments,
+                r.CustomerReceivedDate,
+                BatchStatus.DisplayName(r.Status ?? string.Empty),
+                r.DateCompleted
             }));
     }
 

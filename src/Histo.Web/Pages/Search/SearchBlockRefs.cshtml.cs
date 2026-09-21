@@ -92,10 +92,10 @@ public class SearchBlockRefsModel : GridPageModel
             return RedirectToPage("/Search/SearchBlockRefs");
 
         var results = await SearchAsync(byHistologyRef: hasHistologyRef && !hasSenderRef);
-        return CsvExportHelper.BuildCsv(
-            "search-block-refs.csv",
+        return ExcelExportHelper.BuildXlsx(
+            "search-block-refs.xlsx",
             ["Used block refs", "Unused block refs", "Pre booked block refs"],
-            results.Select(r => (IReadOnlyList<string?>)new string?[]
+            results.Select(r => (IReadOnlyList<object?>)new object?[]
             {
                 r.UsedBlockRefs,
                 r.UnusedBlockRefs,

@@ -76,9 +76,9 @@ public class SearchTestModel : HistoPageModel
     public async Task<IActionResult> OnPostExportCsvAsync()
     {
         var results = await _batches.GetTestItemRowsAsync(ProjectDescription, SubmissionType);
-        return CsvExportHelper.BuildCsv(
-            "search-test-totals.csv",
+        return ExcelExportHelper.BuildXlsx(
+            "search-test-totals.xlsx",
             ["Description", "Count"],
-            results.Select(r => (IReadOnlyList<string?>)new string?[] { r.Description, r.Count.ToString() }));
+            results.Select(r => (IReadOnlyList<object?>)new object?[] { r.Description, r.Count }));
     }
 }

@@ -232,27 +232,36 @@ public class ViewSubmissionsModel : HistoPageModel
     }
 
     /// <summary>
-    /// CSV export — replaces legacy <c>lbExportExcel_Click</c> → <c>ExcelExport.aspx</c> pattern.
+    /// Excel (.xlsx) export — replaces legacy <c>lbExportExcel_Click</c> → <c>ExcelExport.aspx</c>
+    /// pattern. Reproduces its dedicated 16-column export table exactly (same code, identical to
+    /// <c>SearchSubmissions</c>'s own export handler in legacy).
     /// </summary>
     public async Task<IActionResult> OnPostExportCsvAsync()
     {
         var results = await _batches.SearchAsync(BuildCriteria());
-        return CsvExportHelper.BuildCsv(
-            "view-submissions.csv",
-            ["Submission number", "Project/Contract", "Pathologist", "Species",
-             "Date submitted", "Date received/rejected", "Date completed",
-             "Customer received date", "Status"],
-            results.Select(r => (IReadOnlyList<string?>)new string?[]
+        return ExcelExportHelper.BuildXlsx(
+            "view-submissions.xlsx",
+            ["Submission Number", "Project/Contract", "Pathologist", "Species", "Submitted Date",
+             "Submission Type", "Submitted By", "Safe To Handle", "Received Date", "Time Received/Rejected",
+             "Received By", "Other Submitted By", "Comments", "Customer Received Date", "Status", "Completed Date"],
+            results.Select(r => (IReadOnlyList<object?>)new object?[]
             {
-                r.ID.ToString(),
+                r.ID,
                 r.ProjectDescription,
                 r.ContactDescription,
                 r.Species,
-                r.BatchDate?.ToShortDateString(),
-                r.DateReceived?.ToShortDateString(),
-                r.DateCompleted?.ToShortDateString(),
-                r.CustomerReceivedDate?.ToShortDateString(),
-                BatchStatus.DisplayName(r.Status ?? "")
+                r.BatchDate,
+                r.BatchType == "0" ? "TSE" : "NON TSE",
+                r.SubmittedBy,
+                r.SafeToHandle == "1" ? "Yes" : "No",
+                r.DateReceived,
+                r.ReceivedTime,
+                r.ReceivedBy,
+                r.OtherSubmittedBy,
+                r.Comments,
+                r.CustomerReceivedDate,
+                BatchStatus.DisplayName(r.Status ?? ""),
+                r.DateCompleted
             }));
     }
 

@@ -78,16 +78,16 @@ public class AuditLogByUserModel : GridPageModel
         return Page();
     }
 
-    /// <summary>Replaces the legacy ExcelExport.aspx link — exports the current results as CSV.</summary>
+    /// <summary>Replaces the legacy ExcelExport.aspx link — exports the current results as .xlsx.</summary>
     public async Task<IActionResult> OnPostExportCsvAsync()
     {
         var results = await _auditLog.GetByUserAsync(UserID, StartDate, EndDate);
-        return CsvExportHelper.BuildCsv(
-            "AuditLogByUser.csv",
+        return ExcelExportHelper.BuildXlsx(
+            "UserAuditlogResult.xlsx",
             ["Table", "Field", "Date/Time", "User", "Before", "After", "Reason", "Key"],
-            results.Select(e => (IReadOnlyList<string?>)new string?[]
+            results.Select(e => (IReadOnlyList<object?>)new object?[]
             {
-                e.TableName, e.FieldName, e.ChangedAt.ToString("dd/MM/yyyy HH:mm:ss"), e.UserName,
+                e.TableName, e.FieldName, e.ChangedAt, e.UserName,
                 e.BeforeValue, e.AfterValue, e.Reason, e.KeyID
             }));
     }
