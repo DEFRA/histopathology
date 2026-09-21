@@ -223,8 +223,11 @@ public class BlockDetailsModel : HistoPageModel
         if (histoRefError is not null)
         {
             ErrorMessage = histoRefError;
-            await LoadSupportingDataAsync();
-            await LoadEditModeDataAsync();
+            var attemptedHistoRef = EditHistologyRef;
+            var attemptedPmDate = EditPMDate;
+            if (!await LoadEditModeDataAsync()) return Page();
+            EditHistologyRef = attemptedHistoRef;
+            EditPMDate = attemptedPmDate;
             return Page();
         }
 
