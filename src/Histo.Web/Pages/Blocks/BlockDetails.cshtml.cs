@@ -678,10 +678,9 @@ public class BlockDetailsModel : HistoPageModel
         var counter = counters.FirstOrDefault(c => c.Type == histologyType);
         if (counter is not null)
         {
-            // Check that entered ref is less than the next available ref
-            if (string.Compare(histologyRef, counter.NextHistologyRef, StringComparison.Ordinal) >= 0)
-                return $"Histology Reference entered ({histologyRef}) must be less than the next available reference ({counter.NextHistologyRef}) for this type.";
-        }
+            // Check that entered ref number is less than the next available ref number
+            if (int.TryParse(counter.NextHistologyRef, out var nextRef) && refNumber >= nextRef)
+                return $"Histology Reference entered ({histologyRef}) must be less than the next available reference number ({counter.NextHistologyRef}) for this type.";
 
         return null;
     }
