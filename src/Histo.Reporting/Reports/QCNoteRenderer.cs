@@ -18,8 +18,9 @@
 //     ├── Top bordered box  — 5-row, 2-column table (40% label / 60% bold value)
 //     │     QC Note Ref | Submission Number | Project | Species | Stain Ref
 //     └── Body bordered box — fills remaining page height
-//           Row 1: 4 static column headers in 7pt grey (Sender Ref | Histo Ref | Block Ref | Test)
-//           Row 2: QCText paragraph
+//           QCText, monospaced (legacy stores the Sender Ref/Histo Ref/Block Ref/Test
+//           header and data row as pre-padded plain text inside QCText itself — do not
+//           render a separate header row here, or it duplicates on every note).
 //   Footer (pinned): CreatedBy left  /  DateCreated right
 
 using System.Data;
@@ -34,13 +35,16 @@ namespace Histo.Reporting.Reports;
 /// Layout matches the legacy Crystal Reports A4 portrait QC Note form:
 /// <list type="bullet">
 ///   <item><description><b>Top bordered box</b>: 5 label/value rows — QCNoteRef, SubmissionNumber, Project, Species, StainRef.</description></item>
-///   <item><description><b>Body bordered box</b>: 4-column static header row (Sender Ref | Histo Ref | Block Ref | Test) in 7pt grey, then QCText paragraph. Expands to fill remaining page height.</description></item>
+///   <item><description><b>Body bordered box</b>: <c>QCText</c> rendered as a single monospaced block. Expands to fill remaining page height.</description></item>
 ///   <item><description><b>Footer</b>: CreatedBy left, DateCreated right.</description></item>
 /// </list>
 /// <para>
 /// Expected DataSet: single table named <c>"Header"</c> with columns
 /// QCNoteRef, SubmissionNumber, Project, Species, StainRef, QCText, CreatedBy, DateCreated.
 /// DateCreated is pre-formatted as "dd MMMM yyyy" by the DataSetBuilder — no parsing needed here.
+/// <c>QCText</c> already contains the Sender Ref/Histo Ref/Block Ref/Test header and data row
+/// as space-padded plain text (legacy builds this directly into the field), so it must be
+/// rendered as-is in a monospaced font rather than alongside a second, separately-drawn header.
 /// </para>
 /// </summary>
 public sealed class QCNoteRenderer
@@ -126,42 +130,14 @@ public sealed class QCNoteRenderer
                     // ════════════════════════════════════════════════════════════
                     // SECTION 2 — Detail / Body
                     // Bordered box that fills the remaining page height (Extend()).
-                    // Row 1: 4 static column headers — Sender Ref | Histo Ref |
-                    //        Block Ref | Test — in 7pt grey, evenly spaced (25% each).
-                    //        These are pre-printed labels only; the corresponding
-                    //        data columns are not present in the modern DataSet.
-                    // Row 2: QCText paragraph.
+                    // QCText already contains the Sender Ref/Histo Ref/Block Ref/Test
+                    // header and data row as space-padded plain text (built by legacy
+                    // directly into the field) — render it as a single monospaced
+                    // block so columns stay aligned. Do not draw a second header row
+                    // here; it would duplicate what QCText already contains.
                     // ════════════════════════════════════════════════════════════
-                    col.Item().Extend().Border(1).Column(body =>
-                    {
-                        body.Spacing(0);
-
-                        // Static 4-column header row — 7pt grey, monospace-style.
-                        body.Item().Table(h =>
-                        {
-                            h.ColumnsDefinition(c =>
-                            {
-                                c.RelativeColumn(25); // Sender Ref
-                                c.RelativeColumn(25); // Histo Ref
-                                c.RelativeColumn(25); // Block Ref
-                                c.RelativeColumn(25); // Test
-                            });
-
-                            void ColHeader(string label) =>
-                                h.Cell().PaddingVertical(2).PaddingHorizontal(4)
-                                 .Text(label)
-                                 .FontSize(7)
-                                 .FontColor(Colors.Grey.Medium);
-
-                            ColHeader("Sender Ref");
-                            ColHeader("Histo Ref");
-                            ColHeader("Block Ref");
-                            ColHeader("Test");
-                        });
-
-                        // QCText body paragraph — may be multi-line.
-                        body.Item().Padding(4).Text(qcText).FontSize(9);
-                    });
+                    col.Item().Extend().Border(1).Padding(4)
+                       .Text(qcText).FontFamily("Consolas").FontSize(9);
                 });
             });
         }).GeneratePdf();
