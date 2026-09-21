@@ -13,7 +13,6 @@
 //   ✓ Reads from ds.Tables by name:
 //       Submission, SubmissionTissues, SubmissionBlocks,
 //       BlockHistology, BlockSpecialStain, BlockAntibodies
-//   ✓ Sections with zero rows completely skipped (no heading, no rule, no empty table)
 //   ✓ Field() private helper — safe null/DBNull column extraction
 //
 // Layout (A4 Portrait, ~15mm margins):
@@ -23,7 +22,9 @@
 //   Content:
 //     ├── Two-column row: left = "Submission Comments" (bold) + text;
 //     │                   right = "Submission Status Comments" (bold) + text
-//     └── Up to 5 conditional sections (each only when table has > 0 rows):
+//     └── 5 sections, always rendered regardless of row count (confirmed against
+//         SubmissionNotes-image.png reference — legacy always prints heading/column
+//         headers even with zero matching rows; only the data rows themselves vary):
 //           bold-italic heading → thin horizontal rule → 8pt column-header row → data rows
 //           1. SubmissionTissues  — SenderRef | TissueCode | TissueComment | TissueArchiveComment
 //           2. SubmissionBlocks   — SenderRef | BlockRef   | BlockComment  | BlockArchiveComment
@@ -45,7 +46,7 @@ namespace Histo.Reporting.Reports;
 /// <list type="bullet">
 ///   <item><description><b>Page header</b>: left — bold "Submission notes for Submission:" + bold SubmissionNumber; right — today's date "dd/MM/yyyy".</description></item>
 ///   <item><description><b>Submission comments</b>: two equal-width columns — "Submission Comments" (left) and "Submission Status Comments" (right), each with a bold heading above the comment text.</description></item>
-///   <item><description><b>Five conditional sections</b> (rendered only when the corresponding DataSet table has at least one row): bold-italic heading, thin horizontal rule, 8pt column-header row, data rows.</description></item>
+///   <item><description><b>Five sections</b> (always rendered, regardless of row count — matches the legacy reference PDF, which always prints the heading/column headers even with zero matching rows): bold-italic heading, thin horizontal rule, 8pt column-header row, data rows.</description></item>
 ///   <item><description><b>Page footer</b>: right-aligned "Page {n} of {total}".</description></item>
 /// </list>
 /// <para>
@@ -103,16 +104,21 @@ public sealed class SubmissionNotesRenderer
                 page.DefaultTextStyle(s => s.FontFamily("Arial").FontSize(9));
 
                 // ── Page Header — repeats on every page ──────────────────────────
-                page.Header().PaddingBottom(8).Row(header =>
+                page.Header().Column(headerCol =>
                 {
-                    // Left: bold label + bold submission number (both bold, per visual reference)
-                    header.RelativeItem().Text(t =>
+                    headerCol.Item().Row(header =>
                     {
-                        t.Span("Submission notes for Submission:  ").Bold();
-                        t.Span(submissionNumber).Bold();
+                        // Left: bold label + bold submission number (both bold, per visual reference)
+                        header.RelativeItem().Text(t =>
+                        {
+                            t.Span("Submission notes for Submission:  ").Bold();
+                            t.Span(submissionNumber).Bold();
+                        });
+                        // Right: today's date
+                        header.RelativeItem().AlignRight().Text(reportDate);
                     });
-                    // Right: today's date
-                    header.RelativeItem().AlignRight().Text(reportDate);
+                    // Full-width rule under the title, per visual reference (SubmissionNotes-image.png).
+                    headerCol.Item().PaddingTop(2).PaddingBottom(8).LineHorizontal(0.5f);
                 });
 
                 // ── Page Footer — repeats on every page ──────────────────────────
@@ -156,178 +162,168 @@ public sealed class SubmissionNotesRenderer
 
                     // ════════════════════════════════════════════════════════════
                     // SECTION 1 — Submission tissue comments (SubmissionTissues)
-                    // Skipped entirely when tissueRows is empty.
+                    // Heading/column headers always render; only data rows vary.
                     // ════════════════════════════════════════════════════════════
-                    if (tissueRows.Count > 0)
+                    col.Item().Column(section =>
                     {
-                        col.Item().Column(section =>
+                        section.Spacing(2);
+                        section.Item().Text("Submission tissue comments:").Bold().Italic();
+                        section.Item().Table(t =>
                         {
-                            section.Spacing(2);
-                            section.Item().Text("Submission tissue comments:").Bold().Italic();
-                            section.Item().LineHorizontal(0.5f);
-                            section.Item().Table(t =>
+                            t.ColumnsDefinition(c =>
                             {
-                                t.ColumnsDefinition(c =>
-                                {
-                                    c.RelativeColumn(25); // SenderRef
-                                    c.RelativeColumn(25); // Tissue Code
-                                    c.RelativeColumn(25); // Tissue Comment
-                                    c.RelativeColumn(25); // Tissue Archive Comment
-                                });
-
-                                foreach (var heading in new[] { "SenderRef", "Tissue Code", "Tissue Comment", "Tissue Archive Comment" })
-                                    t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
-
-                                foreach (var r in tissueRows)
-                                {
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "SenderRef"));
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "TissueCode"));
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "TissueComment"));
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "TissueArchiveComment"));
-                                }
+                                c.RelativeColumn(25); // SenderRef
+                                c.RelativeColumn(25); // Tissue Code
+                                c.RelativeColumn(25); // Tissue Comment
+                                c.RelativeColumn(25); // Tissue Archive Comment
                             });
+
+                            foreach (var heading in new[] { "SenderRef", "Tissue Code", "Tissue Comment", "Tissue Archive Comment" })
+                                t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
+
+                            t.Cell().ColumnSpan(4).LineHorizontal(0.5f);
+
+                            foreach (var r in tissueRows)
+                            {
+                                t.Cell().PaddingVertical(2).Text(Field(r, "SenderRef"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, "TissueCode"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, "TissueComment"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, "TissueArchiveComment"));
+                            }
                         });
-                    }
+                    });
 
                     // ════════════════════════════════════════════════════════════
                     // SECTION 2 — Submission blocks comments (SubmissionBlocks)
-                    // Skipped entirely when blockRows is empty.
+                    // Heading/column headers always render; only data rows vary.
                     // ════════════════════════════════════════════════════════════
-                    if (blockRows.Count > 0)
+                    col.Item().Column(section =>
                     {
-                        col.Item().Column(section =>
+                        section.Spacing(2);
+                        section.Item().Text("Submission blocks comments:").Bold().Italic();
+                        section.Item().Table(t =>
                         {
-                            section.Spacing(2);
-                            section.Item().Text("Submission blocks comments:").Bold().Italic();
-                            section.Item().LineHorizontal(0.5f);
-                            section.Item().Table(t =>
+                            t.ColumnsDefinition(c =>
                             {
-                                t.ColumnsDefinition(c =>
-                                {
-                                    c.RelativeColumn(25); // SenderRef
-                                    c.RelativeColumn(25); // Block Ref
-                                    c.RelativeColumn(25); // Block Comment
-                                    c.RelativeColumn(25); // Block Archive Comment
-                                });
-
-                                foreach (var heading in new[] { "SenderRef", "Block Ref", "Block Comment", "Block Archive Comment" })
-                                    t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
-
-                                foreach (var r in blockRows)
-                                {
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "SenderRef"));
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "BlockRef"));
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "BlockComment"));
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "BlockArchiveComment"));
-                                }
+                                c.RelativeColumn(25); // SenderRef
+                                c.RelativeColumn(25); // Block Ref
+                                c.RelativeColumn(25); // Block Comment
+                                c.RelativeColumn(25); // Block Archive Comment
                             });
+
+                            foreach (var heading in new[] { "SenderRef", "Block Ref", "Block Comment", "Block Archive Comment" })
+                                t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
+
+                            t.Cell().ColumnSpan(4).LineHorizontal(0.5f);
+
+                            foreach (var r in blockRows)
+                            {
+                                t.Cell().PaddingVertical(2).Text(Field(r, "SenderRef"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, "BlockRef"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, "BlockComment"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, "BlockArchiveComment"));
+                            }
                         });
-                    }
+                    });
 
                     // ════════════════════════════════════════════════════════════
                     // SECTION 3 — Histology tests comments (BlockHistology)
-                    // Skipped entirely when histologyRows is empty.
+                    // Heading/column headers always render; only data rows vary.
                     // ════════════════════════════════════════════════════════════
-                    if (histologyRows.Count > 0)
+                    col.Item().Column(section =>
                     {
-                        col.Item().Column(section =>
+                        section.Spacing(2);
+                        section.Item().Text("Histology tests comments:").Bold().Italic();
+                        section.Item().Table(t =>
                         {
-                            section.Spacing(2);
-                            section.Item().Text("Histology tests comments:").Bold().Italic();
-                            section.Item().LineHorizontal(0.5f);
-                            section.Item().Table(t =>
+                            t.ColumnsDefinition(c =>
                             {
-                                t.ColumnsDefinition(c =>
-                                {
-                                    c.RelativeColumn(25); // Block Ref
-                                    c.RelativeColumn(25); // Test
-                                    c.RelativeColumn(25); // Test Comment
-                                    c.RelativeColumn(25); // Test Archive Comment
-                                });
-
-                                foreach (var heading in new[] { "Block Ref", "Test", "Test Comment", "Test Archive Comment" })
-                                    t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
-
-                                foreach (var r in histologyRows)
-                                {
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "BlockRef"));
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "Test"));
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "TestComment"));
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "TestArchiveComment"));
-                                }
+                                c.RelativeColumn(25); // Block Ref
+                                c.RelativeColumn(25); // Test
+                                c.RelativeColumn(25); // Test Comment
+                                c.RelativeColumn(25); // Test Archive Comment
                             });
+
+                            foreach (var heading in new[] { "Block Ref", "Test", "Test Comment", "Test Archive Comment" })
+                                t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
+
+                            t.Cell().ColumnSpan(4).LineHorizontal(0.5f);
+
+                            foreach (var r in histologyRows)
+                            {
+                                t.Cell().PaddingVertical(2).Text(Field(r, "BlockRef"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, "Test"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, "TestComment"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, "TestArchiveComment"));
+                            }
                         });
-                    }
+                    });
 
                     // ════════════════════════════════════════════════════════════
                     // SECTION 4 — Special stain tests comments (BlockSpecialStain)
-                    // Skipped entirely when specialStainRows is empty.
+                    // Heading/column headers always render; only data rows vary.
                     // ════════════════════════════════════════════════════════════
-                    if (specialStainRows.Count > 0)
+                    col.Item().Column(section =>
                     {
-                        col.Item().Column(section =>
+                        section.Spacing(2);
+                        section.Item().Text("Special stain tests comments:").Bold().Italic();
+                        section.Item().Table(t =>
                         {
-                            section.Spacing(2);
-                            section.Item().Text("Special stain tests comments:").Bold().Italic();
-                            section.Item().LineHorizontal(0.5f);
-                            section.Item().Table(t =>
+                            t.ColumnsDefinition(c =>
                             {
-                                t.ColumnsDefinition(c =>
-                                {
-                                    c.RelativeColumn(25); // Block Ref
-                                    c.RelativeColumn(25); // Test
-                                    c.RelativeColumn(25); // Test Comment
-                                    c.RelativeColumn(25); // Test Archive Comment
-                                });
-
-                                foreach (var heading in new[] { "Block Ref", "Test", "Test Comment", "Test Archive Comment" })
-                                    t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
-
-                                foreach (var r in specialStainRows)
-                                {
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "BlockRef"));
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "Test"));
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "TestComment"));
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "TestArchiveComment"));
-                                }
+                                c.RelativeColumn(25); // Block Ref
+                                c.RelativeColumn(25); // Test
+                                c.RelativeColumn(25); // Test Comment
+                                c.RelativeColumn(25); // Test Archive Comment
                             });
+
+                            foreach (var heading in new[] { "Block Ref", "Test", "Test Comment", "Test Archive Comment" })
+                                t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
+
+                            t.Cell().ColumnSpan(4).LineHorizontal(0.5f);
+
+                            foreach (var r in specialStainRows)
+                            {
+                                t.Cell().PaddingVertical(2).Text(Field(r, "BlockRef"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, "Test"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, "TestComment"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, "TestArchiveComment"));
+                            }
                         });
-                    }
+                    });
 
                     // ════════════════════════════════════════════════════════════
                     // SECTION 5 — Antibodies tests comments (BlockAntibodies)
-                    // Skipped entirely when antibodyRows is empty.
+                    // Heading/column headers always render; only data rows vary.
                     // ════════════════════════════════════════════════════════════
-                    if (antibodyRows.Count > 0)
+                    col.Item().Column(section =>
                     {
-                        col.Item().Column(section =>
+                        section.Spacing(2);
+                        section.Item().Text("Antibodies tests comments:").Bold().Italic();
+                        section.Item().Table(t =>
                         {
-                            section.Spacing(2);
-                            section.Item().Text("Antibodies tests comments:").Bold().Italic();
-                            section.Item().LineHorizontal(0.5f);
-                            section.Item().Table(t =>
+                            t.ColumnsDefinition(c =>
                             {
-                                t.ColumnsDefinition(c =>
-                                {
-                                    c.RelativeColumn(25); // BlockRef
-                                    c.RelativeColumn(25); // Test
-                                    c.RelativeColumn(25); // Test Comment
-                                    c.RelativeColumn(25); // Test Archive Comment
-                                });
-
-                                foreach (var heading in new[] { "BlockRef", "Test", "Test Comment", "Test Archive Comment" })
-                                    t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
-
-                                foreach (var r in antibodyRows)
-                                {
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "BlockRef"));
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "Test"));
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "TestComment"));
-                                    t.Cell().PaddingVertical(2).Text(Field(r, "TestArchiveComment"));
-                                }
+                                c.RelativeColumn(25); // BlockRef
+                                c.RelativeColumn(25); // Test
+                                c.RelativeColumn(25); // Test Comment
+                                c.RelativeColumn(25); // Test Archive Comment
                             });
+
+                            foreach (var heading in new[] { "BlockRef", "Test", "Test Comment", "Test Archive Comment" })
+                                t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
+
+                            t.Cell().ColumnSpan(4).LineHorizontal(0.5f);
+
+                            foreach (var r in antibodyRows)
+                            {
+                                t.Cell().PaddingVertical(2).Text(Field(r, "BlockRef"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, "Test"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, "TestComment"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, "TestArchiveComment"));
+                            }
                         });
-                    }
+                    });
                 });
             });
         }).GeneratePdf();

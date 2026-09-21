@@ -61,8 +61,9 @@ public sealed class HistologyReportRenderer
     /// </list>
     /// </summary>
     /// <param name="ds">Populated DataSet matching HistologyReportDataset.xsd.</param>
+    /// <param name="rowsPerPage">Submission rows printed per page (legacy default 13). Values &lt;= 0 fall back to 13.</param>
     /// <returns>PDF content as a byte array.</returns>
-    public Task<byte[]> RenderAsync(DataSet ds)
+    public Task<byte[]> RenderAsync(DataSet ds, int rowsPerPage = 13)
     {
         DataRow? batch   = ds.Tables["Batch"]?.Rows.Count > 0
             ? ds.Tables["Batch"]!.Rows[0] : null;
@@ -101,10 +102,6 @@ public sealed class HistologyReportRenderer
         var formic = postFix is not null ? IsChecked(Field(postFix, "Formic")) : false;
         var other  = postFix is not null ? IsChecked(Field(postFix, "Other"))  : false;
 
-        // Unicode checkbox characters — substitutes for Wingdings Chr(252).
-        const string CheckedBox   = "\u25A0"; // ■
-        const string UncheckedBox = "\u25A1"; // □
-
         byte[] pdf = Document.Create(container =>
         {
             container.Page(page =>
@@ -129,34 +126,46 @@ public sealed class HistologyReportRenderer
                     foot.Item().Border(1).Row(panels =>
                     {
                         // ── Panel A — Histology Required ──────────────────────
-                        panels.RelativeItem().BorderRight(1).Column(a =>
+                        panels.RelativeItem(30).BorderRight(1).Padding(3).Column(a =>
                         {
                             a.Spacing(2);
-                            a.Item().Text("Histology Required").Bold().FontSize(8);
 
-                            // HistologySubReport inlined (ADR-004): BatchHistology codes list.
-                            foreach (var hrow in histologyRows)
+                            // Two columns side by side (matches legacy): Histology Required
+                            // list on the left, Comments box + "More comments" checkbox on the right.
+                            a.Item().Row(top =>
                             {
-                                a.Item().PaddingLeft(4)
-                                 .Text(Field(hrow, "Code"))
-                                 .FontSize(8).FontColor(Colors.Blue.Medium);
-                            }
+                                top.RelativeItem(34).Column(left =>
+                                {
+                                    left.Item().Text("Histology Required").Bold().FontSize(8);
 
-                            // Comments sub-section.
-                            a.Item().PaddingTop(3).Text("Comments").Bold().FontSize(7.5f);
-                            a.Item().Border(0.5f).MinHeight(30)
-                             .Padding(2).Text(comments).FontSize(8);
+                                    // HistologySubReport inlined (ADR-004): BatchHistology codes list.
+                                    foreach (var hrow in histologyRows)
+                                        left.Item().PaddingLeft(4).Text(Field(hrow, "Code")).FontSize(8);
+                                });
 
-                            // "More comments" checkbox line.
-                            a.Item().Text(
-                                $"{(commentLengthOk ? CheckedBox : UncheckedBox)} More comments on Submissions database")
-                                .FontSize(7.5f);
+                                top.ConstantItem(6);
 
-                            a.Item().PaddingTop(4).Text("Stain Ref").Bold().FontSize(8);
+                                top.RelativeItem(66).Column(cmt =>
+                                {
+                                    cmt.Item().Text("Comments").Bold().FontSize(7.5f);
+                                    // Fixed (not Min) height — a hard cap so long comments never push
+                                    // into or overlap the "Stain Ref" line below; overflow text clips.
+                                    cmt.Item().Border(0.5f).Height(95).Padding(2).Text(comments).FontSize(8).ClampLines(7);
+                                    CheckboxItem(cmt.Item().PaddingTop(3), commentLengthOk, "More comments on Submissions database");
+                                });
+                            });
+
+                            // Stain Ref — bordered box with a fill-in line, matching the
+                            // Processor/Program box style so it reads clearly as a form field.
+                            a.Item().PaddingTop(6).Border(0.75f).Padding(3).Column(sr =>
+                            {
+                                sr.Item().Text("Stain Ref").Bold().FontSize(8);
+                                sr.Item().PaddingTop(6).PaddingRight(4).BorderBottom(0.75f).MinHeight(2);
+                            });
                         });
 
                         // ── Panel B — Fixation ────────────────────────────────
-                        panels.RelativeItem().BorderRight(1).Padding(3).Column(b =>
+                        panels.RelativeItem(16).BorderRight(1).Padding(3).Column(b =>
                         {
                             b.Spacing(2);
                             b.Item().Text("Fixation").Bold().FontSize(8);
@@ -164,62 +173,89 @@ public sealed class HistologyReportRenderer
 
                             b.Item().PaddingTop(3).Text("Post Fixation").Bold().FontSize(8);
 
-                            void CbRow(bool isChecked, string label, string extraVal = "") =>
-                                b.Item().Text(
-                                    $"{(isChecked ? CheckedBox : UncheckedBox)} {label}{(extraVal.Length > 0 ? " " + extraVal : string.Empty)}")
-                                    .FontSize(8);
+                            CheckboxItem(b.Item(), decal,  "Decalcify");
+                            CheckboxItem(b.Item(), phenol, "Phenol / Alc");
+                            CheckboxItem(b.Item(), formic, "Formic Acid");
+                            CheckboxItem(b.Item(), other,  "Other", trailingLine: true, trailingValue: postFixOther);
 
-                            CbRow(decal,  "Decalcify");
-                            CbRow(phenol, "Phenol / Alc");
-                            CbRow(formic, "Formic Acid");
-                            CbRow(other,  "Other", postFixOther);
+                            b.Item().PaddingTop(4).Text(t =>
+                            {
+                                t.Span("Date").FontSize(8);
+                                t.Span("  (sign)").FontSize(7);
+                            });
 
-                            b.Item().PaddingTop(4).Text("Date  (sign)").FontSize(8);
-                            b.Item().Text("In  _________________").FontSize(8);
-                            b.Item().Text("Out _________________").FontSize(8);
+                            void SignLine(string lbl) =>
+                                b.Item().PaddingTop(3).Row(row =>
+                                {
+                                    row.ConstantItem(22).Text(lbl).FontSize(8);
+                                    row.RelativeItem().AlignBottom().PaddingBottom(1).BorderBottom(0.75f).MinHeight(11);
+                                });
+
+                            SignLine("In");
+                            SignLine("Out");
                         });
 
                         // ── Panel C — Tissue Processing (pre-printed, no data) ─
-                        panels.RelativeItem().BorderRight(1).Padding(3).Column(c =>
+                        panels.RelativeItem(32).BorderRight(1).Padding(3).Column(c =>
                         {
                             c.Spacing(2);
 
-                            c.Item().Row(r =>
+                            // Title row: section name (left) + "Diagram" label (right, above the box).
+                            c.Item().Row(titleRow =>
                             {
-                                r.RelativeItem().Text("Tissue Processing").Bold().FontSize(8);
-                                r.ConstantItem(50).AlignRight()
-                                 .Text("Diagram").FontSize(7.5f);
+                                titleRow.RelativeItem().Text("Tissue Processing").Bold().FontSize(8);
+                                titleRow.ConstantItem(94).AlignRight().Text("Diagram").FontSize(7.5f);
                             });
 
-                            // Diagram box (top-right, pre-printed blank).
                             c.Item().Row(r =>
                             {
+                                // Left — processing-schedule checkboxes.
                                 r.RelativeItem().Column(inner =>
                                 {
-                                    inner.Spacing(2);
-                                    void TpRow(string lbl) =>
-                                        inner.Item().Text($"{UncheckedBox} {lbl}").FontSize(8);
-
-                                    TpRow("Routine O/N  Date ______");
-                                    TpRow("37C O/N");
-                                    TpRow("6 Hour");
-                                    TpRow("2 Day");
-                                    TpRow("3 Day");
-                                    TpRow("Other  _______________");
+                                    CheckboxItem(inner.Item(), false, "Routine O/N");
+                                    CheckboxItem(inner.Item(), false, "37C O/N");
+                                    CheckboxItem(inner.Item(), false, "6 Hour");
+                                    CheckboxItem(inner.Item(), false, "2 Day");
+                                    CheckboxItem(inner.Item(), false, "3 Day");
+                                    CheckboxItem(inner.Item(), false, "Other", trailingLine: true);
                                 });
 
-                                r.ConstantItem(50).Border(0.5f).MinHeight(45); // diagram box
+                                // Middle — Date: short bordered box, top-aligned with Routine O/N
+                                // (wrapped in a column so it doesn't stretch to the tall Diagram box).
+                                r.ConstantItem(50).Column(midCol =>
+                                {
+                                    midCol.Item().Border(0.75f).Height(62).Padding(3).Column(dateCol =>
+                                    {
+                                        dateCol.Item().Text("Date").FontSize(8);
+                                        dateCol.Item().PaddingTop(32).BorderBottom(0.75f).MinHeight(2);
+                                    });
+                                });
+
+                                r.ConstantItem(4);
+
+                                // Right — Diagram box: large, starts at the top of this row
+                                // (aligned with the Routine O/N checkbox).
+                                r.ConstantItem(90).Border(0.5f).MinHeight(110);
                             });
 
-                            c.Item().PaddingTop(3).Row(r =>
+                            c.Item().PaddingTop(3).Border(0.75f).Padding(3).Row(r =>
                             {
-                                r.RelativeItem().Text("Processor ___________").FontSize(8);
-                                r.RelativeItem().Text("Program ___________").FontSize(8);
+                                r.RelativeItem().Column(pc =>
+                                {
+                                    pc.Item().Text("Processor").FontSize(8);
+                                    pc.Item().PaddingTop(10).PaddingRight(4).BorderBottom(0.75f).MinHeight(2);
+                                });
+                                r.ConstantItem(6);
+                                r.RelativeItem().Column(pr =>
+                                {
+                                    pr.Item().Text("Program").FontSize(8);
+                                    pr.Item().PaddingTop(10).PaddingRight(4).BorderBottom(0.75f).MinHeight(2);
+                                });
                             });
                         });
 
                         // ── Panel D — Dispatch ────────────────────────────────
-                        panels.RelativeItem().Padding(3).Column(d =>
+                        panels.RelativeItem(22).Padding(3).Column(d =>
                         {
                             d.Spacing(3);
                             d.Item().Text("Dispatch").Bold().FontSize(8);
@@ -241,7 +277,7 @@ public sealed class HistologyReportRenderer
                                     grid.Cell().PaddingVertical(2)
                                         .Text(lbl).FontSize(8);
                                 void GridBox() =>
-                                    grid.Cell().Border(0.5f).MinHeight(12);
+                                    grid.Cell().Border(0.5f).MinHeight(22);
 
                                 GridHeader(string.Empty); GridHeader("L"); GridHeader("S");
                                 GridLabel("No. Blocks"); GridBox(); GridBox();
@@ -281,7 +317,8 @@ public sealed class HistologyReportRenderer
                     });
                 });
 
-                page.Content().Column(col =>
+                // ── Report header (repeats on every page, per legacy) ───────────
+                page.Header().Column(col =>
                 {
                     col.Spacing(3);
 
@@ -329,9 +366,13 @@ public sealed class HistologyReportRenderer
                             centre.Spacing(0);
 
                             // Title bar: white text on black background.
+                            // Fixed height + vertical centring so it aligns exactly with the
+                            // batch-type badge in the right panel (both bars share the same height).
                             centre.Item()
                                   .Background(Colors.Black)
-                                  .PaddingVertical(5).PaddingHorizontal(4)
+                                  .Height(24)
+                                  .PaddingHorizontal(4)
+                                  .AlignMiddle()
                                   .AlignCenter()
                                   .Text("HISTOLOGY SUBMISSION FORM")
                                   .Bold().FontSize(13).FontColor(Colors.White);
@@ -367,9 +408,12 @@ public sealed class HistologyReportRenderer
                             right.Spacing(0);
 
                             // BatchType badge: white text on black background.
+                            // Same fixed height as the centre title bar so both align exactly.
                             right.Item()
                                  .Background(Colors.Black)
-                                 .PaddingVertical(5).PaddingHorizontal(4)
+                                 .Height(24)
+                                 .PaddingHorizontal(4)
+                                 .AlignMiddle()
                                  .AlignCenter()
                                  .Text(batchType)
                                  .Bold().FontSize(12).FontColor(Colors.White);
@@ -403,82 +447,104 @@ public sealed class HistologyReportRenderer
                        .AlignCenter()
                        .Text("It is essential that this form is dated and initialled at completion of each stage")
                        .Italic().FontSize(7.5f);
+                });
 
+                page.Content().Column(col =>
+                {
                     // ════════════════════════════════════════════════════════════
                     // SECTIONS 1 + 2 — PageHeader + Detail
-                    // 13-column submission table.
-                    // Columns 1–4 carry data; columns 5–13 are pre-printed blanks
-                    // for manual completion by lab staff.
+                    // 13-column submission table, paginated at exactly 13 rows per page
+                    // (matches legacy Crystal Reports). Column headers repeat per chunk;
+                    // the report header (SECTION 0) and 4-panel footer repeat via the
+                    // page-level Header()/Footer(), so every page carries both.
+                    // Columns 1–4 carry data; columns 5–13 are pre-printed blanks.
                     // RepeatBlock rule: "*" suffix on BlockRef when truthy.
                     // ════════════════════════════════════════════════════════════
-                    col.Item().Table(t =>
+                    // Configurable page size (legacy default 13); guarded against non-positive values.
+                    int RowsPerPage = rowsPerPage > 0 ? rowsPerPage : 13;
+                    var pageChunks = submissionRows
+                        .Select((row, i) => (row, i))
+                        .GroupBy(x => x.i / RowsPerPage)
+                        .Select(g => g.Select(x => x.row).ToList())
+                        .ToList();
+                    if (pageChunks.Count == 0) pageChunks.Add([]);
+
+                    for (int chunkIndex = 0; chunkIndex < pageChunks.Count; chunkIndex++)
                     {
-                        t.ColumnsDefinition(c =>
+                        var chunk = pageChunks[chunkIndex];
+                        col.Item().Table(t =>
                         {
-                            c.RelativeColumn(10); // 1  Sender Ref
-                            c.RelativeColumn(9);  // 2  Histology Ref
-                            c.RelativeColumn(6);  // 3  Block Ref
-                            c.RelativeColumn(9);  // 4  Tissue Code
-                            c.RelativeColumn(6);  // 5  Block      (blank)
-                            c.RelativeColumn(5);  // 6  Cass       (blank)
-                            c.RelativeColumn(6);  // 7  Embed      (blank)
-                            c.RelativeColumn(6);  // 8  Section    (blank)
-                            c.RelativeColumn(7);  // 9  Block Filed (blank)
-                            c.RelativeColumn(6);  // 10 Stain      (blank)
-                            c.RelativeColumn(6);  // 11 QC Code    (blank)
-                            c.RelativeColumn(14); // 12 Comments   (CustomerRef)
-                            c.RelativeColumn(10); // 13 Dispatch   (blank)
+                            t.ColumnsDefinition(c =>
+                            {
+                                c.RelativeColumn(10); // 1  Sender Ref
+                                c.RelativeColumn(9);  // 2  Histology Ref
+                                c.RelativeColumn(6);  // 3  Block Ref
+                                c.RelativeColumn(9);  // 4  Tissue Code
+                                c.RelativeColumn(6);  // 5  Block      (blank)
+                                c.RelativeColumn(5);  // 6  Cass       (blank)
+                                c.RelativeColumn(6);  // 7  Embed      (blank)
+                                c.RelativeColumn(6);  // 8  Section    (blank)
+                                c.RelativeColumn(7);  // 9  Block Filed (blank)
+                                c.RelativeColumn(6);  // 10 Stain      (blank)
+                                c.RelativeColumn(6);  // 11 QC Code    (blank)
+                                c.RelativeColumn(14); // 12 Comments   (CustomerRef)
+                                c.RelativeColumn(10); // 13 Dispatch   (blank)
+                            });
+
+                            t.Header(h =>
+                            {
+                                void Th(string lbl) =>
+                                    h.Cell()
+                                     .Background(Colors.Grey.Lighten3)
+                                     .Border(0.5f)
+                                     .PaddingVertical(2).PaddingHorizontal(2)
+                                     .Text(lbl).Bold().FontSize(7.5f);
+
+                                Th("Sender Ref");
+                                Th("Histology\nRef");
+                                Th("Block\nRef");
+                                Th("Tissue\nCode");
+                                Th("Block");
+                                Th("Cass");
+                                Th("Embed");
+                                Th("Section");
+                                Th("Block\nFiled");
+                                Th("Stain");
+                                Th("QC\nCode");
+                                Th("Comments");
+                                Th("Dispatch");
+                            });
+
+                            foreach (var row in chunk)
+                            {
+                                var blockRef = Field(row, "BlockRef")
+                                    + (IsRepeatBlock(Field(row, "RepeatBlock")) ? "*" : string.Empty);
+
+                                void Td(string v) =>
+                                    t.Cell().Border(0.5f)
+                                     .PaddingVertical(2).PaddingHorizontal(2)
+                                     .Text(v).FontSize(8);
+
+                                Td(Field(row, "SenderRef"));
+                                Td(Field(row, "HistologyRef"));
+                                Td(blockRef);
+                                Td(Field(row, "TissueDetails"));
+                                Td(string.Empty); // Block
+                                Td(string.Empty); // Cass
+                                Td(string.Empty); // Embed
+                                Td(string.Empty); // Section
+                                Td(string.Empty); // Block Filed
+                                Td(string.Empty); // Stain
+                                Td(string.Empty); // QC Code
+                                Td(Field(row, "CustomerRef")); // Comments column
+                                Td(string.Empty); // Dispatch
+                            }
                         });
 
-                        t.Header(h =>
-                        {
-                            void Th(string lbl) =>
-                                h.Cell()
-                                 .Background(Colors.Grey.Lighten3)
-                                 .Border(0.5f)
-                                 .PaddingVertical(2).PaddingHorizontal(2)
-                                 .Text(lbl).Bold().FontSize(7.5f);
-
-                            Th("Sender Ref");
-                            Th("Histology\nRef");
-                            Th("Block\nRef");
-                            Th("Tissue\nCode");
-                            Th("Block");
-                            Th("Cass");
-                            Th("Embed");
-                            Th("Section");
-                            Th("Block\nFiled");
-                            Th("Stain");
-                            Th("QC\nCode");
-                            Th("Comments");
-                            Th("Dispatch");
-                        });
-
-                        foreach (var row in submissionRows)
-                        {
-                            var blockRef = Field(row, "BlockRef")
-                                + (IsRepeatBlock(Field(row, "RepeatBlock")) ? "*" : string.Empty);
-
-                            void Td(string v) =>
-                                t.Cell().Border(0.5f)
-                                 .PaddingVertical(2).PaddingHorizontal(2)
-                                 .Text(v).FontSize(8);
-
-                            Td(Field(row, "SenderRef"));
-                            Td(Field(row, "HistologyRef"));
-                            Td(blockRef);
-                            Td(Field(row, "TissueDetails"));
-                            Td(string.Empty); // Block
-                            Td(string.Empty); // Cass
-                            Td(string.Empty); // Embed
-                            Td(string.Empty); // Section
-                            Td(string.Empty); // Block Filed
-                            Td(string.Empty); // Stain
-                            Td(string.Empty); // QC Code
-                            Td(Field(row, "CustomerRef")); // Comments column
-                            Td(string.Empty); // Dispatch
-                        }
-                    });
+                        // Force a new page after each full chunk except the last.
+                        if (chunkIndex < pageChunks.Count - 1)
+                            col.Item().PageBreak();
+                    }
 
                 });
             });
@@ -489,8 +555,34 @@ public sealed class HistologyReportRenderer
 
     // ── Private helpers ──────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Safe field extractor. Returns <see cref="string.Empty"/> when the column
+    /// <summary>    /// Renders a legacy-style square checkbox (a bordered box, not a tiny Unicode glyph) followed
+    /// by its label. When <paramref name="trailingLine"/> is set, a fill-in underline follows the
+    /// label (used for "Other ____"). Replaces the Wingdings Chr(252) tick from the legacy form.
+    /// </summary>
+    private static void CheckboxItem(IContainer item, bool isChecked, string label,
+        bool trailingLine = false, string trailingValue = "")
+    {
+        item.PaddingBottom(3).Row(row =>
+        {
+            // AlignMiddle before Height so the fixed 9×9 box is vertically centred in the row
+            // rather than stretched to the taller label height — stretching left glitched corners.
+            row.ConstantItem(9).AlignMiddle().Width(9).Height(9).Border(0.75f).AlignMiddle().AlignCenter()
+               .Text(isChecked ? "X" : string.Empty).FontSize(7).Bold();
+            row.ConstantItem(4);
+            if (trailingLine)
+            {
+                row.ConstantItem(30).AlignMiddle().Text(label).FontSize(8);
+                row.RelativeItem().AlignBottom().PaddingBottom(1).BorderBottom(0.75f)
+                   .Text(trailingValue).FontSize(8);
+            }
+            else
+            {
+                row.RelativeItem().AlignMiddle().Text(label).FontSize(8);
+            }
+        });
+    }
+
+    /// <summary>    /// Safe field extractor. Returns <see cref="string.Empty"/> when the column
     /// is absent, the row value is <see cref="DBNull"/>, or the value is null.
     /// </summary>
     private static string Field(DataRow row, string column)

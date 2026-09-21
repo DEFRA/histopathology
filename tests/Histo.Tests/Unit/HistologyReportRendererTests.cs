@@ -188,6 +188,34 @@ public class HistologyReportRendererTests
     }
 
     [Fact]
+    public async Task RenderAsync_MoreThan13Rows_PaginatesWithoutOverflow()
+    {
+        // 28 rows (matching batch 10243) must span multiple pages at 13/page without
+        // a QuestPDF layout overflow — guards the chunked-pagination logic.
+        var renderer = new HistologyReportRenderer();
+        var ds       = BuildTestDataSet();
+
+        var submissions = ds.Tables["BatchSubmission"]!;
+        submissions.Rows.Clear();
+        for (int i = 1; i <= 28; i++)
+        {
+            var r = submissions.NewRow();
+            r["BatchID"]       = "42";
+            r["SenderRef"]     = $"15/P220/06/{i:D2}";
+            r["HistologyRef"]  = $"11/{42879 + i}";
+            r["BlockRef"]      = i.ToString("D2");
+            r["TissueDetails"] = "Viscera";
+            r["RepeatBlock"]   = "";
+            r["CustomerRef"]   = $"visc {i}";
+            submissions.Rows.Add(r);
+        }
+
+        var pdf = await renderer.RenderAsync(ds);
+
+        Assert.True(pdf.Length > 0, "28-row report should render to a non-empty multi-page PDF.");
+    }
+
+    [Fact]
     public async Task RenderAsync_EmptyHistologyRows_StillProducesPdf()
     {
         var renderer = new HistologyReportRenderer();

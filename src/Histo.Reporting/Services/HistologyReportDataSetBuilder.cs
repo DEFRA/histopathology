@@ -31,6 +31,12 @@ public sealed class HistologyReportDataSetBuilder
     // Legacy source: HistopathologySystem/Common.vb — LOOKUP_CONTACTS / LOOKUP_PROJECTS
     private const int LookupContacts = 18;
     private const int LookupProjects = 19;
+    private const int LookupFixation = 10;     // LOOKUP_FIXATION — keyed on Code (ddlFixation.DataValueField = "Code")
+    private const int LookupTimeReceived = 3;  // LOOKUP_TIME_RECEIVED — keyed on Code
+    private const int LookupSubmittedAs = 11;  // LOOKUP_SUBMITTEDAS — keyed on Code (GetBatchSubmittedAs returns Code only, no Description)
+    private const int LookupSpecialStain = 6;      // LOOKUP_SPECIAL_STAIN
+    private const int LookupTseAntibodies = 4;     // LOOKUP_TSE_ANTIBODIES
+    private const int LookupNonTseAntibodies = 5;  // LOOKUP_NONTSE_ANTIBODIES
 
     private readonly IDbConnectionFactory _db;
     private readonly IConfiguration _config;
@@ -75,8 +81,8 @@ public sealed class HistologyReportDataSetBuilder
 
         var rawBatch      = (await commonGrid.ReadAsync()).Cast<IDictionary<string, object>>().ToList();
         var rawHistology  = (await commonGrid.ReadAsync()).Cast<IDictionary<string, object>>().ToList();
-        _                 = await commonGrid.ReadAsync(); // antibodies — not needed for this report
-        _                 = await commonGrid.ReadAsync(); // stains     — not needed for this report
+        var rawAntibodies = (await commonGrid.ReadAsync()).Cast<IDictionary<string, object>>().ToList(); // [2] — expanded into the Histology Required section for IHC codes
+        var rawStains     = (await commonGrid.ReadAsync()).Cast<IDictionary<string, object>>().ToList(); // [3] — expanded into the Histology Required section for Special Stain code
         var rawPostFix    = (await commonGrid.ReadAsync()).Cast<IDictionary<string, object>>().ToList();
         var rawSubmittedAs = (await commonGrid.ReadAsync()).Cast<IDictionary<string, object>>().ToList();
 
@@ -100,20 +106,59 @@ public sealed class HistologyReportDataSetBuilder
         var speciesTask   = _lookups.GetSpeciesLookupAsync(ct);
         var projectsTask  = _lookups.GetLookupDataAsync(LookupProjects, includeInactive: true, ct: ct);
         var contactsTask  = _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true, ct: ct);
+        var fixationTask  = _lookups.GetLookupDataAsync(LookupFixation, includeInactive: true, ct: ct);
+        var timeReceivedTask = _lookups.GetLookupDataAsync(LookupTimeReceived, includeInactive: true, ct: ct);
+        var submittedAsTask = _lookups.GetLookupDataAsync(LookupSubmittedAs, includeInactive: true, ct: ct);
+        // Histology Required section lookups (legacy GetHistologyListType / GetListType).
+        var histologyTask = _lookups.GetHistologyTypesAsync(ct);
+        var specialStainTask = _lookups.GetLookupDataAsync(LookupSpecialStain, includeInactive: true, ct: ct);
+        var tseAntibodiesTask = _lookups.GetLookupDataAsync(LookupTseAntibodies, includeInactive: true, ct: ct);
+        var nonTseAntibodiesTask = _lookups.GetLookupDataAsync(LookupNonTseAntibodies, includeInactive: true, ct: ct);
         var usersTask     = _users.GetAllUsersAsync(ct);
-        await Task.WhenAll(speciesTask, projectsTask, contactsTask, usersTask);
+        await Task.WhenAll(speciesTask, projectsTask, contactsTask, fixationTask, timeReceivedTask, submittedAsTask,
+            histologyTask, specialStainTask, tseAntibodiesTask, nonTseAntibodiesTask, usersTask);
 
         var speciesById  = speciesTask.Result.ToDictionary(s => s.ID.ToString(), s => s.Name, StringComparer.OrdinalIgnoreCase);
         var projectsById = projectsTask.Result.ToDictionary(p => p.ID.ToString(), p => p.Name, StringComparer.OrdinalIgnoreCase);
         var contactsById = contactsTask.Result.ToDictionary(c => c.ID.ToString(), c => c.Name, StringComparer.OrdinalIgnoreCase);
+        // Fixation/TimeReceived are Code-keyed (not ID) — tblBatch stores the Code, matching
+        // how BatchDetails/ReceiveBatch resolve them. GroupBy guards against duplicate/blank codes.
+        var fixationByCode = fixationTask.Result
+            .Where(f => !string.IsNullOrEmpty(f.Code))
+            .GroupBy(f => f.Code!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Name, StringComparer.OrdinalIgnoreCase);
+        var timeReceivedByCode = timeReceivedTask.Result
+            .Where(t => !string.IsNullOrEmpty(t.Code))
+            .GroupBy(t => t.Code!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Name, StringComparer.OrdinalIgnoreCase);
+        var submittedAsByCode = submittedAsTask.Result
+            .Where(s => !string.IsNullOrEmpty(s.Code))
+            .GroupBy(s => s.Code!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Name, StringComparer.OrdinalIgnoreCase);
         var userById      = usersTask.Result.ToDictionary(u => u.UserID, u => u.Name);
+
+        // Histology Required lookups — all keyed on Code (matches legacy DataView.Find on "Code").
+        static Dictionary<string, string> ByCode(IReadOnlyList<Administration.Models.LookupItem> items) => items
+            .Where(i => !string.IsNullOrEmpty(i.Code))
+            .GroupBy(i => i.Code!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Name, StringComparer.OrdinalIgnoreCase);
+        var histologyByCode         = ByCode(histologyTask.Result);
+        var specialStainByCode      = ByCode(specialStainTask.Result);
+        var tseAntibodiesByCode     = ByCode(tseAntibodiesTask.Result);
+        var nonTseAntibodiesByCode  = ByCode(nonTseAntibodiesTask.Result);
+
+        int batchType = rawBatch.Count > 0 && rawBatch[0].TryGetValue("BatchType", out var btVal)
+            ? Convert.ToInt32(btVal ?? 0) : 0;
 
         // ── 3. Assemble the report DataSet ───────────────────────────────────
         var ds = new DataSet("HistologyReport");
 
-        ds.Tables.Add(BuildBatchTable(rawBatch, rawSubmittedAs, batchId, speciesById, projectsById, contactsById, userById));
+        // Total Samples = the batch's animal (sample) count — the header SP returns no such
+        // column, matching BatchDetails.SampleCount = GetAnimalsByBatchAsync().Count.
+        ds.Tables.Add(BuildBatchTable(rawBatch, rawSubmittedAs, batchId, speciesById, projectsById, contactsById, userById, fixationByCode, timeReceivedByCode, submittedAsByCode, rawAnimals.Count));
         ds.Tables.Add(BuildPostFixationTable(rawPostFix, batchId));
-        ds.Tables.Add(BuildHistologyTable(rawHistology, batchId));
+        ds.Tables.Add(BuildHistologyTable(rawHistology, batchId, rawAntibodies, rawStains, batchType,
+            histologyByCode, specialStainByCode, tseAntibodiesByCode, nonTseAntibodiesByCode));
         ds.Tables.Add(BuildSubmissionTable(rawBatchSubmissions, rawTissues, rawAnimals, batchId));
         ds.Tables.Add(BuildVersionTable(rawBatch));
 
@@ -129,7 +174,11 @@ public sealed class HistologyReportDataSetBuilder
         IReadOnlyDictionary<string, string>? speciesById = null,
         IReadOnlyDictionary<string, string>? projectsById = null,
         IReadOnlyDictionary<string, string>? contactsById = null,
-        IReadOnlyDictionary<int, string>? userById = null)
+        IReadOnlyDictionary<int, string>? userById = null,
+        IReadOnlyDictionary<string, string>? fixationByCode = null,
+        IReadOnlyDictionary<string, string>? timeReceivedByCode = null,
+        IReadOnlyDictionary<string, string>? submittedAsByCode = null,
+        int sampleCount = 0)
     {
         var dt = new DataTable("Batch");
         dt.Columns.Add("ProjectContractCode");
@@ -176,17 +225,25 @@ public sealed class HistologyReportDataSetBuilder
         dr["Species"]          = speciesById is not null && speciesById.TryGetValue(rawSpecies, out var sn)
             ? sn : rawSpecies;
         dr["DateReceived"]     = Str(src, "DateReceived");
-        dr["TimeReceived"]     = Str(src, "TimeReceived");
+        // TimeReceived is a Code (foreign key to LOOKUP_TIME_RECEIVED = 3) — resolve to its
+        // display text (e.g. "before 11.00"); falls back to the raw code when unresolved.
+        var rawTimeReceived   = Str(src, "TimeReceived");
+        dr["TimeReceived"]     = timeReceivedByCode is not null && timeReceivedByCode.TryGetValue(rawTimeReceived, out var trn)
+            ? trn : rawTimeReceived;
         dr["SafeToHandle"]     = Bool(src, "SafeToHandle");
         dr["Comments"]         = Str(src, "Comments");
-        dr["Fixation"]         = Str(src, "Fixation");
+        // Fixation is a Code (foreign key to LOOKUP_FIXATION = 10, keyed on Code not ID) —
+        // resolve to its display text (e.g. "Other"); falls back to the raw code when unresolved.
+        var rawFixation       = Str(src, "Fixation");
+        dr["Fixation"]         = fixationByCode is not null && fixationByCode.TryGetValue(rawFixation, out var fxn)
+            ? fxn : rawFixation;
         dr["PostFixationOther"] = Str(src, "PostFixationOther");
         var rawSubmittedBy     = Str(src, "OtherSubmittedBy");
         dr["OtherSubmittedBy"] = userById is not null
             && int.TryParse(rawSubmittedBy, out var submittedByUserId)
             && userById.TryGetValue(submittedByUserId, out var sbn)
                 ? sbn : rawSubmittedBy;
-        dr["NumberSamples"]    = Str(src, "NumberSamples");
+        dr["NumberSamples"]    = sampleCount.ToString();
         dr["MoreHistology"]    = string.Empty; // set below if any histology overflows
 
         // BatchType label — matches legacy "TSE" / "NON TSE" display
@@ -194,12 +251,17 @@ public sealed class HistologyReportDataSetBuilder
             ? Convert.ToInt32(btVal ?? 0) : 0;
         dr["BatchType"] = batchType == 0 ? "TSE" : "NON TSE";
 
-        // SubmittedAs — concatenate all SubmittedAs descriptions for this batch
-        var submittedAsCodes = rawSubmittedAs
+        // SubmittedAs — GetBatchSubmittedAs returns Code only (no Description); resolve each
+        // Code to its display name via LOOKUP_SUBMITTEDAS (table 11), then concatenate.
+        var submittedAsNames = rawSubmittedAs
             .Where(r => r.TryGetValue("BatchID", out var bid) && Convert.ToInt32(bid) == batchId)
-            .Select(r => Str(r, "Description"))
+            .Select(r =>
+            {
+                var code = Str(r, "Code");
+                return submittedAsByCode is not null && submittedAsByCode.TryGetValue(code, out var n) ? n : code;
+            })
             .Where(s => !string.IsNullOrWhiteSpace(s));
-        dr["SubmittedAs"] = string.Join(", ", submittedAsCodes);
+        dr["SubmittedAs"] = string.Join(", ", submittedAsNames);
 
         // CommentLengthOK — flag if comments exceed the visible limit (150 chars, matches legacy)
         var comments = dr["Comments"]?.ToString() ?? string.Empty;
@@ -241,20 +303,83 @@ public sealed class HistologyReportDataSetBuilder
         return dt;
     }
 
+    /// <summary>
+    /// Builds the "Histology Required" sub-report table, replicating legacy
+    /// <c>SubmissionForm.aspx.vb::CreateBatchTestTable</c>: each histology <c>Code</c> is
+    /// resolved to its display name, and the Special Stain (code 3) and IHC (codes 4/6) flags
+    /// are expanded into their actual test rows from the Antibodies/Stains result sets.
+    /// The resolved display text is stored in the <c>Code</c> column (as legacy does).
+    /// Capped at 8 rows (legacy limit).
+    /// </summary>
+    /// <param name="batchType">0 = TSE (uses table 4 antibodies), else Non-TSE (table 5).</param>
     internal static DataTable BuildHistologyTable(
         IList<IDictionary<string, object>> rawHistology,
-        int batchId)
+        int batchId,
+        IList<IDictionary<string, object>>? rawAntibodies = null,
+        IList<IDictionary<string, object>>? rawStains = null,
+        int batchType = 0,
+        IReadOnlyDictionary<string, string>? histologyByCode = null,
+        IReadOnlyDictionary<string, string>? specialStainByCode = null,
+        IReadOnlyDictionary<string, string>? tseAntibodiesByCode = null,
+        IReadOnlyDictionary<string, string>? nonTseAntibodiesByCode = null)
     {
+        const int MaxRows = 8; // legacy caps the Histology Required list at 8 entries
         var dt = new DataTable("BatchHistology");
         dt.Columns.Add("BatchID", typeof(int));
-        dt.Columns.Add("Code");
+        dt.Columns.Add("Code"); // holds the resolved DESCRIPTION (matches legacy sub-report shape)
 
-        foreach (var row in rawHistology)
+        rawAntibodies ??= [];
+        rawStains ??= [];
+
+        string ResolveHistology(string code) =>
+            histologyByCode is not null && histologyByCode.TryGetValue(code, out var d) ? d : code;
+        string ResolveStain(string code) =>
+            code == "Other" ? "Special Other"
+            : specialStainByCode is not null && specialStainByCode.TryGetValue(code, out var d) ? d : code;
+        string ResolveAntibody(string code)
+        {
+            if (code == "Other") return "IHC-PrP Other";
+            var lookup = batchType == 0 ? tseAntibodiesByCode : nonTseAntibodiesByCode;
+            return lookup is not null && lookup.TryGetValue(code, out var d) ? d : code;
+        }
+
+        void Add(string description)
         {
             var dr = dt.NewRow();
             dr["BatchID"] = batchId;
-            dr["Code"]    = Str(row, "Code");
+            dr["Code"]    = description;
             dt.Rows.Add(dr);
+        }
+
+        foreach (var hrow in rawHistology)
+        {
+            if (dt.Rows.Count >= MaxRows) break;
+            var code = Str(hrow, "Code");
+            switch (code)
+            {
+                // Direct histology tests (EO/H&E/H&E-BSE/Archive) — resolve to description.
+                case "1" or "2" or "5" or "7":
+                    Add(ResolveHistology(code));
+                    break;
+
+                // Special Stain flag — expand into the batch's actual special-stain rows.
+                case "3":
+                    foreach (var srow in rawStains)
+                    {
+                        if (dt.Rows.Count >= MaxRows) break;
+                        Add(ResolveStain(Str(srow, "Code")));
+                    }
+                    break;
+
+                // IHC-PrP / IHC-Other flags — expand into the batch's actual antibody rows.
+                case "4" or "6":
+                    foreach (var arow in rawAntibodies)
+                    {
+                        if (dt.Rows.Count >= MaxRows) break;
+                        Add(ResolveAntibody(Str(arow, "Code")));
+                    }
+                    break;
+            }
         }
 
         return dt;
