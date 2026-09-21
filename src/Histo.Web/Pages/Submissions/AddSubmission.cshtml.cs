@@ -1,5 +1,7 @@
 using Histo.Administration.Interfaces;
 using Histo.Core.Domain;
+using Histo.Histology.Interfaces;
+using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -13,13 +15,15 @@ public class AddSubmissionModel : HistoPageModel
     private readonly ISubmissionService _submissions;
     private readonly IBatchService _batches;
     private readonly ILookupService _lookups;
+    private readonly IBlockService _blocks;
 
-    public AddSubmissionModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups)
+    public AddSubmissionModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups, IBlockService blocks)
         : base(session)
     {
         _submissions = submissions;
         _batches = batches;
         _lookups = lookups;
+        _blocks = blocks;
     }
 
     /// <summary>Batch ID from the URL (route/query). Falls back to <see cref="ISessionService.BatchID"/>.</summary>
@@ -89,16 +93,50 @@ public class AddSubmissionModel : HistoPageModel
 
         Session.BatchSubmissionID = submissionId;
 
-        // Legacy source: AddSubmission.aspx.vb — bNeuropath is derived from the user's area
-        // (SV_HeaderUserArea = "Neuropath"), never from a manual form control.
-        var isNeuropath = Session.UserArea == "Neuropath";
-        var newAnimalId = await _submissions.AddAnimalAsync(submissionId.Value, SenderRef, isNeuropath, Session.UserID);
-        if (newAnimalId <= 0)
+        var batch = await _batches.GetByIdAsync(batchId.Value);
+
+        int newAnimalId;
+        if (batch?.IsPreCassetted == true)
         {
-            // AddAnimalAsync swallows the underlying SQL exception and returns 0 on failure —
-            // redirecting anyway here previously hid the fact that no sample was actually saved.
-            ModelError = "Could not add the sample. Please try again.";
-            return Page();
+            // Pre-cassetted samples may only use a block ref already pre-booked for this sender
+            // (Book Blocks) — legacy: clsBlock.NewBlock -> GetPreBookedBlock. Checking here, before
+            // navigating away, avoids the user only finding out on the block page that nothing is
+            // available. Reuses the pre-booked animal's own ID so its pre-booked blocks carry over.
+            // A sender ref can match more than one animal row (e.g. an unrelated past submission
+            // with no pre-booked blocks, alongside the actual pre-booked placeholder) — check each
+            // candidate rather than assuming the first match is the pre-booked one.
+            Block[] preBookedBlocks = [];
+            SenderSearchResult? preBookedAnimal = null;
+            foreach (var candidate in await _submissions.GetAnimalBySenderAsync(SenderRef))
+            {
+                var candidateBlocks = await _blocks.GetPreBookedByAnimalAsync(candidate.ID);
+                if (candidateBlocks.Count == 0) continue;
+                preBookedAnimal = candidate;
+                preBookedBlocks = [.. candidateBlocks];
+                break;
+            }
+
+            if (preBookedAnimal is null || preBookedBlocks.Length == 0)
+            {
+                ModelError = "This sender reference has no pre-booked block. Book a block reference for this sender before adding the sample.";
+                return Page();
+            }
+
+            newAnimalId = preBookedAnimal.ID;
+        }
+        else
+        {
+            // Legacy source: AddSubmission.aspx.vb — bNeuropath is derived from the user's area
+            // (SV_HeaderUserArea = "Neuropath"), never from a manual form control.
+            var isNeuropath = Session.UserArea == "Neuropath";
+            newAnimalId = await _submissions.AddAnimalAsync(submissionId.Value, SenderRef, isNeuropath, Session.UserID);
+            if (newAnimalId <= 0)
+            {
+                // AddAnimalAsync swallows the underlying SQL exception and returns 0 on failure —
+                // redirecting anyway here previously hid the fact that no sample was actually saved.
+                ModelError = "Could not add the sample. Please try again.";
+                return Page();
+            }
         }
 
         // Legacy AddSubmission.aspx::btnNext_Click continues straight into the per-sample detail
@@ -140,12 +178,14 @@ public class AddSubmissionModel : HistoPageModel
                 return RedirectToPage("/Submissions/SampleSummary", new { batchId });
             }
 
+            Session.SampleDetailReturnPage = $"/Submissions/SampleSummary?batchId={batchId}";
             return RedirectToPage("/Submissions/SubmissionDetails", new { batchId, animalId = newAnimalId });
         }
 
         if (SourceAnimalId is > 0)
             return RedirectToPage("/Submissions/SampleSummary", new { batchId });
 
+        Session.SampleDetailReturnPage = $"/Submissions/SampleSummary?batchId={batchId}";
         return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = newAnimalId });
     }
 

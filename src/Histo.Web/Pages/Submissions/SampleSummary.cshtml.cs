@@ -95,6 +95,12 @@ public class SampleSummaryModel : HistoPageModel
     /// </summary>
     public bool IsViewMode => Session.IsViewSubmissionMode;
 
+    /// <summary>Back-link target — whichever of BatchDetails/EditBatch's "Samples" button was
+    /// actually used to get here (see <see cref="ISessionService.SampleSummaryReturnPage"/>).</summary>
+    public string BackLinkPage => string.IsNullOrWhiteSpace(Session.SampleSummaryReturnPage)
+        ? "/Batches/BatchDetails"
+        : Session.SampleSummaryReturnPage;
+
     public async Task<IActionResult> OnGetAsync()
     {
         ViewData["Title"] = "Sample summary";
@@ -194,6 +200,10 @@ public class SampleSummaryModel : HistoPageModel
         var batchId = BatchId ?? Session.BatchID;
         if (batchId is null or <= 0) return RedirectToPage("/Index");
 
+        // Preserve the current sample summary as the landing point when the user hits Back from
+        // the detail screen, rather than forcing a fixed jump back to the batch summary.
+        Session.SampleDetailReturnPage = $"/Submissions/SampleSummary?batchId={batchId.Value}";
+
         // Re-resolve submission type server-side on POST.
         // Do not trust the hidden field from the view for routing decisions.
         var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId.Value);
@@ -250,7 +260,11 @@ public class SampleSummaryModel : HistoPageModel
         var batchId = BatchId ?? Session.BatchID;
         if (batchId is null or <= 0) return RedirectToPage("/Index");
 
-        var animals = await _submissions.GetAnimalsByBatchAsync(batchId.Value);
+        // Same merge as OnGetAsync — GetAnimalsByBatchAsync alone misses samples that only exist
+        // via a block assignment, which was wrongly reporting "no samples" for such batches.
+        var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(batchId.Value);
+        var allAnimals = await _submissions.GetAnimalsByBatchAsync(batchId.Value);
+        var animals = blockAnimals.Count > 0 ? MergeAnimals(blockAnimals, allAnimals) : allAnimals;
         if (animals.Count == 0)
         {
             TempData["SampleSummary_Error"] = "You must add at least one sample before finishing this submission.";

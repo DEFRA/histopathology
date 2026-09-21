@@ -33,9 +33,10 @@ public class BlockDetailsModel : HistoPageModel
     private readonly IBatchService _batches;
     private readonly ILookupService _lookups;
     private readonly IBlockTestService _blockTests;
+    private readonly IHistologyRefService _histologyRefs;
 
     public BlockDetailsModel(ISessionService session, ISubmissionService submissions, IBlockService blocks,
-        IBatchService batches, ILookupService lookups, IBlockTestService blockTests)
+        IBatchService batches, ILookupService lookups, IBlockTestService blockTests, IHistologyRefService histologyRefs)
         : base(session)
     {
         _submissions = submissions;
@@ -43,6 +44,7 @@ public class BlockDetailsModel : HistoPageModel
         _batches = batches;
         _lookups = lookups;
         _blockTests = blockTests;
+        _histologyRefs = histologyRefs;
     }
 
     [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
@@ -95,6 +97,12 @@ public class BlockDetailsModel : HistoPageModel
     /// <summary>Legacy: chkbCarryTests — "Use these tests for the next block?", read by the Next Block handler.</summary>
     [BindProperty] public bool CarryTestsToNextBlock { get; set; }
 
+    /// <summary>Histology Reference for the sample (NN/NNNNN format). Stored on Animal record.</summary>
+    [BindProperty] public string? EditHistologyRef { get; set; }
+
+    /// <summary>Post-mortem Date for the sample. Stored on Animal record.</summary>
+    [BindProperty] public string? EditPMDate { get; set; }
+
     public Animal? Animal { get; private set; }
     public Batch? Batch { get; private set; }
     public Block? Block { get; private set; }
@@ -142,6 +150,9 @@ public class BlockDetailsModel : HistoPageModel
         if (redirect is not null) return redirect;
         if (Animal is null) return Page();
 
+        // Initialize Histology Reference and PM Date from Animal record
+        EditHistologyRef = Animal.HistologyRef;
+        EditPMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
         await LoadSupportingDataAsync();
 
         if (IsEditMode)
@@ -200,12 +211,60 @@ public class BlockDetailsModel : HistoPageModel
         return Page();
     }
 
-    /// <summary>Creates a new block, or saves ref/customer ref/repeat changes to an existing one.</summary>
-    public async Task<IActionResult> OnPostSaveAsync()
+    /// <summary>Saves the block (ref/customer ref/repeat/comment) and its test selections together — replaces the former separate Save block/Save tests actions.</summary>
+    public async Task<IActionResult> OnPostDoneAsync()
     {
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
         if (Animal is null) return RedirectToPage("/Submissions/SampleSummary", new { batchId = BatchId });
+
+        // Validate Histology Reference before proceeding
+        var histoRefError = await ValidateHistologyRefAsync(EditHistologyRef);
+        if (histoRefError is not null)
+        {
+            ErrorMessage = histoRefError;
+            var attemptedHistoRef = EditHistologyRef;
+            var attemptedPmDate = EditPMDate;
+            if (!await LoadEditModeDataAsync()) return Page();
+            EditHistologyRef = attemptedHistoRef;
+            EditPMDate = attemptedPmDate;
+            return Page();
+        }
+
+        // Validate test selections up front too, so nothing is saved at all if either half is invalid.
+        var testsError = ValidateTestSelections(SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes);
+        if (testsError is not null)
+        {
+            ErrorMessage = testsError;
+            ExistingHistologyCodes = SelectedHistologyCodes;
+            ExistingAntibodyCodes = SelectedAntibodyCodes;
+            ExistingStainCodes = SelectedStainCodes;
+            await LoadSupportingDataAsync();
+            await LoadEditModeDataAsync();
+            return Page();
+        }
+
+        // Save Histology Reference and PM Date to Animal record if they've changed
+        if (Animal is not null && (Animal.HistologyRef != EditHistologyRef || Animal.PMDate != EditPMDate))
+        {
+            var updatedAnimal = new Animal
+            {
+                ID = Animal.ID,
+                BatchSubmissionID = Animal.BatchSubmissionID,
+                SenderRef = Animal.SenderRef,
+                NextBlockRef = Animal.NextBlockRef,
+                HistoRefSet = !string.IsNullOrWhiteSpace(EditHistologyRef),
+                HistologyRef = EditHistologyRef,
+                OnHold = Animal.OnHold,
+                PMDate = DateFormatHelpers.ToLegacyDate(EditPMDate),
+                PMDateSet = !string.IsNullOrWhiteSpace(EditPMDate),
+                IsPGNumber = Animal.IsPGNumber,
+                BookedHistologyRef = Animal.BookedHistologyRef,
+                RowStamp = Animal.RowStamp,
+            };
+            await _submissions.UpdateAnimalAsync(updatedAnimal, Session.UserID);
+            Animal = updatedAnimal; // Update the local reference
+        }
 
         await LoadSupportingDataAsync();
         var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
@@ -233,6 +292,8 @@ public class BlockDetailsModel : HistoPageModel
                 RowStamp = existing.RowStamp,
             };
             await _blocks.UpdateBlockAsync(updated, Session.UserID);
+            await _blockTests.SaveTestSelectionsAsync(
+                BatchId ?? 0, existing.ID, SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes, Session.UserID);
             return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
         }
 
@@ -285,6 +346,8 @@ public class BlockDetailsModel : HistoPageModel
             Order = current.Order,
             RowStamp = current.RowStamp,
         }, Session.UserID);
+        await _blockTests.SaveTestSelectionsAsync(
+            BatchId ?? 0, current.ID, SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes, Session.UserID);
 
         var count = Math.Max(1, NewNumberOfBlocks);
         if (count > 1)
@@ -368,32 +431,6 @@ public class BlockDetailsModel : HistoPageModel
             RowStamp = existing.RowStamp,
         };
         await _submissions.UpdateTissueAsync(updated, Session.UserID);
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
-    }
-
-    /// <summary>Delta-saves this block's Histology/Antibodies/Stain test-type selections.</summary>
-    public async Task<IActionResult> OnPostSaveTestsAsync()
-    {
-        var redirect = await LoadAnimalAsync();
-        if (redirect is not null) return redirect;
-        if (Animal is null || BlockId is not > 0) return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
-
-        var error = ValidateTestSelections(SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes);
-        if (error is not null)
-        {
-            ErrorMessage = error;
-            ExistingHistologyCodes = SelectedHistologyCodes;
-            ExistingAntibodyCodes = SelectedAntibodyCodes;
-            ExistingStainCodes = SelectedStainCodes;
-            await LoadSupportingDataAsync();
-            Block = (await _blocks.GetByBatchAsync(BatchId ?? 0)).FirstOrDefault(b => b.ID == BlockId);
-            Tissues = Block is null ? [] : await _submissions.GetTissuesByBlockAsync(Block.BatchID, Block.ID);
-            return Page();
-        }
-
-        await _blockTests.SaveTestSelectionsAsync(
-            BatchId ?? 0, BlockId.Value, SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes, Session.UserID);
-
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
     }
 
@@ -530,6 +567,10 @@ public class BlockDetailsModel : HistoPageModel
         NewRepeatBlock = Block.RepeatBlock;
         NewComment = Block.Comment;
 
+        // Populate Histology Reference and PM Date from Animal record
+        EditHistologyRef = Animal?.HistologyRef;
+        EditPMDate = Animal?.PMDate;
+
         Tissues = await _submissions.GetTissuesByBlockAsync(Block.BatchID, Block.ID);
 
         if (EditTissueId is > 0)
@@ -553,7 +594,9 @@ public class BlockDetailsModel : HistoPageModel
         // Legacy: DisplayBatchLevelTests (Page_Load, new-block branch) — a brand-new block with no
         // test selections of its own yet defaults to the batch-level Histology/Antibody/Stain
         // choices made when the submission was created, instead of forcing a re-pick per block.
-        if (IsAddFlow && ExistingHistologyCodes.Count == 0 && ExistingAntibodyCodes.Count == 0 && ExistingStainCodes.Count == 0)
+        // Not gated on IsAddFlow — a block reached via "Edit block" that has never had its own
+        // tests saved is just as untested as one reached via the auto-provisioned add flow.
+        if (ExistingHistologyCodes.Count == 0 && ExistingAntibodyCodes.Count == 0 && ExistingStainCodes.Count == 0)
         {
             var batchDefaults = await _batches.GetBatchTestSelectionsAsync(BatchId ?? 0);
             ExistingHistologyCodes = batchDefaults.Histology.Select(r => r.Code).ToList();
@@ -601,5 +644,63 @@ public class BlockDetailsModel : HistoPageModel
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Validates Histology Reference format (NN/NNNNN) and business rules.
+    /// Returns error message if invalid, null if valid.
+    /// </summary>
+    private async Task<string?> ValidateHistologyRefAsync(string? histologyRef)
+    {
+        if (string.IsNullOrWhiteSpace(histologyRef))
+            return null; // Empty is allowed (not recorded)
+
+        // Check format: NN/NNNNN
+        if (!System.Text.RegularExpressions.Regex.IsMatch(histologyRef, @"^\d{2}/\d{5}$"))
+            return "Histology Reference must be in NN/NNNNN format (e.g., 26/40004).";
+
+        // Extract year (first 2 digits)
+        var yearStr = histologyRef.Substring(0, 2);
+        if (!int.TryParse(yearStr, out var year))
+            return "Invalid year in Histology Reference.";
+
+        var currentYear = DateTime.Now.Year % 100; // Get last 2 digits of current year
+        if (year > currentYear)
+            return $"Histology Reference year ({year}) cannot be greater than current year ({currentYear}).";
+
+        // Extract the numeric part (after /)
+        var numStr = histologyRef.Substring(3);
+        if (!int.TryParse(numStr, out var refNumber))
+            return "Invalid Histology Reference number.";
+
+        // Determine histology type from the numeric range
+        int histologyType = DetermineHistologyTypeFromRef(refNumber);
+
+        // Get the next available ref for this type
+        var counters = await _histologyRefs.GetCountersAsync();
+        var counter = counters.FirstOrDefault(c => c.Type == histologyType);
+        if (counter is not null)
+        {
+            // Check that entered ref number is less than the next available ref number
+            if (int.TryParse(counter.NextHistologyRef, out var nextRef) && refNumber >= nextRef)
+                return $"Histology Reference entered ({histologyRef}) must be less than the next available reference number ({counter.NextHistologyRef}) for this type.";
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Determines histology type code based on the numeric range of the reference.
+    /// Ranges: Neuropath <20000, AbattoirSurvey <30000, TBDiag <40000, GeneralPool <60000, MouseProjects <90000.
+    /// </summary>
+    private static int DetermineHistologyTypeFromRef(int refNumber)
+    {
+        // These type codes come from HistologyRefTypeCode
+        if (refNumber < 20000) return 1; // Neuropath
+        if (refNumber < 30000) return 2; // AbattoirSurvey
+        if (refNumber < 40000) return 3; // TBDiag
+        if (refNumber < 60000) return 4; // GeneralPool
+        if (refNumber < 90000) return 5; // MouseProjects
+        return 4; // Default to GeneralPool
     }
 }

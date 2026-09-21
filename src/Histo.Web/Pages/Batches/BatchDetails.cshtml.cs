@@ -323,6 +323,7 @@ public class BatchDetailsModel : HistoPageModel
 
         Session.BatchID = effectiveBatchId; // keep session in sync as a fallback for links not yet migrated
         BatchId = effectiveBatchId;
+        Session.SampleSummaryReturnPage = "/Batches/BatchDetails"; // so SampleSummary's back link returns here
         try
         {
             Batch = await _batches.GetByIdAsync(effectiveBatchId.Value);
