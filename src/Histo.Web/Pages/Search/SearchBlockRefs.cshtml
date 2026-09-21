@@ -11,6 +11,11 @@
 
 <partial name="_ErrorSummary" model="Model.Errors" />
 
+<p class="govuk-body">
+    Use this page to check which block references are already used, still unused, or pre-booked for a sender or histology reference.
+    This helps avoid duplicate block references and confirms whether a pre-cassetted sample can proceed with a valid booking.
+</p>
+
 @* GET so the search is bookmarkable and deep-linkable, matching the legacy page's
    Request.QueryString("SenderRef"/"HistologyRef") support, and so the sort/paging
    links below preserve the criteria. *@

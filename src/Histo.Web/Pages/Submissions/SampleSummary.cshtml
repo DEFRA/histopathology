@@ -8,7 +8,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Batches/BatchDetails" asp-route-BatchId="@Model.BatchId" class="govuk-back-link">Back</a>
+    <a href="@Url.Page(Model.BackLinkPage)" class="govuk-back-link">Back</a>
 }
 
 @if (!string.IsNullOrEmpty(Model.SaveError))

@@ -97,8 +97,14 @@ else
             </div>
             <div class="govuk-grid-column-one-half">
                 <div class="govuk-form-group">
-                    <label class="govuk-label">Histology reference</label>
-                    <p class="govuk-body govuk-!-font-weight-bold">@(Model.Animal.HistologyRef ?? "Not recorded")</p>
+                    <label class="govuk-label" for="EditHistologyRef">Histology reference</label>
+                    <div class="govuk-hint">Format: NN/NNNNN (e.g., 26/40004). Year (first 2 digits) must not exceed current year.</div>
+                    <input class="govuk-input govuk-input--width-10" asp-for="EditHistologyRef" placeholder="e.g., 26/40004" maxlength="8" pattern="\d{2}/\d{5}" />
+                </div>
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="EditPMDate">PM Date</label>
+                    <div class="govuk-hint">Date sample was collected for post-mortem examination.</div>
+                    <input class="govuk-input govuk-input--width-10" asp-for="EditPMDate" type="date" />
                 </div>
                 <div class="govuk-form-group">
                     <label class="govuk-label" for="NewCustomerRef">Customer reference</label>
@@ -273,7 +279,7 @@ else
                             <div class="govuk-checkboxes__item">
                                 <input class="govuk-checkboxes__input" type="checkbox" name="SelectedHistologyCodes"
                                        id="hist-@opt.Code" value="@opt.Code" data-histology-code="@opt.Code"
-                                       checked="@Model.ExistingHistologyCodes.Contains(opt.Code ?? "")" />
+                                       @(Model.ExistingHistologyCodes.Contains(opt.Code ?? "") ? "checked" : "") />
                                 <label class="govuk-label govuk-checkboxes__label" for="hist-@opt.Code">@opt.Name</label>
                             </div>
                         }
@@ -292,7 +298,7 @@ else
                         {
                             <div class="govuk-checkboxes__item">
                                 <input class="govuk-checkboxes__input" type="checkbox" name="SelectedAntibodyCodes"
-                                       id="ab-@opt.Code" value="@opt.Code" checked="@Model.ExistingAntibodyCodes.Contains(opt.Code ?? "")" />
+                                       id="ab-@opt.Code" value="@opt.Code" @(Model.ExistingAntibodyCodes.Contains(opt.Code ?? "") ? "checked" : "") />
                                 <label class="govuk-label govuk-checkboxes__label" for="ab-@opt.Code">@opt.Name</label>
                             </div>
                         }
@@ -311,7 +317,7 @@ else
                         {
                             <div class="govuk-checkboxes__item">
                                 <input class="govuk-checkboxes__input" type="checkbox" name="SelectedStainCodes"
-                                       id="stain-@opt.Code" value="@opt.Code" checked="@Model.ExistingStainCodes.Contains(opt.Code ?? "")" />
+                                       id="stain-@opt.Code" value="@opt.Code" @(Model.ExistingStainCodes.Contains(opt.Code ?? "") ? "checked" : "") />
                                 <label class="govuk-label govuk-checkboxes__label" for="stain-@opt.Code">@opt.Name</label>
                             </div>
                         }

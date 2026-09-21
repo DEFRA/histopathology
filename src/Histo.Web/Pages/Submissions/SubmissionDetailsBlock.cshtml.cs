@@ -118,6 +118,10 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     /// Legacy source: SubmissionDetailsBlock.aspx.vb::DisableEnableControls (SV_ViewSubmission branch).</summary>
     public bool IsViewMode => Session.IsViewSubmissionMode;
 
+    public string BackLinkPage => string.IsNullOrWhiteSpace(Session.ReturnPage)
+        ? $"/Submissions/SampleSummary?batchId={BatchId ?? Session.BatchID ?? 0}"
+        : Session.ReturnPage;
+
     public async Task<IActionResult> OnGetAsync()
     {
         ViewData["Title"] = "Sample Blocks";
