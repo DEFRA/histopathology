@@ -684,6 +684,7 @@ public class BlockDetailsModel : HistoPageModel
             // Check that entered ref number is less than the next available ref number
             if (int.TryParse(counter.NextHistologyRef, out var nextRef) && refNumber >= nextRef)
                 return $"Histology Reference entered ({histologyRef}) must be less than the next available reference number ({counter.NextHistologyRef}) for this type.";
+        }
 
         return null;
     }
