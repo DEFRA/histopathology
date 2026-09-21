@@ -118,14 +118,17 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     /// Legacy source: SubmissionDetailsBlock.aspx.vb::DisableEnableControls (SV_ViewSubmission branch).</summary>
     public bool IsViewMode => Session.IsViewSubmissionMode;
 
-    public string BackLinkPage => string.IsNullOrWhiteSpace(Session.ReturnPage)
+    // Set by whichever page navigated here (SampleSummary/BatchBlocks/AddSubmission) right before
+    // redirecting — falls back to SampleSummary if reached without that breadcrumb (e.g. a stale/direct link).
+    public string BackLinkPage => string.IsNullOrWhiteSpace(Session.SampleDetailReturnPage)
         ? $"/Submissions/SampleSummary?batchId={BatchId ?? Session.BatchID ?? 0}"
-        : Session.ReturnPage;
+        : Session.SampleDetailReturnPage;
 
     public async Task<IActionResult> OnGetAsync()
     {
         ViewData["Title"] = "Sample Blocks";
         ViewData["PageTitle"] = "Sample Blocks";
+        if (TempData["SubmissionDetailsBlock_Error"] is string deleteError) ErrorMessage = deleteError;
 
         // No AnimalId means the caller wants the batch-wide overview, which now lives on its own page.
         if (AnimalId is null or <= 0)
@@ -168,9 +171,15 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     /// </summary>
     public async Task<IActionResult> OnPostDeleteAsync(List<int>? blockIds)
     {
+        var failedIds = new List<int>();
         if (blockIds is not null)
             foreach (var id in blockIds)
-                await _blocks.DeleteBlockAsync(id, Session.UserID);
+                if (!await _blocks.DeleteBlockAsync(id, Session.UserID))
+                    failedIds.Add(id);
+
+        if (failedIds.Count > 0)
+            TempData["SubmissionDetailsBlock_Error"] =
+                $"Could not delete block(s) {string.Join(", ", failedIds)}. They may still have tissues or test results recorded against them.";
 
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
     }

@@ -52,7 +52,7 @@ else
         }
     }
 
-    <form method="post" asp-page-handler="Save">
+    <form method="post" asp-page-handler="Done" id="block-details-form">
         <input type="hidden" asp-for="BatchId" />
         <input type="hidden" asp-for="AnimalId" />
         <input type="hidden" asp-for="IsAddFlow" />
@@ -123,9 +123,6 @@ else
         <div class="govuk-form-group">
             <label class="govuk-label" for="NewComment">Comments and details of other tests</label>
             <textarea class="govuk-textarea" asp-for="NewComment" rows="3"></textarea>
-        </div>
-        <div class="govuk-button-group">
-            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">@(Model.IsAddFlow ? "Add block" : "Save block")</button>
         </div>
     </form>
 
@@ -252,80 +249,76 @@ else
         </form>
 
         <h2 class="govuk-heading-m">Tests</h2>
-        <form method="post" asp-page-handler="SaveTests">
-            <input type="hidden" asp-for="BatchId" />
-            <input type="hidden" asp-for="AnimalId" />
-            <input type="hidden" asp-for="BlockId" />
-            <input type="hidden" asp-for="IsAddFlow" />
-            @{
-                // A block with its own saved tests only shows those; a new/untested block (merely
-                // pre-checked with the batch defaults) still shows the full list so more can be picked.
-                var histOptions = Model.HasSavedTests
-                    ? Model.HistologyOptions.Where(o => Model.ExistingHistologyCodes.Contains(o.Code ?? "")).ToList()
-                    : Model.HistologyOptions;
-                var antibodyOptions = Model.HasSavedTests
-                    ? Model.AntibodyOptions.Where(o => Model.ExistingAntibodyCodes.Contains(o.Code ?? "")).ToList()
-                    : Model.AntibodyOptions;
-                var stainOptions = Model.HasSavedTests
-                    ? Model.StainOptions.Where(o => Model.ExistingStainCodes.Contains(o.Code ?? "")).ToList()
-                    : Model.StainOptions;
-            }
-            <div class="govuk-form-group">
-                <fieldset class="govuk-fieldset">
-                    <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Histology</legend>
-                    <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes" id="block-histology-checkboxes">
-                        @foreach (var opt in histOptions)
-                        {
-                            <div class="govuk-checkboxes__item">
-                                <input class="govuk-checkboxes__input" type="checkbox" name="SelectedHistologyCodes"
-                                       id="hist-@opt.Code" value="@opt.Code" data-histology-code="@opt.Code"
-                                       @(Model.ExistingHistologyCodes.Contains(opt.Code ?? "") ? "checked" : "") />
-                                <label class="govuk-label govuk-checkboxes__label" for="hist-@opt.Code">@opt.Name</label>
-                            </div>
-                        }
-                    </div>
-                </fieldset>
-            </div>
-            <div class="govuk-form-group">
-                <fieldset class="govuk-fieldset">
-                    <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Antibodies</legend>
-                    @if (Model.HasSavedTests && antibodyOptions.Count == 0)
+        <div>
+        @{
+            // Fields below use form="block-details-form" so they submit together with the block
+            // details form above (via the single "Done" button) even though they sit outside it —
+            // the Tissues table's own Add/Edit/Delete forms can't be nested between two <form> tags.
+            // A block with its own saved tests only shows those; a new/untested block (merely
+            // pre-checked with the batch defaults) still shows the full list so more can be picked.
+            // Narrowed independently per category — a block can have saved Antibody/Stain codes
+            // while Histology itself is empty (e.g. mid-correction), and that must not hide every
+            // Histology option, leaving the user with nothing to check to satisfy validation.
+            var histOptions = Model.ExistingHistologyCodes.Count > 0
+                ? Model.HistologyOptions.Where(o => Model.ExistingHistologyCodes.Contains(o.Code ?? "")).ToList()
+                : Model.HistologyOptions;
+            var antibodyOptions = Model.ExistingAntibodyCodes.Count > 0
+                ? Model.AntibodyOptions.Where(o => Model.ExistingAntibodyCodes.Contains(o.Code ?? "")).ToList()
+                : Model.AntibodyOptions;
+            var stainOptions = Model.ExistingStainCodes.Count > 0
+                ? Model.StainOptions.Where(o => Model.ExistingStainCodes.Contains(o.Code ?? "")).ToList()
+                : Model.StainOptions;
+        }
+        <div class="govuk-form-group">
+            <fieldset class="govuk-fieldset">
+                <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Histology</legend>
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes" id="block-histology-checkboxes">
+                    @foreach (var opt in histOptions)
                     {
-                        <p class="govuk-hint">No antibody tests were recorded for this block.</p>
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" type="checkbox" name="SelectedHistologyCodes" form="block-details-form"
+                                   id="hist-@opt.Code" value="@opt.Code" data-histology-code="@opt.Code"
+                                   @(Model.ExistingHistologyCodes.Contains(opt.Code ?? "") ? "checked" : "") />
+                            <label class="govuk-label govuk-checkboxes__label" for="hist-@opt.Code">@opt.Name</label>
+                        </div>
                     }
-                    <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
-                        @foreach (var opt in antibodyOptions)
-                        {
-                            <div class="govuk-checkboxes__item">
-                                <input class="govuk-checkboxes__input" type="checkbox" name="SelectedAntibodyCodes"
-                                       id="ab-@opt.Code" value="@opt.Code" @(Model.ExistingAntibodyCodes.Contains(opt.Code ?? "") ? "checked" : "") />
-                                <label class="govuk-label govuk-checkboxes__label" for="ab-@opt.Code">@opt.Name</label>
-                            </div>
-                        }
-                    </div>
-                </fieldset>
-            </div>
-            <div class="govuk-form-group">
-                <fieldset class="govuk-fieldset">
-                    <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Special stain</legend>
-                    @if (Model.HasSavedTests && stainOptions.Count == 0)
+                </div>
+            </fieldset>
+        </div>
+        <div class="govuk-form-group">
+            <fieldset class="govuk-fieldset">
+                <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Antibodies</legend>
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                    @foreach (var opt in antibodyOptions)
                     {
-                        <p class="govuk-hint">No special stain tests were recorded for this block.</p>
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" type="checkbox" name="SelectedAntibodyCodes" form="block-details-form"
+                                   id="ab-@opt.Code" value="@opt.Code" @(Model.ExistingAntibodyCodes.Contains(opt.Code ?? "") ? "checked" : "") />
+                            <label class="govuk-label govuk-checkboxes__label" for="ab-@opt.Code">@opt.Name</label>
+                        </div>
                     }
-                    <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
-                        @foreach (var opt in stainOptions)
-                        {
-                            <div class="govuk-checkboxes__item">
-                                <input class="govuk-checkboxes__input" type="checkbox" name="SelectedStainCodes"
-                                       id="stain-@opt.Code" value="@opt.Code" @(Model.ExistingStainCodes.Contains(opt.Code ?? "") ? "checked" : "") />
-                                <label class="govuk-label govuk-checkboxes__label" for="stain-@opt.Code">@opt.Name</label>
-                            </div>
-                        }
-                    </div>
-                </fieldset>
-            </div>
-            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Save tests</button>
-        </form>
+                </div>
+            </fieldset>
+        </div>
+        <div class="govuk-form-group">
+            <fieldset class="govuk-fieldset">
+                <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Special stain</legend>
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                    @foreach (var opt in stainOptions)
+                    {
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" type="checkbox" name="SelectedStainCodes" form="block-details-form"
+                                   id="stain-@opt.Code" value="@opt.Code" @(Model.ExistingStainCodes.Contains(opt.Code ?? "") ? "checked" : "") />
+                            <label class="govuk-label govuk-checkboxes__label" for="stain-@opt.Code">@opt.Name</label>
+                        </div>
+                    }
+                </div>
+            </fieldset>
+        </div>
+        <div class="govuk-button-group">
+            <button type="submit" form="block-details-form" class="govuk-button" data-module="govuk-button">Done</button>
+        </div>
+        </div>
 
         <form method="post" asp-page-handler="NextBlock">
             <input type="hidden" asp-for="BatchId" />
