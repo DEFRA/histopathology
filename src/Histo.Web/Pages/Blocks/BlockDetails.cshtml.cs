@@ -253,7 +253,7 @@ public class BlockDetailsModel : HistoPageModel
                 HistoRefSet = !string.IsNullOrWhiteSpace(EditHistologyRef),
                 HistologyRef = EditHistologyRef,
                 OnHold = Animal.OnHold,
-                PMDate = EditPMDate,
+                PMDate = DateFormatHelpers.ToLegacyDate(EditPMDate),
                 PMDateSet = !string.IsNullOrWhiteSpace(EditPMDate),
                 IsPGNumber = Animal.IsPGNumber,
                 BookedHistologyRef = Animal.BookedHistologyRef,
