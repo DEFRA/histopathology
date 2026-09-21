@@ -152,8 +152,7 @@ public class BlockDetailsModel : HistoPageModel
 
         // Initialize Histology Reference and PM Date from Animal record
         EditHistologyRef = Animal.HistologyRef;
-        EditPMDate = Animal.PMDate;
-
+        EditPMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
         await LoadSupportingDataAsync();
 
         if (IsEditMode)
