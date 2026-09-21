@@ -32,6 +32,8 @@ public sealed class SessionService : ISessionService
     private const string KeyBatchType  = "BatchType";
     private const string KeyReturnPage = "ReturnPage";
     private const string KeyReturnPageQuery = "ReturnPageQuery";
+    private const string KeySampleSummaryReturnPage = "SampleSummaryReturnPage";
+    private const string KeySampleDetailReturnPage = "SampleDetailReturnPage";
     private const string KeyIsViewSubmissionMode = "IsViewSubmissionMode";
 
     private readonly ISession _session;
@@ -94,6 +96,18 @@ public sealed class SessionService : ISessionService
     {
         get => GetStr(KeyReturnPageQuery);
         set => _session.SetString(KeyReturnPageQuery, value ?? string.Empty);
+    }
+
+    public string? SampleSummaryReturnPage
+    {
+        get => GetStr(KeySampleSummaryReturnPage);
+        set => _session.SetString(KeySampleSummaryReturnPage, value ?? string.Empty);
+    }
+
+    public string? SampleDetailReturnPage
+    {
+        get => GetStr(KeySampleDetailReturnPage);
+        set => _session.SetString(KeySampleDetailReturnPage, value ?? string.Empty);
     }
 
     public bool IsViewSubmissionMode

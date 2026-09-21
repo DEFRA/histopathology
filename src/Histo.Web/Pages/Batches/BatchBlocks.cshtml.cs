@@ -116,6 +116,7 @@ public class BatchBlocksModel : HistoPageModel
             return Page();
         }
 
+        Session.SampleDetailReturnPage = $"/Batches/BatchBlocks?batchId={BatchId}";
         return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId = BatchId, animalId = selected.AnimalID });
     }
 

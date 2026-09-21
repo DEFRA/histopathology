@@ -86,6 +86,25 @@ public interface ISessionService
     string? ReturnPageQuery { get; set; }
 
     /// <summary>
+    /// The page path (<c>/Batches/BatchDetails</c> or <c>/Batches/EditBatch</c>) the user's
+    /// "Samples" button came from — read by <c>SampleSummary.cshtml</c> for its back link.
+    /// Kept separate from <see cref="ReturnPage"/> because BatchDetails/EditBatch already use
+    /// that slot for their OWN back link (to wherever THEY were entered from); reusing it here
+    /// would overwrite that value. Falls back to <c>/Batches/BatchDetails</c> when unset.
+    /// </summary>
+    string? SampleSummaryReturnPage { get; set; }
+
+    /// <summary>
+    /// The page path the user's "Edit sample"/"Add sample"/"Edit sample" action came from — read
+    /// by <c>SubmissionDetails.cshtml</c>/<c>SubmissionDetailsBlock.cshtml</c> for their back link.
+    /// Kept separate from <see cref="ReturnPage"/>, which is also written by several unrelated
+    /// row-select flows (BatchDetails/EditBatch/ViewSubmissions/SearchSubmissions); sharing that
+    /// slot let an unrelated navigation elsewhere in the same session (e.g. another tab) overwrite
+    /// it before the user clicked Back here. Falls back to SampleSummary for the current batch when unset.
+    /// </summary>
+    string? SampleDetailReturnPage { get; set; }
+
+    /// <summary>
     /// True when the user is in the read-only "View Submission" journey (legacy
     /// <c>SessionVars.SV_ViewSubmission</c>). Gates Add/Edit/Copy/Delete sample on
     /// <c>BatchBlockSummary</c>/<c>BatchDetails</c>.

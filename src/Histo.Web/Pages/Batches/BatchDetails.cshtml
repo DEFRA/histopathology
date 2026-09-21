@@ -14,7 +14,7 @@
     }
     else
     {
-        <a href="@Url.Page(Model.BackLinkPage)" class="govuk-back-link">Back</a>
+        <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
     }
 }
 
@@ -584,7 +584,7 @@
             <a asp-page="/Batches/DateReturned" class="govuk-button govuk-button--secondary" data-module="govuk-button">Date returned</a>
         }
 
-        <a href="@Url.Page(Model.BackLinkPage)" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        <a href="@Model.BackLinkPage" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
     </div>
 }
 

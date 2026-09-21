@@ -115,6 +115,7 @@ public class EditBatchModel : HistoPageModel
         // which otherwise kept Add/Edit/Copy sample hidden on BatchBlockSummary. Mirrors legacy
         // btnEditSubmission_Click: Session(SV_ViewSubmission) = False.
         Session.IsViewSubmissionMode = false;
+        Session.SampleSummaryReturnPage = "/Batches/EditBatch"; // so SampleSummary's back link returns here
 
         // Pre-populate editable fields from loaded batch
         ProjectContractCode = Batch.ProjectContractCode;

@@ -35,6 +35,8 @@ public class SampleSummaryModelTests
         _session.Setup(s => s.UserID).Returns(42);
         _blocks.Setup(b => b.GetByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Block>)[]);
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
     }
 
     private SampleSummaryModel CreateSut() =>
