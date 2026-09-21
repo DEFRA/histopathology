@@ -24,7 +24,7 @@ GO
 
 -- Step 3: Deactivate the Mouse Bioassay / Neuropath user areas
 PRINT '--- Deactivating Mouse Bioassay / Neuropath user areas ---';
-:r ../DeploymentScripts/V20260917_01_Deactivate_MouseBioassay_Neuropath_UserAreas.sql
+:r ../Migrations/V20260917_01_Deactivate_MouseBioassay_Neuropath_UserAreas.sql
 GO
 
 PRINT '=== Database deployment completed ===';
