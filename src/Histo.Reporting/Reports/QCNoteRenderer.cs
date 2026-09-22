@@ -18,9 +18,11 @@
 //     ├── Top bordered box  — 5-row, 2-column table (40% label / 60% bold value)
 //     │     QC Note Ref | Submission Number | Project | Species | Stain Ref
 //     └── Body bordered box — fills remaining page height
-//           QCText, monospaced (legacy stores the Sender Ref/Histo Ref/Block Ref/Test
-//           header and data row as pre-padded plain text inside QCText itself — do not
-//           render a separate header row here, or it duplicates on every note).
+//           TestSummary (Sender Ref/Histo Ref/Block Ref/Test, monospaced — built by the
+//           DataSetBuilder from live SP row data, always present regardless of QCText),
+//           then QCText (the free-form note) below it. QCText alone cannot be trusted to
+//           contain the headings — it is copied verbatim from the SP and can be pure free
+//           text for a genuinely saved note.
 //   Footer (pinned): CreatedBy left  /  DateCreated right
 
 using System.Data;
@@ -35,16 +37,16 @@ namespace Histo.Reporting.Reports;
 /// Layout matches the legacy Crystal Reports A4 portrait QC Note form:
 /// <list type="bullet">
 ///   <item><description><b>Top bordered box</b>: 5 label/value rows — QCNoteRef, SubmissionNumber, Project, Species, StainRef.</description></item>
-///   <item><description><b>Body bordered box</b>: <c>QCText</c> rendered as a single monospaced block. Expands to fill remaining page height.</description></item>
+///   <item><description><b>Body bordered box</b>: <c>TestSummary</c> (always present) followed by <c>QCText</c>, both monospaced. Expands to fill remaining page height.</description></item>
 ///   <item><description><b>Footer</b>: CreatedBy left, DateCreated right.</description></item>
 /// </list>
 /// <para>
 /// Expected DataSet: single table named <c>"Header"</c> with columns
-/// QCNoteRef, SubmissionNumber, Project, Species, StainRef, QCText, CreatedBy, DateCreated.
+/// QCNoteRef, SubmissionNumber, Project, Species, StainRef, QCText, TestSummary, CreatedBy, DateCreated.
 /// DateCreated is pre-formatted as "dd MMMM yyyy" by the DataSetBuilder — no parsing needed here.
-/// <c>QCText</c> already contains the Sender Ref/Histo Ref/Block Ref/Test header and data row
-/// as space-padded plain text (legacy builds this directly into the field), so it must be
-/// rendered as-is in a monospaced font rather than alongside a second, separately-drawn header.
+/// <c>TestSummary</c> is the Sender Ref/Histo Ref/Block Ref/Test table built directly from the SP's
+/// row data — it is always shown, because <c>QCText</c> alone is not a reliable source of these
+/// headings (a genuinely saved note can be pure free text with no such table embedded in it).
 /// </para>
 /// </summary>
 public sealed class QCNoteRenderer
@@ -70,6 +72,7 @@ public sealed class QCNoteRenderer
         var species          = Field(row, "Species");
         var stainRef         = Field(row, "StainRef");
         var qcText           = Field(row, "QCText");
+        var testSummary      = Field(row, "TestSummary");
         var createdBy        = Field(row, "CreatedBy");
         var dateCreated      = Field(row, "DateCreated");
 
@@ -130,14 +133,17 @@ public sealed class QCNoteRenderer
                     // ════════════════════════════════════════════════════════════
                     // SECTION 2 — Detail / Body
                     // Bordered box that fills the remaining page height (Extend()).
-                    // QCText already contains the Sender Ref/Histo Ref/Block Ref/Test
-                    // header and data row as space-padded plain text (built by legacy
-                    // directly into the field) — render it as a single monospaced
-                    // block so columns stay aligned. Do not draw a second header row
-                    // here; it would duplicate what QCText already contains.
+                    // TestSummary (Sender Ref/Histo Ref/Block Ref/Test, built by the
+                    // DataSetBuilder from live SP data) is always shown first, followed by
+                    // QCText — QCText alone cannot be relied on to contain the headings.
                     // ════════════════════════════════════════════════════════════
-                    col.Item().Extend().Border(1).Padding(4)
-                       .Text(qcText).FontFamily("Consolas").FontSize(9);
+                    col.Item().Extend().Border(1).Padding(4).Column(body =>
+                    {
+                        body.Spacing(4);
+                        if (!string.IsNullOrEmpty(testSummary))
+                            body.Item().Text(testSummary).FontFamily("Consolas").FontSize(9);
+                        body.Item().Text(qcText).FontFamily("Consolas").FontSize(9);
+                    });
                 });
             });
         }).GeneratePdf();

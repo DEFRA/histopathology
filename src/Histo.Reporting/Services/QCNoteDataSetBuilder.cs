@@ -18,7 +18,9 @@ namespace Histo.Reporting.Services;
 /// Expected output table:
 /// <list type="bullet">
 ///   <item><b>Header</b> — single row: QCNoteRef, SubmissionNumber, Project, Species,
-///         StainRef, QCText, CreatedBy, DateCreated</item>
+///         StainRef, QCText, TestSummary, CreatedBy, DateCreated. <c>TestSummary</c> is a
+///         Sender Ref/Histo Ref/Block Ref/Test table built directly from the SP row data —
+///         independent of <c>QCText</c>, which may or may not itself embed the same table.</item>
 /// </list>
 ///
 /// Stored procedures called (legacy equivalents in <c>clsQCNote.CreateReportDataset</c>):
@@ -142,6 +144,7 @@ public sealed class QCNoteDataSetBuilder
         header.Columns.Add("Species");
         header.Columns.Add("StainRef");
         header.Columns.Add("QCText");
+        header.Columns.Add("TestSummary");
         header.Columns.Add("CreatedBy");
         header.Columns.Add("DateCreated");
 
@@ -152,6 +155,7 @@ public sealed class QCNoteDataSetBuilder
         row["Species"]          = speciesName;
         row["StainRef"]         = stainRef;
         row["QCText"]           = qcText;
+        row["TestSummary"]      = BuildTestSummary(allContentRows);
         row["CreatedBy"]        = createdBy;
         row["DateCreated"]      = dateCreated;
         header.Rows.Add(row);
@@ -166,6 +170,35 @@ public sealed class QCNoteDataSetBuilder
         if (!row.TryGetValue(key, out var val) || val is null || val is DBNull)
             return string.Empty;
         return Convert.ToString(val) ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Builds the Sender Ref / Histo Ref / Block Ref / Test padded header-and-data table from the
+    /// live SP row data, independent of whatever <c>QCText</c> happens to contain. <c>QCText</c>
+    /// alone is not a reliable source for these headings — it is copied verbatim from the SP, and
+    /// only <see cref="Histo.QualityControl.Repositories.QCNoteRepository"/>'s Edit-screen default
+    /// text (shown when a note has never been saved) happens to embed this same table; a genuinely
+    /// saved note can be pure free text with no table at all. Mirrors
+    /// <c>QCNoteRepository.BuildDefaultNoteText</c>'s padding so both surfaces render identically.
+    /// </summary>
+    private static string BuildTestSummary(IReadOnlyList<IDictionary<string, object>> rows)
+    {
+        static string Pad(string value, int width) => value + new string(' ', Math.Max(0, width - value.Length));
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append(Pad("Sender Ref", 22)).Append(Pad("Histo Ref", 22)).Append(Pad("Block Ref", 15)).Append("Test").AppendLine();
+
+        foreach (var r in rows)
+        {
+            var senderRef    = Str(r, "SenderRef");
+            var histologyRef = Str(r, "HistologyRef");
+            var blockRef     = Str(r, "BlockRef");
+            var description  = Str(r, "Description");
+
+            sb.Append(Pad(senderRef, 22)).Append(Pad(histologyRef, 22)).Append(Pad(blockRef, 15)).Append(description).AppendLine();
+        }
+
+        return sb.ToString();
     }
 
     /// <summary>
