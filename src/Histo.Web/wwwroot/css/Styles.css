@@ -170,44 +170,10 @@
     text-align: left;
 }
 
-/* Breaks a wide data table out of the standard govuk-width-container (max 960px) so more
- * columns fit without horizontal scrolling on typical desktop widths, while still centring
- * on the viewport (not just within the narrower parent) and capping out on ultra-wide screens.
- * .app-table-responsive remains nested inside as the scroll fallback for narrow viewports. */
-.app-wide-container {
-    position: relative;
-    left: 50%;
-    transform: translateX(-50%);
-    width: calc(100vw - 60px);
-    max-width: 1400px;
-    box-sizing: border-box;
-}
-
 /* View Submissions column headers — centred per request, scoped to this one table so other
  * pages sharing the _SortableHeaderPost partial keep their default left alignment. */
 #view-submissions-table.govuk-table th.govuk-table__header {
     text-align: center;
-}
-
-/* User Maintenance table — fixed layout with defined column widths so long Name/Email values
- * no longer stretch or shrink the whole table; overflow truncates with an ellipsis, and the
- * full value remains available via the cell's title tooltip. */
-#user-maintenance-table {
-    table-layout: fixed;
-    width: 100%;
-}
-
-#user-maintenance-table th:nth-child(1), #user-maintenance-table td:nth-child(1) { width: 22%; }
-#user-maintenance-table th:nth-child(2), #user-maintenance-table td:nth-child(2) { width: 30%; }
-#user-maintenance-table th:nth-child(3), #user-maintenance-table td:nth-child(3) { width: 16%; }
-#user-maintenance-table th:nth-child(4), #user-maintenance-table td:nth-child(4) { width: 16%; }
-#user-maintenance-table th:nth-child(5), #user-maintenance-table td:nth-child(5) { width: 8%; }
-#user-maintenance-table th:nth-child(6), #user-maintenance-table td:nth-child(6) { width: 8%; }
-
-#user-maintenance-table td {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 
