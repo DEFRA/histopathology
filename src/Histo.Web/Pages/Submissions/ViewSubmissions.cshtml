@@ -165,7 +165,7 @@
             <input type="hidden" name="ReceivedDateTo"      value="@Model.ReceivedDateTo?.ToString("yyyy-MM-dd")" />
         </form>
 
-        <table class="govuk-table" id="view-submissions-table">
+        <table class="govuk-table">
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
                     @{ ViewData["FormId"] = "view-action-form"; ViewData["Handler"] = "Search"; }
