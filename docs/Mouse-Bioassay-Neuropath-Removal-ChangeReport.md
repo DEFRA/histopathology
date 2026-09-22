@@ -21,7 +21,7 @@ No UI screens were removed. The **User Area** field itself is unchanged — only
 | `V20260917_01_Deactivate_MouseBioassay_Neuropath_UserAreas.sql` (new) | Sets `IsActive = 0` for `luUserArea` rows named "Mouse Bioassay" and "Neuropath". Transactional, with a post-check that rolls back if the update didn't take. |
 | `Deploy.sql` | Adds Step 5 to `:r`-include the new script during deployment. |
 | `src/Histo.Core/Domain/AnimalHelpers.cs` | Removed `ComputePgAutoHistologyRef` / `IsAfterYear01` — the PG-number auto-reversal logic that only applied when a user's area was Neuropath. |
-| `src/Histo.Core/Domain/GroupAreaMappingHelpers.cs` (new) | New whitelist: `Customer` → External Customer/TB Diagnostics; `Histopathology User` → Histopath; `Maintenance` → Other VLA. Fails closed on unknown group/area. |
+| `src/Histo.Core/Domain/GroupAreaMappingHelpers.cs` (new) | New validation: any known group may pair with any of the 4 active areas; unknown or retired group/area names fail closed. |
 | `src/Histo.Submissions/Interfaces/ISubmissionService.cs`, `Services/SubmissionService.cs` | `AddAnimalAsync` no longer takes an `isNeuropath` parameter; animals are always created with `HistologyRef = null` / `IsPGNumber = false` at creation time. |
 | `src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs` | Removed the `Session.UserArea == "Neuropath"` branch that fed `isNeuropath` into `AddAnimalAsync`. |
 | `src/Histo.Web/Pages/Admin/EditAnimalRef.cshtml.cs` | Removed the hardcoded `isNeuropath: true` PG-reversal check on Histology Ref rename; now goes straight to standard Histology Ref format validation. |
