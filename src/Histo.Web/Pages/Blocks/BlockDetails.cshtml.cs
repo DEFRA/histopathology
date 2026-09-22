@@ -103,6 +103,12 @@ public class BlockDetailsModel : HistoPageModel
     /// <summary>Post-mortem Date for the sample. Stored on Animal record.</summary>
     [BindProperty] public string? EditPMDate { get; set; }
 
+    /// <summary>Once a Histology Ref has been assigned to this sample it becomes read-only here — matches legacy, which only allows entry while unset.</summary>
+    public bool HistologyRefLocked => Animal?.HistoRefSet == true;
+
+    /// <summary>Once a PM Date has been assigned to this sample it becomes read-only here — matches legacy, which only allows entry while unset.</summary>
+    public bool PMDateLocked => Animal?.PMDateSet == true;
+
     public Animal? Animal { get; private set; }
     public Batch? Batch { get; private set; }
     public Block? Block { get; private set; }
@@ -223,6 +229,11 @@ public class BlockDetailsModel : HistoPageModel
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
         if (Animal is null) return RedirectToPage("/Submissions/SampleSummary", new { batchId = BatchId });
+
+        // Locked fields can't be changed by a crafted POST — silently keep the existing value
+        // rather than trusting the submitted one, mirroring the readonly inputs in the view.
+        if (HistologyRefLocked) EditHistologyRef = Animal.HistologyRef;
+        if (PMDateLocked) EditPMDate = Animal.PMDate;
 
         // Validate Histology Reference before proceeding
         var histoRefError = await ValidateHistologyRefAsync(EditHistologyRef);

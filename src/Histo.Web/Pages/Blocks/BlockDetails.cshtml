@@ -99,12 +99,12 @@ else
                 <div class="govuk-form-group">
                     <label class="govuk-label" for="EditHistologyRef">Histology reference</label>
                     <div class="govuk-hint">Format: NN/NNNNN (e.g., 26/40004). Year (first 2 digits) must not exceed current year.</div>
-                    <input class="govuk-input govuk-input--width-10" asp-for="EditHistologyRef" placeholder="e.g., 26/40004" maxlength="8" pattern="\d{2}/\d{5}" />
+                    <input class="govuk-input govuk-input--width-10" asp-for="EditHistologyRef" placeholder="e.g., 26/40004" maxlength="8" pattern="\d{2}/\d{5}" readonly="@(Model.HistologyRefLocked ? "readonly" : null)" />
                 </div>
                 <div class="govuk-form-group">
                     <label class="govuk-label" for="EditPMDate">PM Date</label>
                     <div class="govuk-hint">Date sample was collected for post-mortem examination.</div>
-                    <input class="govuk-input govuk-input--width-10" asp-for="EditPMDate" type="date" />
+                    <input class="govuk-input govuk-input--width-10" asp-for="EditPMDate" type="date" readonly="@(Model.PMDateLocked ? "readonly" : null)" />
                 </div>
                 <div class="govuk-form-group">
                     <label class="govuk-label" for="NewCustomerRef">Customer reference</label>
