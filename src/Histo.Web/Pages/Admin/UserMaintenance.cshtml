@@ -65,7 +65,7 @@
 </p>
 
 <div class="app-table-responsive">
-<table class="govuk-table">
+<table class="govuk-table" id="user-maintenance-table">
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
             @{ ViewData["Label"] = "Name"; ViewData["Column"] = "Name"; }
@@ -85,8 +85,8 @@
         @foreach (var u in Model.PagedEntries)
         {
             <tr class="govuk-table__row">
-                <td class="govuk-table__cell">@u.Name</td>
-                <td class="govuk-table__cell">@u.Email</td>
+                <td class="govuk-table__cell" title="@u.Name">@u.Name</td>
+                <td class="govuk-table__cell" title="@u.Email">@u.Email</td>
                 <td class="govuk-table__cell">@Model.ResolveGroupName(u)</td>
                 <td class="govuk-table__cell">@Model.ResolveAreaName(u)</td>
                 <td class="govuk-table__cell">@(u.Active ? "Yes" : "No")</td>

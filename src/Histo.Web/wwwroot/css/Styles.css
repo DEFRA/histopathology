@@ -189,6 +189,27 @@
     text-align: center;
 }
 
+/* User Maintenance table — fixed layout with defined column widths so long Name/Email values
+ * no longer stretch or shrink the whole table; overflow truncates with an ellipsis, and the
+ * full value remains available via the cell's title tooltip. */
+#user-maintenance-table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+#user-maintenance-table th:nth-child(1), #user-maintenance-table td:nth-child(1) { width: 22%; }
+#user-maintenance-table th:nth-child(2), #user-maintenance-table td:nth-child(2) { width: 30%; }
+#user-maintenance-table th:nth-child(3), #user-maintenance-table td:nth-child(3) { width: 16%; }
+#user-maintenance-table th:nth-child(4), #user-maintenance-table td:nth-child(4) { width: 16%; }
+#user-maintenance-table th:nth-child(5), #user-maintenance-table td:nth-child(5) { width: 8%; }
+#user-maintenance-table th:nth-child(6), #user-maintenance-table td:nth-child(6) { width: 8%; }
+
+#user-maintenance-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 
 
 
