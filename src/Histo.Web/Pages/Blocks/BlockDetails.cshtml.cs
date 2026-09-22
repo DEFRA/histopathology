@@ -123,6 +123,12 @@ public class BlockDetailsModel : HistoPageModel
     public IReadOnlyList<string> ExistingAntibodyCodes { get; private set; } = [];
     public IReadOnlyList<string> ExistingStainCodes { get; private set; } = [];
 
+    /// <summary>True when the checked histology codes include IHC-PrP or IHC-Other — gates the Antibodies section, matching BatchDetails/EditBatch.</summary>
+    public bool ShowAntibodies => ExistingHistologyCodes.Contains(HistologyCode.IhcPrp) || ExistingHistologyCodes.Contains(HistologyCode.IhcOther);
+
+    /// <summary>True when the checked histology codes include Special Stain — gates the Special stain section, matching BatchDetails/EditBatch.</summary>
+    public bool ShowStains => ExistingHistologyCodes.Contains(HistologyCode.SpecialStain);
+
     /// <summary>
     /// True when this block already has its own saved test selections (as opposed to a brand-new
     /// block merely pre-checked with the batch-level defaults). Only then do the Tests checkboxes

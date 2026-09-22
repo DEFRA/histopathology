@@ -294,7 +294,7 @@ else
         <div class="govuk-form-group">
             <fieldset class="govuk-fieldset">
                 <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Antibodies</legend>
-                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes" id="block-antibodies-section" style="@(Model.ShowAntibodies ? "" : "display:none")">
                     @foreach (var opt in antibodyOptions)
                     {
                         <div class="govuk-checkboxes__item">
@@ -309,7 +309,7 @@ else
         <div class="govuk-form-group">
             <fieldset class="govuk-fieldset">
                 <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Special stain</legend>
-                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes" id="block-stains-section" style="@(Model.ShowStains ? "" : "display:none")">
                     @foreach (var opt in stainOptions)
                     {
                         <div class="govuk-checkboxes__item">
@@ -322,9 +322,6 @@ else
             </fieldset>
         </div>
         }
-        <div class="govuk-button-group">
-            <button type="submit" form="block-details-form" class="govuk-button" data-module="govuk-button">Done</button>
-        </div>
         </div>
 
         <form method="post" asp-page-handler="NextBlock">
@@ -354,6 +351,10 @@ else
             </div>
             <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Next block</button>
         </form>
+
+        <div class="govuk-button-group">
+            <button type="submit" form="block-details-form" class="govuk-button" data-module="govuk-button">Done</button>
+        </div>
     }
 
 @section Scripts {
@@ -366,6 +367,17 @@ else
             var group = document.getElementById('block-histology-checkboxes');
             if (!group) return;
             var exclusiveCodes = ['1', '7']; // EO, Archive
+            var ihcCodes = ['@Histo.Submissions.Models.HistologyCode.IhcPrp', '@Histo.Submissions.Models.HistologyCode.IhcOther'];
+            var stainCode = '@Histo.Submissions.Models.HistologyCode.SpecialStain';
+            var antibodiesSection = document.getElementById('block-antibodies-section');
+            var stainsSection = document.getElementById('block-stains-section');
+
+            function syncTestSections() {
+                var codes = Array.from(group.querySelectorAll('input[type=checkbox]:checked')).map(function (cb) { return cb.getAttribute('data-histology-code'); });
+                if (antibodiesSection) antibodiesSection.style.display = codes.some(function (c) { return ihcCodes.indexOf(c) >= 0; }) ? '' : 'none';
+                if (stainsSection) stainsSection.style.display = codes.indexOf(stainCode) >= 0 ? '' : 'none';
+            }
+
             group.addEventListener('change', function (e) {
                 var target = e.target;
                 if (!target || !target.matches('input[type="checkbox"]')) return;
@@ -380,6 +392,7 @@ else
                         if (cb !== target && exclusiveCodes.indexOf(cb.getAttribute('data-histology-code')) !== -1) cb.checked = false;
                     });
                 }
+                syncTestSections();
             });
         })();
     </script>

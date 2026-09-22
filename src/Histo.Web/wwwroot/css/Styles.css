@@ -183,6 +183,12 @@
     box-sizing: border-box;
 }
 
+/* View Submissions column headers — centred per request, scoped to this one table so other
+ * pages sharing the _SortableHeaderPost partial keep their default left alignment. */
+#view-submissions-table.govuk-table th.govuk-table__header {
+    text-align: center;
+}
+
 
 
 
