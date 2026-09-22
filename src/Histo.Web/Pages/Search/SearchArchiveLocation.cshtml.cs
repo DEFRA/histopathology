@@ -121,7 +121,7 @@ public class SearchArchiveLocationModel : HistoPageModel
     }
 
     /// <summary>Replaces the legacy ExcelExport.aspx link — exports the current results as .xlsx.</summary>
-    public async Task<IActionResult> OnPostExportCsvAsync()
+    public async Task<IActionResult> OnPostExportExcelAsync()
     {
         var senderRef = NullIfEmpty(SenderRef);
         var histologyRef = NullIfEmpty(HistologyRef);

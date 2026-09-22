@@ -72,7 +72,7 @@ public class ViewSubmissionsModelTests
     }
 
     [Fact]
-    public async Task OnPostExportCsvAsync_ReproducesLegacy16ColumnExportTable()
+    public async Task OnPostExportExcelAsync_ReproducesLegacy16ColumnExportTable()
     {
         // Legacy lbExportExcel_Click (SearchSubmissions.aspx.vb / ViewSubmissions.aspx.vb, identical
         // code in both) builds this exact 16-column table, not the 6-9 on-screen grid columns.
@@ -91,7 +91,7 @@ public class ViewSubmissionsModelTests
             ]);
         var sut = CreateSut();
 
-        var result = await sut.OnPostExportCsvAsync();
+        var result = await sut.OnPostExportExcelAsync();
 
         var file = Assert.IsType<Microsoft.AspNetCore.Mvc.FileContentResult>(result);
         using var stream = new MemoryStream(file.FileContents);

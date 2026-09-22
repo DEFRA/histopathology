@@ -270,7 +270,7 @@ public class SearchSubmissionsModel : HistoPageModel
     /// Replaces the legacy <c>lbExportExcel_Click</c> → <c>ExcelExport.aspx</c> pattern —
     /// reproduces its dedicated 16-column export table exactly (same as <c>ViewSubmissions</c>).
     /// </summary>
-    public async Task<IActionResult> OnPostExportCsvAsync()
+    public async Task<IActionResult> OnPostExportExcelAsync()
     {
         var results = await _batches.SearchAsync(BuildCriteria());
         return ExcelExportHelper.BuildXlsx(

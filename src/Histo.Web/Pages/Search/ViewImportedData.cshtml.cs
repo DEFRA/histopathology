@@ -70,7 +70,7 @@ public class ViewImportedDataModel : GridPageModel
     }
 
     /// <summary>Replaces the legacy ExcelExport.aspx link — exports the current results as .xlsx.</summary>
-    public async Task<IActionResult> OnGetExportCsvAsync()
+    public async Task<IActionResult> OnGetExportExcelAsync()
     {
         var rows = ApplyFilter(await _submissions.GetImportedDataAsync(SelectedTable), Filter);
         return ExcelExportHelper.BuildXlsx(

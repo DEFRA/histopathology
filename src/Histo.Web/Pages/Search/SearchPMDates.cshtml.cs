@@ -93,7 +93,7 @@ public class SearchPMDatesModel : HistoPageModel
     }
 
     /// <summary>Replaces the legacy <c>hlbExcel</c> link. Exports every result row, not just the current page.</summary>
-    public async Task<IActionResult> OnPostExportCsvAsync()
+    public async Task<IActionResult> OnPostExportExcelAsync()
     {
         if (!TryBuildRange(out var from, out var to)) return RedirectToPage("/Search/SearchPMDates");
 

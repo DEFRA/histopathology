@@ -236,7 +236,7 @@ public class ViewSubmissionsModel : HistoPageModel
     /// pattern. Reproduces its dedicated 16-column export table exactly (same code, identical to
     /// <c>SearchSubmissions</c>'s own export handler in legacy).
     /// </summary>
-    public async Task<IActionResult> OnPostExportCsvAsync()
+    public async Task<IActionResult> OnPostExportExcelAsync()
     {
         var results = await _batches.SearchAsync(BuildCriteria());
         return ExcelExportHelper.BuildXlsx(

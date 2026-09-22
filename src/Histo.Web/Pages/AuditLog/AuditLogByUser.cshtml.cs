@@ -79,7 +79,7 @@ public class AuditLogByUserModel : GridPageModel
     }
 
     /// <summary>Replaces the legacy ExcelExport.aspx link — exports the current results as .xlsx.</summary>
-    public async Task<IActionResult> OnPostExportCsvAsync()
+    public async Task<IActionResult> OnPostExportExcelAsync()
     {
         var results = await _auditLog.GetByUserAsync(UserID, StartDate, EndDate);
         return ExcelExportHelper.BuildXlsx(

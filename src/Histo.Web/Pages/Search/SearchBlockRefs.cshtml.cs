@@ -84,7 +84,7 @@ public class SearchBlockRefsModel : GridPageModel
     }
 
     /// <summary>Replaces the legacy <c>hlExcelExport</c> link. Exports every range row, not just the current page.</summary>
-    public async Task<IActionResult> OnGetExportCsvAsync()
+    public async Task<IActionResult> OnGetExportExcelAsync()
     {
         var hasSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
         var hasHistologyRef = !string.IsNullOrWhiteSpace(HistologyRef);

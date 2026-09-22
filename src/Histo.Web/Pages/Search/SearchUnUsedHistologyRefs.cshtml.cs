@@ -40,7 +40,7 @@ public class SearchUnUsedHistologyRefsModel : GridPageModel
     }
 
     /// <summary>Replaces the legacy <c>hlExcelExport</c> link. Exports every row, not just the current page.</summary>
-    public async Task<IActionResult> OnGetExportCsvAsync()
+    public async Task<IActionResult> OnGetExportExcelAsync()
     {
         var results = await _histologyRefs.GetAllUnusedRefsAsync();
         return ExcelExportHelper.BuildXlsx(

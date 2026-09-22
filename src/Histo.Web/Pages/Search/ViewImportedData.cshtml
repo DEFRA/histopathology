@@ -30,7 +30,7 @@
         <a class="govuk-button govuk-button--secondary" asp-page="/Search/ViewImportedData" asp-route-ReturnPage="@Model.ReturnPage">Clear</a>
         @if (!string.IsNullOrEmpty(Model.SelectedTable) && Model.Results.Any())
         {
-            <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</button>
+            <button type="submit" asp-page-handler="ExportExcel" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</button>
         }
     </div>
 </form>

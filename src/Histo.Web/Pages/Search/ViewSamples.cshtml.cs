@@ -129,7 +129,7 @@ public class ViewSamplesModel : HistoPageModel
     }
 
     /// <summary>Replaces the legacy ExcelExport.aspx links (hlTissuesExcelExport / hlExcelExport).</summary>
-    public async Task<IActionResult> OnPostExportCsvAsync()
+    public async Task<IActionResult> OnPostExportExcelAsync()
     {
         SetTitle();
         await LoadLookupsAsync();

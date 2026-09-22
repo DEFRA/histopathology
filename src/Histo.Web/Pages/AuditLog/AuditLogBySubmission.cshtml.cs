@@ -67,7 +67,7 @@ public class AuditLogBySubmissionModel : GridPageModel
     }
 
     /// <summary>Replaces the legacy ExcelExport.aspx link — exports the current results as .xlsx.</summary>
-    public async Task<IActionResult> OnPostExportCsvAsync()
+    public async Task<IActionResult> OnPostExportExcelAsync()
     {
         if (SubmissionID is null or <= 0) return RedirectToPage();
         var results = await _auditLog.GetBySubmissionAsync(SubmissionID.Value, StartDate, EndDate);

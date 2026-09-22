@@ -73,7 +73,7 @@ public class SearchTestModel : HistoPageModel
     }
 
     /// <summary>Replaces the legacy <c>hlbExcel</c> link.</summary>
-    public async Task<IActionResult> OnPostExportCsvAsync()
+    public async Task<IActionResult> OnPostExportExcelAsync()
     {
         var results = await _batches.GetTestItemRowsAsync(ProjectDescription, SubmissionType);
         return ExcelExportHelper.BuildXlsx(

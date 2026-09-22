@@ -77,7 +77,7 @@
     <partial name="_Pagination" />
 
     <div class="govuk-button-group">
-        <a asp-page="/Search/SearchBlockRefs" asp-page-handler="ExportCsv"
+        <a asp-page="/Search/SearchBlockRefs" asp-page-handler="ExportExcel"
            asp-route-SenderRef="@Model.SenderRef" asp-route-HistologyRef="@Model.HistologyRef" asp-route-ReturnPage="@Model.ReturnPage"
                class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</a>
         @* Legacy lbViewImportedData opened ViewImportedData.aspx?SearchString=<ref> in a popup.
