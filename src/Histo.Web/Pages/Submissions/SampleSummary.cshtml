@@ -119,6 +119,7 @@
                     }
                 </td>
                 <td class="govuk-table__cell">
+                    <div class="govuk-button-group govuk-!-margin-bottom-0">
                     @* Routes to SubmissionDetails (Wet Tissue) or SubmissionDetailsBlock (block types),
                        both of which already render read-only when IsViewMode — labelled to match. *@
                     <form method="post" asp-page-handler="Select" class="govuk-!-display-inline">
@@ -138,6 +139,7 @@
                         <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" asp-route-ConfirmDeleteAnimalId="@a.ID"
                            class="govuk-button govuk-button--warning govuk-!-margin-bottom-0">Delete sample</a>
                     }
+                    </div>
                 </td>
             </tr>
         }

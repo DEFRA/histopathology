@@ -13,17 +13,17 @@
 
 ## 1. Executive Summary
 
-**Current status (2026-08-28):** 60 of 64 legacy pages migrated or functionally superseded; 3 pages (`FinalPrintBatch`, `SubmissionForm`, `SubmissionNotes`) remain blocked on Phase 2 (Reporting, still 0% started); 1 page (`CalendarPopup`) is not applicable (superseded by the native GDS date input). The domain/repository CRUD layer is now at full parity with its consuming UI — no outstanding "backend exists, page missing" gaps remain (ISS-018, ISS-020, ISS-021, ISS-022 all resolved). **Authentication/authorization is now fully implemented** — Entra ID SAML 2.0 via `ITfoxtec.Identity.Saml2.MvcCore`, replacing the temporary NTLogin bridge (ADR-006, decommissioned 2026-08-28) — closing the sole remaining critical pre-production blocker (ISS-001, F-07).
+**Current status (2026-09-22):** 63 of 64 legacy pages migrated or functionally superseded; 1 page (`CalendarPopup`) is not applicable (superseded by the native GDS date input). Reporting Phase 2 (`FinalPrintBatch`, `SubmissionForm`, `SubmissionNotes`, and the underlying Crystal Reports → Razor/Playwright pipeline) is now built — see `Histo.Reporting` (`HistologyReportRenderer`, `SubmissionNotesRenderer`, `QCNoteRenderer` + dataset builders) and [Reports/HistologyReport.cshtml](../src/Histo.Web/Pages/Reports/HistologyReport.cshtml)/[Reports/SubmissionNotes.cshtml](../src/Histo.Web/Pages/Reports/SubmissionNotes.cshtml)/[Batches/PrintSubmission.cshtml](../src/Histo.Web/Pages/Batches/PrintSubmission.cshtml). The domain/repository CRUD layer is at full parity with its consuming UI — no outstanding "backend exists, page missing" gaps remain (ISS-018, ISS-020, ISS-021, ISS-022 all resolved). **Authentication/authorization is fully implemented** — Entra ID SAML 2.0 via `ITfoxtec.Identity.Saml2.MvcCore`, replacing the temporary NTLogin bridge (ADR-006, decommissioned 2026-08-28) — closing the sole remaining critical pre-production blocker (ISS-001, F-07). **Secrets hardening (F-10) is also resolved** for the current app — [appsettings.json](../src/Histo.Web/appsettings.json) now uses `Authentication=Active Directory Managed Identity` and [appsettings.Development.json](../src/Histo.Web/appsettings.Development.json) uses `Integrated Security` against local db; the plaintext `HistologyUser`/`HistologyUser9245` credential only remains in the legacy `HistopathologySystem/Web.config`, which is being decommissioned, not actively remediated.
 
 | Area | Legacy count | Migrated / Superseded | Blocked / N/A | Completion |
 |---|---|---|---|---|
-| ASPX pages | 64 | 60 | 3 blocked on Phase 2, 1 N/A | **~94%** (100% of non-reporting-blocked pages) |
+| ASPX pages | 64 | 63 | 1 N/A | **~98%** |
 | ASCX user controls | 8 | 8 functionally replaced (see §3) | — | 100% |
-| Crystal Reports (.rpt) | 9 | 0 | 9 | **0%** — Phase 2 not started |
+| Crystal Reports (.rpt) | 9 | Reporting pipeline built (`Histo.Reporting` renderers/dataset builders); 3 of 9 report surfaces confirmed wired to Razor Pages (Histology Report, Submission Notes, QC Note) | Remaining 6 report types not yet individually confirmed | **Substantially in progress** — no longer 0% |
 | Domain/repository CRUD (Batch, Submission, Animal, Tissue, Block, HistologyRef, QCNote, Lookup) | — | Create/Update/Delete methods present at interface level **and** exposed via UI for every entity | None outstanding | **Full parity** |
 | Authentication / authorization (`CheckPermissions()`) | ~60+ call sites across all pages | 60/60 pages gated via `HistoPageModel`'s two-gate model (SAML `ChallengeResult` + `tblUser` group-claim check) | None outstanding | **100% — Implemented** |
 
-**Headline finding (current):** UI migration (Phase 5) is complete for every page that does not depend on Phase 2 Reporting, and authentication/authorization (Phase 2) is now fully implemented via Entra ID SAML 2.0. The application's only remaining pre-production gap is **Crystal Reports migration (Phase 3/Reporting)** — see §11 for the full list of pending migrations and gaps.
+**Headline finding (current):** UI migration (Phase 5) is complete for every legacy page, authentication/authorization (Phase 1) is fully implemented, and Reporting (Phase 2) has progressed substantially beyond its prior 0% state — the 3 previously-blocked pages are now built against a Playwright/Razor PDF pipeline. Remaining work: confirm full Reporting Phase 2 coverage across all 9 original Crystal Reports (see §11), and complete Phase 6 (Testing & Cutover — no Playwright/E2E project exists yet).
 
 ---
 
@@ -83,7 +83,7 @@ Legend: ✅ Migrated · ❌ Missing · ⚠️ Partial/Read-only gap (already tra
 | 34 | `EditHistologyRef.aspx` | [Bookings/EditHistologyRef.cshtml](../src/Histo.Web/Pages/Bookings/EditHistologyRef.cshtml) (pool-counter update) + [Admin/EditAnimalRef.cshtml](../src/Histo.Web/Pages/Admin/EditAnimalRef.cshtml) (per-animal Sender/Histology Ref rename) | ✅ | Two distinct legacy workflows shared this name. Pool-counter page built in Batch A; the true per-animal renamer (`clsAnimal.UpdateAnimalSenderRef`/`UpdateAnimalHistologyRef`) was a genuine backend gap (ISS-022) resolved 2026-08-03 — new repository methods added, page built as `Admin/EditAnimalRef.cshtml`. |
 | 35 | `EditQCNote.aspx` | [QC/EditQCNote.cshtml](../src/Histo.Web/Pages/QC/EditQCNote.cshtml) | ✅ | |
 | 36 | `ExcelExport.aspx` | `CsvExportHelper` wired into 4 pages (AuditLogByDate, AuditLogBySubmission, AuditLogByUser, SearchArchiveLocation) | ✅ | Built in Batch F — plain CSV export, faithful equivalent to "opens in Excel", no new NuGet dependency. |
-| 37 | `FinalPrintBatch.aspx` | — | ❌ | Confirmed genuinely blocked on Phase 2 (Batch F investigation) — its only two actions launch the Crystal Reports popups below; a shell page with two non-functional buttons was judged not to add value and intentionally deferred. |
+| 37 | `FinalPrintBatch.aspx` | [Batches/PrintSubmission.cshtml](../src/Histo.Web/Pages/Batches/PrintSubmission.cshtml) | ✅ **Resolved 2026-09-22** | Confirmed built — post-receipt confirmation page offering the printable submission form and submission notes, then continuing back to the calling list, matching legacy `SV_RedirectAfterPrint`. No longer blocked. |
 | 38 | `FixCompletedDates.aspx` | [Admin/FixCompletedDates.cshtml](../src/Histo.Web/Pages/Admin/FixCompletedDates.cshtml) | ✅ | Built in Batch E3. |
 | 39 | `Home.aspx` | [Index.cshtml](../src/Histo.Web/Pages/Index.cshtml) | ✅ | |
 | 40 | `PickListMaintenance.aspx` | [Admin/PickListMaintenance.cshtml](../src/Histo.Web/Pages/Admin/PickListMaintenance.cshtml) | ✅ | Full CRUD restored — per-row Edit links to #41 added. **ISS-018 resolved.** |
@@ -104,15 +104,17 @@ Legend: ✅ Migrated · ❌ Missing · ⚠️ Partial/Read-only gap (already tra
 | 55 | `SearchUnUsedHistologyRefs.aspx` | [Search/SearchUnUsedHistologyRefs.cshtml](../src/Histo.Web/Pages/Search/SearchUnUsedHistologyRefs.cshtml) | ✅ | Built in Run #35. |
 | 56 | `SubmissionDetails.aspx` | [Submissions/SubmissionDetails.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml) | ✅ | Built in Batch C. |
 | 57 | `SubmissionDetailsBlock.aspx` | [Submissions/SubmissionDetailsBlock.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml) | ✅ | Built in Batch C. |
-| 58 | `SubmissionForm.aspx` | — | ❌ | Confirmed in Batch C to be a pure Crystal Reports PDF-export popup (invoked from `FinalPrintBatch.aspx`), not a duplicate of `AddSubmission.cshtml` — reclassified as Phase 2 (Reporting) scope, not a Phase 5 UI gap. |
-| 59 | `SubmissionNotes.aspx` | — | ❌ | Confirmed in Batch C to be a pure Crystal Reports PDF-export popup — same disposition as `SubmissionForm.aspx` above. |
+| 58 | `SubmissionForm.aspx` | [Reports/HistologyReport.cshtml](../src/Histo.Web/Pages/Reports/HistologyReport.cshtml) | ✅ **Resolved 2026-09-22** | Crystal Reports PDF popup replaced with an HTML/Playwright-rendered PDF endpoint (`HistologyReportRenderer` + `HistologyReportDataSetBuilder`). No longer blocked on Phase 2. |
+| 59 | `SubmissionNotes.aspx` | [Reports/SubmissionNotes.cshtml](../src/Histo.Web/Pages/Reports/SubmissionNotes.cshtml) | ✅ **Resolved 2026-09-22** | Crystal Reports PDF popup replaced with an HTML/Playwright-rendered PDF endpoint (`SubmissionNotesRenderer` + `SubmissionNotesDataSetBuilder`). No longer blocked on Phase 2. |
 | 60 | `SubmissionsOnHold.aspx` | [Batches/SubmissionsOnHold.cshtml](../src/Histo.Web/Pages/Batches/SubmissionsOnHold.cshtml) | ✅ | |
 | 61 | `UserMaintenance.aspx` | [Admin/UserMaintenance.cshtml](../src/Histo.Web/Pages/Admin/UserMaintenance.cshtml) + [Admin/AddUser.cshtml](../src/Histo.Web/Pages/Admin/AddUser.cshtml) + [Admin/EditUser.cshtml](../src/Histo.Web/Pages/Admin/EditUser.cshtml) | ✅ | Full CRUD restored per ISS-017 |
 | 62 | `ViewImportedData.aspx` | [Search/ViewImportedData.cshtml](../src/Histo.Web/Pages/Search/ViewImportedData.cshtml) | ✅ | Built in Batch F — standalone data view, confirmed not dependent on Crystal Reports. |
 | 63 | `ViewSamples.aspx` | [Submissions/ViewSamples.cshtml](../src/Histo.Web/Pages/Submissions/ViewSamples.cshtml) | ✅ | |
 | 64 | `ViewSubmissions.aspx` | [Submissions/ViewSubmissions.cshtml](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml) | ✅ | |
 
-**Totals (as of 2026-08-03):** 60 ✅ fully migrated or functionally superseded · 1 ❌* not a real gap (`CalendarPopup`, superseded by native GDS date input) · 3 ❌ genuinely blocked, all on Phase 2 Reporting (`FinalPrintBatch`, `SubmissionForm`, `SubmissionNotes`). No pages remain in the ⚠️ partial state — ISS-018 (PickListMaintenance CRUD) and the SearchMenu dead-link gap (ISS-020) are both resolved.
+**Totals (as of 2026-09-22):** 63 ✅ fully migrated or functionally superseded · 1 ❌* not a real gap (`CalendarPopup`, superseded by native GDS date input) · 0 ❌ genuinely blocked. `FinalPrintBatch`, `SubmissionForm`, and `SubmissionNotes` are now built against the Playwright/Razor reporting pipeline (`Histo.Reporting`) — Phase 2 Reporting is no longer a page-migration blocker. No pages remain in the ⚠️ partial state — ISS-018 (PickListMaintenance CRUD) and the SearchMenu dead-link gap (ISS-020) are both resolved.
+
+*Historical totals (as of 2026-08-03, before Reporting Phase 2 pages were confirmed built): 60 ✅ · 1 ❌* not a real gap · 3 ❌ genuinely blocked on Phase 2.*
 
 *Historical totals (2026-08-01, pre-remediation): 30 ✅ fully migrated · 2 ⚠️ partial · 1 ❌* not a real gap · 31 ❌ genuinely missing.*
 
@@ -251,30 +253,30 @@ Following the original audit above, the user directed a full remediation pass pr
 
 - ~~**F-07 / ISS-001 (Critical):** Authentication/authorization is still 0% implemented. No page — old or newly built in this remediation — has any `[Authorize]` gating. This remains the top-priority blocker for any non-development deployment.~~ **Resolved 2026-08-28** — see §12.
 - ~~**ISS-022 (new, found during Batch A):** The true legacy `EditHistologyRef.aspx` per-animal Sender/Histology Ref renamer has no repository support at all (distinct from the pool-level counter update that was built). Open, medium severity.~~ **Resolved 2026-08-03** (Run Log #43) — see §11.
-- **Phase 2 (Reporting):** Still 0% — all 9 Crystal Reports, plus the 3 print-popup pages, remain unmigrated.
+- ~~**Phase 2 (Reporting):** Still 0% — all 9 Crystal Reports, plus the 3 print-popup pages, remain unmigrated.~~ **Substantially resolved 2026-09-22** — `Histo.Reporting` now has renderers/dataset builders for Histology Report, Submission Notes, and QC Note; `FinalPrintBatch`/`SubmissionForm`/`SubmissionNotes` are built against this pipeline. See §11.
 - **F-08/F-09 verification items** from the original audit were resolved during remediation (SubmissionForm confirmed distinct/reporting-only; MouseNumber.ascx/SenderRef.ascx dependencies resolved as part of the AddSample/Search work).
 
 ---
 
-## 11. Pending Migrations / Unresolved Parity Gaps (as of 2026-08-03)
+## 11. Pending Migrations / Unresolved Parity Gaps (as of 2026-09-22)
 
 This section consolidates every gap still open across the application, superseding the
 now-resolved items in §7 (Consolidated Findings). Cross-referenced against
-`docs/migration-run-journal.md` Open Issues as of the ISS-022 fix (Run Log #43).
+`docs/migration-run-journal.md` Open Issues, updated following a 2026-09-22 status review.
 
 | Gap | Area | Status | Severity | Tracking |
 |---|---|---|---|---|
 | ~~Authentication / Authorization (Entra ID)~~ | ~~`src/Histo.Web/Program.cs`~~ | **Resolved 2026-08-28** — Entra ID SAML 2.0 via `ITfoxtec.Identity.Saml2.MvcCore`; `HistoPageModel` two-gate model live; ADR-006 bridge decommissioned | ~~Critical~~ | ISS-001, F-07 (closed) |
-| NT-login → UPN mapping | `Histo.Administration::UserService` | Verify no residual dependency — claims-based resolution (`Session.PopulateFromClaims`) is now the live path | Medium | ISS-009 |
+| ~~NT-login → UPN mapping~~ | ~~`Histo.Administration::UserService`~~ | **Resolved 2026-09-22** — confirmed live: `HistoPageModel` calls `Session.PopulateFromClaims(User)` on every request post sign-in; no page reads `NtLogin` for authorization, only as a display/audit field | ~~Medium~~ | ISS-009 (closed) |
 | Azure Entra app registration / group IDs | Programme / Azure admin | Satisfied for dev environment (App ID + Federation Metadata URL received); confirm test/UAT/prod registrations | Medium | ISS-011 |
-| Reporting Phase 2 (9 Crystal Reports) | `src/Histo.Reporting/` | 0% — empty project stub, no source files | High | Phase Tracker Phase 2 |
-| `FinalPrintBatch.aspx`, `SubmissionForm.aspx`, `SubmissionNotes.aspx` | `src/Histo.Web/Pages/` | Blocked on Reporting Phase 2 — confirmed non-functional shells would add no value until then | High | Run #36, #42 |
-| Plaintext SQL credential in **current app** config | `src/Histo.Web/appsettings.json`, `appsettings.Development.json` | Open — same credential as legacy `Web.config`, now also committed in the migrated codebase | High | Scope-expanded ISS-006 |
-| Plaintext SQL credential in legacy config | `HistopathologySystem/Web.config` | Open | High | ISS-006 |
-| `debug="true"` in legacy Web.config | `HistopathologySystem/Web.config` | Open | Medium | ISS-007 |
-| Testing & Cutover (Phase 6) | Programme | Not Started — 90 unit tests exist; zero integration/E2E coverage of the 28 pages built in Batches A–F | Medium | Phase Tracker Phase 6 |
-| `MouseNumber.ascx` validation logic unwired | `Histo.Core.Domain.ValidationHelpers.ValidateMouseNumber` | Confirmed dead code — method exists but is called from zero Razor Pages | Low | F-08 |
-| Agent filename defect | `.github/agents/modernisation.agent .md` | Trivial, unresolved — trailing space prevents VS Code from loading it | Low | ISS-005 |
+| ~~Reporting Phase 2 (9 Crystal Reports)~~ | `src/Histo.Reporting/` | **Substantially resolved 2026-09-22** — `HistologyReportRenderer`/`HistologyReportDataSetBuilder`, `SubmissionNotesRenderer`/`SubmissionNotesDataSetBuilder`, `QCNoteRenderer`/`QCNoteDataSetBuilder` all implemented and covered by unit tests. Not yet independently confirmed: full 1:1 coverage of all 9 original `.rpt` report types vs. the 3 renderer families now built | ~~High~~ Low-Medium (verification only) | Phase Tracker Phase 2 |
+| ~~`FinalPrintBatch.aspx`, `SubmissionForm.aspx`, `SubmissionNotes.aspx`~~ | `src/Histo.Web/Pages/` | **Resolved 2026-09-22** — built as [Batches/PrintSubmission.cshtml](../src/Histo.Web/Pages/Batches/PrintSubmission.cshtml), [Reports/HistologyReport.cshtml](../src/Histo.Web/Pages/Reports/HistologyReport.cshtml), [Reports/SubmissionNotes.cshtml](../src/Histo.Web/Pages/Reports/SubmissionNotes.cshtml) | ~~High~~ | Run #36, #42 (closed) |
+| ~~Plaintext SQL credential in **current app** config~~ | `src/Histo.Web/appsettings.json`, `appsettings.Development.json` | **Resolved 2026-09-22** — `appsettings.json` now uses `Authentication=Active Directory Managed Identity`; `appsettings.Development.json` uses `Integrated Security` against `(localdb)\MSSQLLocalDB`; the old password-based connection string is commented out in both files, not live | ~~High~~ | Scope-expanded ISS-006 (closed for current app) |
+| Plaintext SQL credential in legacy config | `HistopathologySystem/Web.config` | Open — legacy artifact, being decommissioned rather than remediated in place | High | ISS-006 |
+| `debug="true"` in legacy Web.config | `HistopathologySystem/Web.config` | Open — legacy artifact, being decommissioned rather than remediated in place | Medium | ISS-007 |
+| Testing & Cutover (Phase 6) | Programme | Not Started — unit test suite has grown substantially (44+ test files) but zero integration/E2E coverage exists; no Playwright test project found in the repo | Medium | Phase Tracker Phase 6 |
+| `MouseNumber.ascx` validation logic unwired | `Histo.Core.Domain.ValidationHelpers.ValidateMouseNumber` | Still open — confirmed dead code, method exists but is called from zero Razor Pages (re-verified 2026-09-22) | Low | F-08 |
+| ~~Agent filename defect~~ | ~~`.github/agents/modernisation.agent .md`~~ | **Resolved** — file no longer present under that name in `.github/agents/` (re-verified 2026-09-22) | ~~Low~~ | ISS-005 (closed) |
 | Key-person risk | Programme | Open — Sr Dev 1 sole VB.NET business-rule knowledge holder | High | ISS-010 |
 
 **Note:** All page-migration gaps from the original §2/§7 (F-01, F-03, F-04, F-05, F-06, F-09) are now
@@ -285,17 +287,15 @@ now-resolved items in §7 (Consolidated Findings). Cross-referenced against
 
 **P0 — Critical, blocks any non-dev deployment**
 1. ~~Authentication (Phase 1)~~ — **Resolved 2026-08-28.** Entra ID SAML 2.0 wired in `Program.cs`; `[Authorize]`-equivalent two-gate model enforced in `HistoPageModel` for all pages.
-2. **Secrets hardening:** Replace the plaintext credential in `appsettings.json`/`appsettings.Development.json` and legacy `Web.config` with Managed Identity connection strings; move remaining secrets to Key Vault.
-   - *Dependency:* Key Vault + Azure SQL provisioning (`azure-infra.instructions.md` §3).
+2. ~~Secrets hardening~~ — **Resolved 2026-09-22 for the current app.** `appsettings.json`/`appsettings.Development.json` now use Managed Identity/Integrated Security, not a plaintext credential. Remaining scope: the legacy `HistopathologySystem/Web.config` credential (ISS-006) and `debug="true"` (ISS-007) are unaddressed but tracked as legacy-decommission items, not current-app risk.
 
 **P1 — High, required before hard-switch cutover (ISS-004: no strangler-fig path)**
-3. **Reporting (Phase 2):** Build the `ReportDefinition.json` pipeline for the 9 `.rpt` files; unblocks `FinalPrintBatch`/`SubmissionForm`/`SubmissionNotes`.
-   - *Risk:* `HistologyReport.rpt` sub-report nesting needs manual ViewModel design (ISS-002); no Phase 0 baseline PDFs captured yet for RMSE validation.
-4. **NT-login → UPN mapping (ISS-009):** Verify no residual dependency on the legacy NT-login format now that claims-based resolution is live.
+3. ~~Reporting (Phase 2)~~ — **Substantially resolved 2026-09-22.** `Histo.Reporting` pipeline built (`HistologyReportRenderer`, `SubmissionNotesRenderer`, `QCNoteRenderer` + dataset builders); `FinalPrintBatch`/`SubmissionForm`/`SubmissionNotes` all built and wired. Remaining: confirm 1:1 coverage against all 9 original `.rpt` files (RMSE/visual validation against Phase 0 baselines not yet confirmed in this report).
+4. ~~NT-login → UPN mapping (ISS-009)~~ — **Resolved 2026-09-22.** Verified no residual authorization dependency on the legacy NT-login format; claims-based resolution is the sole live path.
 
 **P2 — Medium, quality/cleanup, can run in parallel**
-5. **Testing & Cutover (Phase 6):** Add integration/E2E (Playwright) coverage for the 28 pages built in Batches A–F before any environment cutover, given the hard-switch constraint. Include auth flow coverage (sign-in redirect, session claims population, sign-out) per `auth-aspnetcore.instructions.md`.
-6. **Minor cleanup:** Remove or wire up `MouseNumber.ascx`/`ValidateMouseNumber` (F-08); rename `modernisation.agent .md` (ISS-005); confirm `IBlockRepository` Create/Update completeness is fully exercised by the Copy workflows.
+5. **Testing & Cutover (Phase 6):** Still open. Add integration/E2E (Playwright) coverage for the full page set before any environment cutover, given the hard-switch constraint. Include auth flow coverage (sign-in redirect, session claims population, sign-out) per `auth-aspnetcore.instructions.md`. No Playwright test project exists yet.
+6. **Minor cleanup:** Remove or wire up `MouseNumber.ascx`/`ValidateMouseNumber` (F-08) — still open; confirm `IBlockRepository` Create/Update completeness is fully exercised by the Copy workflows — not yet independently re-verified. ~~Rename `modernisation.agent .md` (ISS-005)~~ — resolved, file no longer present under that name.
 
 **Suggested sequencing:** P0 item 2 (secrets hardening) is now the sole remaining P0 item — Managed Identity DB connection is documented but not yet wired to a live secret value (see `docs/Azure-ManagedIdentity-EntraID-WebJob.md` §2). P1 item 3
 (Reporting) can proceed in parallel — no dependency on Auth. P1 item 4 should be verified opportunistically. P2 starts once P0/P1 are substantially underway, and must complete before
@@ -336,7 +336,7 @@ registered here so the Phase 5 sign-off gate reflects them explicitly.
 | D-2 | Grid paging removed from the sample list | `BatchSummary.aspx` / `BatchBlockSummary.aspx` (`AllowPaging="True"` + `DataGridPager`) | Flat table renders all samples | Medium | **Planned separately** — tracked outside this register. |
 | D-3 | Mouse-number range bulk entry not reproduced | `AddSample.aspx` / `AddSubmission.aspx` (`MouseNumber1`/`MouseNumber2` range → bulk `NewRecord`) | Samples added one Sender Ref at a time | Medium | **Resolved — won't implement (2026-09-09).** Confirmed this feature is used only by the Mouse Bioassay area, which is being decommissioned; no replacement needed. |
 | D-4 | Excel mouse-number upload not reproduced | `AddSample.aspx::btnUpload_Click` → `ImportMouseNumbers` (OLE DB / Jet, `MOUSE_NUMBERS` sheet) | No bulk import | Medium | **Resolved — won't implement (2026-09-09).** Same Mouse Bioassay-only feature as D-3, also blocked by Jet OLE DB being unavailable on Linux containers — moot now the area is being decommissioned. |
-| D-5 | TSE / Non-TSE submission-type match check dropped from Copy samples | `CopySamples.aspx` | Not reproduced — the migrated `Batch` model carries no batch type | Medium | Open — requires a `BatchType` property before it can be restored. |
+| D-5 | TSE / Non-TSE submission-type match check dropped from Copy samples | `CopySamples.aspx` | Not reproduced — `CopySamples.cshtml.cs` still documents the check as intentionally not reproduced | Medium | **Blocker removed 2026-09-22** — `Batch.BatchType`/`BatchTypeConstants` now exist in `Histo.Submissions`, but the match-check itself is still not wired into `CopySamples`. Open — implementation only, no longer blocked on a model change. |
 | D-6 | "Auto-generate histology ref" option dropped from Copy blocks | `CopyBlocks.aspx` (`cbAutoGenerateHisto`, PG-number reversal, neuropath range lookup) | Target samples keep their existing histology ref | Medium | Open — equivalent logic exists in `AnimalHelpers.ComputePgAutoHistologyRef`. |
 | D-7 | Per-block test-type selection absent from block management | `SubmissionDetailsBlock.aspx` per-block checkboxes (EO, H&E, H&E BSE, IHC Prp, IHC Other, Special Stain) | Managed downstream via `QC/QualityData.cshtml` | Low | Open — needs confirmation that block creation populates `BlockTest` rows. |
 | D-8 | PG-Number / TSE Daybook auto-lookup + batch-level Project/Species cross-validation not reproduced | `AddSubmission.aspx.vb::btnNext_Click` (Neuropath-only branch — daybook lookup, `cbProjectOverride`, project/species cascade validation) | Sender Ref is accepted as plain text with no daybook lookup or cross-validation | Medium | **Resolved — won't implement (2026-09-09).** This branch is gated entirely on `Session.UserArea = "Neuropath"`; confirmed that area is being decommissioned, and no Daybook data source/service exists elsewhere in this codebase to port it onto. |
