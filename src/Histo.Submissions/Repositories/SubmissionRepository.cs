@@ -175,9 +175,12 @@ public sealed class SubmissionRepository : ISubmissionRepository
     public async Task DeleteAnimalAsync(int animalId, int userId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
+        // DeleteAnimal only declares @ID — passing @UserID as well makes SQL Server reject every
+        // call with "too many arguments specified", which SubmissionService's catch-all silently
+        // turned into a false "may still have blocks or tissues" error for every delete attempt.
         await conn.ExecuteAsync(
             "DeleteAnimal",
-            new { ID = animalId, UserID = userId },
+            new { ID = animalId },
             commandType: System.Data.CommandType.StoredProcedure);
     }
 

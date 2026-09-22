@@ -99,12 +99,12 @@ else
                 <div class="govuk-form-group">
                     <label class="govuk-label" for="EditHistologyRef">Histology reference</label>
                     <div class="govuk-hint">Format: NN/NNNNN (e.g., 26/40004). Year (first 2 digits) must not exceed current year.</div>
-                    <input class="govuk-input govuk-input--width-10" asp-for="EditHistologyRef" placeholder="e.g., 26/40004" maxlength="8" pattern="\d{2}/\d{5}" />
+                    <input class="govuk-input govuk-input--width-10" asp-for="EditHistologyRef" placeholder="e.g., 26/40004" maxlength="8" pattern="\d{2}/\d{5}" readonly="@(Model.HistologyRefLocked ? "readonly" : null)" />
                 </div>
                 <div class="govuk-form-group">
                     <label class="govuk-label" for="EditPMDate">PM Date</label>
                     <div class="govuk-hint">Date sample was collected for post-mortem examination.</div>
-                    <input class="govuk-input govuk-input--width-10" asp-for="EditPMDate" type="date" />
+                    <input class="govuk-input govuk-input--width-10" asp-for="EditPMDate" type="date" readonly="@(Model.PMDateLocked ? "readonly" : null)" />
                 </div>
                 <div class="govuk-form-group">
                     <label class="govuk-label" for="NewCustomerRef">Customer reference</label>
@@ -269,6 +269,12 @@ else
                 ? Model.StainOptions.Where(o => Model.ExistingStainCodes.Contains(o.Code ?? "")).ToList()
                 : Model.StainOptions;
         }
+        @if (histOptions.Count == 0)
+        {
+            <p class="govuk-body">No test types are selected for this submission.</p>
+        }
+        else
+        {
         <div class="govuk-form-group">
             <fieldset class="govuk-fieldset">
                 <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Histology</legend>
@@ -288,7 +294,7 @@ else
         <div class="govuk-form-group">
             <fieldset class="govuk-fieldset">
                 <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Antibodies</legend>
-                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes" id="block-antibodies-section" style="@(Model.ShowAntibodies ? "" : "display:none")">
                     @foreach (var opt in antibodyOptions)
                     {
                         <div class="govuk-checkboxes__item">
@@ -303,7 +309,7 @@ else
         <div class="govuk-form-group">
             <fieldset class="govuk-fieldset">
                 <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Special stain</legend>
-                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes" id="block-stains-section" style="@(Model.ShowStains ? "" : "display:none")">
                     @foreach (var opt in stainOptions)
                     {
                         <div class="govuk-checkboxes__item">
@@ -315,9 +321,7 @@ else
                 </div>
             </fieldset>
         </div>
-        <div class="govuk-button-group">
-            <button type="submit" form="block-details-form" class="govuk-button" data-module="govuk-button">Done</button>
-        </div>
+        }
         </div>
 
         <form method="post" asp-page-handler="NextBlock">
@@ -347,6 +351,10 @@ else
             </div>
             <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Next block</button>
         </form>
+
+        <div class="govuk-button-group">
+            <button type="submit" form="block-details-form" class="govuk-button" data-module="govuk-button">Done</button>
+        </div>
     }
 
 @section Scripts {
@@ -359,6 +367,25 @@ else
             var group = document.getElementById('block-histology-checkboxes');
             if (!group) return;
             var exclusiveCodes = ['1', '7']; // EO, Archive
+            var ihcCodes = ['@Histo.Submissions.Models.HistologyCode.IhcPrp', '@Histo.Submissions.Models.HistologyCode.IhcOther'];
+            var stainCode = '@Histo.Submissions.Models.HistologyCode.SpecialStain';
+            var antibodiesSection = document.getElementById('block-antibodies-section');
+            var stainsSection = document.getElementById('block-stains-section');
+
+            function syncTestSections() {
+                var codes = Array.from(group.querySelectorAll('input[type=checkbox]:checked')).map(function (cb) { return cb.getAttribute('data-histology-code'); });
+                var showAntibodies = codes.some(function (c) { return ihcCodes.indexOf(c) >= 0; });
+                var showStains = codes.indexOf(stainCode) >= 0;
+                if (antibodiesSection) {
+                    antibodiesSection.style.display = showAntibodies ? '' : 'none';
+                    if (!showAntibodies) antibodiesSection.querySelectorAll('input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
+                }
+                if (stainsSection) {
+                    stainsSection.style.display = showStains ? '' : 'none';
+                    if (!showStains) stainsSection.querySelectorAll('input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
+                }
+            }
+            syncTestSections();
             group.addEventListener('change', function (e) {
                 var target = e.target;
                 if (!target || !target.matches('input[type="checkbox"]')) return;
@@ -373,6 +400,7 @@ else
                         if (cb !== target && exclusiveCodes.indexOf(cb.getAttribute('data-histology-code')) !== -1) cb.checked = false;
                     });
                 }
+                syncTestSections();
             });
         })();
     </script>
