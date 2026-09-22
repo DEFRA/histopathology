@@ -228,10 +228,6 @@
     @* ── Action panel — shown only when a row has been selected ──────────────── *@
     @if (Model.SelectedBatchId > 0)
     {
-        <div class="govuk-inset-text">
-            <p class="govuk-body govuk-!-font-weight-bold">Selected: Submission #@Model.SelectedBatchId</p>
-        </div>
-
         <div class="govuk-button-group">
 
             @* Print Submission — now that BatchDetails no longer duplicates these, this is the

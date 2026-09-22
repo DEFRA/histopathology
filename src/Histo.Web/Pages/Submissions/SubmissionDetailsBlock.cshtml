@@ -79,48 +79,6 @@ else
 
     <h2 class="govuk-heading-m">Blocks</h2>
 
-
-    @* "Block ref search" — inline lookup pre-filled with this sample's sender ref, replacing
-       legacy's navigate-away to SearchBlockRefs.aspx. *@
-    <details class="govuk-details" @(Model.ShowUsedRefs ? "open" : "")>
-        <summary class="govuk-details__summary">
-            <span class="govuk-details__summary-text">Block ref search — check used block refs for this sample</span>
-        </summary>
-        <div class="govuk-details__text">
-            <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-ShowUsedRefs="true"
-               class="govuk-button govuk-button--secondary govuk-!-margin-bottom-2" data-module="govuk-button">Check now</a>
-            @if (Model.ShowUsedRefs)
-            {
-                @if (Model.UsedBlockRefResults.Any())
-                {
-                    <table class="govuk-table">
-                        <thead class="govuk-table__head">
-                            <tr class="govuk-table__row">
-                                <th scope="col" class="govuk-table__header">Used block refs</th>
-                                <th scope="col" class="govuk-table__header">Unused block refs</th>
-                                <th scope="col" class="govuk-table__header">Pre booked block refs</th>
-                            </tr>
-                        </thead>
-                        <tbody class="govuk-table__body">
-                            @foreach (var r in Model.UsedBlockRefResults)
-                            {
-                                <tr class="govuk-table__row">
-                                    <td class="govuk-table__cell">@r.UsedBlockRefs</td>
-                                    <td class="govuk-table__cell">@r.UnusedBlockRefs</td>
-                                    <td class="govuk-table__cell">@r.PreBookedBlockRefs</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                }
-                else
-                {
-                    <p class="govuk-body">No block refs found for this sender ref.</p>
-                }
-            }
-        </div>
-    </details>
-
     @* Inline GOV.UK confirmation panel — replaces the browser confirm() dialog for Delete. *@
     @if (!Model.IsViewMode && Model.ConfirmDeleteBlockIds.Any())
     {
