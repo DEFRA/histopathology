@@ -253,7 +253,7 @@ public class ViewSubmissionsModel : HistoPageModel
                 r.BatchDate,
                 r.BatchType == "0" ? "TSE" : "NON TSE",
                 r.SubmittedBy,
-                r.SafeToHandle == "1" ? "Yes" : "No",
+                r.SafeToHandle is "1" or "true" or "True" or "yes" or "Yes" ? "Yes" : "No",
                 r.DateReceived,
                 r.ReceivedTime,
                 r.ReceivedBy,
