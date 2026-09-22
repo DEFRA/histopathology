@@ -4,6 +4,7 @@ using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.Submissions;
 using Histo.Web.Services;
+using ExcelDataReader;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
@@ -68,5 +69,45 @@ public class ViewSubmissionsModelTests
         var modelType = typeof(ViewSubmissionsModel);
         Assert.Null(modelType.GetProperty("SubmittedArea"));
         Assert.Null(modelType.GetProperty("IsAreaRestricted"));
+    }
+
+    [Fact]
+    public async Task OnPostExportExcelAsync_ReproducesLegacy16ColumnExportTable()
+    {
+        // Legacy lbExportExcel_Click (SearchSubmissions.aspx.vb / ViewSubmissions.aspx.vb, identical
+        // code in both) builds this exact 16-column table, not the 6-9 on-screen grid columns.
+        _batches.Setup(b => b.SearchAsync(It.IsAny<BatchSearchCriteria>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSearchResult>)
+            [
+                new BatchSearchResult
+                {
+                    ID = 12345, ProjectDescription = "Project X", ContactDescription = "Dr Smith",
+                    Species = "Ovine", BatchDate = new DateTime(2026, 1, 1), BatchType = "0",
+                    SubmittedBy = "J Bloggs", SafeToHandle = "1", DateReceived = new DateTime(2026, 1, 2),
+                    ReceivedTime = "09:30", ReceivedBy = "R Jones", OtherSubmittedBy = "Other Person",
+                    Comments = "Test comment", CustomerReceivedDate = new DateTime(2026, 1, 3),
+                    Status = "3", DateCompleted = new DateTime(2026, 1, 10),
+                },
+            ]);
+        var sut = CreateSut();
+
+        var result = await sut.OnPostExportExcelAsync();
+
+        var file = Assert.IsType<Microsoft.AspNetCore.Mvc.FileContentResult>(result);
+        using var stream = new MemoryStream(file.FileContents);
+        using var reader = ExcelReaderFactory.CreateReader(stream);
+        var table = reader.AsDataSet().Tables[0];
+
+        Assert.Equal(2, table.Rows.Count); // header + 1 data row
+        Assert.Equal(
+            new[]
+            {
+                "Submission Number", "Project/Contract", "Pathologist", "Species", "Submitted Date",
+                "Submission Type", "Submitted By", "Safe To Handle", "Received Date", "Time Received/Rejected",
+                "Received By", "Other Submitted By", "Comments", "Customer Received Date", "Status", "Completed Date",
+            },
+            table.Rows[0].ItemArray.Select(v => v?.ToString()));
+        Assert.Equal("TSE", table.Rows[1][5]);
+        Assert.Equal("Yes", table.Rows[1][7]);
     }
 }

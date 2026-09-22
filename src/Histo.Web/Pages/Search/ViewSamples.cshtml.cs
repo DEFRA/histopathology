@@ -129,7 +129,7 @@ public class ViewSamplesModel : HistoPageModel
     }
 
     /// <summary>Replaces the legacy ExcelExport.aspx links (hlTissuesExcelExport / hlExcelExport).</summary>
-    public async Task<IActionResult> OnPostExportCsvAsync()
+    public async Task<IActionResult> OnPostExportExcelAsync()
     {
         SetTitle();
         await LoadLookupsAsync();
@@ -145,18 +145,18 @@ public class ViewSamplesModel : HistoPageModel
             : (IReadOnlyList<string>)new[] { "Sub. number", "Date submitted", "Date received", "Time received", "Date completed", "Customer received date", "Submitted as", "Tissue", "No pieces" };
 
         var rows = results.Select(r => isBlockMode
-            ? (IReadOnlyList<string?>)new string?[]
+            ? (IReadOnlyList<object?>)new object?[]
               {
-                  r.ID.ToString(), r.DateSubmitted?.ToShortDateString(), r.DateReceived?.ToShortDateString(), r.TimeReceived,
-                  r.DateCompleted?.ToShortDateString(), r.CustomerReceivedDate?.ToShortDateString(), r.SubmittedAs, r.BlockRef, r.TissueDescription, r.NoPieces?.ToString(),
+                  r.ID, r.DateSubmitted, r.DateReceived, r.TimeReceived,
+                  r.DateCompleted, r.CustomerReceivedDate, r.SubmittedAs, r.BlockRef, r.TissueDescription, r.NoPieces,
               }
-            : (IReadOnlyList<string?>)new string?[]
+            : (IReadOnlyList<object?>)new object?[]
               {
-                  r.ID.ToString(), r.DateSubmitted?.ToShortDateString(), r.DateReceived?.ToShortDateString(), r.TimeReceived,
-                  r.DateCompleted?.ToShortDateString(), r.CustomerReceivedDate?.ToShortDateString(), r.SubmittedAs, r.TissueDescription, r.NoPieces?.ToString(),
+                  r.ID, r.DateSubmitted, r.DateReceived, r.TimeReceived,
+                  r.DateCompleted, r.CustomerReceivedDate, r.SubmittedAs, r.TissueDescription, r.NoPieces,
               });
 
-        return CsvExportHelper.BuildCsv(isBlockMode ? "BlockInformation.csv" : "TissueInformation.csv", headers, rows);
+        return ExcelExportHelper.BuildXlsx(isBlockMode ? "BlockInformation.xlsx" : "TissueInformation.xlsx", headers, rows);
     }
 
     private Task<IReadOnlyList<AnimalTissueSearchResult>> SearchAsync()

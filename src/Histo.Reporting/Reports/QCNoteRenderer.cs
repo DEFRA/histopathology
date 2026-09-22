@@ -18,8 +18,11 @@
 //     ├── Top bordered box  — 5-row, 2-column table (40% label / 60% bold value)
 //     │     QC Note Ref | Submission Number | Project | Species | Stain Ref
 //     └── Body bordered box — fills remaining page height
-//           Row 1: 4 static column headers in 7pt grey (Sender Ref | Histo Ref | Block Ref | Test)
-//           Row 2: QCText paragraph
+//           TestSummary (Sender Ref/Histo Ref/Block Ref/Test, monospaced — built by the
+//           DataSetBuilder from live SP row data, always present regardless of QCText),
+//           then QCText (the free-form note) below it. QCText alone cannot be trusted to
+//           contain the headings — it is copied verbatim from the SP and can be pure free
+//           text for a genuinely saved note.
 //   Footer (pinned): CreatedBy left  /  DateCreated right
 
 using System.Data;
@@ -34,13 +37,16 @@ namespace Histo.Reporting.Reports;
 /// Layout matches the legacy Crystal Reports A4 portrait QC Note form:
 /// <list type="bullet">
 ///   <item><description><b>Top bordered box</b>: 5 label/value rows — QCNoteRef, SubmissionNumber, Project, Species, StainRef.</description></item>
-///   <item><description><b>Body bordered box</b>: 4-column static header row (Sender Ref | Histo Ref | Block Ref | Test) in 7pt grey, then QCText paragraph. Expands to fill remaining page height.</description></item>
+///   <item><description><b>Body bordered box</b>: <c>TestSummary</c> (always present) followed by <c>QCText</c>, both monospaced. Expands to fill remaining page height.</description></item>
 ///   <item><description><b>Footer</b>: CreatedBy left, DateCreated right.</description></item>
 /// </list>
 /// <para>
 /// Expected DataSet: single table named <c>"Header"</c> with columns
-/// QCNoteRef, SubmissionNumber, Project, Species, StainRef, QCText, CreatedBy, DateCreated.
+/// QCNoteRef, SubmissionNumber, Project, Species, StainRef, QCText, TestSummary, CreatedBy, DateCreated.
 /// DateCreated is pre-formatted as "dd MMMM yyyy" by the DataSetBuilder — no parsing needed here.
+/// <c>TestSummary</c> is the Sender Ref/Histo Ref/Block Ref/Test table built directly from the SP's
+/// row data — it is always shown, because <c>QCText</c> alone is not a reliable source of these
+/// headings (a genuinely saved note can be pure free text with no such table embedded in it).
 /// </para>
 /// </summary>
 public sealed class QCNoteRenderer
@@ -66,6 +72,7 @@ public sealed class QCNoteRenderer
         var species          = Field(row, "Species");
         var stainRef         = Field(row, "StainRef");
         var qcText           = Field(row, "QCText");
+        var testSummary      = Field(row, "TestSummary");
         var createdBy        = Field(row, "CreatedBy");
         var dateCreated      = Field(row, "DateCreated");
 
@@ -126,41 +133,16 @@ public sealed class QCNoteRenderer
                     // ════════════════════════════════════════════════════════════
                     // SECTION 2 — Detail / Body
                     // Bordered box that fills the remaining page height (Extend()).
-                    // Row 1: 4 static column headers — Sender Ref | Histo Ref |
-                    //        Block Ref | Test — in 7pt grey, evenly spaced (25% each).
-                    //        These are pre-printed labels only; the corresponding
-                    //        data columns are not present in the modern DataSet.
-                    // Row 2: QCText paragraph.
+                    // TestSummary (Sender Ref/Histo Ref/Block Ref/Test, built by the
+                    // DataSetBuilder from live SP data) is always shown first, followed by
+                    // QCText — QCText alone cannot be relied on to contain the headings.
                     // ════════════════════════════════════════════════════════════
-                    col.Item().Extend().Border(1).Column(body =>
+                    col.Item().Extend().Border(1).Padding(4).Column(body =>
                     {
-                        body.Spacing(0);
-
-                        // Static 4-column header row — 7pt grey, monospace-style.
-                        body.Item().Table(h =>
-                        {
-                            h.ColumnsDefinition(c =>
-                            {
-                                c.RelativeColumn(25); // Sender Ref
-                                c.RelativeColumn(25); // Histo Ref
-                                c.RelativeColumn(25); // Block Ref
-                                c.RelativeColumn(25); // Test
-                            });
-
-                            void ColHeader(string label) =>
-                                h.Cell().PaddingVertical(2).PaddingHorizontal(4)
-                                 .Text(label)
-                                 .FontSize(7)
-                                 .FontColor(Colors.Grey.Medium);
-
-                            ColHeader("Sender Ref");
-                            ColHeader("Histo Ref");
-                            ColHeader("Block Ref");
-                            ColHeader("Test");
-                        });
-
-                        // QCText body paragraph — may be multi-line.
-                        body.Item().Padding(4).Text(qcText).FontSize(9);
+                        body.Spacing(4);
+                        if (!string.IsNullOrEmpty(testSummary))
+                            body.Item().Text(testSummary).FontFamily("Consolas").FontSize(9);
+                        body.Item().Text(qcText).FontFamily("Consolas").FontSize(9);
                     });
                 });
             });

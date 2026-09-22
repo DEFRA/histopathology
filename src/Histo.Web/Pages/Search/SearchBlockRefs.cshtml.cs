@@ -84,7 +84,7 @@ public class SearchBlockRefsModel : GridPageModel
     }
 
     /// <summary>Replaces the legacy <c>hlExcelExport</c> link. Exports every range row, not just the current page.</summary>
-    public async Task<IActionResult> OnGetExportCsvAsync()
+    public async Task<IActionResult> OnGetExportExcelAsync()
     {
         var hasSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
         var hasHistologyRef = !string.IsNullOrWhiteSpace(HistologyRef);
@@ -92,10 +92,10 @@ public class SearchBlockRefsModel : GridPageModel
             return RedirectToPage("/Search/SearchBlockRefs");
 
         var results = await SearchAsync(byHistologyRef: hasHistologyRef && !hasSenderRef);
-        return CsvExportHelper.BuildCsv(
-            "search-block-refs.csv",
+        return ExcelExportHelper.BuildXlsx(
+            "search-block-refs.xlsx",
             ["Used block refs", "Unused block refs", "Pre booked block refs"],
-            results.Select(r => (IReadOnlyList<string?>)new string?[]
+            results.Select(r => (IReadOnlyList<object?>)new object?[]
             {
                 r.UsedBlockRefs,
                 r.UnusedBlockRefs,

@@ -46,8 +46,8 @@ public class HistologyReportDataSetBuilderTests
             ("BatchType",          batchType));
     }
 
-    private static Dictionary<string, object> SubmittedAsRow(int batchId, string description)
-        => Row(("BatchID", batchId), ("Description", description));
+    private static Dictionary<string, object> SubmittedAsRow(int batchId, string code)
+        => Row(("BatchID", batchId), ("Code", code));
 
     // ── BuildBatchTable ──────────────────────────────────────────────────────
 
@@ -145,17 +145,23 @@ public class HistologyReportDataSetBuilderTests
     }
 
     [Fact]
-    public void BuildBatchTable_MultipleSubmittedAsRows_ConcatenatesDescriptions()
+    public void BuildBatchTable_MultipleSubmittedAsRows_ConcatenatesResolvedNames()
     {
         const int batchId = 99;
+        var submittedAsByCode = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["2"] = "Wax Block",
+            ["6"] = "Fresh Tissue",
+        };
         var table = HistologyReportDataSetBuilder.BuildBatchTable(
             rawBatch: [DefaultBatchRow()],
             rawSubmittedAs:
             [
-                SubmittedAsRow(batchId, "Wax Block"),
-                SubmittedAsRow(batchId, "Fresh Tissue")
+                SubmittedAsRow(batchId, "2"),
+                SubmittedAsRow(batchId, "6")
             ],
-            batchId: batchId);
+            batchId: batchId,
+            submittedAsByCode: submittedAsByCode);
 
         Assert.Equal("Wax Block, Fresh Tissue", table.Rows[0]["SubmittedAs"]);
     }
@@ -165,16 +171,69 @@ public class HistologyReportDataSetBuilderTests
     {
         // Rows belonging to a different batch should be excluded from concatenation
         const int batchId = 99;
+        var submittedAsByCode = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["2"] = "Wax Block",
+        };
         var table = HistologyReportDataSetBuilder.BuildBatchTable(
             rawBatch: [DefaultBatchRow()],
             rawSubmittedAs:
             [
-                SubmittedAsRow(batchId, "Wax Block"),
-                SubmittedAsRow(999,     "Should Not Appear")
+                SubmittedAsRow(batchId, "2"),
+                SubmittedAsRow(999,     "9")
             ],
-            batchId: batchId);
+            batchId: batchId,
+            submittedAsByCode: submittedAsByCode);
 
         Assert.Equal("Wax Block", table.Rows[0]["SubmittedAs"]);
+    }
+
+    [Fact]
+    public void BuildBatchTable_FixationCode_ResolvesToDisplayName()
+    {
+        var fixationByCode = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["1"] = "Other" };
+        var row = DefaultBatchRow();
+        row["Fixation"] = "1";
+
+        var table = HistologyReportDataSetBuilder.BuildBatchTable(
+            rawBatch: [row], rawSubmittedAs: [], batchId: 99, fixationByCode: fixationByCode);
+
+        Assert.Equal("Other", table.Rows[0]["Fixation"]);
+    }
+
+    [Fact]
+    public void BuildBatchTable_TimeReceivedCode_ResolvesToDisplayName()
+    {
+        var timeReceivedByCode = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["2"] = "before 11.00" };
+        var row = DefaultBatchRow();
+        row["TimeReceived"] = "2";
+
+        var table = HistologyReportDataSetBuilder.BuildBatchTable(
+            rawBatch: [row], rawSubmittedAs: [], batchId: 99, timeReceivedByCode: timeReceivedByCode);
+
+        Assert.Equal("before 11.00", table.Rows[0]["TimeReceived"]);
+    }
+
+    [Fact]
+    public void BuildBatchTable_UnresolvedFixationCode_FallsBackToRawCode()
+    {
+        var row = DefaultBatchRow();
+        row["Fixation"] = "7";
+
+        var table = HistologyReportDataSetBuilder.BuildBatchTable(
+            rawBatch: [row], rawSubmittedAs: [], batchId: 99,
+            fixationByCode: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["1"] = "Other" });
+
+        Assert.Equal("7", table.Rows[0]["Fixation"]);
+    }
+
+    [Fact]
+    public void BuildBatchTable_SampleCount_PopulatesNumberSamples()
+    {
+        var table = HistologyReportDataSetBuilder.BuildBatchTable(
+            rawBatch: [DefaultBatchRow()], rawSubmittedAs: [], batchId: 99, sampleCount: 4);
+
+        Assert.Equal("4", table.Rows[0]["NumberSamples"]);
     }
 
     [Fact]
@@ -274,38 +333,76 @@ public class HistologyReportDataSetBuilderTests
     }
 
     [Fact]
-    public void BuildHistologyTable_ThreeCodes_ReturnsThreeRows()
+    public void BuildHistologyTable_DirectCodes_ResolvedToDescriptions()
     {
+        var histologyByCode = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["2"] = "H&E",
+            ["7"] = "Archive",
+        };
         var table = HistologyReportDataSetBuilder.BuildHistologyTable(
-            rawHistology:
-            [
-                Row(("Code", "H&E")),
-                Row(("Code", "PAS")),
-                Row(("Code", "MT"))
-            ],
-            batchId: 1);
+            rawHistology: [Row(("Code", "2")), Row(("Code", "7"))],
+            batchId: 1,
+            histologyByCode: histologyByCode);
 
-        Assert.Equal(3, table.Rows.Count);
-    }
-
-    [Fact]
-    public void BuildHistologyTable_CodeColumnMappedCorrectly()
-    {
-        var table = HistologyReportDataSetBuilder.BuildHistologyTable(
-            rawHistology: [Row(("Code", "H&E"))],
-            batchId: 42);
-
+        Assert.Equal(2, table.Rows.Count);
         Assert.Equal("H&E", table.Rows[0]["Code"]);
+        Assert.Equal("Archive", table.Rows[1]["Code"]);
     }
 
     [Fact]
-    public void BuildHistologyTable_BatchIdMappedCorrectly()
+    public void BuildHistologyTable_Code7_ResolvesToArchive()
     {
         var table = HistologyReportDataSetBuilder.BuildHistologyTable(
-            rawHistology: [Row(("Code", "H&E"))],
-            batchId: 42);
+            rawHistology: [Row(("Code", "7"))],
+            batchId: 42,
+            histologyByCode: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["7"] = "Archive" });
 
+        Assert.Equal("Archive", table.Rows[0]["Code"]);
         Assert.Equal(42, table.Rows[0]["BatchID"]);
+    }
+
+    [Fact]
+    public void BuildHistologyTable_SpecialStainFlag_ExpandsStainRows()
+    {
+        // Histology code 3 (Special Stain) expands into the batch's actual stain rows.
+        var table = HistologyReportDataSetBuilder.BuildHistologyTable(
+            rawHistology: [Row(("Code", "3"))],
+            batchId: 1,
+            rawStains: [Row(("Code", "14")), Row(("Code", "Other"))],
+            specialStainByCode: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["14"] = "PAS" });
+
+        Assert.Equal(2, table.Rows.Count);
+        Assert.Equal("PAS", table.Rows[0]["Code"]);
+        Assert.Equal("Special Other", table.Rows[1]["Code"]); // "Other" special-cased by legacy
+    }
+
+    [Fact]
+    public void BuildHistologyTable_IhcFlagTse_ExpandsTseAntibodyRows()
+    {
+        // Histology code 4/6 (IHC) expands into the batch's antibody rows; TSE uses table 4.
+        var table = HistologyReportDataSetBuilder.BuildHistologyTable(
+            rawHistology: [Row(("Code", "4"))],
+            batchId: 1,
+            rawAntibodies: [Row(("Code", "1")), Row(("Code", "Other"))],
+            batchType: 0, // TSE
+            tseAntibodiesByCode: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["1"] = "PrP (SAF84)" });
+
+        Assert.Equal(2, table.Rows.Count);
+        Assert.Equal("PrP (SAF84)", table.Rows[0]["Code"]);
+        Assert.Equal("IHC-PrP Other", table.Rows[1]["Code"]);
+    }
+
+    [Fact]
+    public void BuildHistologyTable_CappedAtEightRows()
+    {
+        var codes = Enumerable.Range(0, 12).Select(_ => Row(("Code", "2"))).ToArray();
+        var table = HistologyReportDataSetBuilder.BuildHistologyTable(
+            rawHistology: codes,
+            batchId: 1,
+            histologyByCode: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["2"] = "H&E" });
+
+        Assert.Equal(8, table.Rows.Count);
     }
 
     // ── BuildSubmissionTable ──────────────────────────────────────────────────

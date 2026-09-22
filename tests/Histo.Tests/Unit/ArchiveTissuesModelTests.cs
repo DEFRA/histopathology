@@ -37,7 +37,7 @@ public class ArchiveTissuesModelTests
             .ReturnsAsync((IReadOnlyList<LookupItem>)[]);
         _lookups.Setup(l => l.GetSpeciesLookupAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<LookupItem>)[]);
-        _lookups.Setup(l => l.GetUserAreasAsync(It.IsAny<CancellationToken>()))
+        _lookups.Setup(l => l.GetUserAreasAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<LookupItem>)[]);
         _users.Setup(u => u.GetAllUsersAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<User>)[]);
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))

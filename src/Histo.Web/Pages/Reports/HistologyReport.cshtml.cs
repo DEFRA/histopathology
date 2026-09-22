@@ -2,6 +2,7 @@ using Histo.Reporting.Reports;
 using Histo.Reporting.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 
 namespace Histo.Web.Pages.Reports;
 
@@ -19,15 +20,18 @@ public class HistologyReportModel : HistoPageModel
 {
     private readonly HistologyReportDataSetBuilder _dataSetBuilder;
     private readonly HistologyReportRenderer _renderer;
+    private readonly IConfiguration _config;
 
     public HistologyReportModel(
         ISessionService session,
         HistologyReportDataSetBuilder dataSetBuilder,
-        HistologyReportRenderer renderer)
+        HistologyReportRenderer renderer,
+        IConfiguration config)
         : base(session)
     {
         _dataSetBuilder = dataSetBuilder;
         _renderer       = renderer;
+        _config         = config;
     }
 
     public async Task<IActionResult> OnGetAsync(CancellationToken ct = default)
@@ -36,8 +40,11 @@ public class HistologyReportModel : HistoPageModel
         if (batchId is null or <= 0)
             return RedirectToPage("/Index");
 
+        // Rows-per-page is configurable (appsettings Reporting:HistologyReportRowsPerPage); default 13.
+        var rowsPerPage = _config.GetValue<int?>("Reporting:HistologyReportRowsPerPage") ?? 13;
+
         var ds  = await _dataSetBuilder.BuildAsync(batchId.Value, ct);
-        var pdf = await _renderer.RenderAsync(ds);
+        var pdf = await _renderer.RenderAsync(ds, rowsPerPage);
 
         return File(pdf, "application/pdf", $"HistologyReport-{batchId}.pdf");
     }

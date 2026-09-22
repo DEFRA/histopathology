@@ -68,7 +68,7 @@ public class BookBlockRefModelTests
     {
         _submissions.Setup(s => s.GetAnimalBySenderAsync("ABC123", It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<SenderSearchResult>)[]);
-        _submissions.Setup(s => s.AddAnimalAsync(0, "ABC123", false, 99, null, false, It.IsAny<CancellationToken>()))
+        _submissions.Setup(s => s.AddAnimalAsync(0, "ABC123", 99, null, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(501);
         var sut = CreateSut();
         sut.SenderRefFrom = "ABC123";
@@ -93,7 +93,7 @@ public class BookBlockRefModelTests
 
         await sut.OnPostAsync();
 
-        _submissions.Verify(s => s.AddAnimalAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+        _submissions.Verify(s => s.AddAnimalAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
         _blocks.Verify(b => b.CreatePreBookedBlockAsync(77, "01", It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -119,7 +119,7 @@ public class BookBlockRefModelTests
     {
         _submissions.Setup(s => s.GetAnimalBySenderAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<SenderSearchResult>)[]);
-        _submissions.Setup(s => s.AddAnimalAsync(0, It.IsAny<string>(), false, 99, null, false, It.IsAny<CancellationToken>()))
+        _submissions.Setup(s => s.AddAnimalAsync(0, It.IsAny<string>(), 99, null, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
         var sut = CreateSut();
         sut.SenderRefFrom = "PG0001/24";
@@ -130,9 +130,9 @@ public class BookBlockRefModelTests
 
         Assert.IsType<PageResult>(result);
         Assert.Null(sut.Error);
-        _submissions.Verify(s => s.AddAnimalAsync(0, "PG0001/24", false, 99, null, false, It.IsAny<CancellationToken>()), Times.Once);
-        _submissions.Verify(s => s.AddAnimalAsync(0, "PG0002/24", false, 99, null, false, It.IsAny<CancellationToken>()), Times.Once);
-        _submissions.Verify(s => s.AddAnimalAsync(0, "PG0003/24", false, 99, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _submissions.Verify(s => s.AddAnimalAsync(0, "PG0001/24", 99, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _submissions.Verify(s => s.AddAnimalAsync(0, "PG0002/24", 99, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _submissions.Verify(s => s.AddAnimalAsync(0, "PG0003/24", 99, null, false, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

@@ -7,11 +7,11 @@ using Moq;
 namespace Histo.Tests.Unit;
 
 /// <summary>
-/// Unit tests for <see cref="SubmissionService"/> — animal creation with PG-number
-/// auto-reversal.
+/// Unit tests for SubmissionService animal creation.
 ///
-/// These tests verify that the PG-number business rule from clsAnimal.vb NewRecord()
-/// is preserved correctly in the Phase 4 domain service layer.
+/// The PG-number auto-reversal / Neuropath-specific behaviour previously
+/// covered here was removed together with the Neuropath user area - see
+/// docs/Mouse-Bioassay-Neuropath-Removal-Analysis.md, section 3, item 4.
 /// </summary>
 public class SubmissionServiceAnimalTests
 {
@@ -22,27 +22,7 @@ public class SubmissionServiceAnimalTests
         new(_repoMock.Object, _loggerMock.Object);
 
     [Fact]
-    public async Task AddAnimalAsync_NeuropathWithPgRef_SetsAutoHistologyRef()
-    {
-        _repoMock
-            .Setup(r => r.AddAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), default))
-            .ReturnsAsync(42);
-
-        var sut = BuildSut();
-        await sut.AddAnimalAsync(
-            batchSubmissionId: 1,
-            senderRef: "PG012302",
-            isNeuropath: true,
-            userId: 99);
-
-        _repoMock.Verify(r => r.AddAnimalAsync(
-            It.Is<Animal>(a => a.HistologyRef == "02/00123" && a.IsPGNumber),
-            99,
-            default));
-    }
-
-    [Fact]
-    public async Task AddAnimalAsync_NotNeuropath_SetsNoHistologyRef()
+    public async Task AddAnimalAsync_SetsNoHistologyRef()
     {
         _repoMock
             .Setup(r => r.AddAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), default))
@@ -52,27 +32,6 @@ public class SubmissionServiceAnimalTests
         await sut.AddAnimalAsync(
             batchSubmissionId: 1,
             senderRef: "PG012302",
-            isNeuropath: false,
-            userId: 1);
-
-        _repoMock.Verify(r => r.AddAnimalAsync(
-            It.Is<Animal>(a => a.HistologyRef == null && !a.IsPGNumber),
-            1,
-            default));
-    }
-
-    [Fact]
-    public async Task AddAnimalAsync_NonPgRef_SetsNoHistologyRef()
-    {
-        _repoMock
-            .Setup(r => r.AddAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), default))
-            .ReturnsAsync(1);
-
-        var sut = BuildSut();
-        await sut.AddAnimalAsync(
-            batchSubmissionId: 1,
-            senderRef: "AB012302",
-            isNeuropath: true,
             userId: 1);
 
         _repoMock.Verify(r => r.AddAnimalAsync(
@@ -89,7 +48,7 @@ public class SubmissionServiceAnimalTests
             .ReturnsAsync(1);
 
         var sut = BuildSut();
-        await sut.AddAnimalAsync(1, "REF001", false, 1);
+        await sut.AddAnimalAsync(1, "REF001", 1);
 
         _repoMock.Verify(r => r.AddAnimalAsync(
             It.Is<Animal>(a => a.NextBlockRef == "01"),
@@ -105,7 +64,7 @@ public class SubmissionServiceAnimalTests
             .ThrowsAsync(new InvalidOperationException("DB error"));
 
         var sut = BuildSut();
-        var result = await sut.AddAnimalAsync(1, "REF001", false, 1);
+        var result = await sut.AddAnimalAsync(1, "REF001", 1);
 
         Assert.Equal(0, result);
         _loggerMock.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>(), It.IsAny<object[]>()));

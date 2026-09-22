@@ -149,7 +149,7 @@ public class SubmissionNotesRendererTests
     }
 
     [Fact]
-    public async Task RenderAsync_AllCommentSectionsEmpty_SkipsThemAndStillProducesPdf()
+    public async Task RenderAsync_AllCommentSectionsEmpty_StillRendersHeadingsAndProducesPdf()
     {
         var renderer = new SubmissionNotesRenderer();
         var ds       = BuildTestDataSet();
@@ -167,7 +167,7 @@ public class SubmissionNotesRendererTests
     }
 
     [Fact]
-    public async Task RenderAsync_OnlyTissueSection_RendersOnlyThatSection()
+    public async Task RenderAsync_OnlyTissueSectionPopulated_StillProducesPdf()
     {
         var renderer = new SubmissionNotesRenderer();
         var ds       = BuildTestDataSet();

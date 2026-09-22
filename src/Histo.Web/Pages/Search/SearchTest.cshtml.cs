@@ -73,12 +73,12 @@ public class SearchTestModel : HistoPageModel
     }
 
     /// <summary>Replaces the legacy <c>hlbExcel</c> link.</summary>
-    public async Task<IActionResult> OnPostExportCsvAsync()
+    public async Task<IActionResult> OnPostExportExcelAsync()
     {
         var results = await _batches.GetTestItemRowsAsync(ProjectDescription, SubmissionType);
-        return CsvExportHelper.BuildCsv(
-            "search-test-totals.csv",
+        return ExcelExportHelper.BuildXlsx(
+            "search-test-totals.xlsx",
             ["Description", "Count"],
-            results.Select(r => (IReadOnlyList<string?>)new string?[] { r.Description, r.Count.ToString() }));
+            results.Select(r => (IReadOnlyList<object?>)new object?[] { r.Description, r.Count }));
     }
 }

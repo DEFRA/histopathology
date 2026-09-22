@@ -33,7 +33,9 @@
     <input type="hidden" asp-for="OriginalCode" />
     <input type="hidden" asp-for="ReturnUrl" />
 
-    @* Area dropdown — only for Contacts (table 18) and Projects (table 19) *@
+    @* Area dropdown — only for Contacts (table 18) and Projects (table 19). Note: EditluProjects/
+       EditluContacts (the real update procedures) have no @Area parameter, so a change here is
+       not currently persisted — tracked as a known issue, fix pending a decision. *@
     @if (Model.ShowAreaColumn)
     {
         <div class="govuk-form-group">

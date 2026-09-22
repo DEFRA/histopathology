@@ -12,7 +12,16 @@ namespace Histo.AuditLog.Models;
 /// </summary>
 public sealed class AuditLogEntry
 {
-    public int ID { get; init; }
+    /// <summary>
+    /// Business key of the audited record. Not a strict integer: the audit SPs
+    /// return <c>AuditLog.ID</c> untouched, and for lookup-table edits (e.g.
+    /// <c>luArchiveLocation</c>) it is that table's varchar <c>Code</c>, not a
+    /// numeric surrogate key. A previous <c>int</c> declaration threw a
+    /// FormatException on any such row, silently swallowed by the service's
+    /// catch-all and returning an empty result for the whole date/user/submission
+    /// query. Not displayed anywhere (the grid's "Key" column is <see cref="KeyID"/>).
+    /// </summary>
+    public string? ID { get; init; }
 
     // ── Legacy granular columns (compliance-critical) ────────────────────────
     /// <summary>Database table that was modified (e.g. BATCH_TABLE, ANIMAL_TABLE).</summary>

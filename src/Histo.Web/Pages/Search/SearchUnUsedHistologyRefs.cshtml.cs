@@ -17,7 +17,7 @@ public class SearchUnUsedHistologyRefsModel : GridPageModel
 
     [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
 
-    /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
+    /// <summary>Only ever redirect to a path inside this application ï¿½ blocks open-redirect abuse.</summary>
     public string BackLinkPage =>
         !string.IsNullOrWhiteSpace(ReturnPage) && Url.IsLocalUrl(ReturnPage) ? ReturnPage : "/Search/SearchMenu";
 
@@ -40,18 +40,12 @@ public class SearchUnUsedHistologyRefsModel : GridPageModel
     }
 
     /// <summary>Replaces the legacy <c>hlExcelExport</c> link. Exports every row, not just the current page.</summary>
-    public async Task<IActionResult> OnGetExportCsvAsync()
+    public async Task<IActionResult> OnGetExportExcelAsync()
     {
-        //var results = await _histologyRefs.GetAllUnusedRefsAsync();
-        //return CsvExportHelper.BuildCsv(
-        //    "unused-histology-refs.csv",
-        //    ["Histology ref", "Sender ref"],
-        //    results.Select(r => (IReadOnlyList<string?>)new string?[] { r.Ref, r.SenderRef }));
-
         var results = await _histologyRefs.GetAllUnusedRefsAsync();
-        return CsvExportHelper.BuildCsv(
-            "unused-histology-refs.csv",
+        return ExcelExportHelper.BuildXlsx(
+            "unused-histology-refs.xlsx",
             ["Histology ref"],
-            results.Select(r => (IReadOnlyList<string?>)new string?[] { r.Ref}));
+            results.Select(r => (IReadOnlyList<object?>)new object?[] { r.Ref }));
     }
 }

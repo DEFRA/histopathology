@@ -96,7 +96,7 @@ public class AddLookupItemModelTests
             .ReturnsAsync((IReadOnlyList<EditableLookup>)[new EditableLookup { ID = 18, TableName = "Pathologists" }]);
         _lookups.Setup(l => l.GetLookupDataAsync(18, true, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<LookupItem>)[]);
-        _lookups.Setup(l => l.GetUserAreasAsync(It.IsAny<CancellationToken>()))
+        _lookups.Setup(l => l.GetUserAreasAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 3, Name = "Pathology" }]);
         _lookups.Setup(l => l.CreateLookupItemAsync(18, It.IsAny<LookupItem>(), 7, It.IsAny<CancellationToken>())).ReturnsAsync(true);
         var sut = CreateSut();

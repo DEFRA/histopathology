@@ -213,7 +213,7 @@
 
         @* Export to CSV — mirrors legacy lbExportExcel (all result rows). *@
         <button form="view-action-form"
-                formaction="?handler=ExportCsv"
+                formaction="?handler=ExportExcel"
                 type="submit"
                 class="govuk-button govuk-button--secondary"
                 data-module="govuk-button">
@@ -228,10 +228,6 @@
     @* ── Action panel — shown only when a row has been selected ──────────────── *@
     @if (Model.SelectedBatchId > 0)
     {
-        <div class="govuk-inset-text">
-            <p class="govuk-body govuk-!-font-weight-bold">Selected: Submission #@Model.SelectedBatchId</p>
-        </div>
-
         <div class="govuk-button-group">
 
             @* Print Submission — now that BatchDetails no longer duplicates these, this is the

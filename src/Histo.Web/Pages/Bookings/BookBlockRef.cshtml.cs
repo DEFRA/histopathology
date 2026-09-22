@@ -138,7 +138,7 @@ public class BookBlockRefModel : HistoPageModel
             var existing = await _submissions.GetAnimalBySenderAsync(senderRef);
             var animalId = existing.FirstOrDefault()?.ID ?? 0;
             if (animalId == 0)
-                animalId = await _submissions.AddAnimalAsync(batchSubmissionId: 0, senderRef, isNeuropath: false, userId);
+                animalId = await _submissions.AddAnimalAsync(batchSubmissionId: 0, senderRef, userId);
 
             if (animalId == 0)
             {

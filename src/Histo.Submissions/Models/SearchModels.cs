@@ -109,6 +109,17 @@ public sealed class BatchSearchResult
     /// in the results grid but preserved for completeness.
     /// </summary>
     public string? SubmittedBy { get; init; }
+
+    // The 6 fields below are not shown on the results grid, but are read from this
+    // same SP result by legacy's lbExportExcel_Click (SearchSubmissions.aspx.vb /
+    // ViewSubmissions.aspx.vb, identical in both) to build its richer Export to
+    // Excel table — kept here so the Excel export can reproduce it exactly.
+    public string? BatchType { get; init; }
+    public string? SafeToHandle { get; init; }
+    public string? ReceivedTime { get; init; }
+    public string? ReceivedBy { get; init; }
+    public string? OtherSubmittedBy { get; init; }
+    public string? Comments { get; init; }
 }
 
 /// <summary>

@@ -53,8 +53,11 @@ public interface ILookupRepository
     /// <summary>
     /// Returns the list of user areas for the User Maintenance area drop-down.
     /// Maps to <c>GetluUserArea</c> (legacy source: <c>LookupData.GetUserAreas</c>).
+    /// Pass <paramref name="includeInactive"/> = <see langword="true"/> to also include
+    /// deactivated areas (calls <c>GetluUserAreaAll</c>) — needed to resolve a historical
+    /// Batch/User area code to a name after the area itself has been retired.
     /// </summary>
-    Task<IReadOnlyList<LookupItem>> GetUserAreasAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<LookupItem>> GetUserAreasAsync(bool includeInactive = false, CancellationToken ct = default);
 
     /// <summary>
     /// Returns the list of legacy imported ICC_Sub table names for the ViewImportedData

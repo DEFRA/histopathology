@@ -290,7 +290,9 @@ public class ReceiveBatchModel : HistoPageModel
         var projectsTask     = _lookups.GetLookupDataAsync(LookupProjects);
         var contactsTask     = _lookups.GetLookupDataAsync(LookupContacts);
         var speciesTask      = _lookups.GetSpeciesLookupAsync();
-        var userAreasTask    = _lookups.GetUserAreasAsync();
+        // includeInactive: true — resolves the Entered/Submitted Area name for display even when
+        // the batch was entered under a since-retired area (Mouse Bioassay/Neuropath).
+        var userAreasTask    = _lookups.GetUserAreasAsync(includeInactive: true);
 
         await Task.WhenAll(usersTask, timeReceivedTask, postFixationTask,
             projectsTask, contactsTask, speciesTask, userAreasTask);

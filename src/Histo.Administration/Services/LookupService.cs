@@ -116,11 +116,11 @@ public sealed class LookupService : ILookupService
     }
 
     /// <summary>Returns the user area pick-list for the User Maintenance form.</summary>
-    public async Task<IReadOnlyList<LookupItem>> GetUserAreasAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<LookupItem>> GetUserAreasAsync(bool includeInactive = false, CancellationToken ct = default)
     {
         try
         {
-            return await _lookups.GetUserAreasAsync(ct);
+            return await _lookups.GetUserAreasAsync(includeInactive, ct);
         }
         catch (Exception ex)
         {

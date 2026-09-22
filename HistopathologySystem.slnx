@@ -14,6 +14,7 @@
   <Folder Name="/src/Database/" />
   <Folder Name="/src/Database/Migrations/">
     <File Path="src/Database/Migrations/V20260914_01_User_Email_NotNull_NTLogin_Nullable.sql" />
+    <File Path="src/Database/Migrations/V20260917_01_Deactivate_MouseBioassay_Neuropath_UserAreas.sql" />
   </Folder>
   <Folder Name="/src/Database/Deploy/">
     <File Path="src/Database/Deploy/Deploy.sql" />

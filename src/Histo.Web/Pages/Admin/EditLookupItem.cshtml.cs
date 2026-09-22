@@ -64,6 +64,7 @@ public class EditLookupItemModel : HistoPageModel
         Code = item.Code ?? string.Empty;
         OriginalCode = item.Code ?? string.Empty;
         Area = item.Area;
+        await EnsureCurrentAreaVisibleAsync();
         return Page();
     }
 
@@ -71,6 +72,7 @@ public class EditLookupItemModel : HistoPageModel
     {
         SetTitle();
         await LoadTableAsync();
+        await EnsureCurrentAreaVisibleAsync();
 
         Validate();
         if (Errors.Count > 0) return Page();
@@ -137,6 +139,20 @@ public class EditLookupItemModel : HistoPageModel
 
         if (ShowAreaColumn)
             UserAreas = await _lookups.GetUserAreasAsync();
+    }
+
+    /// <summary>
+    /// If this item's stored Area isn't in the active list (a since-retired area like Mouse
+    /// Bioassay/Neuropath), fetches its name and adds it to <see cref="UserAreas"/> so the
+    /// dropdown displays/preserves the real value instead of silently defaulting away from it.
+    /// </summary>
+    private async Task EnsureCurrentAreaVisibleAsync()
+    {
+        if (!ShowAreaColumn || string.IsNullOrEmpty(Area) || UserAreas.Any(a => a.ID.ToString() == Area)) return;
+
+        var allAreas = await _lookups.GetUserAreasAsync(includeInactive: true);
+        var retired = allAreas.FirstOrDefault(a => a.ID.ToString() == Area);
+        if (retired is not null) UserAreas = [.. UserAreas, retired];
     }
 
     private void SetTitle()

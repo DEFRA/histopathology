@@ -1,4 +1,4 @@
-﻿-- ============================================================================
+﻿-- ============================================================================-- ============================================================================
 -- DEPLOYMENT MANIFEST — One-Time Database Migration
 -- ============================================================================
 -- This script is idempotent and safe to re-run via CI/CD pipeline.
@@ -20,6 +20,11 @@ GO
 -- Step 2: Deployment script to used to alter/create tables, columns etc
 PRINT '--- Create or Alter Table, Column  ---';
 :r ../Migrations/V20260914_01_User_Email_NotNull_NTLogin_Nullable.sql
+GO
+
+-- Step 3: Deactivate the Mouse Bioassay / Neuropath user areas
+PRINT '--- Deactivating Mouse Bioassay / Neuropath user areas ---';
+:r ../Migrations/V20260917_01_Deactivate_MouseBioassay_Neuropath_UserAreas.sql
 GO
 
 PRINT '=== Database deployment completed ===';

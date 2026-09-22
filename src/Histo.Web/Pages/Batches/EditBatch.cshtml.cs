@@ -360,7 +360,10 @@ public class EditBatchModel : HistoPageModel
         var contactsTask  = _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true);
         var speciesTask   = _lookups.GetSpeciesLookupAsync();
         var fixationTask  = _lookups.GetLookupDataAsync(LookupFixation);
-        var areaTask      = _lookups.GetLookupDataAsync(LookupUserArea);
+        // includeInactive: true — the "Submitted area" field is read-only display here (never
+        // editable — see class doc comment), so a since-retired area (Mouse Bioassay/Neuropath)
+        // must still resolve to a name rather than falling through to "Not recorded".
+        var areaTask      = _lookups.GetUserAreasAsync(includeInactive: true);
         var usersTask     = _users.GetAllUsersAsync();
         await Task.WhenAll(projectsTask, contactsTask, speciesTask, fixationTask, areaTask, usersTask);
         Projects    = projectsTask.Result;

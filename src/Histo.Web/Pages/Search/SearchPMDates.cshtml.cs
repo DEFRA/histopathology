@@ -93,25 +93,25 @@ public class SearchPMDatesModel : HistoPageModel
     }
 
     /// <summary>Replaces the legacy <c>hlbExcel</c> link. Exports every result row, not just the current page.</summary>
-    public async Task<IActionResult> OnPostExportCsvAsync()
+    public async Task<IActionResult> OnPostExportExcelAsync()
     {
         if (!TryBuildRange(out var from, out var to)) return RedirectToPage("/Search/SearchPMDates");
 
         var results = await _submissions.GetByPmDateRangeAsync(from, to);
-        return CsvExportHelper.BuildCsv(
-            "search-pm-dates.csv",
+        return ExcelExportHelper.BuildXlsx(
+            "search-pm-dates.xlsx",
             ["Sub. number", "Sender ref", "PM date", "Date submitted", "Date received / rejected",
              "Time received / rejected", "Date completed", "Customer received date"],
-            results.Select(r => (IReadOnlyList<string?>)new string?[]
+            results.Select(r => (IReadOnlyList<object?>)new object?[]
             {
-                r.ID.ToString(),
+                r.ID,
                 r.SenderRef,
-                r.PMDate?.ToShortDateString(),
-                r.BatchDate?.ToShortDateString(),
-                r.DateReceived?.ToShortDateString(),
+                r.PMDate,
+                r.BatchDate,
+                r.DateReceived,
                 r.TimeReceived,
-                r.CompletedDate?.ToShortDateString(),
-                r.CustomerReceivedDate?.ToShortDateString()
+                r.CompletedDate,
+                r.CustomerReceivedDate
             }));
     }
 
