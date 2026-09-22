@@ -12,58 +12,64 @@
 <partial name="_ErrorSummary" model="Model.Errors" />
 
 <form method="post" asp-antiforgery="true">
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="HistologyRef">Histology ref</label>
-        <input class="govuk-input govuk-input--width-20" asp-for="HistologyRef" />
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="SenderRef">Sender ref</label>
-        <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" />
-    </div>
-    @* Tissue/Slide archive locations are picked from the Archive Location pick list (table 16);
-       Block archive locations are freeform text, matching legacy's per-mode field behaviour. *@
-    @if (Model.ArchiveType == "Block")
-    {
-        <div class="govuk-form-group">
-            <label class="govuk-label" for="ArchiveLocation">Archive location</label>
-            <input class="govuk-input" asp-for="ArchiveLocation" />
-        </div>
-    }
-    else
-    {
-        <div class="govuk-form-group">
-            <label class="govuk-label" for="ArchiveLocation">Archive location</label>
-            <select class="govuk-select" asp-for="ArchiveLocation">
-                <option value="">-- Any --</option>
-                @foreach (var loc in Model.ArchiveLocations)
-                {
-                    <option value="@loc.Code">@loc.Name</option>
-                }
-            </select>
-        </div>
-    }
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="ArchiveType">Archive type</label>
-        <select class="govuk-select" asp-for="ArchiveType">
-            <option value="Tissue">Tissue archive</option>
-            <option value="Block">Block archive</option>
-            <option value="Slide">Slide archive</option>
-        </select>
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="TissueCode">Tissue code (Tissue archive only)</label>
-        <select class="govuk-select" asp-for="TissueCode">
-            <option value="">-- Any --</option>
-            @foreach (var t in Model.Tissues)
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="HistologyRef">Histology ref</label>
+                <input class="govuk-input govuk-input--width-20" asp-for="HistologyRef" />
+            </div>
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="SenderRef">Sender ref</label>
+                <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" />
+            </div>
+            @* Tissue/Slide archive locations are picked from the Archive Location pick list (table 16);
+               Block archive locations are freeform text, matching legacy's per-mode field behaviour. *@
+            @if (Model.ArchiveType == "Block")
             {
-                var v = !string.IsNullOrWhiteSpace(t.Code) ? t.Code : t.ID.ToString();
-                <option value="@v">@t.Name</option>
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="ArchiveLocation">Archive location</label>
+                    <input class="govuk-input" asp-for="ArchiveLocation" />
+                </div>
             }
-        </select>
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="BlockRef">Block ref (Block archive only)</label>
-        <input class="govuk-input  govuk-input--width-5" asp-for="BlockRef" />
+            else
+            {
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="ArchiveLocation">Archive location</label>
+                    <select class="govuk-select" asp-for="ArchiveLocation">
+                        <option value="">-- Any --</option>
+                        @foreach (var loc in Model.ArchiveLocations)
+                        {
+                            <option value="@loc.Code">@loc.Name</option>
+                        }
+                    </select>
+                </div>
+            }
+        </div>
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="ArchiveType">Archive type</label>
+                <select class="govuk-select" asp-for="ArchiveType">
+                    <option value="Tissue">Tissue archive</option>
+                    <option value="Block">Block archive</option>
+                    <option value="Slide">Slide archive</option>
+                </select>
+            </div>
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="TissueCode">Tissue code (Tissue archive only)</label>
+                <select class="govuk-select" asp-for="TissueCode">
+                    <option value="">-- Any --</option>
+                    @foreach (var t in Model.Tissues)
+                    {
+                        var v = !string.IsNullOrWhiteSpace(t.Code) ? t.Code : t.ID.ToString();
+                        <option value="@v">@t.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="BlockRef">Block ref (Block archive only)</label>
+                <input class="govuk-input  govuk-input--width-5" asp-for="BlockRef" />
+            </div>
+        </div>
     </div>
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>

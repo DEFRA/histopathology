@@ -104,4 +104,7 @@ public interface ILookupRepository
     /// Legacy source: <c>LookupData.vb::GetHistologyLookupData</c> — <c>GetluHistology</c> SP.
     /// </summary>
     Task<IReadOnlyList<LookupItem>> GetHistologyTypesAsync(CancellationToken ct = default);
+
+    /// <summary>Returns all active premium/TC charge codes from <c>GetluPremiumCharges</c>.</summary>
+    Task<IReadOnlyList<LookupItem>> GetPremiumChargesAsync(CancellationToken ct = default);
 }

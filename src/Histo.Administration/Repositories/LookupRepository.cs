@@ -120,6 +120,16 @@ public sealed class LookupRepository : ILookupRepository
     }
 
     /// <inheritdoc/>
+    public async Task<IReadOnlyList<LookupItem>> GetPremiumChargesAsync(CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<dynamic>(
+            "GetluPremiumCharges",
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.Select(MapLookupItem).ToList();
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<LookupItem>> GetUserAreasAsync(bool includeInactive = false, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();

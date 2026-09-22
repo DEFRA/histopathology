@@ -44,6 +44,9 @@ public class QCNotesModel : GridPageModel
     [BindProperty]
     public int? QuickGoRef { get; set; }
 
+    /// <summary>Field id → message, rendered by the GDS error summary and inline field errors.</summary>
+    public Dictionary<string, string> Errors { get; } = [];
+
     public async Task OnGetAsync()
     {
         ViewData["Title"] = "QC notes";
@@ -57,10 +60,18 @@ public class QCNotesModel : GridPageModel
         return RedirectToPage("/QC/EditQCNote", new { noteId });
     }
 
-    public IActionResult OnPostGoAsync()
+    public async Task<IActionResult> OnPostGoAsync()
     {
-        if (QuickGoRef.HasValue)
-            return RedirectToPage("/QC/EditQCNote", new { noteId = QuickGoRef.Value });
-        return RedirectToPage();
+        if (!QuickGoRef.HasValue || QuickGoRef.Value <= 0)
+        {
+            Errors["QuickGoRef"] = "QC Number is mandatory.";
+            ViewData["Title"] = "QC notes";
+            ViewData["PageTitle"] = "Quality control notes";
+            Notes = await _qc.GetAllAsync();
+            PopulateGridViewData(Notes.Count);
+            return Page();
+        }
+
+        return RedirectToPage("/QC/EditQCNote", new { noteId = QuickGoRef.Value });
     }
 }

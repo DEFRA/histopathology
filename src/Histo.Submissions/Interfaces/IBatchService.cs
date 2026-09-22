@@ -40,6 +40,20 @@ public interface IBatchService
     /// <summary>Returns a simplified test-item listing for a project/date range.</summary>
     Task<IReadOnlyList<TestItemRow>> GetTestItemRowsAsync(string? projectDesc, int batchType, CancellationToken ct = default);
 
+    /// <summary>See <see cref="Histo.Submissions.Interfaces.IBatchRepository.GetTestPremiumChargeCountsAsync"/>.</summary>
+    Task<IReadOnlyList<TestPremiumChargeCount>> GetTestPremiumChargeCountsAsync(
+        string? projectDesc, int batchType,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        DateTime? startDate = null, DateTime? endDate = null,
+        CancellationToken ct = default);
+
+    /// <summary>See <see cref="Histo.Submissions.Interfaces.IBatchRepository.GetTestPremiumChargeBatchesAsync"/>.</summary>
+    Task<IReadOnlyList<TestPremiumChargeBatchRef>> GetTestPremiumChargeBatchesAsync(
+        string? projectDesc, int batchType,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        DateTime? startDate = null, DateTime? endDate = null,
+        CancellationToken ct = default);
+
     /// <summary>Recomputes and corrects the CompletedDate of all cassetted batches. Returns the number of batches updated.</summary>
     Task<int> FixCompletedDatesAsync(CancellationToken ct = default);
 

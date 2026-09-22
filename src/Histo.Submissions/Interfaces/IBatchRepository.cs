@@ -110,6 +110,40 @@ public interface IBatchRepository
     /// </summary>
     Task<IReadOnlyList<TestItemRow>> GetTestItemRowsAsync(string? projectDesc, int batchType, CancellationToken ct = default);
 
+    /// <summary>
+    /// Counts dispatched Histology/Antibodies/Special-Stain tests per project, grouped by their
+    /// premium/TC charge code, restricted to the given selected test codes (an empty list for a
+    /// test type excludes it from the count entirely, matching legacy's per-checkbox-group
+    /// conditional branches). Replaces the legacy <c>CountHistologysTestItems</c>/
+    /// <c>CountAntibodesTestItems</c>/<c>CountStainTestItems</c> stored procedures, confirmed via
+    /// live query (2026-09-22) not to exist in this database.
+    /// </summary>
+    Task<IReadOnlyList<TestPremiumChargeCount>> GetTestPremiumChargeCountsAsync(
+        string? projectDesc,
+        int batchType,
+        IReadOnlyList<string> histologyCodes,
+        IReadOnlyList<string> antibodyCodes,
+        IReadOnlyList<string> stainCodes,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Same filters as <see cref="GetTestPremiumChargeCountsAsync"/> but returns the distinct
+    /// owning Batch IDs per premium/TC charge code, for the "Analyse submissions" drill-down grid.
+    /// Replaces the legacy <c>CountHistologysTestBatch</c>/<c>CountAntibodesTestBatch</c>/
+    /// <c>CountStainTestBatch</c> stored procedures (also confirmed not to exist).
+    /// </summary>
+    Task<IReadOnlyList<TestPremiumChargeBatchRef>> GetTestPremiumChargeBatchesAsync(
+        string? projectDesc,
+        int batchType,
+        IReadOnlyList<string> histologyCodes,
+        IReadOnlyList<string> antibodyCodes,
+        IReadOnlyList<string> stainCodes,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        CancellationToken ct = default);
+
     // -----------------------------------------------------------------------
     // Fix Completed Dates (admin data-correction utility)
     // -----------------------------------------------------------------------
