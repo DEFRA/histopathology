@@ -163,6 +163,26 @@
     text-align: center;
 }
 
+/* govuk-table__header--numeric right-aligns by default (intended for genuine numeric data);
+ * every use of it in this app is actually an "Actions"/"Select" action column, so its header
+ * text must stay left-aligned like every other column. */
+.govuk-table__header--numeric {
+    text-align: left;
+}
+
+/* Breaks a wide data table out of the standard govuk-width-container (max 960px) so more
+ * columns fit without horizontal scrolling on typical desktop widths, while still centring
+ * on the viewport (not just within the narrower parent) and capping out on ultra-wide screens.
+ * .app-table-responsive remains nested inside as the scroll fallback for narrow viewports. */
+.app-wide-container {
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100vw - 60px);
+    max-width: 1400px;
+    box-sizing: border-box;
+}
+
 
 
 

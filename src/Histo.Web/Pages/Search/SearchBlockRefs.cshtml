@@ -80,12 +80,6 @@
         <a asp-page="/Search/SearchBlockRefs" asp-page-handler="ExportExcel"
            asp-route-SenderRef="@Model.SenderRef" asp-route-HistologyRef="@Model.HistologyRef" asp-route-ReturnPage="@Model.ReturnPage"
                class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</a>
-        @* Legacy lbViewImportedData opened ViewImportedData.aspx?SearchString=<ref> in a popup.
-           The migrated page names that parameter Filter and needs a table chosen there. *@
-        <a asp-page="/Search/ViewImportedData"
-           asp-route-Filter="@(Model.SenderRef ?? Model.HistologyRef)"
-           asp-route-ReturnPage="@Model.ReturnPage"
-           class="govuk-link">View old ICC_Sub data</a>
     </div>
     }
     else if (Model.Searched)

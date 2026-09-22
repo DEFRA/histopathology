@@ -269,6 +269,12 @@ else
                 ? Model.StainOptions.Where(o => Model.ExistingStainCodes.Contains(o.Code ?? "")).ToList()
                 : Model.StainOptions;
         }
+        @if (histOptions.Count == 0)
+        {
+            <p class="govuk-body">No test types are selected for this submission.</p>
+        }
+        else
+        {
         <div class="govuk-form-group">
             <fieldset class="govuk-fieldset">
                 <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Histology</legend>
@@ -315,6 +321,7 @@ else
                 </div>
             </fieldset>
         </div>
+        }
         <div class="govuk-button-group">
             <button type="submit" form="block-details-form" class="govuk-button" data-module="govuk-button">Done</button>
         </div>
