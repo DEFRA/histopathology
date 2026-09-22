@@ -374,10 +374,18 @@ else
 
             function syncTestSections() {
                 var codes = Array.from(group.querySelectorAll('input[type=checkbox]:checked')).map(function (cb) { return cb.getAttribute('data-histology-code'); });
-                if (antibodiesSection) antibodiesSection.style.display = codes.some(function (c) { return ihcCodes.indexOf(c) >= 0; }) ? '' : 'none';
-                if (stainsSection) stainsSection.style.display = codes.indexOf(stainCode) >= 0 ? '' : 'none';
+                var showAntibodies = codes.some(function (c) { return ihcCodes.indexOf(c) >= 0; });
+                var showStains = codes.indexOf(stainCode) >= 0;
+                if (antibodiesSection) {
+                    antibodiesSection.style.display = showAntibodies ? '' : 'none';
+                    if (!showAntibodies) antibodiesSection.querySelectorAll('input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
+                }
+                if (stainsSection) {
+                    stainsSection.style.display = showStains ? '' : 'none';
+                    if (!showStains) stainsSection.querySelectorAll('input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
+                }
             }
-
+            syncTestSections();
             group.addEventListener('change', function (e) {
                 var target = e.target;
                 if (!target || !target.matches('input[type="checkbox"]')) return;
