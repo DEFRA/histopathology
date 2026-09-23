@@ -255,27 +255,45 @@ public class SubmissionDetailsBlockModel : HistoPageModel
             return "Invalid Histology Reference number.";
 
         var histologyType = DetermineHistologyTypeFromRef(refNumber);
-        var counters = await _histologyRefs.GetCountersAsync();
-        var counter = counters.FirstOrDefault(c => c.Type == histologyType);
-        if (counter is not null && int.TryParse(counter.NextHistologyRef, out var nextRef) && refNumber >= nextRef)
-            return $"Histology Reference entered ({histologyRef}) must be less than the next available reference number ({counter.NextHistologyRef}) for this type.";
+        if (histologyType != 0 && !IsPreviousYearHistoRef(year))
+        {
+            var counters = await _histologyRefs.GetCountersAsync();
+            var counter = counters.FirstOrDefault(c => c.Type == histologyType);
+            if (counter is not null && int.TryParse(counter.NextHistologyRef, out var nextRef) && refNumber >= nextRef)
+                return $"Histology Reference entered ({histologyRef}) must be less than the next available reference number ({counter.NextHistologyRef}) for this type.";
+        }
 
         return null;
     }
 
     /// <summary>
     /// Determines histology type code from the numeric range of the reference — mirrors
-    /// <c>Blocks/BlockDetails.cshtml.cs::DetermineHistologyTypeFromRef</c>.
-    /// Ranges: Neuropath &lt;20000, AbattoirSurvey &lt;30000, TBDiag &lt;40000, GeneralPool &lt;60000, MouseProjects &lt;90000.
+    /// <c>Common.vb::CheckRange</c> (via <c>Blocks/BlockDetails.cshtml.cs::DetermineHistologyTypeFromRef</c>).
+    /// Ranges: Neuropath 10000-19999, AbattoirSurvey 20000-29999, TBDiag 30000-39999,
+    /// GeneralPool 40000-59999, MouseProjects 60000-89999. Out-of-range (e.g. &lt;10000 or &gt;=90000)
+    /// returns 0 — legacy leaves the type unset and skips the next-ref check entirely for these.
     /// </summary>
     private static int DetermineHistologyTypeFromRef(int refNumber)
     {
-        if (refNumber < 20000) return 1; // Neuropath
-        if (refNumber < 30000) return 2; // AbattoirSurvey
-        if (refNumber < 40000) return 3; // TBDiag
-        if (refNumber < 60000) return 4; // GeneralPool
-        if (refNumber < 90000) return 5; // MouseProjects
-        return 6; // Use PG number / out of range — no counter to check against
+        if (refNumber is >= 10000 and < 20000) return 1; // Neuropath
+        if (refNumber is >= 20000 and < 30000) return 2; // AbattoirSurvey
+        if (refNumber is >= 30000 and < 40000) return 3; // TBDiag
+        if (refNumber is >= 40000 and < 60000) return 4; // GeneralPool
+        if (refNumber is >= 60000 and < 90000) return 5; // MouseProjects
+        return 0; // out of range — no counter to check against
+    }
+
+    /// <summary>
+    /// Legacy source: Common.vb::IsPreviousYearHistoRef (plus IsPre00's Y2K rollover pivot, which
+    /// only matters when the current year is '00' or '01' — practically dormant until 2100).
+    /// When true, the ref's year is before the current year, so the "must be less than next ref"
+    /// check is skipped entirely.
+    /// </summary>
+    private static bool IsPreviousYearHistoRef(int histoRefYear)
+    {
+        var currentYear = DateTime.Now.Year % 100;
+        if (histoRefYear < currentYear) return true;
+        return currentYear is 0 or 1 && histoRefYear is >= 70 and <= 99;
     }
 
     /// <summary>
