@@ -1,0 +1,592 @@
+@page
+@model Histo.Web.Pages.Batches.BatchDetailsModel
+@using Histo.Core.Domain
+@{
+    ViewData["Title"] = "Submission details";
+    ViewData["PageTitle"] = "Submission details";
+}
+
+@section BeforeHeading {
+    @* GAP-3: context-aware back link — ReturnPage is set by the list page before navigating here. *@
+    @if (Model.IsCreateMode)
+    {
+        <a asp-page="/Batches/Cassetted" class="govuk-back-link">Back</a>
+    }
+    else
+    {
+        <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
+    }
+}
+
+@* -- CREATE MODE: editable form matching legacy BatchDetails.aspx new-batch mode -- *@
+@if (Model.IsCreateMode)
+{
+    @if (Model.Errors.ContainsKey("Create_Save"))
+    {
+        <div class="govuk-error-summary" data-module="govuk-error-summary">
+            <div role="alert">
+                <h2 class="govuk-error-summary__title">There is a problem</h2>
+                <div class="govuk-error-summary__body"><ul class="govuk-list govuk-error-summary__list"><li><a href="#Create_OtherSubmittedBy">@Model.Errors["Create_Save"]</a></li></ul></div>
+            </div>
+        </div>
+    }
+    else if (Model.Errors.Count > 0)
+    {
+        <div class="govuk-error-summary" data-module="govuk-error-summary">
+            <div role="alert">
+                <h2 class="govuk-error-summary__title">There is a problem</h2>
+                <div class="govuk-error-summary__body">
+                    <ul class="govuk-list govuk-error-summary__list">
+                        @foreach (var e in Model.Errors)
+                        {
+                            var anchor = e.Key switch
+                            {
+                                "Create_Histology" => "create-histology-checkboxes",
+                                "Create_Antibodies" => "create-antibodies-section",
+                                "Create_Stains" => "create-stains-section",
+                                _ => e.Key
+                            };
+                            <li><a href="#@anchor" class="govuk-link">@e.Value</a></li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    }
+
+    <form method="post" asp-page-handler="Create">
+
+        @* Read-only: Entered By and Entered Area set from current session user — legacy ddlEnteredBy (disabled) *@
+        <dl class="govuk-summary-list govuk-!-margin-bottom-4">
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">Submission type</dt>
+                <dd class="govuk-summary-list__value">@(Model.Create_SubmittedAsName ?? "-")</dd>
+            </div>
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">Entered by</dt>
+                <dd class="govuk-summary-list__value">@Model.Session.UserName</dd>
+            </div>
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">Entered area</dt>
+                <dd class="govuk-summary-list__value">@Model.Session.UserArea</dd>
+            </div>
+        </dl>
+
+        @* Field pairing mirrors the Edit submission page — each pair is its own govuk-grid-row
+           using two-thirds/one-third columns so the right field lines up with the "Special
+           stains" column below, and a single tall pair (e.g. a "Manage ..." button under a
+           select) doesn't push every row below it out of alignment. *@
+        <div class="govuk-grid-row">
+            <div class="govuk-grid-column-two-thirds">
+                @* Submitted By (external) — required, legacy ddlSubmittedBy rfvSubmittedBy *@
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_OtherSubmittedBy") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="Create_OtherSubmittedBy">Submitted by</label>
+                    @if (Model.Errors.TryGetValue("Create_OtherSubmittedBy", out var subByErr))
+                    {
+                        <p id="Create_OtherSubmittedBy-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @subByErr</p>
+                    }
+                    <select class="govuk-select app-select-stack @(Model.Errors.ContainsKey("Create_OtherSubmittedBy") ? "govuk-select--error" : "")"
+                            asp-for="Create_OtherSubmittedBy" id="Create_OtherSubmittedBy">
+                        <option value="">-- Select --</option>
+                        @foreach (var u in Model.Create_AllUsers)
+                        {
+                            @if (Model.Create_OtherSubmittedBy == u.UserID) { <option value="@u.UserID" selected>@u.Name</option> } else { <option value="@u.UserID">@u.Name</option> }
+                        }
+                    </select>
+                    @* Replaces legacy btnNewSubmittedBy — the "Submitted by" list is user-backed, so it is
+                       maintained on User maintenance rather than a lookup table. *@
+                    <button type="submit" asp-page-handler="ManagePickList" name="field" value="submittedBy" formnovalidate
+                            class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+                        Manage submitted by list
+                    </button>
+                </div>
+            </div>
+            <div class="govuk-grid-column-one-third">
+                @* Submitted Area — required, legacy ddlUserArea rfvSubmittedArea *@
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_OtherSubmittedArea") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="Create_OtherSubmittedArea">Submitted area</label>
+                    @if (Model.Errors.TryGetValue("Create_OtherSubmittedArea", out var subAreaErr))
+                    {
+                        <p id="Create_OtherSubmittedArea-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @subAreaErr</p>
+                    }
+                    <select class="govuk-select @(Model.Errors.ContainsKey("Create_OtherSubmittedArea") ? "govuk-select--error" : "")"
+                            asp-for="Create_OtherSubmittedArea" id="Create_OtherSubmittedArea">
+                        <option value="">-- Select --</option>
+                        @foreach (var a in Model.Create_UserAreas)
+                        {
+                            @if (Model.Create_OtherSubmittedArea == a.ID.ToString()) { <option value="@a.ID" selected>@a.Name</option> } else { <option value="@a.ID">@a.Name</option> }
+                        }
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="govuk-grid-row">
+            <div class="govuk-grid-column-two-thirds">
+                @* Project / Contract Code — required, legacy ddlProjectCode rvfProjectContract *@
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_ProjectContractCode") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="Create_ProjectContractCode">Project / contract code</label>
+                    @if (Model.Errors.TryGetValue("Create_ProjectContractCode", out var projErr))
+                    {
+                        <p id="Create_ProjectContractCode-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @projErr</p>
+                    }
+                    <select class="govuk-select app-select-stack @(Model.Errors.ContainsKey("Create_ProjectContractCode") ? "govuk-select--error" : "")"
+                            asp-for="Create_ProjectContractCode" id="Create_ProjectContractCode">
+                        <option value="">-- Select --</option>
+                        @foreach (var p in Model.Create_Projects)
+                        {
+                            @if (Model.Create_ProjectContractCode == p.ID.ToString()) { <option value="@p.ID" selected>@p.Name</option> } else { <option value="@p.ID">@p.Name</option> }
+                        }
+                    </select>
+                    @* Replaces legacy btnNewProject — opens the Projects pick list (LOOKUP_PROJECTS = 19). *@
+                    <button type="submit" asp-page-handler="ManagePickList" name="field" value="project" formnovalidate
+                            class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+                        Manage project / contract codes
+                    </button>
+                </div>
+            </div>
+            <div class="govuk-grid-column-one-third">
+                @* Submission date — required, legacy ctlBatchDate *@
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_BatchDateStr") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="Create_BatchDateStr">Submission date</label>
+                    @if (Model.Errors.TryGetValue("Create_BatchDateStr", out var bdErr))
+                    {
+                        <p id="Create_BatchDateStr-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @bdErr</p>
+                    }
+                    <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("Create_BatchDateStr") ? "govuk-input--error" : "")"
+                           asp-for="Create_BatchDateStr" id="Create_BatchDateStr" type="date" max="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                </div>
+            </div>
+        </div>
+        <div class="govuk-grid-row">
+            <div class="govuk-grid-column-two-thirds">
+                @* Pathologist — required, legacy ddlContactName rvfContact *@
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_ContactName") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="Create_ContactName">Pathologist</label>
+                    @if (Model.Errors.TryGetValue("Create_ContactName", out var cnErr))
+                    {
+                        <p id="Create_ContactName-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @cnErr</p>
+                    }
+                    <select class="govuk-select app-select-stack @(Model.Errors.ContainsKey("Create_ContactName") ? "govuk-select--error" : "")"
+                            asp-for="Create_ContactName" id="Create_ContactName">
+                        <option value="">-- Select --</option>
+                        @foreach (var c in Model.Create_Contacts)
+                        {
+                            @if (Model.Create_ContactName == c.ID.ToString()) { <option value="@c.ID" selected>@c.Name</option> } else { <option value="@c.ID">@c.Name</option> }
+                        }
+                    </select>
+                    @* Replaces legacy btnNewContact — opens the Contacts pick list (LOOKUP_CONTACTS = 18). *@
+                    <button type="submit" asp-page-handler="ManagePickList" name="field" value="pathologist" formnovalidate
+                            class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+                        Manage pathologists
+                    </button>
+                </div>
+            </div>
+            <div class="govuk-grid-column-one-third">
+                @* Fixation — optional, legacy ddlFixation *@
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="Create_Fixation">Fixation</label>
+                    <select class="govuk-select" asp-for="Create_Fixation" id="Create_Fixation">
+                        <option value="">-- Not specified --</option>
+                        @foreach (var f in Model.Create_Fixations)
+                        {
+                            @if (Model.Create_Fixation == (f.Code ?? f.ID.ToString())) { <option value="@(f.Code ?? f.ID.ToString())" selected>@f.Name</option> } else { <option value="@(f.Code ?? f.ID.ToString())">@f.Name</option> }
+                        }
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="govuk-grid-row">
+            <div class="govuk-grid-column-two-thirds">
+                @* Species — required, legacy ddlSpecies rvfSpecies *@
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_SpeciesId") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="Create_SpeciesId">Species</label>
+                    @if (Model.Errors.TryGetValue("Create_SpeciesId", out var spErr))
+                    {
+                        <p id="Create_SpeciesId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @spErr</p>
+                    }
+                    <select class="govuk-select app-select-stack @(Model.Errors.ContainsKey("Create_SpeciesId") ? "govuk-select--error" : "")"
+                            asp-for="Create_SpeciesId" id="Create_SpeciesId">
+                        <option value="">-- Select --</option>
+                        @foreach (var s in Model.Create_SpeciesList)
+                        {
+                            @if (Model.Create_SpeciesId == s.ID.ToString()) { <option value="@s.ID" selected>@s.Name</option> } else { <option value="@s.ID">@s.Name</option> }
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="govuk-grid-column-one-third">
+                @* Is it adequately fixed? — legacy ddlSafeToHandle (Yes/No dropdown), migrated to
+                   GDS radios: a native select isn't recommended for a binary choice. *@
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_SafeToHandle") ? "govuk-form-group--error" : "")">
+                    <fieldset class="govuk-fieldset">
+                        <legend class="govuk-fieldset__legend">Is it adequately fixed?</legend>
+                        @if (Model.Errors.TryGetValue("Create_SafeToHandle", out var safeErr))
+                        {
+                            <p id="Create_SafeToHandle-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @safeErr</p>
+                        }
+                        <div class="govuk-radios govuk-radios--inline" data-module="govuk-radios">
+                            <div class="govuk-radios__item">
+                                <input class="govuk-radios__input" type="radio" id="Create_SafeToHandle" name="Create_SafeToHandle" value="true" checked="@(Model.Create_SafeToHandle == true)" />
+                                <label class="govuk-label govuk-radios__label" for="Create_SafeToHandle">Yes</label>
+                            </div>
+                            <div class="govuk-radios__item">
+                                <input class="govuk-radios__input" type="radio" id="Create_SafeToHandle-no" name="Create_SafeToHandle" value="false" checked="@(Model.Create_SafeToHandle == false)" />
+                                <label class="govuk-label govuk-radios__label" for="Create_SafeToHandle-no">No</label>
+                            </div>
+                        </div>
+                    </fieldset>
+                </div>
+            </div>
+        </div>
+
+        @* ── Histology, antibody and stain checkboxes — mirrors legacy BatchDetails.aspx 3-column
+           chkblHistology/chkblAntibodies/chkblSpecialStain table layout ── *@
+        <div class="govuk-grid-row">
+            <div class="govuk-grid-column-one-third">
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_Histology") ? "govuk-form-group--error" : "")">
+                    <fieldset class="govuk-fieldset">
+                        <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Histology</legend>
+                        <div class="govuk-hint">Select at least one histology type.</div>
+                        @if (Model.Errors.TryGetValue("Create_Histology", out var histErr))
+                        {
+                            <p id="Create_Histology-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @histErr</p>
+                        }
+                        <div class="govuk-checkboxes" data-module="govuk-checkboxes" id="create-histology-checkboxes">
+                            @foreach (var item in Model.Create_HistologyOptions)
+                            {
+                                var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
+                                var cbId = $"create-histology-{code}";
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input" id="@cbId"
+                                           name="Create_SelectedHistologyCodes" type="checkbox" value="@code"
+                                           data-histology-code="@code"
+                                           @(Model.Create_SelectedHistologyCodes.Contains(code) ? "checked" : "") />
+                                    <label class="govuk-label govuk-checkboxes__label" for="@cbId">@item.Name</label>
+                                </div>
+                            }
+                        </div>
+                    </fieldset>
+                </div>
+            </div>
+            <div class="govuk-grid-column-one-third">
+                @* Antibodies — conditional on IHC histology selection *@
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_Antibodies") ? "govuk-form-group--error" : "")"
+                     id="create-antibodies-section"
+                     style="@(Model.Create_ShowAntibodies ? "" : "display:none")">
+                    <fieldset class="govuk-fieldset">
+                        <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Antibodies</legend>
+                        <div class="govuk-hint">Required when IHC is selected above.</div>
+                        @if (Model.Errors.TryGetValue("Create_Antibodies", out var abErr))
+                        {
+                            <p id="Create_Antibodies-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @abErr</p>
+                        }
+                        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                            @foreach (var item in Model.Create_AntibodyOptions)
+                            {
+                                var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
+                                var cbId = $"create-antibody-{code}";
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input" id="@cbId"
+                                           name="Create_SelectedAntibodyCodes" type="checkbox" value="@code"
+                                           @(Model.Create_SelectedAntibodyCodes.Contains(code) ? "checked" : "") />
+                                    <label class="govuk-label govuk-checkboxes__label" for="@cbId">@item.Name</label>
+                                </div>
+                            }
+                        </div>
+                    </fieldset>
+                </div>
+            </div>
+            <div class="govuk-grid-column-one-third">
+                @* Special stains — conditional on Special Stain histology selection *@
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_Stains") ? "govuk-form-group--error" : "")"
+                     id="create-stains-section"
+                     style="@(Model.Create_ShowStains ? "" : "display:none")">
+                    <fieldset class="govuk-fieldset">
+                        <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Special stains</legend>
+                        <div class="govuk-hint">Required when Special Stain is selected above.</div>
+                        @if (Model.Errors.TryGetValue("Create_Stains", out var stainErr))
+                        {
+                            <p id="Create_Stains-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @stainErr</p>
+                        }
+                        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                            @foreach (var item in Model.Create_StainOptions)
+                            {
+                                var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
+                                var cbId = $"create-stain-{code}";
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input" id="@cbId"
+                                           name="Create_SelectedStainCodes" type="checkbox" value="@code"
+                                           @(Model.Create_SelectedStainCodes.Contains(code) ? "checked" : "") />
+                                    <label class="govuk-label govuk-checkboxes__label" for="@cbId">@item.Name</label>
+                                </div>
+                            }
+                        </div>
+                    </fieldset>
+                </div>
+            </div>
+        </div>
+
+        @* Comments — optional *@
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="Create_Comments">Submission comments</label>
+            <textarea class="govuk-textarea" asp-for="Create_Comments" id="Create_Comments" rows="3"></textarea>
+        </div>
+
+        <div class="govuk-button-group">
+            <button type="submit" class="govuk-button" data-module="govuk-button">Create submission</button>
+            <a asp-page="/Batches/Cassetted" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back</a>
+            <a asp-page="/Index" class="govuk-link"
+               onclick="return confirm('Are you sure you want to cancel? Any information you have entered will be lost.');">Cancel</a>
+        </div>
+    </form>
+
+    @* Show/hide antibody and stain sections when histology checkboxes change *@
+    <script>
+    (function () {
+        // Legacy-matching behaviour (SubmissionDetailsBlock chkblHistology_SelectedIndexChanged):
+        // EO and Archive are both mutually exclusive with every other Histology test.
+        var exclusiveCodes = ['@Histo.Submissions.Models.HistologyCode.EO', '@Histo.Submissions.Models.HistologyCode.Archive'];
+        var checkboxes  = document.querySelectorAll('#create-histology-checkboxes input[type=checkbox]');
+
+        function enforceExclusivity(changed) {
+            var isExclusive = exclusiveCodes.indexOf(changed.value) >= 0;
+            if (isExclusive && changed.checked) {
+                checkboxes.forEach(function (cb) { if (cb !== changed) cb.checked = false; });
+            } else if (!isExclusive && changed.checked) {
+                checkboxes.forEach(function (cb) { if (exclusiveCodes.indexOf(cb.value) >= 0) cb.checked = false; });
+            }
+        }
+
+        function syncTestSections() {
+            var codes = Array.from(document.querySelectorAll('#create-histology-checkboxes input:checked')).map(function(cb){ return cb.value; });
+                var ihc   = ['@Histo.Submissions.Models.HistologyCode.IhcPrp','@Histo.Submissions.Models.HistologyCode.IhcOther'];
+            var showAntibodies = codes.some(function(c){ return ihc.indexOf(c) >= 0; });
+            var showStains     = codes.indexOf('@Histo.Submissions.Models.HistologyCode.SpecialStain') >= 0;
+            document.getElementById('create-antibodies-section').style.display = showAntibodies ? '' : 'none';
+            document.getElementById('create-stains-section').style.display     = showStains ? '' : 'none';
+            // Clear stale selections in sections that are now hidden, so they don't persist
+            // in the "Selected test types" summary or get submitted on Save.
+            if (!showAntibodies) {
+                document.querySelectorAll('#create-antibodies-section input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
+            }
+            if (!showStains) {
+                document.querySelectorAll('#create-stains-section input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
+            }
+        }
+        document.getElementById('create-histology-checkboxes').addEventListener('change', function (e) {
+            enforceExclusivity(e.target);
+            syncTestSections();
+        });
+    })();
+    </script>
+}
+
+@if (!Model.IsCreateMode)
+{
+    if (Model.LoadError is not null)
+    {
+        <div class="govuk-error-summary" data-module="govuk-error-summary">
+            <div role="alert">
+                <h2 class="govuk-error-summary__title">There is a problem</h2>
+                <div class="govuk-error-summary__body"><ul class="govuk-list govuk-error-summary__list"><li>@Model.LoadError</li></ul></div>
+            </div>
+        </div>
+    }
+    else if (Model.Batch is null)
+    {
+        <div class="govuk-warning-text">
+            <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+            <strong class="govuk-warning-text__text">
+                <span class="govuk-visually-hidden">Warning</span>
+                Batch not found.
+            </strong>
+        </div>
+    }
+    else
+    {
+    @* Sample count shown as a hint next to the "Samples" button below, rather than a separate
+       summary-list link to the same destination — avoids two navigation points to one page. *@
+    <dl class="govuk-summary-list">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submission number</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.ID</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Date submitted</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.BatchDate?.ToShortDateString()</dd>
+        </div>
+        @*  GAP-6: "Entered By" and "Entered Area" were on BatchDetails.aspx (the VLA staff member who
+            entered the submission) but were absent from the new read-only view.
+            Root cause: the ui-implementation agent captured primary data fields but missed the two
+            user-identity blocks (entering user + external submitter) because they appeared as
+            disabled dropdowns in view mode. *@
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Entered by</dt>
+            <dd class="govuk-summary-list__value">
+                @(string.IsNullOrWhiteSpace(Model.EnteredByName) ? "Not recorded" : Model.EnteredByName)
+            </dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Entered area</dt>
+            <dd class="govuk-summary-list__value">
+                @(string.IsNullOrWhiteSpace(Model.EnteredAreaName) ? "Not recorded" : Model.EnteredAreaName)
+            </dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submitted by</dt>
+            <dd class="govuk-summary-list__value">
+                @(string.IsNullOrWhiteSpace(Model.SubmittedByName) ? "Not recorded" : Model.SubmittedByName)
+            </dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submitted area</dt>
+            <dd class="govuk-summary-list__value">
+                @(string.IsNullOrWhiteSpace(Model.SubmittedAreaName) ? "Not recorded" : Model.SubmittedAreaName)
+            </dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submitted as</dt>
+            <dd class="govuk-summary-list__value">
+                @(string.IsNullOrWhiteSpace(Model.SubmittedAsDescription) ? "Not recorded" : Model.SubmittedAsDescription)
+            </dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Project / contract code</dt>
+            <dd class="govuk-summary-list__value">@Model.ProjectName</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Pathologist</dt>
+            <dd class="govuk-summary-list__value">@Model.PathologistName</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Species</dt>
+            <dd class="govuk-summary-list__value">@Model.SpeciesName</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Fixation</dt>
+            <dd class="govuk-summary-list__value">@Model.FixationName</dd>
+        </div>
+        @* GAP-6: "Is it adequately fixed?" (SafeToHandle) was on BatchDetails.aspx but absent from the new view. *@
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Is it adequately fixed?</dt>
+            <dd class="govuk-summary-list__value">
+                @(Model.Batch.SafeToHandle == true ? "Yes" :
+                  Model.Batch.SafeToHandle == false ? "No" :
+                  "Not specified")
+            </dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Status</dt>
+            <dd class="govuk-summary-list__value">@BatchStatus.DisplayName(Model.Batch.Status)</dd>
+        </div>
+        @* GAP-1: CustomerReceivedDate (date returned) was missing from the summary.
+           Label matches legacy lblCustomerReceivedDate ("Customer Received Date") exactly —
+           not a distinct field from the legacy "Date Returned" workflow, just the same
+           tblBatch.CustomerReceivedDate column. *@
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Customer received date</dt>
+            <dd class="govuk-summary-list__value">
+                @(Model.Batch.CustomerReceivedDate.HasValue
+                    ? Model.Batch.CustomerReceivedDate.Value.ToShortDateString()
+                    : "Not yet recorded")
+            </dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submission comments</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.Comments</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submission category</dt>
+            <dd class="govuk-summary-list__value">@Histo.Submissions.Models.BatchTypeConstants.DisplayName(Model.Batch.BatchType)</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Pre-cassetted</dt>
+            <dd class="govuk-summary-list__value">@(Model.Batch.IsPreCassetted ? "Yes" : "No")</dd>
+        </div>
+    </dl>
+    @* -- Selected test types � batch-level histology / antibody / special stain selections --
+       GAP-5: Legacy BatchDetails.aspx had a "Select Histology and required tests" section with
+       three CheckBoxList controls (chkblHistology, chkblAntibodies, chkblSpecialStain).
+       In the new application these are displayed here as a read-only summary and edited via
+       the dedicated EditBatchTests page. *@
+    <h2 class="govuk-heading-m">Selected test types</h2>
+    <dl class="govuk-summary-list">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Histology</dt>
+            <dd class="govuk-summary-list__value">
+                @if (Model.TestSelections.Histology.Count == 0)
+                {
+                    <span class="govuk-hint">None selected</span>
+                }
+                else
+                {
+                    foreach (var row in Model.TestSelections.Histology)
+                    {
+                        var name = Model.HistologyNames.TryGetValue(row.Code, out var h) ? h : row.Code;
+                        <strong class="govuk-tag govuk-tag--blue govuk-!-margin-right-1">@name</strong>
+                    }
+                }
+            </dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Antibodies</dt>
+            <dd class="govuk-summary-list__value">
+                @if (Model.TestSelections.Antibodies.Count == 0)
+                {
+                    <span class="govuk-hint">None selected</span>
+                }
+                else
+                {
+                    foreach (var row in Model.TestSelections.Antibodies)
+                    {
+                        var name = Model.AntibodyNames.TryGetValue(row.Code, out var a) ? a : row.Code;
+                        <strong class="govuk-tag govuk-tag--purple govuk-!-margin-right-1">@name</strong>
+                    }
+                }
+            </dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Special stains</dt>
+            <dd class="govuk-summary-list__value">
+                @if (Model.TestSelections.Stains.Count == 0)
+                {
+                    <span class="govuk-hint">None selected</span>
+                }
+                else
+                {
+                    foreach (var row in Model.TestSelections.Stains)
+                    {
+                        var name = Model.StainNames.TryGetValue(row.Code, out var s) ? s : row.Code;
+                        <strong class="govuk-tag govuk-tag--green govuk-!-margin-right-1">@name</strong>
+                    }
+                }
+            </dd>
+        </div>
+    </dl>
+
+    @* GAP-4: Action buttons � matches legacy BatchDetails.aspx view mode (SV_ViewSubmission=True).
+       Editing actions (Edit submission status, Copy batch, Edit test types) are accessed from
+       list-page action panels, not from this read-only view page. *@
+    <div class="govuk-button-group">
+
+        <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button" data-module="govuk-button">
+            Samples
+            @if (Model.CanModifySamples)
+            {
+                <span class="govuk-visually-hidden">, @Model.SampleCount added so far</span>
+            }
+        </a>
+
+
+        @* Date returned � Completed status only. *@
+        @if (Model.CanDateReturned)
+        {
+            <a asp-page="/Batches/DateReturned" class="govuk-button govuk-button--secondary" data-module="govuk-button">Date returned</a>
+        }
+
+        <a href="@Model.BackLinkPage" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    </div>
+}
+
+}
+

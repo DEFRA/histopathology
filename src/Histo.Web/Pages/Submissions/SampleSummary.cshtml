@@ -1,0 +1,151 @@
+@page
+@model Histo.Web.Pages.Submissions.SampleSummaryModel
+@{
+    ViewData["Title"] = "Sample summary";
+    ViewData["PageTitle"] = "Sample summary";
+    // Surfaces the submission type since this page no longer has a type-specific name/URL.
+    ViewData["BatchNo"] = Model.SubmittedAsDescription ?? "Unknown submission type";
+}
+
+@section BeforeHeading {
+    <a asp-page="@Model.BackLinkPage" asp-route-BatchId="@Model.BatchId" class="govuk-back-link">Back</a>
+}
+
+@if (!string.IsNullOrEmpty(Model.SaveError))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.SaveError</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+@* "Bypass sort" — legacy chkByPassSort: when checked, animals display in block-insertion order
+   instead of the default SenderRef / HistologyRef ascending order. Placed above the table to
+   match legacy BatchBlockSummary.aspx layout. An explicit Apply button is used instead of
+   auto-submitting on change, per WCAG 3.2.2 (On Input). Checkbox and button share a flex row so
+   Apply lines up with the checkbox instead of stacking below it. *@
+<form method="post" asp-page-handler="ToggleByPassSort" class="govuk-!-margin-bottom-4">
+    <input type="hidden" asp-for="BatchId" />
+    <div class="govuk-!-margin-bottom-0" style="display: flex; align-items: center; gap: 15px;">
+        <div class="govuk-checkboxes govuk-!-margin-bottom-0" data-module="govuk-checkboxes">
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" id="byPassSort" type="checkbox"
+                       name="byPassSort" @(Model.Batch?.ByPassSort == true ? "checked" : "") />
+                <label class="govuk-label govuk-checkboxes__label" for="byPassSort">Bypass sort</label>
+            </div>
+        </div>
+        <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Apply</button>
+    </div>
+</form>
+
+@* "Add sample"/"Finish" — grouped so GDS renders them on one line (govuk-button-group). *@
+@if (Model.CanModifySamples && !Model.IsViewMode)
+{
+    <div class="govuk-button-group">
+        <a asp-page="/Submissions/AddSubmission" asp-route-BatchId="@Model.BatchId" asp-route-batchSubmissionId="@Model.BatchSubmissionId" class="govuk-button" data-module="govuk-button">Add sample</a>
+
+        @* "Finish" — replaces legacy btSubmit/Done (BatchBlocks.aspx.vb / BatchSummary.aspx.vb /
+           BatchBlockSummary.aspx.vb): finalises the submission once at least one sample exists.
+           Validated server-side (OnPostFinishAsync) rather than disabled client-side, for accessibility.
+           display:contents removes the form's own box from the flex layout so the button itself
+           (not the form wrapping it) is the flex item — without this it sat lower/shorter than
+           the "Add sample" link instead of lining up with it. *@
+        <form method="post" asp-page-handler="Finish" style="display: contents">
+            <input type="hidden" asp-for="BatchId" />
+            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Finish</button>
+        </form>
+    </div>
+}
+
+@* Inline GOV.UK confirmation panel — replaces the browser confirm() dialog for Delete sample. *@
+@if (Model.ConfirmDeleteAnimalId is int confirmId)
+{
+    var confirmAnimal = Model.Animals.FirstOrDefault(a => a.ID == confirmId);
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <strong class="govuk-warning-text__text">
+            <span class="govuk-visually-hidden">Warning</span>
+            Are you sure you want to delete sample @(confirmAnimal?.SenderRef ?? "this sample")?
+        </strong>
+    </div>
+    <form method="post" asp-page-handler="Delete" class="govuk-!-display-inline">
+        <input type="hidden" name="animalId" value="@confirmId" />
+        <input type="hidden" asp-for="BatchId" />
+        <button type="submit" class="govuk-button govuk-button--warning" data-module="govuk-button">Yes, delete sample</button>
+        <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    </form>
+}
+
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">Sender ref</th>
+            <th scope="col" class="govuk-table__header">Histology ref</th>
+            <th scope="col" class="govuk-table__header">Tissue details</th>
+            <th scope="col" class="govuk-table__header">Actions</th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @for (var i = 0; i < Model.Animals.Count; i++)
+        {
+            var a = Model.Animals[i];
+            var tissues = Model.TissuesByAnimalId.TryGetValue(a.ID, out var t)
+                ? t : (IReadOnlyList<string>)[];
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">@a.SenderRef</td>
+                <td class="govuk-table__cell">@a.HistologyRef</td>
+                <td class="govuk-table__cell">
+                    @if (tissues.Any())
+                    {
+                        <details class="govuk-details">
+                            <summary class="govuk-details__summary">
+                                <span class="govuk-details__summary-text">@tissues.Count tissue(s)</span>
+                            </summary>
+                            <div class="govuk-details__text">
+                                <ul class="govuk-list">
+                                    @foreach (var td in tissues)
+                                    {
+                                        <li>@td</li>
+                                    }
+                                </ul>
+                            </div>
+                        </details>
+                    }
+                </td>
+                <td class="govuk-table__cell">
+                    <div class="govuk-button-group govuk-!-margin-bottom-0">
+                    @* Routes to SubmissionDetails (Wet Tissue) or SubmissionDetailsBlock (block types),
+                       both of which already render read-only when IsViewMode — labelled to match. *@
+                    <form method="post" asp-page-handler="Select" class="govuk-!-display-inline">
+                        <input type="hidden" name="animalId" value="@a.ID" />
+                        <input type="hidden" asp-for="BatchId" />
+                        <button type="submit" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button">@(Model.IsViewMode ? "View sample" : "Edit sample")</button>
+                    </form>
+                    @if (Model.CanModifySamples && !Model.IsViewMode)
+                    {
+                        @* "Copy sample" — replaces legacy btnCopySubmission_Click, which redirected to AddSample.aspx
+                           with the source animal's data pre-filled. AddSample.cshtml was consolidated into
+                           AddSubmission.cshtml (both were near-duplicate "add a sample by Sender Ref" screens) —
+                           copying passes the source Sender Ref as a query parameter to pre-fill the Add sample form. *@
+                        <a asp-page="/Submissions/AddSubmission" asp-route-batchId="@Model.BatchId" asp-route-batchSubmissionId="@Model.BatchSubmissionId" asp-route-senderRef="@a.SenderRef" asp-route-sourceAnimalId="@a.ID"
+                           class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Copy sample</a>
+                        @* "Delete sample" — links to the inline confirmation panel above instead of a browser confirm() dialog. *@
+                        <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" asp-route-ConfirmDeleteAnimalId="@a.ID"
+                           class="govuk-button govuk-button--warning govuk-!-margin-bottom-0">Delete sample</a>
+                    }
+                    </div>
+                </td>
+            </tr>
+        }
+        @if (!Model.Animals.Any())
+        {
+            <tr class="govuk-table__row"><td colspan="5" class="govuk-table__cell">No samples in this submission.</td></tr>
+        }
+    </tbody>
+</table>

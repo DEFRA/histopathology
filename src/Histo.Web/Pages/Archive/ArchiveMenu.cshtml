@@ -1,0 +1,15 @@
+@page
+@model ArchiveMenuModel
+@{
+    ViewData["Title"] = "Archive";
+    ViewData["PageTitle"] = "Archive";
+}
+
+@section BeforeHeading {
+    <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
+}
+
+<ul class="govuk-list govuk-list--spaced">
+    <li><a asp-page="/Archive/ArchiveBlocks" asp-route-batchId="@Model.BatchId" asp-route-returnPage="@Model.BackLinkPage" class="govuk-link">Archive blocks</a></li>
+    <li><a asp-page="/Archive/ArchiveTissues" asp-route-batchId="@Model.BatchId" asp-route-returnPage="@Model.BackLinkPage" class="govuk-link">Archive tissues</a></li>
+</ul>

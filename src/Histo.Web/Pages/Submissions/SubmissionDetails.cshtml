@@ -1,0 +1,179 @@
+@page
+@model Histo.Web.Pages.Submissions.SubmissionDetailsModel
+@{
+    ViewData["Title"] = "Sample details";
+    ViewData["PageTitle"] = "Sample details";
+}
+
+@section BeforeHeading {
+    <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
+}
+
+@if (Model.Animal is null)
+{
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <strong class="govuk-warning-text__text">
+            <span class="govuk-visually-hidden">Warning</span>
+            Sample not found.
+        </strong>
+    </div>
+}
+else
+{
+    <dl class="govuk-summary-list">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Sender ref</dt>
+            <dd class="govuk-summary-list__value">@Model.Animal.SenderRef</dd>
+        </div>
+    </dl>
+
+    <form method="post" asp-page-handler="SaveDetails">
+        <input type="hidden" asp-for="BatchId" />
+        <input type="hidden" asp-for="AnimalId" />
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="PMDate">PM date</label>
+            @if (Model.IsViewMode)
+            {
+                <input class="govuk-input govuk-input--width-10" type="date" asp-for="PMDate" readonly disabled />
+            }
+            else
+            {
+                <input class="govuk-input govuk-input--width-10" type="date" asp-for="PMDate" />
+            }
+        </div>
+        @* Histology reference is never shown here — legacy (ctlHistologyDiv) always hides it on
+           this Wet Tissue page; it's set via Booking/EditAnimalRef instead. *@
+        @if (!Model.IsViewMode)
+        {
+            <button type="submit" class="govuk-button" data-module="govuk-button">Save details</button>
+        }
+    </form>
+
+    <h2 class="govuk-heading-m">Tissues</h2>
+
+    @* Inline GOV.UK confirmation panel — replaces the browser confirm() dialog for Delete tissue. *@
+    @if (Model.ConfirmDeleteTissueId is int confirmTissueId)
+    {
+        <div class="govuk-warning-text">
+            <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+            <strong class="govuk-warning-text__text">
+                <span class="govuk-visually-hidden">Warning</span>
+                Are you sure you want to delete this tissue?
+            </strong>
+        </div>
+        <form method="post" asp-page-handler="DeleteTissue" class="govuk-!-display-inline">
+            <input type="hidden" name="tissueId" value="@confirmTissueId" />
+            <input type="hidden" asp-for="BatchId" />
+            <input type="hidden" asp-for="AnimalId" />
+            <button type="submit" class="govuk-button govuk-button--warning" data-module="govuk-button">Yes, delete tissue</button>
+            <a asp-page="/Submissions/SubmissionDetails" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        </form>
+    }
+
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Tissue code</th>
+                <th scope="col" class="govuk-table__header">No. pieces</th>
+                <th scope="col" class="govuk-table__header">Comment</th>
+                <th scope="col" class="govuk-table__header">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var t in Model.Tissues)
+            {
+                @if (!Model.IsViewMode && Model.EditTissueId == t.ID)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell" colspan="4">
+                            <form method="post" asp-page-handler="UpdateTissue">
+                                <input type="hidden" asp-for="BatchId" />
+                                <input type="hidden" asp-for="AnimalId" />
+                                <input type="hidden" asp-for="TissueId" />
+                                <div class="govuk-form-group">
+                                    <label class="govuk-label" for="EditTissueCode">Tissue code</label>
+                                    <select class="govuk-select" asp-for="EditTissueCode">
+                                        @foreach (var opt in Model.TissueOptions)
+                                        {
+                                            <option value="@opt.Code">@opt.Name</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="govuk-form-group">
+                                    <label class="govuk-label" for="EditNoPieces">No. pieces</label>
+                                    <input class="govuk-input govuk-input--width-3" asp-for="EditNoPieces" />
+                                </div>
+                                <div class="govuk-form-group">
+                                    <label class="govuk-label" for="EditComment">Comment</label>
+                                    <textarea class="govuk-textarea" asp-for="EditComment" rows="2"></textarea>
+                                </div>
+                                <div class="govuk-button-group">
+                                    <button type="submit" class="govuk-button" data-module="govuk-button">Save tissue</button>
+                                    <a asp-page="/Submissions/SubmissionDetails" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+                                </div>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@Model.TissueName(t.TissueCode)</td>
+                        <td class="govuk-table__cell">@t.NoPieces</td>
+                        <td class="govuk-table__cell">@t.Comment</td>
+                        <td class="govuk-table__cell">
+                            @if (!Model.IsViewMode)
+                            {
+                                <div class="govuk-button-group govuk-!-margin-bottom-0">
+                                    <a asp-page="/Submissions/SubmissionDetails"
+                                       asp-route-BatchId="@Model.BatchId"
+                                       asp-route-AnimalId="@Model.AnimalId"
+                                       asp-route-EditTissueId="@t.ID"
+                                       class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Edit</a>
+                                    <a asp-page="/Submissions/SubmissionDetails"
+                                       asp-route-BatchId="@Model.BatchId"
+                                       asp-route-AnimalId="@Model.AnimalId"
+                                       asp-route-ConfirmDeleteTissueId="@t.ID"
+                                       class="govuk-button govuk-button--warning govuk-!-margin-bottom-0">Delete</a>
+                                </div>
+                            }
+                        </td>
+                    </tr>
+                }
+            }
+            @if (!Model.Tissues.Any())
+            {
+                <tr class="govuk-table__row"><td colspan="4" class="govuk-table__cell">No tissues recorded for this sample.</td></tr>
+            }
+        </tbody>
+    </table>
+
+    @if (!Model.IsViewMode)
+    {
+        <h2 class="govuk-heading-m">Add tissue</h2>
+        <form method="post" asp-page-handler="AddTissue">
+            <input type="hidden" asp-for="BatchId" />
+            <input type="hidden" asp-for="AnimalId" />
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="TissueCode">Tissue code</label>
+                <select class="govuk-select" asp-for="TissueCode">
+                    <option value="">-- Select --</option>
+                    @foreach (var opt in Model.TissueOptions)
+                    {
+                        <option value="@opt.Code">@opt.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="NoPieces">No. pieces</label>
+                <input class="govuk-input govuk-input--width-3" asp-for="NoPieces" />
+            </div>
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="Comment">Comment</label>
+                <textarea class="govuk-textarea" asp-for="Comment" rows="2"></textarea>
+            </div>
+            <button type="submit" class="govuk-button" data-module="govuk-button">Add tissue</button>
+        </form>
+    }
+}

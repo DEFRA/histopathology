@@ -1,0 +1,87 @@
+@page
+@model Histo.Web.Pages.Admin.AddUserModel
+@{
+    ViewData["Title"] = "Add user";
+    ViewData["PageTitle"] = "Add user";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Admin/UserMaintenance" asp-route-returnUrl="@Model.SafeReturnUrl" class="govuk-back-link">Back</a>
+}
+
+<partial name="_ErrorSummary" model="Model.Errors" />
+
+@if (!string.IsNullOrEmpty(Model.SaveError))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.SaveError</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+<form method="post" asp-antiforgery="true">
+    <input type="hidden" asp-for="ReturnUrl" />
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("Name") ? "govuk-form-group--error" : "")">
+        <label class="govuk-label" for="Name">Name</label>
+        @if (Model.Errors.TryGetValue("Name", out var nameError))
+        {
+            <p id="name-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @nameError</p>
+        }
+        <input class="govuk-input @(Model.Errors.ContainsKey("Name") ? "govuk-input--error" : "")" asp-for="Name" aria-describedby="@(Model.Errors.ContainsKey("Name") ? "Name-error" : null)" maxlength="35" />
+    </div>
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("Email") ? "govuk-form-group--error" : "")">
+        <label class="govuk-label" for="Email">Email</label>
+        @if (Model.Errors.TryGetValue("Email", out var emailError))
+        {
+            <p id="email-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @emailError</p>
+        }
+        <input class="govuk-input @(Model.Errors.ContainsKey("Email") ? "govuk-input--error" : "")" asp-for="Email" type="email" aria-describedby="@(Model.Errors.ContainsKey("Email") ? "Email-error" : null)" maxlength="60" />
+    </div>
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("GroupCode") ? "govuk-form-group--error" : "")">
+        <label class="govuk-label" for="GroupCode">Group</label>
+
+        @if (Model.Errors.TryGetValue("GroupCode", out var groupCodeError))
+        {
+            <p id="groupCode-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @groupCodeError</p>
+        }
+        <select class="govuk-select @(Model.Errors.ContainsKey("GroupCode") ? "govuk-select--error" : "")" asp-for="GroupCode" aria-describedby="@(Model.Errors.ContainsKey("GroupCode") ? "GroupCode-error" : null)">
+            <option value="">-- Select --</option>
+            @foreach (var g in Model.Groups)
+            {
+                <option value="@g.ID">@g.Name</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("AreaCode") ? "govuk-form-group--error" : "")">
+        <label class="govuk-label" for="AreaCode">Area</label>
+        @if (Model.Errors.TryGetValue("AreaCode", out var areaCodeError))
+        {
+            <p id="groupCode-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @areaCodeError</p>
+        }
+        <select class="govuk-select @(Model.Errors.ContainsKey("AreaCode") ? "govuk-select--error" : "")" asp-for="AreaCode" aria-describedby="@(Model.Errors.ContainsKey("AreaCode") ? "AreaCode-error" : null)">
+            <option value="">-- Select --</option>
+            @foreach (var a in Model.Areas)
+            {
+                <option value="@a.ID">@a.Name</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-form-group">
+        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="Active" type="checkbox" />
+                <label class="govuk-label govuk-checkboxes__label" for="Active">Active</label>
+            </div>
+        </div>
+    </div>
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Add user</button>
+        <a asp-page="/Admin/UserMaintenance" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    </div>
+</form>

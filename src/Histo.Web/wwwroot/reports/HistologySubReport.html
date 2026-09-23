@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Histology Sub-Report — Histology Codes</title>
+  <!--
+    Template:  HistologySubReport.html
+    Stage:     Stage 2 — HtmlTemplateGenerationSkill
+    Source:    output/definition/HistologySubReport.ReportDefinition.json
+    Parent:    HistologyReport.rpt (embedded sub-report per ADR-004)
+    Paradigm:  modern (net10.0 ASP.NET Core)
+    Generated: 2026-08-05
+    Tokens:    2 / 2 (100%)
+      - {{Static.CodeLabel}}      Section 0 ReportHeader  ColHeader_Code
+      - {{BatchHistology.Code}}   Section 2 Detail        Code (repeating)
+    Notes:
+      - Page margins 0 — sub-report inherits page context from parent HistologyReport.
+      - Max 8 rows (batch-level) or 9 rows (block-level) per SubmissionForm.aspx.vb
+        CreateBatchTestTable / CreateBlockTestTable modulo logic.
+      - This file is the standalone template; HistologyReport.html also inlines
+        this structure directly for self-contained rendering.
+  -->
+  <style>
+    @page {
+      size: 210mm 297mm;
+      margin: 0;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 9pt;
+      color: #000000;
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!--
+    SECTION 0 — ReportHeader
+    Contains: ColHeader_Code label
+    Source: sections[0] sectionLabel="ReportHeader"
+  -->
+  <!--
+    SECTION 2 — Detail (repeating)
+    Contains: Code field — one row per BatchHistology record
+    Source: sections[2] sectionLabel="Detail"
+  -->
+  <table style="border-collapse: collapse; width: auto; min-width: 120px; font-size: 9pt;">
+    <thead>
+      <tr>
+        <!-- sections[0].elements[0] TextElement ColHeader_Code bold left -->
+        <th style="font-weight: bold; border: 1px solid #888888; padding: 2px 8px; background-color: #e8e8e8; text-align: left; white-space: nowrap;">
+          {{Static.CodeLabel}}
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- sections[2].elements[0] FieldElement Code — repeating per BatchHistology row -->
+      <tr>
+        <td style="border: 1px solid #888888; padding: 2px 8px; text-align: left;">
+          {{BatchHistology.Code}}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!--
+    SECTION 1 — PageHeader   (empty — suppressed for sub-report)
+    SECTION 3 — ReportFooter (empty — suppressed for sub-report)
+    SECTION 4 — PageFooter   (empty — suppressed for sub-report)
+  -->
+
+</body>
+</html>

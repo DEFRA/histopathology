@@ -1,0 +1,26 @@
+using Histo.Histology.Models;
+
+namespace Histo.Histology.Interfaces;
+
+/// <summary>
+/// Public service contract for the quality-control/dispatch test worklist — the module boundary exposed to Histo.Web.
+/// Concrete implementation: <see cref="Histo.Histology.Services.BlockTestService"/>.
+/// </summary>
+public interface IBlockTestService
+{
+    Task<IReadOnlyList<BlockTest>> GetByBatchAsync(int batchId, CancellationToken ct = default);
+    Task<BlockTest?> GetByIdAsync(int batchId, int testId, CancellationToken ct = default);
+
+    /// <summary>Updates a test record. Throws <see cref="BlockTestConcurrencyException"/> on concurrent modification.</summary>
+    Task UpdateAsync(BlockTest test, int userId, CancellationToken ct = default);
+
+    /// <summary>Delta-saves premium-charge (TC code) selections for a single test.</summary>
+    Task SaveTCCodesAsync(int batchId, int testId, string testType,
+        IReadOnlyList<TcCode> existing, IReadOnlyList<string> selected,
+        int userId, CancellationToken ct = default);
+
+    /// <summary>Delta-saves Histology/Antibodies/Stain test-type selections for a single block.</summary>
+    Task SaveTestSelectionsAsync(int batchId, int blockId,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        int userId, CancellationToken ct = default);
+}

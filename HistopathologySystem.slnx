@@ -1,0 +1,28 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Histo.Administration/Histo.Administration.csproj" />
+    <Project Path="src/Histo.AuditLog/Histo.AuditLog.csproj" />
+    <Project Path="src/Histo.Core/Histo.Core.csproj" />
+    <Project Path="src/Histo.Histology/Histo.Histology.csproj" />
+    <Project Path="src/Histo.Infrastructure/Histo.Infrastructure.csproj" />
+    <Project Path="src/Histo.QualityControl/Histo.QualityControl.csproj" />
+    <Project Path="src/Histo.Reporting/Histo.Reporting.csproj" />
+    <Project Path="src/Histo.Submissions/Histo.Submissions.csproj" />
+    <Project Path="src/Histo.Web/Histo.Web.csproj" />
+    <Project Path="src/Histo.WebJobs/Histo.WebJobs.csproj" />
+  </Folder>
+  <Folder Name="/src/Database/" />
+  <Folder Name="/src/Database/Migrations/">
+    <File Path="src/Database/Migrations/V20260914_01_User_Email_NotNull_NTLogin_Nullable.sql" />
+    <File Path="src/Database/Migrations/V20260917_01_Deactivate_MouseBioassay_Neuropath_UserAreas.sql" />
+  </Folder>
+  <Folder Name="/src/Database/Deploy/">
+    <File Path="src/Database/Deploy/Deploy.sql" />
+  </Folder>
+  <Folder Name="/src/Database/StoredProcedures/">
+    <File Path="src/Database/StoredProcedures/dbo.GetUserByEmail.sql" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Histo.Tests/Histo.Tests.csproj" />
+  </Folder>
+</Solution>

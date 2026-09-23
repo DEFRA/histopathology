@@ -1,0 +1,36 @@
+@page
+@model Histo.Web.Pages.Admin.PickListMaintenanceModel
+@{
+    ViewData["Title"] = "Pick list maintenance";
+    ViewData["PageTitle"] = "Pick list maintenance";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Index" class="govuk-back-link">Back</a>
+}
+
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            @{ ViewData["Label"] = "Pick list name"; ViewData["Column"] = "TableName"; }
+            <partial name="_SortableHeader" />
+            <th scope="col" class="govuk-table__header govuk-table__header--numeric"><span class="govuk-visually-hidden">Actions</span></th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @foreach (var l in Model.PagedEntries)
+        {
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">@l.TableName</td>
+                <td class="govuk-table__cell govuk-table__cell--numeric">
+                    <a asp-page="/Admin/LookupItems" asp-route-tableId="@l.ID" class="govuk-link">Edit items</a>
+                </td>
+            </tr>
+        }
+        @if (!Model.PagedEntries.Any())
+        {
+            <tr class="govuk-table__row"><td colspan="2" class="govuk-table__cell">No editable pick lists found.</td></tr>
+        }
+    </tbody>
+</table>
+<partial name="_Pagination" />

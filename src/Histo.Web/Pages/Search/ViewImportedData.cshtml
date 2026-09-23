@@ -1,0 +1,88 @@
+@page
+@model Histo.Web.Pages.Search.ViewImportedDataModel
+@{
+    ViewData["Title"] = "View old ICC_Sub data";
+    ViewData["PageTitle"] = "View old ICC_Sub data";
+}
+
+@section BeforeHeading {
+    <a asp-page="@Model.BackLinkPage" class="govuk-back-link">Back</a>
+}
+
+<form method="get">
+    <input type="hidden" name="ReturnPage" value="@Model.ReturnPage" />
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="SelectedTable">Table</label>
+        <select class="govuk-select" asp-for="SelectedTable">
+            <option value="">-- Select a table --</option>
+            @foreach (var t in Model.Tables)
+            {
+                <option value="@t.ID" selected="@(t.ID.ToString() == Model.SelectedTable)">@t.Name</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Filter">Filter</label>
+        <input class="govuk-input govuk-input--width-30" asp-for="Filter" />
+    </div>
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Go</button>
+        <a class="govuk-button govuk-button--secondary" asp-page="/Search/ViewImportedData" asp-route-ReturnPage="@Model.ReturnPage">Clear</a>
+        @if (!string.IsNullOrEmpty(Model.SelectedTable) && Model.Results.Any())
+        {
+            <button type="submit" asp-page-handler="ExportExcel" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</button>
+        }
+    </div>
+</form>
+
+@if (!string.IsNullOrEmpty(Model.SelectedTable))
+{
+    @if (Model.Results.Any())
+    {
+        <table class="govuk-table">
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    @{ ViewData["Label"] = "Sender ref"; ViewData["Column"] = "SenderRef"; }
+                    <partial name="_SortableHeader" />
+                    @{ ViewData["Label"] = "Histology ref"; ViewData["Column"] = "HistologyRef"; }
+                    <partial name="_SortableHeader" />
+                    @{ ViewData["Label"] = "Block ref"; ViewData["Column"] = "BlockRef"; }
+                    <partial name="_SortableHeader" />
+                    @{ ViewData["Label"] = "Project"; ViewData["Column"] = "Project"; }
+                    <partial name="_SortableHeader" />
+                    @{ ViewData["Label"] = "Date submitted"; ViewData["Column"] = "DateSubmitted"; }
+                    <partial name="_SortableHeader" />
+                    @{ ViewData["Label"] = "Species"; ViewData["Column"] = "Species"; }
+                    <partial name="_SortableHeader" />
+                    @{ ViewData["Label"] = "Tissue"; ViewData["Column"] = "Tissue"; }
+                    <partial name="_SortableHeader" />
+                    @{
+                        ViewData["Label"] = "Comments"; ViewData["Column"] = "Comments";
+                    }
+                    <partial name="_SortableHeader" />
+                    @* <th scope="col" class="govuk-table__header">Comments</th> *@
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @foreach (var r in Model.PagedResults)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@r.SenderRef</td>
+                        <td class="govuk-table__cell">@r.HistologyRef</td>
+                        <td class="govuk-table__cell">@r.BlockRef</td>
+                        <td class="govuk-table__cell">@r.Project</td>
+                        <td class="govuk-table__cell">@r.DateSubmitted?.ToShortDateString()</td>
+                        <td class="govuk-table__cell">@r.Species</td>
+                        <td class="govuk-table__cell">@r.Tissue</td>
+                        <td class="govuk-table__cell">@r.Comments</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <partial name="_Pagination" />
+    }
+    else
+    {
+        <p class="govuk-body">No imported data found for the selected table.</p>
+    }
+}

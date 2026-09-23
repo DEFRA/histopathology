@@ -1,0 +1,64 @@
+@page
+@model SubmissionsOnHoldModel
+@{
+    ViewData["Title"] = "Samples on hold";
+    ViewData["PageTitle"] = "Samples on hold";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Batches/EditSubmissionStatus" asp-route-BatchId="@Model.BatchId" class="govuk-back-link">Back</a>
+}
+
+<p class="govuk-body">Select which samples in this submission should be put on hold.</p>
+
+@if (!string.IsNullOrEmpty(Model.SaveError))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.SaveError</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+<form method="post" asp-page-handler="Save">
+    <input type="hidden" asp-for="BatchId" />
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Sender ref</th>
+                <th scope="col" class="govuk-table__header">Histology ref</th>
+                <th scope="col" class="govuk-table__header">On hold</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var a in Model.Animals)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@a.SenderRef</td>
+                    <td class="govuk-table__cell">@a.HistologyRef</td>
+                    <td class="govuk-table__cell">
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" type="checkbox" name="OnHoldAnimalIds" value="@a.ID" checked="@a.OnHold" />
+                            <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">On hold for @a.SenderRef</span></label>
+                        </div>
+                    </td>
+                </tr>
+            }
+            @if (!Model.Animals.Any())
+            {
+                <tr class="govuk-table__row"><td colspan="3" class="govuk-table__cell">No samples found for this submission.</td></tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
+        <button type="submit" formaction="?handler=Done" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</button>
+    </div>
+</form>
+

@@ -1,0 +1,92 @@
+@page
+@model SearchPMDatesModel
+@{
+    ViewData["Title"] = "Search by PM date";
+    ViewData["PageTitle"] = "Search by PM date";
+}
+
+@section BeforeHeading {
+    <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
+}
+
+<partial name="_ErrorSummary" model="Model.Errors" />
+
+<form method="post" asp-page-handler="Search">
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("StartDate") ? "govuk-form-group--error" : "")">
+        <label class="govuk-label" for="StartDate">PM from date</label>
+        @if (Model.Errors.TryGetValue("StartDate", out var startErr))
+        {
+            <p id="StartDate-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @startErr</p>
+        }
+        <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("StartDate") ? "govuk-input--error" : "")"
+               type="date" asp-for="StartDate" aria-describedby="@(Model.Errors.ContainsKey("StartDate") ? "StartDate-error" : null)" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="EndDate">PM to date</label>
+        <input class="govuk-input govuk-input--width-10" type="date" asp-for="EndDate" />
+    </div>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
+</form>
+
+@if (Model.Results.Any())
+{
+    @* Carrier form holding the current criteria so sort/page/export re-run the same search.
+       asp-page triggers FormTagHelper to inject the antiforgery token. *@
+    <form id="pmdates-action-form" method="post" asp-page="/Search/SearchPMDates">
+        <input type="hidden" name="StartDate" value="@Model.StartDate?.ToString("yyyy-MM-dd")" />
+        <input type="hidden" name="EndDate"   value="@Model.EndDate?.ToString("yyyy-MM-dd")" />
+    </form>
+
+    <table class="govuk-table">
+        <caption class="govuk-table__caption govuk-table__caption--m govuk-visually-hidden">Submissions matching the selected PM date range</caption>
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                @{ ViewData["Label"] = "Sub. number"; ViewData["Column"] = "ID"; }
+                <partial name="_SortableHeaderPost" />
+                @{ ViewData["Label"] = "Sender ref"; ViewData["Column"] = "SenderRef"; }
+                <partial name="_SortableHeaderPost" />
+                @{ ViewData["Label"] = "PM date"; ViewData["Column"] = "PMDate"; }
+                <partial name="_SortableHeaderPost" />
+                @{ ViewData["Label"] = "Date submitted"; ViewData["Column"] = "BatchDate"; }
+                <partial name="_SortableHeaderPost" />
+                @{ ViewData["Label"] = "Date received / rejected"; ViewData["Column"] = "DateReceived"; }
+                <partial name="_SortableHeaderPost" />
+                @{ ViewData["Label"] = "Time received / rejected"; ViewData["Column"] = "TimeReceived"; }
+                <partial name="_SortableHeaderPost" />
+                @{ ViewData["Label"] = "Date completed"; ViewData["Column"] = "CompletedDate"; }
+                <partial name="_SortableHeaderPost" />
+                @{ ViewData["Label"] = "Customer received date"; ViewData["Column"] = "CustomerReceivedDate"; }
+                <partial name="_SortableHeaderPost" />
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var r in Model.PagedResults)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@r.ID</td>
+                    <td class="govuk-table__cell">@r.SenderRef</td>
+                    <td class="govuk-table__cell">@r.PMDate?.ToShortDateString()</td>
+                    <td class="govuk-table__cell">@r.BatchDate?.ToShortDateString()</td>
+                    <td class="govuk-table__cell">@r.DateReceived?.ToShortDateString()</td>
+                    <td class="govuk-table__cell">@r.TimeReceived</td>
+                    <td class="govuk-table__cell">@r.CompletedDate?.ToShortDateString()</td>
+                    <td class="govuk-table__cell">@r.CustomerReceivedDate?.ToShortDateString()</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <partial name="_PaginationPost" />
+
+    <button form="pmdates-action-form"
+            formaction="?handler=ExportExcel"
+            type="submit"
+            class="govuk-button govuk-button--secondary"
+            data-module="govuk-button">
+        Export to excel
+    </button>
+}
+else if (Model.Searched)
+{
+    <p class="govuk-body">No submissions found for the selected PM date range.</p>
+}

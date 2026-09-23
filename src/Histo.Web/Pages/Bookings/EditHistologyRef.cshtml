@@ -1,0 +1,57 @@
+@page
+@model Histo.Web.Pages.Bookings.EditHistologyRefModel
+@{
+    ViewData["Title"] = "Edit histology reference";
+    ViewData["PageTitle"] = "Edit histology reference";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Index" class="govuk-back-link">Back</a>
+}
+
+<p class="govuk-body">Use this page to correct the "next histology reference" counter for a histology type. Please use this with extreme care.</p>
+
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.Error</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="govuk-panel govuk-panel--confirmation govuk-!-margin-bottom-6">
+        <p class="govuk-panel__body">@Model.SuccessMessage</p>
+    </div>
+}
+
+<form method="post" asp-antiforgery="true">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="HistologyType">Histology Ref Type</label>
+        <select name="HistologyType" id="HistologyType" class="govuk-select">
+            <option value="">-- Select --</option>
+            <option value="1">Neuropath</option>
+            <option value="2">Abattoir Survey</option>
+            <option value="3">TB Diagnostic</option>
+            <option value="4">General Pool</option>
+            <option value="5">Mouse Projects</option>
+        </select>
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="NewHistologyRef">Next Histology Ref</label>
+        <input class="govuk-input" id="NewHistologyRef" name="NewHistologyRef" type="text" value="@Model.NewHistologyRef" />
+    </div>
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
+        <a asp-page="/Index" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
+    </div>
+</form>
+
+<p class="govuk-body"><a asp-page="/Search/SearchBlockRefs" asp-route-ReturnPage="/Bookings/EditHistologyRef" class="govuk-link">Check Used Block Refs</a></p>

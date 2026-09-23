@@ -1,0 +1,170 @@
+using Histo.Administration.Interfaces;
+using Histo.Histology.Interfaces;
+using Histo.Histology.Models;
+using Histo.Submissions.Interfaces;
+using Histo.Submissions.Models;
+using Histo.Web.Services;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Histo.Web.Pages.QC;
+
+/// <summary>
+/// Quality-control / dispatch worklist for the current batch — replaces
+/// <c>QualityData.aspx</c>. Lists every histology, antibodies and special-stain
+/// test on the batch's blocks so results, QC data, dispatch and archive
+/// information can be recorded per test via <see cref="EditQualityDataTestModel"/>.
+///
+/// SIMPLIFIED: the legacy page edits several selected tests at once in a single
+/// save. This page edits one test at a time instead. See
+/// <see cref="Histo.Histology.Models.BlockTest"/> for further scope notes.
+/// </summary>
+public class QualityDataModel : GridPageModel
+{
+    private readonly IBlockTestService _tests;
+    private readonly IBatchService _batches;
+    private readonly ILookupService _lookups;
+    private readonly IUserService _users;
+
+    private const int LookupAntibodiesTse    = 4;
+    private const int LookupAntibodiesNonTse = 5;
+    private const int LookupSpecialStain     = 6;
+    private const int LookupHistologyTse     = 7;
+    private const int LookupHistologyNonTse  = 8;
+
+    public QualityDataModel(
+        ISessionService session,
+        IBlockTestService tests,
+        IBatchService batches,
+        ILookupService lookups,
+        IUserService users)
+        : base(session)
+    {
+        _tests   = tests;
+        _batches = batches;
+        _lookups = lookups;
+        _users   = users;
+    }
+
+    public IReadOnlyList<BlockTest> Tests { get; private set; } = [];
+    public int BatchID => Session.BatchID ?? 0;
+    public Batch? BatchSummary { get; private set; }
+
+    /// <summary>
+    /// Back-link target — honours <see cref="ISessionService.ReturnPage"/> so users arriving via
+    /// Search submissions / View submissions ("View quality data") return there, not always to
+    /// BatchesForDispatch (the only entry point the legacy hardcoded link assumed).
+    /// </summary>
+    public string BackLinkPage => string.IsNullOrWhiteSpace(Session.ReturnPage)
+        ? "/Batches/BatchesForDispatch"
+        : Session.ReturnPage;
+
+    // Resolved display names for batch summary header
+    public string? ProjectName { get; private set; }
+    public string? PathologistName { get; private set; }
+    public string? SpeciesName { get; private set; }
+    public string? EnteredByName { get; private set; }
+    public string? EnteredAreaName { get; private set; }
+    public string? SubmittedByName { get; private set; }
+    public string? SubmittedAreaName { get; private set; }
+
+    [BindProperty(SupportsGet = true)] public string? FilterHistologyRef { get; set; }
+    [BindProperty(SupportsGet = true)] public string? FilterTest { get; set; }
+
+    public IReadOnlyList<string> HistologyRefs { get; private set; } = [];
+    public IReadOnlyList<string> TestNames { get; private set; } = [];
+
+    // Resolved code→name map keyed as "TestType|Code"
+    private IReadOnlyDictionary<string, string> _testNameMap = new Dictionary<string, string>();
+
+    public string GetTestName(BlockTest t) =>
+        _testNameMap.TryGetValue($"{t.TestType}|{t.Code}", out var n) ? n : t.Code;
+
+    public IReadOnlyList<BlockTest> PagedEntries =>
+        (SortColumn switch
+        {
+            "BlockRef"    => SortDesc ? Tests.OrderByDescending(t => t.BlockRef)         : Tests.OrderBy(t => t.BlockRef),
+            "Test"        => SortDesc ? Tests.OrderByDescending(t => GetTestName(t))      : Tests.OrderBy(t => GetTestName(t)),
+            "Result"      => SortDesc ? Tests.OrderByDescending(t => t.Result)            : Tests.OrderBy(t => t.Result),
+            "Dispatched"  => SortDesc ? Tests.OrderByDescending(t => t.Dispatched)        : Tests.OrderBy(t => t.Dispatched),
+            "Archived"    => SortDesc ? Tests.OrderByDescending(t => t.Archived)          : Tests.OrderBy(t => t.Archived),
+            "OnHold"      => SortDesc ? Tests.OrderByDescending(t => t.OnHold)            : Tests.OrderBy(t => t.OnHold),
+            _             => SortDesc ? Tests.OrderByDescending(t => t.HistologyRef)      : Tests.OrderBy(t => t.HistologyRef),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
+
+    public async Task<IActionResult> OnGetAsync()
+    {
+        ViewData["Title"] = "Quality data";
+        ViewData["PageTitle"] = "Quality data";
+        if (!Session.BatchID.HasValue) return RedirectToPage("/Index");
+
+        var allTests    = await _tests.GetByBatchAsync(Session.BatchID.Value);
+        BatchSummary    = await _batches.GetByIdAsync(Session.BatchID.Value);
+
+        if (BatchSummary is not null)
+            await ResolveBatchSummaryAsync(BatchSummary);
+
+        await ResolveTestNamesAsync(BatchSummary?.BatchType ?? Histo.Submissions.Models.BatchTypeConstants.Tse);
+
+        HistologyRefs = allTests
+            .Select(t => t.HistologyRef)
+            .Where(r => !string.IsNullOrEmpty(r))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(r => r)
+            .ToList()!;
+
+        TestNames = allTests
+            .Select(GetTestName)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(n => n)
+            .ToList()!;
+
+        var filtered = allTests.AsEnumerable();
+        if (!string.IsNullOrEmpty(FilterHistologyRef))
+            filtered = filtered.Where(t => t.HistologyRef == FilterHistologyRef);
+        if (!string.IsNullOrEmpty(FilterTest))
+            filtered = filtered.Where(t => string.Equals(GetTestName(t), FilterTest, StringComparison.OrdinalIgnoreCase));
+        Tests = filtered.ToList();
+
+        PopulateGridViewData(Tests.Count);
+        return Page();
+    }
+
+    public IActionResult OnPostEdit(int testId)
+    {
+        return RedirectToPage("/QC/EditQualityDataTest", new { testId });
+    }
+
+    private async Task ResolveTestNamesAsync(int batchType)
+    {
+        var antibodyId = batchType == Histo.Submissions.Models.BatchTypeConstants.Tse ? LookupAntibodiesTse : LookupAntibodiesNonTse;
+
+        var histTask     = _lookups.GetHistologyTypesAsync();
+        var antibodyTask = _lookups.GetLookupDataAsync(antibodyId);
+        var stainTask    = _lookups.GetLookupDataAsync(LookupSpecialStain);
+        await Task.WhenAll(histTask, antibodyTask, stainTask);
+
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var i in histTask.Result)     map[$"Histology|{i.Code ?? i.ID.ToString()}"]  = i.Name;
+        foreach (var i in antibodyTask.Result) map[$"Antibodies|{i.Code ?? i.ID.ToString()}"] = i.Name;
+        foreach (var i in stainTask.Result)    map[$"Stain|{i.Code ?? i.ID.ToString()}"]      = i.Name;
+        _testNameMap = map;
+    }
+
+    private async Task ResolveBatchSummaryAsync(Batch batch)
+    {
+        var summary = await BatchSummaryDisplayResolver.ResolveAsync(batch, _lookups, _users);
+        ProjectName       = summary.ProjectName;
+        PathologistName   = summary.PathologistName;
+        SpeciesName       = summary.SpeciesName;
+        EnteredByName     = summary.EnteredByName;
+        EnteredAreaName   = summary.EnteredAreaName;
+        SubmittedByName   = summary.SubmittedByName;
+        SubmittedAreaName = summary.SubmittedAreaName;
+    }
+}
+
+

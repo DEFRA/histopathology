@@ -1,0 +1,49 @@
+@* _NavPartial.cshtml
+   Minimal top-level header nav — task links live on the Index.cshtml home page
+   grid menu instead, per GDS pattern (header = global wayfinding only).
+   Visible links are determined by the user's GroupName stored in ISessionService.
+   Emits <li class="govuk-service-navigation__item"> items only — the enclosing
+   <ul id="navigation" class="govuk-service-navigation__list"> lives in _Layout.cshtml.
+*@
+@inject Histo.Web.Services.ISessionService SessionSvc
+
+@{
+    var group = SessionSvc.GroupName;
+    bool isHisto = group == "Histopathology User";
+    bool isMaint = group == "Maintenance";
+
+    // Context-sensitive help — deep-links into the relevant Help/Index.cshtml section for the
+    // page the user is currently on, instead of always opening at the top of the page.
+    var currentPage = ViewContext.RouteData.Values["page"] as string;
+    var helpAnchor = Histo.Core.Domain.HelpSectionMap.Resolve(currentPage);
+    var helpHref = "/Help/Index" + (helpAnchor is not null ? $"#{helpAnchor}" : "");
+}
+
+@if (isHisto || isMaint)
+{
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Search/SearchMenu">Search</a>
+    </li>
+}
+
+@if (isMaint)
+{
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Admin/UserMaintenance">User maintenance</a>
+    </li>
+    <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Admin/PickListMaintenance">Pick list maintenance</a>
+    </li>
+@*     <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Admin/EditAnimalRef">Edit Sender/Histology Ref</a>
+    </li> *@
+@*     <li class="govuk-service-navigation__item">
+        <a class="govuk-service-navigation__link" asp-page="/Bookings/EditHistologyRef">Edit histology ref counter</a>
+    </li> *@
+}
+
+<li class="govuk-service-navigation__item">
+    <a class="govuk-service-navigation__link" href="@helpHref"
+       target="_blank" rel="noreferrer noopener">Help</a>
+</li>
+

@@ -1,0 +1,171 @@
+/* Histo.Web site theme — migrated to the GOV.UK Design System (govuk-frontend v6).
+ * The header, footer, navigation, page title, home panels, and all page content
+ * (tables, forms, buttons, selects) are now rendered with real govuk-frontend
+ * markup/classes throughout the application.
+
+/* GOV.UK's govuk-service-navigation__container doesn't set align-items, so its flex
+ * children (service-name span, our app-header-right div) can end up vertically
+ * misaligned relative to each other depending on their own padding/margin. Forcing
+ * center alignment here keeps "Histopathology System" and the user-context/Menu
+ * group on a single visually-aligned row at all viewport widths.
+ */
+.govuk-service-navigation__container {
+    align-items: center;
+}
+
+/* User context + "Menu" toggle, grouped on the right of the service navigation bar.
+ * The govuk-service-navigation__container uses display:flex — margin-left:auto
+ * pushes this group to the far right, regardless of viewport width.
+ */
+.app-header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-left: auto;
+}
+
+.app-header-user {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 15px;
+    row-gap: 0;
+    white-space: normal;
+    margin-bottom: 0;
+}
+
+/* GOV.UK's govuk-service-navigation__container doesn't set align-items, so its flex
+ * children (service-name span, our app-header-right div) can end up vertically
+ * misaligned relative to each other depending on their own padding/margin. Forcing
+ * center alignment here keeps "Histopathology System" and the user-context/Menu
+ * group on a single visually-aligned row at all viewport widths.
+ */
+.govuk-service-navigation__container {
+    align-items: center;
+}
+
+/* Groups the user-context text and "Menu" toggle button together, and margin-left: auto
+ * pushes this group to the far right, regardless of viewport width.
+ */
+.app-header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-left: auto;
+}
+
+/* Our "Menu" toggle is shown unconditionally (desktop and mobile) — govuk-frontend's own
+ * .govuk-service-navigation__toggle is hidden above the tablet breakpoint by a CSS media
+ * breakpoint; [hidden] needs !important here to win against that unconditional
+ * display:flex rule. */
+.app-nav-toggle {
+    white-space: nowrap;
+}
+
+.govuk-service-navigation__list[hidden] {
+    display: none !important;
+}
+
+.app-nav-wrapper {
+    border-top: 1px solid var(--govuk-border-colour, #b1b4b6);
+}
+
+/* APHA departmental logo replacing the GOV.UK crown mark. Kept in its own row
+ * (not squeezed inline with the licence text) so the wordmark stays legible per WCAG 1.4.5. */
+.govuk-footer__logo {
+    margin-bottom: 5px;
+}
+
+/* Resets native <button> chrome so POST-based sort/pagination controls (which must
+ * submit a form rather than navigate via <a href>) look identical to GOV.UK links.
+ * govuk-link's colour/hover rules are written against the :link/:visited pseudo-classes,
+ * which only ever match real <a href> elements — applying the govuk-link class to a
+ * <button> has no visual effect, so the link colours are restated here explicitly. */
+.app-link-button {
+    background: none;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    cursor: pointer;
+    color: #1d70b8;
+    text-decoration: underline;
+    text-decoration-thickness: max(1px, .0625rem);
+    text-underline-offset: .1578em;
+}
+
+.app-link-button:hover {
+    color: #003078;
+}
+
+.app-link-button:focus {
+    outline: 3px solid transparent;
+    color: #0b0c0c;
+    background-color: #ffdd00;
+    box-shadow: 0 -2px #ffdd00, 0 4px #0b0c0c;
+    text-decoration: none;
+}
+
+/* The "current page" pagination item has a blue background (.govuk-pagination__item--current);
+ * real <a> links get white text there via the :link/:visited pseudo-classes, which never match
+ * a <button> — restated here so the POST-based pagination's current-page number is legible
+ * instead of rendering in the same blue as the background. */
+.govuk-pagination__item--current .app-link-button,
+.govuk-pagination__item--current .app-link-button:hover {
+    color: #fff;
+    text-decoration: none;
+}
+
+/* Aligns a <select> with its "Manage …" pick-list button on the same row (e.g. Project/
+ * Contract code, Pathologist, Submitted by (external) on EditBatch/BatchDetails) instead of
+ * the button stacking below on its own line. Wraps on narrow screens rather than overflowing. */
+.app-field-with-button {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 15px;
+}
+
+.app-field-with-button .govuk-select {
+    flex: 0 1 auto;
+}
+
+/* Forces a pick-list <select> (Project/contract code, Pathologist, Submitted by (external) on
+ * EditBatch/BatchDetails) to full block width so its "Manage …" button always wraps onto its own
+ * line below, regardless of how short the select's option text is — without this, a select whose
+ * content is narrower than the column (e.g. Pathologist names) leaves enough room for the button
+ * to render beside it instead of stacking like the other two fields. */
+.app-select-stack {
+    display: block;
+    width: 100%;
+}
+
+/* Wraps a wide table (many columns/long content) in a horizontally scrollable container instead
+ * of letting it overflow past the page width — govuk-table has no built-in responsive behaviour. */
+.app-table-responsive {
+    overflow-x: auto;
+}
+
+/* Uniform-width submission status tag (SearchSubmissions/ViewSubmissions/BatchesForEditing grids)
+ * — govuk-tag sizes to its text by default, so "On hold" and "Not received" render as different
+ * widths; fixing a min-width and centring the text keeps the status column visually aligned. */
+.app-status-tag {
+    min-width: 120px;
+    text-align: center;
+}
+
+/* Uniform-width action buttons (Edit sender/histology ref, Batches for archiving) — govuk-button
+ * sizes to its label by default, so adjacent buttons with different label lengths ("Get histology
+ * ref" vs "Save sender ref", "Archive blocks" vs "Archive tissues") render at inconsistent widths;
+ * a fixed min-width keeps grouped buttons visually uniform. */
+.app-button-uniform {
+    min-width: 160px;
+    text-align: center;
+}
+
+
+
+
+
+
+

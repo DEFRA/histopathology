@@ -1,0 +1,74 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home";
+    ViewData["PageTitle"] = "Welcome to the Histopathology Submissions System";
+}
+
+<div class="govuk-grid-row">
+
+    @* Customer panel *@
+    @if (Model.Session.IsCustomer || Model.Session.IsHistoUser || Model.Session.IsMaintenance)
+    {
+        <div class="govuk-grid-column-one-third">
+            <h2 class="govuk-heading-m">Submissions</h2>
+            <ul class="govuk-list">
+                <li><a class="govuk-link" asp-page="/Batches/Cassetted">New submission</a></li>
+                <li><a class="govuk-link" asp-page="/Submissions/ViewSubmissions">View submissions</a></li>
+            </ul>
+        </div>
+    }
+
+    @* Histopathology User / Maintenance panel *@
+    @if (Model.Session.IsHistoUser || Model.Session.IsMaintenance)
+    {
+        <div class="govuk-grid-column-one-third">
+            <h2 class="govuk-heading-m">Laboratory</h2>
+            <ul class="govuk-list">
+                <li><a class="govuk-link" asp-page="/Batches/BatchesNotReceived">Receive submissions</a></li>
+                <li><a class="govuk-link" asp-page="/Batches/BatchesReceived">Assign tissues to blocks</a></li>
+                <li><a class="govuk-link" asp-page="/Batches/BatchesForEditing">Edit submission status</a></li>
+                <li><a class="govuk-link" asp-page="/Batches/BatchesForDispatch">Enter quality data</a></li>
+                <li><a class="govuk-link" asp-page="/Batches/BatchesForArchiving">Archive submission</a></li>
+            </ul>
+        </div>
+
+        <div class="govuk-grid-column-one-third">
+            <h2 class="govuk-heading-m">Search and reports</h2>
+            <ul class="govuk-list">
+                <li><a class="govuk-link" asp-page="/Search/SearchSubmissions" asp-route-ReturnPage="/Index">Search submissions</a></li>
+                <li><a class="govuk-link" asp-page="/Search/SearchTest" asp-route-ReturnPage="/Index">Search outputs</a></li>
+                <li><a class="govuk-link" asp-page="/Search/SearchPMDates" asp-route-ReturnPage="/Index">Search by PM date</a></li>
+                <li><a class="govuk-link" asp-page="/Search/SearchArchiveLocation" asp-route-ReturnPage="/Index">Search archive locations</a></li>
+                <li><a class="govuk-link" asp-page="/Search/SearchBlockRefs" asp-route-ReturnPage="/Index">Search block refs</a></li>
+                <li><a class="govuk-link" asp-page="/Search/ViewSamples" asp-route-ReturnPage="/Index">View samples</a></li>
+                <li><a class="govuk-link" asp-page="/QC/QCNotes">QC notes</a></li>
+                <li><a class="govuk-link" asp-page="/Search/ViewImportedData" asp-route-ReturnPage="/Index">View old ICC_Sub data</a></li>
+                <li><a class="govuk-link" asp-page="/Search/SearchUnUsedHistologyRefs" asp-route-ReturnPage="/Index">Unused histology refs</a></li>
+                <li><a class="govuk-link" asp-page="/AuditLog/AuditLogMenu">Audit logs</a></li>
+            </ul>
+        </div>
+
+        <div class="govuk-grid-column-one-third">
+            <h2 class="govuk-heading-m">Booking</h2>
+            <ul class="govuk-list">
+                <li><a class="govuk-link" asp-page="/Bookings/BookingMenu">Booking</a></li>
+            </ul>
+        </div>
+    }
+
+    @* Maintenance only *@
+    @if (Model.Session.IsMaintenance)
+    {
+        <div class="govuk-grid-column-one-third">
+            <h2 class="govuk-heading-m">Administration</h2>
+            <ul class="govuk-list">
+                <li><a class="govuk-link" asp-page="/Admin/UserMaintenance">User maintenance</a></li>
+                <li><a class="govuk-link" asp-page="/Admin/PickListMaintenance">Pick list maintenance</a></li>
+                <li><a class="govuk-link" asp-page="/Admin/EditAnimalRef">Edit Sender/Histology Ref</a></li>
+            </ul>
+        </div>
+    }
+
+</div>
+

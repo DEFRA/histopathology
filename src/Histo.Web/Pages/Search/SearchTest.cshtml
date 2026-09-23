@@ -1,0 +1,74 @@
+@page
+@model SearchTestModel
+@{
+    ViewData["Title"] = "Search test totals";
+    ViewData["PageTitle"] = "Search test totals";
+}
+
+@section BeforeHeading {
+    <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
+}
+
+<form method="post" asp-antiforgery="true">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="ProjectDescription">Project or contract code</label>
+        <select class="govuk-select" asp-for="ProjectDescription">
+            <option value="">-- Any --</option>
+            @foreach (var p in Model.Projects)
+            {
+                <option value="@p.Name">@p.Name</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="SubmissionType">Submission type</label>
+        <select class="govuk-select" asp-for="SubmissionType">
+            <option value="0">TSE</option>
+            <option value="1">Non-TSE</option>
+        </select>
+    </div>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Analyse results</button>
+</form>
+
+@if (Model.Searched)
+{
+    @if (Model.Results.Any())
+    {
+        @* Carrier form so Export re-runs the same query. asp-page injects the antiforgery token. *@
+        <form id="searchtest-action-form" method="post" asp-page="/Search/SearchTest">
+            <input type="hidden" name="ProjectDescription" value="@Model.ProjectDescription" />
+            <input type="hidden" name="SubmissionType"     value="@Model.SubmissionType" />
+        </form>
+
+        <table class="govuk-table">
+            <caption class="govuk-table__caption govuk-table__caption--m govuk-visually-hidden">Test item totals</caption>
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">Description</th>
+                    <th scope="col" class="govuk-table__header">Count</th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @foreach (var r in Model.Results)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@r.Description</td>
+                        <td class="govuk-table__cell">@r.Count</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <button form="searchtest-action-form"
+                formaction="?handler=ExportExcel"
+                type="submit"
+                class="govuk-button govuk-button--secondary"
+                data-module="govuk-button">
+            Export to CSV
+        </button>
+    }
+    else
+    {
+        <p class="govuk-body">No test items found matching the search criteria.</p>
+    }
+}

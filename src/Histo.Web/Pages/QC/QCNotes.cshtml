@@ -1,0 +1,69 @@
+@page
+@model QCNotesModel
+@{
+    ViewData["Title"] = "QC notes";
+    ViewData["PageTitle"] = "Quality control notes";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Batches/BatchDetails" class="govuk-back-link">Back</a>
+}
+
+<div class="govuk-form-group">
+    <form method="post" asp-page-handler="Go">
+        <label class="govuk-label" asp-for="QuickGoRef">Go directly to QC note ref</label>
+        <div class="app-field-with-button">
+            <input class="govuk-input govuk-input--width-10" type="number" asp-for="QuickGoRef" min="1" />
+            <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Go</button>
+        </div>
+    </form>
+</div>
+
+@if (Model.Notes.Any())
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                @{ ViewData["Label"] = "QC note ref"; ViewData["Column"] = "QCNoteRef"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Submission No"; ViewData["Column"] = "SubmissionNo"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Stain ref"; ViewData["Column"] = "StainRef"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Project"; ViewData["Column"] = "Project"; }
+                <partial name="_SortableHeader" />
+                @{ ViewData["Label"] = "Species"; ViewData["Column"] = "Species"; }
+                <partial name="_SortableHeader" />
+                <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var n in Model.PagedEntries)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@n.QCNoteRef</td>
+                    <td class="govuk-table__cell">@n.ID</td>
+                    <td class="govuk-table__cell">@n.StainRef</td>
+                    <td class="govuk-table__cell">@n.ProjectDescription</td>
+                    <td class="govuk-table__cell">@n.Species</td>
+                    <td class="govuk-table__cell">
+                        <div class="govuk-button-group govuk-!-margin-bottom-0">
+                            @* display:contents removes the form from the flex layout so the button
+                               itself is the flex item, aligning it with the Print link. *@
+                            <form method="post" style="display:contents">
+                                <input type="hidden" name="noteId" value="@n.QCNoteRef" />
+                                <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-page-handler="Edit">Edit</button>
+                            </form>
+                            <a asp-page="/Reports/QCNote" asp-route-qcNoteRef="@n.QCNoteRef" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Print</a>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <partial name="_Pagination" />
+}
+else
+{
+    <p class="govuk-body">No QC notes for this batch.</p>
+}

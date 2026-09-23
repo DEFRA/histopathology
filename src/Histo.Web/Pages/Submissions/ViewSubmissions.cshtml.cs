@@ -1,0 +1,289 @@
+using Histo.Administration.Interfaces;
+using Histo.Administration.Models;
+using Histo.Core.Domain;
+using Histo.Submissions.Interfaces;
+using Histo.Submissions.Models;
+using Histo.Web.Services;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Histo.Web.Pages.Submissions;
+
+/// <summary>
+/// Submission search page — replaces <c>ViewSubmissions.aspx</c>.
+/// Provides the full multi-field batch search with dropdown-populated filters
+/// matching the legacy page (Project, Pathologist, Species, Fixation dropdowns
+/// from lookup SPs; Users dropdown from UserService; Clear Search link).
+///
+/// Row selection and action panel: the legacy page enabled 6 action buttons
+/// (Print Submission, Print Submission Notes, Copy Submission, Edit Submission,
+/// View Submission, Date Returned) on row click, with availability gated by
+/// batch status (<c>grdviewResults_SelectedIndexChanged</c>).
+/// <see cref="OnPostSelectAsync"/> reproduces this behaviour — it stores
+/// <see cref="ISessionService.BatchID"/>, re-runs the search and returns
+/// <c>Page()</c> so the action panel renders below the results table.
+/// </summary>
+public class ViewSubmissionsModel : HistoPageModel
+{
+    private readonly IBatchService   _batches;
+    private readonly IUserService    _users;
+    private readonly ILookupService  _lookups;
+
+    /// <summary>Single source of truth for the results table header — (display label, sort key) pairs, in column order.</summary>
+    public static readonly IReadOnlyList<(string Label, string Column)> GridColumns =
+    [
+        ("Sub. Number",              "ID"),
+        ("Project Code",             "ProjectDescription"),
+        ("Pathologist",              "ContactDescription"),
+        ("Species",                  "Species"),
+        ("Date Submitted",           "BatchDate"),
+        ("Date Received / Rejected", "DateReceived"),
+        ("Date Completed",           "DateCompleted"),
+        ("Customer Received Date",   "CustomerReceivedDate"),
+        ("Status",                   "Status"),
+    ];
+
+    // Constants matching Common.vb
+    private const int LookupFixative = 10;
+    private const int LookupContacts = 18;
+    private const int LookupProjects = 19;
+
+    public ViewSubmissionsModel(ISessionService session, IBatchService batches, IUserService users, ILookupService lookups)
+        : base(session)
+    {
+        _batches = batches;
+        _users   = users;
+        _lookups = lookups;
+    }
+
+    [BindProperty] public int?      SubmissionNumber    { get; set; }
+    [BindProperty] public string?   Status              { get; set; }
+    [BindProperty] public string?   ProjectContractCode { get; set; }
+    [BindProperty] public string?   ContactName         { get; set; }
+    [BindProperty] public string?   Species             { get; set; }
+    [BindProperty] public string?   Fixation            { get; set; }
+    [BindProperty] public int?      SubmittedBy         { get; set; }
+    [BindProperty] public int?      EnteredBy           { get; set; }
+    [BindProperty] public string?   HistologyRef        { get; set; }
+    [BindProperty] public string?   SenderRef           { get; set; }
+    [BindProperty] public DateTime? SubmittedDateFrom   { get; set; }
+    [BindProperty] public DateTime? SubmittedDateTo     { get; set; }
+    [BindProperty] public DateTime? ReceivedDateFrom    { get; set; }
+    [BindProperty] public DateTime? ReceivedDateTo      { get; set; }
+
+    // Sort/page state is bound the same way as the filter criteria above — [BindProperty]
+    // binds from route/query/form on any non-GET request, so these survive the POST-based
+    // sort/page buttons (see _SortableHeaderPost/_PaginationPost) without needing GridPageModel's
+    // GET-oriented SupportsGet mechanism, which this POST-only search page cannot use.
+    private const int PageSize = 10;
+    [BindProperty(SupportsGet = true)] public string? SortColumn { get; set; }
+    [BindProperty(SupportsGet = true)] public bool    SortDesc   { get; set; }
+    [BindProperty(SupportsGet = true)] public int     PageNumber { get; set; } = 1;
+
+    public IReadOnlyList<BatchSearchResult> PagedResults =>
+        (SortColumn switch
+        {
+            "ID"                 => SortDesc ? Results.OrderByDescending(r => r.ID)                  : Results.OrderBy(r => r.ID),
+            "ProjectDescription" => SortDesc ? Results.OrderByDescending(r => r.ProjectDescription) : Results.OrderBy(r => r.ProjectDescription),
+            "ContactDescription" => SortDesc ? Results.OrderByDescending(r => r.ContactDescription) : Results.OrderBy(r => r.ContactDescription),
+            "Species"            => SortDesc ? Results.OrderByDescending(r => r.Species)            : Results.OrderBy(r => r.Species),
+            "BatchDate"          => SortDesc ? Results.OrderByDescending(r => r.BatchDate)           : Results.OrderBy(r => r.BatchDate),
+            "DateReceived"       => SortDesc ? Results.OrderByDescending(r => r.DateReceived)        : Results.OrderBy(r => r.DateReceived),
+            "DateCompleted"      => SortDesc ? Results.OrderByDescending(r => r.DateCompleted)       : Results.OrderBy(r => r.DateCompleted),
+            "CustomerReceivedDate" => SortDesc ? Results.OrderByDescending(r => r.CustomerReceivedDate) : Results.OrderBy(r => r.CustomerReceivedDate),
+            "Status"             => SortDesc ? Results.OrderByDescending(r => r.Status)              : Results.OrderBy(r => r.Status),
+            // No column clicked yet — legacy default: dvBatchesView.Sort = "ID DESC" (newest first).
+            _                    => Results.OrderByDescending(r => r.ID),
+        })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
+
+    /// <summary>
+    /// formaction for each row's Select button. SortColumn/PageNumber are POST-bound (user
+    /// controllable), so they're percent-encoded before being embedded in the query string —
+    /// otherwise a value containing '&amp;' could inject extra query parameters.
+    /// </summary>
+    public string SelectFormAction =>
+        $"?handler=Select&SortColumn={Uri.EscapeDataString(SortColumn ?? string.Empty)}&SortDesc={(SortDesc ? "true" : "false")}&PageNumber={PageNumber}";
+
+    private void PopulateGridViewData()
+    {
+        var totalPages = Results.Count == 0 ? 1 : (int)Math.Ceiling(Results.Count / (double)PageSize);
+        if (PageNumber < 1) PageNumber = 1;
+        else if (PageNumber > totalPages) PageNumber = totalPages;
+        ViewData["SortColumn"] = SortColumn;
+        ViewData["SortDesc"] = SortDesc;
+        ViewData["CurrentPage"] = PageNumber;
+        ViewData["TotalPages"] = totalPages;
+        ViewData["FormId"] = "view-action-form";
+        ViewData["Handler"] = "Search";
+    }
+
+
+    /// <summary>
+    /// ID of the currently selected result row.
+    /// Bound from the per-row Select button value via <see cref="OnPostSelectAsync"/>.
+    /// Mirrors legacy <c>grdviewResults.DataKeys(SelectedIndex)</c>.
+    /// </summary>
+    [BindProperty] public int SelectedBatchId { get; set; }
+
+    public IReadOnlyList<User>              Users       { get; private set; } = [];
+    public IReadOnlyList<LookupItem>        Projects    { get; private set; } = [];
+    public IReadOnlyList<LookupItem>        Contacts    { get; private set; } = [];
+    public IReadOnlyList<LookupItem>        SpeciesList { get; private set; } = [];
+    public IReadOnlyList<LookupItem>        Fixations   { get; private set; } = [];
+    public IReadOnlyList<BatchSearchResult> Results     { get; private set; } = [];
+    public bool Searched { get; private set; }
+
+    /// <summary>
+    /// <see cref="BatchStatus"/> code of the selected row, or <c>null</c> when no row selected.
+    /// Evaluated after search re-runs in <see cref="OnPostSelectAsync"/>.
+    /// </summary>
+    public string? SelectedBatchStatus => Results.FirstOrDefault(r => r.ID == SelectedBatchId)?.Status;
+
+    /// <summary>Mirrors legacy <c>EnableSubmissionNotes</c> — Print submission notes is only offered when notes exist.</summary>
+    public bool HasNotes { get; private set; }
+
+    // ── Action-button availability — mirrors grdviewResults_SelectedIndexChanged ──────────────
+    // Submitted("1") or Rejected("3"): Edit ✓, View ✓, Copy ✓, DateReturned ✗
+    // Completed("4"):                  Edit ✗, View ✓, Copy ✓, DateReturned ✓
+    // Received/OnHold/InProgress:      Edit ✗, View ✓, Copy ✓, DateReturned ✗
+
+    public bool CanEditSubmission  => SelectedBatchStatus == BatchStatus.Submitted
+                                   || SelectedBatchStatus == BatchStatus.Rejected;
+    public bool CanViewSubmission  => SelectedBatchStatus is not null;
+    public bool CanCopySubmission  => SelectedBatchStatus is not null;
+    public bool CanDateReturned    => SelectedBatchStatus == BatchStatus.Completed;
+
+    private async Task LoadLookupsAsync()
+    {
+        var usersTask = _users.GetAllUsersAsync();
+        var projectsTask = _lookups.GetLookupDataAsync(LookupProjects, includeInactive: true);
+        var contactsTask = _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true);
+        var speciesTask = _lookups.GetSpeciesLookupAsync();
+        var fixationsTask = _lookups.GetLookupDataAsync(LookupFixative);
+
+        await Task.WhenAll(usersTask, projectsTask, contactsTask, speciesTask, fixationsTask);
+
+        Users       = await usersTask;
+        Projects    = await projectsTask;
+        Contacts    = await contactsTask;
+        SpeciesList = await speciesTask;
+        Fixations   = await fixationsTask;
+    }
+
+    public async Task OnGetAsync()
+    {
+        ViewData["Title"] = "View submissions";
+        ViewData["PageTitle"] = "View submissions";
+        var lookupsTask = LoadLookupsAsync();
+        // Show the unfiltered list on first load, matching legacy — a search isn't mandatory
+        // before the user sees any submissions.
+        var resultsTask = _batches.SearchAsync(BuildCriteria());
+        await Task.WhenAll(lookupsTask, resultsTask);
+        Results  = await resultsTask;
+        Searched = true;
+        PopulateGridViewData();
+    }
+
+    public async Task<IActionResult> OnPostSearchAsync()
+    {
+        ViewData["Title"] = "View submissions";
+        ViewData["PageTitle"] = "View submissions";
+        var lookupsTask = LoadLookupsAsync();
+        var resultsTask = _batches.SearchAsync(BuildCriteria());
+        await Task.WhenAll(lookupsTask, resultsTask);
+        SelectedBatchId = 0;
+        Results  = await resultsTask;
+        Searched = true;
+        PopulateGridViewData();
+        return Page();
+    }
+
+    /// <summary>
+    /// Row selection handler. Stores the selected batch ID in session so that
+    /// downstream pages (BatchDetails, EditBatch, CopyBatch, ReceiveBatch) load
+    /// the correct batch on their next GET. Re-runs the search so the results
+    /// table and action panel render together in the same response, matching
+    /// the legacy <c>grdviewResults_SelectedIndexChanged</c> postback behaviour.
+    /// </summary>
+    public async Task<IActionResult> OnPostSelectAsync()
+    {
+        ViewData["Title"] = "View submissions";
+        ViewData["PageTitle"] = "View submissions";
+        var lookupsTask = LoadLookupsAsync();
+        var resultsTask = _batches.SearchAsync(BuildCriteria());
+        await Task.WhenAll(lookupsTask, resultsTask);
+
+        if (SelectedBatchId > 0)
+        {
+            Session.BatchID     = SelectedBatchId;
+            Session.ReturnPage  = "/Submissions/ViewSubmissions";  // GAP-3: context-aware back link on BatchDetails
+            Session.IsViewSubmissionMode = true;
+
+            var selectedBatch = await _batches.GetByIdAsync(SelectedBatchId);
+            HasNotes = !string.IsNullOrWhiteSpace(selectedBatch?.Comments) || !string.IsNullOrWhiteSpace(selectedBatch?.StatusComments);
+        }
+
+        Results  = await resultsTask;
+        Searched = true;
+        PopulateGridViewData();
+        return Page();
+    }
+
+    /// <summary>
+    /// Excel (.xlsx) export — replaces legacy <c>lbExportExcel_Click</c> → <c>ExcelExport.aspx</c>
+    /// pattern. Reproduces its dedicated 16-column export table exactly (same code, identical to
+    /// <c>SearchSubmissions</c>'s own export handler in legacy).
+    /// </summary>
+    public async Task<IActionResult> OnPostExportExcelAsync()
+    {
+        var results = await _batches.SearchAsync(BuildCriteria());
+        return ExcelExportHelper.BuildXlsx(
+            "view-submissions.xlsx",
+            ["Submission Number", "Project/Contract", "Pathologist", "Species", "Submitted Date",
+             "Submission Type", "Submitted By", "Safe To Handle", "Received Date", "Time Received/Rejected",
+             "Received By", "Other Submitted By", "Comments", "Customer Received Date", "Status", "Completed Date"],
+            results.Select(r => (IReadOnlyList<object?>)new object?[]
+            {
+                r.ID,
+                r.ProjectDescription,
+                r.ContactDescription,
+                r.Species,
+                r.BatchDate,
+                r.BatchType == "0" ? "TSE" : "NON TSE",
+                r.SubmittedBy,
+                r.SafeToHandle is "1" or "true" or "True" or "yes" or "Yes" ? "Yes" : "No",
+                r.DateReceived,
+                r.ReceivedTime,
+                r.ReceivedBy,
+                r.OtherSubmittedBy,
+                r.Comments,
+                r.CustomerReceivedDate,
+                BatchStatus.DisplayName(r.Status ?? ""),
+                r.DateCompleted
+            }));
+    }
+
+    private BatchSearchCriteria BuildCriteria() => new()
+    {
+        SubmissionNumber    = SubmissionNumber,
+        Status              = NullIfEmpty(Status),
+        ProjectContractCode = NullIfEmpty(ProjectContractCode),
+        ContactName         = NullIfEmpty(ContactName),
+        Species             = NullIfEmpty(Species),
+        Fixation            = NullIfEmpty(Fixation),
+        SubmittedBy         = SubmittedBy,
+        EnteredBy           = EnteredBy,
+        HistologyRef        = NullIfEmpty(HistologyRef),
+        SenderRef           = NullIfEmpty(SenderRef),
+        SubmittedDateFrom   = SubmittedDateFrom,
+        SubmittedDateTo     = SubmittedDateTo,
+        ReceivedDateFrom    = ReceivedDateFrom,
+        ReceivedDateTo      = ReceivedDateTo,
+    };
+
+    // Hidden form sends empty string for null-valued fields; the SP treats "" as a real
+    // filter value and returns 0 rows. Convert to null so the SP applies no filter.
+    private static string? NullIfEmpty(string? v) => string.IsNullOrWhiteSpace(v) ? null : v;
+}

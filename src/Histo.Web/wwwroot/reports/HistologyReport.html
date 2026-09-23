@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Histology Report</title>
+  <!--
+    Template:  HistologyReport.html
+    Stage:     Stage 2 — HtmlTemplateGenerationSkill
+    Source:    output/definition/HistologyReport.ReportDefinition.json
+    Paradigm:  modern (net10.0 ASP.NET Core)
+    Generated: 2026-08-05
+    Complexity: high — SubReportElement present (HistologySubReport inlined per ADR-004)
+    renderHints: repeatHeaderOnEachPage=true → submission table uses <thead> for page repeat
+    Page:      A4 portrait 210mm × 297mm, margins 12mm all sides
+
+    Tokens: 34 / 34 (100%)
+      Section 0 — ReportHeader (batch-level fields + sub-report)
+        {{Static.ReportTitle}}
+        {{Batch.ProjectContractCode}}
+        {{Batch.ContactName}}
+        {{Batch.BatchDate}}
+        {{Batch.Species}}
+        {{Batch.DateReceived}}
+        {{Batch.TimeReceived}}
+        {{Batch.SafeToHandle}}
+        {{Batch.BatchType}}
+        {{Batch.SubmittedAs}}
+        {{Batch.OtherSubmittedBy}}
+        {{Batch.NumberSamples}}
+        {{Batch.Fixation}}
+        {{Batch.PostFixationOther}}
+        {{Batch.MoreHistology}}
+        {{Batch.Comments}}
+        {{Batch.CommentLengthOK}}
+        {{BatchPostFixation.Decal}}
+        {{BatchPostFixation.Phenol}}
+        {{BatchPostFixation.Formic}}
+        {{BatchPostFixation.Other}}
+        {{SubReport.HistologySubReport}}   ← sub-report marker (hidden span)
+      Sub-report inline structure (HistologySubReport tokens inlined per gate requirement)
+        {{Static.CodeLabel}}
+        {{BatchHistology.Code}}
+      Section 1 — PageHeader (submission table column headers)
+        {{Static.SenderRefLabel}}
+        {{Static.HistologyRefLabel}}
+        {{Static.BlockRefLabel}}
+        {{Static.TissueDetailsLabel}}
+        {{Static.CustomerRefLabel}}
+      Section 2 — Detail (repeating submission rows)
+        {{BatchSubmission.SenderRef}}
+        {{BatchSubmission.HistologyRef}}
+        {{BatchSubmission.BlockRef}}
+        {{BatchSubmission.TissueDetails}}
+        {{BatchSubmission.CustomerRef}}
+        {{BatchSubmission.RepeatBlock}}    ← hidden span; renderer uses to append * to BlockRef
+      Section 4 — PageFooter
+        {{Version.Version}}
+
+    Notes:
+      - All x/y/width/height coordinates were null in the ReportDefinition.json (OLE binary
+        limitation). Layout uses sensible A4 table-based structure derived from sections[].
+      - Wingdings font used for CommentLengthOK and PostFixation checkmark fields, matching
+        Chr(252) rendering from original Crystal Reports SubmissionForm.aspx.vb.
+      - {{BatchSubmission.RepeatBlock}} renders as display:none token; renderer appends '*'
+        to BlockRef cell when value is true per CreateBlockRefString logic.
+      - Sub-report (HistologySubReport) is inlined — no iframe, no external file reference.
+        The {{SubReport.HistologySubReport}} span is the renderer replacement point;
+        the inline table below it defines the layout for BatchHistology rows.
+  -->
+  <style>
+    @page {
+      size: 210mm 297mm;
+      margin: 12mm;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 9pt;
+      color: #000000;
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================================================================
+       SECTION 0 — ReportHeader
+       Batch-level form fields + embedded HistologySubReport sub-report.
+       Source: sections[0] sectionLabel="ReportHeader"
+  ================================================================== -->
+
+  <!-- Report title — TextElement ReportTitle, centered, bold, font-size 12pt -->
+  <div style="text-align: center; font-weight: bold; font-size: 12pt; padding: 4px 0 6px 0; border-bottom: 2px solid #000000; margin-bottom: 8px;">
+    {{Static.ReportTitle}}
+  </div>
+
+  <!-- Batch header fields — two-column label/value form layout -->
+  <table style="width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 9pt;">
+    <tr>
+      <td style="font-weight: bold; padding: 2px 4px; width: 22%; white-space: nowrap;">Project/Contract Code:</td>
+      <td style="padding: 2px 4px; width: 28%;">{{Batch.ProjectContractCode}}</td>
+      <td style="font-weight: bold; padding: 2px 4px; width: 22%; white-space: nowrap;">Contact Name:</td>
+      <td style="padding: 2px 4px; width: 28%;">{{Batch.ContactName}}</td>
+    </tr>
+    <tr>
+      <td style="font-weight: bold; padding: 2px 4px; white-space: nowrap;">Batch Date:</td>
+      <td style="padding: 2px 4px;">{{Batch.BatchDate}}</td>
+      <td style="font-weight: bold; padding: 2px 4px; white-space: nowrap;">Species:</td>
+      <td style="padding: 2px 4px;">{{Batch.Species}}</td>
+    </tr>
+    <tr>
+      <td style="font-weight: bold; padding: 2px 4px; white-space: nowrap;">Date Received:</td>
+      <td style="padding: 2px 4px;">{{Batch.DateReceived}}</td>
+      <td style="font-weight: bold; padding: 2px 4px; white-space: nowrap;">Time Received:</td>
+      <td style="padding: 2px 4px;">{{Batch.TimeReceived}}</td>
+    </tr>
+    <tr>
+      <td style="font-weight: bold; padding: 2px 4px; white-space: nowrap;">Safe to Handle:</td>
+      <td style="padding: 2px 4px;">{{Batch.SafeToHandle}}</td>
+      <td style="font-weight: bold; padding: 2px 4px; white-space: nowrap;">Batch Type:</td>
+      <td style="padding: 2px 4px;">{{Batch.BatchType}}</td>
+    </tr>
+    <tr>
+      <td style="font-weight: bold; padding: 2px 4px; white-space: nowrap;">Submitted As:</td>
+      <td style="padding: 2px 4px;">{{Batch.SubmittedAs}}</td>
+      <td style="font-weight: bold; padding: 2px 4px; white-space: nowrap;">Other Submitted By:</td>
+      <td style="padding: 2px 4px;">{{Batch.OtherSubmittedBy}}</td>
+    </tr>
+    <tr>
+      <td style="font-weight: bold; padding: 2px 4px; white-space: nowrap;">No. of Samples:</td>
+      <td style="padding: 2px 4px;">{{Batch.NumberSamples}}</td>
+      <td style="font-weight: bold; padding: 2px 4px; white-space: nowrap;">Fixation:</td>
+      <td style="padding: 2px 4px;">{{Batch.Fixation}}</td>
+    </tr>
+    <tr>
+      <td style="font-weight: bold; padding: 2px 4px; white-space: nowrap;">Post Fixation Other:</td>
+      <td style="padding: 2px 4px;">{{Batch.PostFixationOther}}</td>
+      <td style="font-weight: bold; padding: 2px 4px; white-space: nowrap;">More Histology:</td>
+      <td style="padding: 2px 4px;">{{Batch.MoreHistology}}</td>
+    </tr>
+    <tr>
+      <td style="font-weight: bold; padding: 2px 4px; white-space: nowrap; vertical-align: top;">Comments:</td>
+      <td colspan="3" style="padding: 2px 4px;">
+        {{Batch.Comments}}&nbsp;<span style="font-family: Wingdings; font-size: 9pt;">{{Batch.CommentLengthOK}}</span>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Post-fixation checkmarks: Decal / Phenol / Formic / Other
+       Original Crystal Reports rendered Chr(252) Wingdings tick character.
+       Renderer pre-resolves to Wingdings ü (✓) when field value indicates selection. -->
+  <table style="border-collapse: collapse; margin-bottom: 10px; font-size: 9pt;">
+    <thead>
+      <tr>
+        <th style="font-weight: bold; border: 1px solid #888888; padding: 2px 10px; background-color: #e8e8e8; text-align: center;">Decal</th>
+        <th style="font-weight: bold; border: 1px solid #888888; padding: 2px 10px; background-color: #e8e8e8; text-align: center;">Phenol</th>
+        <th style="font-weight: bold; border: 1px solid #888888; padding: 2px 10px; background-color: #e8e8e8; text-align: center;">Formic</th>
+        <th style="font-weight: bold; border: 1px solid #888888; padding: 2px 10px; background-color: #e8e8e8; text-align: center;">Other</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="border: 1px solid #888888; padding: 2px 10px; text-align: center; font-family: Wingdings; font-size: 9pt;">{{BatchPostFixation.Decal}}</td>
+        <td style="border: 1px solid #888888; padding: 2px 10px; text-align: center; font-family: Wingdings; font-size: 9pt;">{{BatchPostFixation.Phenol}}</td>
+        <td style="border: 1px solid #888888; padding: 2px 10px; text-align: center; font-family: Wingdings; font-size: 9pt;">{{BatchPostFixation.Formic}}</td>
+        <td style="border: 1px solid #888888; padding: 2px 10px; text-align: center; font-family: Wingdings; font-size: 9pt;">{{BatchPostFixation.Other}}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ==================================================================
+       SubReportElement: HistologySubReport — inlined within ReportHeader
+       Source: sections[0].elements[SubReportElement] label="HistologySubReport"
+       ADR-004: "HistologyReport.rpt embeds HistologySubReport.rpt"
+       Link field: Batch.ID → BatchHistology.BatchID
+       Renderer: iterates BatchHistology DataTable rows; replaces
+                 {{BatchHistology.Code}} for each row; max 8–9 rows.
+
+       {{SubReport.HistologySubReport}} is the renderer marker token.
+       The table below defines the inline sub-report layout (no iframe, no
+       external file reference). HistologySubReport.html is the standalone
+       equivalent used when the sub-report is rendered independently.
+  ================================================================== -->
+  <div style="margin-bottom: 10px;">
+    <!-- Sub-report token: renderer uses this as the section anchor -->
+    <span style="display: none;">{{SubReport.HistologySubReport}}</span>
+    <!-- Sub-report inline structure — HistologySubReport sections[0] + sections[2] -->
+    <table style="border-collapse: collapse; width: auto; min-width: 120px; font-size: 9pt;">
+      <thead>
+        <tr>
+          <!-- HistologySubReport sections[0].elements[0] TextElement ColHeader_Code bold left -->
+          <th style="font-weight: bold; border: 1px solid #888888; padding: 2px 8px; background-color: #e8e8e8; text-align: left; white-space: nowrap;">
+            {{Static.CodeLabel}}
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- HistologySubReport sections[2].elements[0] FieldElement Code — repeating -->
+        <tr>
+          <td style="border: 1px solid #888888; padding: 2px 8px; text-align: left;">
+            {{BatchHistology.Code}}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ==================================================================
+       SECTION 1 — PageHeader (column headers for submission table)
+       SECTION 2 — Detail     (repeating rows — one per BatchSubmission record)
+       renderHints.repeatHeaderOnEachPage = true → <thead> repeats on each page
+       Max ~17 rows per page per SubmissionForm.aspx.vb modulo logic.
+  ================================================================== -->
+  <table style="width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 4px;">
+    <thead>
+      <!-- Section 1 PageHeader — column labels, repeated on each printed page -->
+      <tr>
+        <th style="font-weight: bold; border: 1px solid #000000; padding: 3px 5px; background-color: #e8e8e8; text-align: left; width: 15%;">
+          {{Static.SenderRefLabel}}
+        </th>
+        <th style="font-weight: bold; border: 1px solid #000000; padding: 3px 5px; background-color: #e8e8e8; text-align: left; width: 15%;">
+          {{Static.HistologyRefLabel}}
+        </th>
+        <th style="font-weight: bold; border: 1px solid #000000; padding: 3px 5px; background-color: #e8e8e8; text-align: left; width: 15%;">
+          {{Static.BlockRefLabel}}
+        </th>
+        <th style="font-weight: bold; border: 1px solid #000000; padding: 3px 5px; background-color: #e8e8e8; text-align: left; width: 35%;">
+          {{Static.TissueDetailsLabel}}
+        </th>
+        <th style="font-weight: bold; border: 1px solid #000000; padding: 3px 5px; background-color: #e8e8e8; text-align: left; width: 20%;">
+          {{Static.CustomerRefLabel}}
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Section 2 Detail — repeating row per BatchSubmission record -->
+      <tr>
+        <td style="border: 1px solid #000000; padding: 3px 5px; vertical-align: top;">
+          {{BatchSubmission.SenderRef}}
+        </td>
+        <td style="border: 1px solid #000000; padding: 3px 5px; vertical-align: top;">
+          {{BatchSubmission.HistologyRef}}
+        </td>
+        <td style="border: 1px solid #000000; padding: 3px 5px; vertical-align: top;">
+          {{BatchSubmission.BlockRef}}<span style="display: none;">{{BatchSubmission.RepeatBlock}}</span>
+        </td>
+        <td style="border: 1px solid #000000; padding: 3px 5px; vertical-align: top;">
+          {{BatchSubmission.TissueDetails}}
+        </td>
+        <td style="border: 1px solid #000000; padding: 3px 5px; vertical-align: top;">
+          {{BatchSubmission.CustomerRef}}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ==================================================================
+       SECTION 3 — ReportFooter
+       No elements defined in ReportDefinition.json — section intentionally empty.
+  ================================================================== -->
+
+  <!-- ==================================================================
+       SECTION 4 — PageFooter
+       Version number — sourced from Web.config
+       SubmissionFormVersionTSE or SubmissionFormVersionNonTSE depending on BatchType.
+  ================================================================== -->
+  <div style="margin-top: 12px; font-size: 8pt; text-align: left; border-top: 1px solid #cccccc; padding-top: 4px;">
+    Version: {{Version.Version}}
+  </div>
+
+</body>
+</html>

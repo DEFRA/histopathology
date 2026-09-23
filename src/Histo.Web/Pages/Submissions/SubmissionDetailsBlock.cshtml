@@ -1,0 +1,254 @@
+@page
+@model Histo.Web.Pages.Submissions.SubmissionDetailsBlockModel
+@{
+    ViewData["Title"] = "Sample blocks";
+    ViewData["PageTitle"] = "Sample blocks";
+}
+
+@section BeforeHeading {
+    <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
+}
+
+@if (Model.Animal is null)
+{
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <strong class="govuk-warning-text__text">
+            <span class="govuk-visually-hidden">Warning</span>
+            Sample not found.
+        </strong>
+    </div>
+    <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to samples</a>
+}
+else
+{
+    @if (Model.ErrorMessage is not null)
+    {
+        <div class="govuk-error-summary" data-module="govuk-error-summary">
+            <div role="alert">
+                <h2 class="govuk-error-summary__title">There is a problem</h2>
+                <div class="govuk-error-summary__body">
+                    <ul class="govuk-list govuk-error-summary__list"><li>@Model.ErrorMessage</li></ul>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* PM date and Histology reference are read-only here — matching Sender ref's display and
+       GDS summary-list conventions. Histology reference is set only via "Get next ref" below
+       (there is no manual edit surface for either field on this page). *@
+    <dl class="govuk-summary-list">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Sender ref</dt>
+            <dd class="govuk-summary-list__value">@Model.Animal.SenderRef</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">PM date</dt>
+            <dd class="govuk-summary-list__value">@(Model.Animal.PMDate ?? "Not recorded")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Histology reference</dt>
+            <dd class="govuk-summary-list__value">@(Model.Animal.HistologyRef ?? "Not recorded")</dd>
+        </div>
+    </dl>
+
+    @* "Or Pick" — assigns the next unused histology ref for a type and saves it immediately,
+       replacing legacy's AutoPostBack dropdown with an explicit button per WCAG 3.2.2 (On Input). *@
+   @*  @if (!Model.IsViewMode)
+    {
+        <form method="post" asp-page-handler="GetNextHistologyRef" class="govuk-!-margin-bottom-6">
+            <input type="hidden" asp-for="BatchId" />
+            <input type="hidden" asp-for="AnimalId" />
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="HistologyRefType">Or pick a histology reference type</label>
+                @if (Model.IsPreCassetted)
+                {
+                    <div class="govuk-hint">Mandatory for pre-cassetted submissions.</div>
+                }
+                <select class="govuk-select" asp-for="HistologyRefType">
+                    <option value="">-- Select --</option>
+                    @foreach (var t in Histo.Web.Pages.Submissions.SubmissionDetailsBlockModel.HistologyRefTypeOptions)
+                    {
+                        <option value="@t.Value">@t.Label</option>
+                    }
+                </select>
+            </div>
+            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Get next ref</button>
+        </form>
+    } *@
+
+    <h2 class="govuk-heading-m">Blocks</h2>
+
+    @* Inline GOV.UK confirmation panel — replaces the browser confirm() dialog for Delete. *@
+    @if (!Model.IsViewMode && Model.ConfirmDeleteBlockIds.Any())
+    {
+        <div class="govuk-warning-text">
+            <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+            <strong class="govuk-warning-text__text">
+                <span class="govuk-visually-hidden">Warning</span>
+                Are you sure you want to delete @(Model.ConfirmDeleteBlockIds.Count == 1 ? "this block" : $"these {Model.ConfirmDeleteBlockIds.Count} blocks")?
+            </strong>
+        </div>
+        <form method="post" asp-page-handler="Delete" class="govuk-!-display-inline">
+            @foreach (var id in Model.ConfirmDeleteBlockIds)
+            {
+                <input type="hidden" name="blockIds" value="@id" />
+            }
+            <input type="hidden" asp-for="BatchId" />
+            <input type="hidden" asp-for="AnimalId" />
+            <button type="submit" class="govuk-button govuk-button--warning" data-module="govuk-button">Yes, delete</button>
+            <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        </form>
+    }
+
+    @* Legacy-matching grid: Block Ref, Tissue Details, Archive, EO, H&E, H&E(BSE)/IHC Prp (TSE)
+       or IHC Other (NonTSE), Special Stain, Select. Add/Edit block navigate to the dedicated
+       Blocks/BlockDetails page, matching legacy's SubmissionDetailsBlock.aspx/BlockDetails.aspx split. *@
+    <form method="post" asp-page="/Submissions/SubmissionDetailsBlock" id="blocks-grid-form">
+        <input type="hidden" asp-for="BatchId" />
+        <input type="hidden" asp-for="AnimalId" />
+        <table class="govuk-table">
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">Block ref</th>
+                    <th scope="col" class="govuk-table__header">Tissue details</th>
+                    <th scope="col" class="govuk-table__header">Archive</th>
+                    <th scope="col" class="govuk-table__header">EO</th>
+                    <th scope="col" class="govuk-table__header">H&amp;E</th>
+                    @if (Model.IsTse)
+                    {
+                        <th scope="col" class="govuk-table__header">H&amp;E (BSE)</th>
+                        <th scope="col" class="govuk-table__header">IHC Prp</th>
+                    }
+                    else
+                    {
+                        <th scope="col" class="govuk-table__header">IHC Other</th>
+                    }
+                    <th scope="col" class="govuk-table__header">Special stain</th>
+                    <th scope="col" class="govuk-table__header">Select</th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @foreach (var b in Model.Blocks)
+                {
+                    var blockTissues = Model.TissuesByBlockId.TryGetValue(b.ID, out var bt) ? bt : (IReadOnlyList<Histo.Submissions.Models.Tissue>)[];
+                    var histCodes = Model.HistologyCodesByBlockId.GetValueOrDefault(b.ID, []);
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@b.BlockRef</td>
+                        <td class="govuk-table__cell">
+                            @if (blockTissues.Any())
+                            {
+                                <details class="govuk-details govuk-!-margin-bottom-0">
+                                    <summary class="govuk-details__summary">
+                                        <span class="govuk-details__summary-text">@blockTissues.Count tissue(s)</span>
+                                    </summary>
+                                    <div class="govuk-details__text">
+                                        <ul class="govuk-list">
+                                            @foreach (var t in blockTissues)
+                                            {
+                                                <li>@t.NoPieces x @Model.TissueName(t.TissueCode) @(string.IsNullOrWhiteSpace(t.Comment) ? "" : $"({t.Comment})")</li>
+                                            }
+                                        </ul>
+                                    </div>
+                                </details>
+                            }
+                            else
+                            {
+                                <span>None</span>
+                            }
+                        </td>
+                        <td class="govuk-table__cell">
+                            <div class="govuk-checkboxes govuk-checkboxes--small">
+                                <div class="govuk-checkboxes__item">
+                                    <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.Archive)" />
+                                    <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">Archived</span></label>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="govuk-table__cell">
+                            <div class="govuk-checkboxes govuk-checkboxes--small">
+                                <div class="govuk-checkboxes__item">
+                                    <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.EO)" />
+                                    <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">EO</span></label>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="govuk-table__cell">
+                            <div class="govuk-checkboxes govuk-checkboxes--small">
+                                <div class="govuk-checkboxes__item">
+                                    <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.HAndE)" />
+                                    <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">H&amp;E</span></label>
+                                </div>
+                            </div>
+                        </td>
+                        @if (Model.IsTse)
+                        {
+                            <td class="govuk-table__cell">
+                                <div class="govuk-checkboxes govuk-checkboxes--small">
+                                    <div class="govuk-checkboxes__item">
+                                        <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.HeBse)" />
+                                        <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">H&amp;E (BSE)</span></label>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="govuk-table__cell">
+                                <div class="govuk-checkboxes govuk-checkboxes--small">
+                                    <div class="govuk-checkboxes__item">
+                                        <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcPrp)" />
+                                        <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">IHC Prp</span></label>
+                                    </div>
+                                </div>
+                            </td>
+                        }
+                        else
+                        {
+                            <td class="govuk-table__cell">
+                                <div class="govuk-checkboxes govuk-checkboxes--small">
+                                    <div class="govuk-checkboxes__item">
+                                        <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcOther)" />
+                                        <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">IHC Other</span></label>
+                                    </div>
+                                </div>
+                            </td>
+                        }
+                        <td class="govuk-table__cell">
+                            <div class="govuk-checkboxes govuk-checkboxes--small">
+                                <div class="govuk-checkboxes__item">
+                                    <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.SpecialStain)" />
+                                    <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">Special stain</span></label>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="govuk-table__cell">
+                            <div class="govuk-checkboxes__item">
+                                <input class="govuk-checkboxes__input" type="checkbox" name="blockIds" value="@b.ID" form="blocks-grid-form" />
+                                <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">Select block @b.BlockRef</span></label>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Blocks.Any())
+                {
+                    <tr class="govuk-table__row"><td colspan="9" class="govuk-table__cell">No blocks found for this sample.</td></tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="govuk-button-group">
+            @if (!Model.IsViewMode)
+            {
+                <a asp-page="/Blocks/BlockDetails" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" class="govuk-button" data-module="govuk-button">Add block</a>
+                @if (Model.Blocks.Any())
+                {
+                    <button type="submit" formaction="?handler=EditBlockSelect" class="govuk-button govuk-button--secondary" data-module="govuk-button">Edit block</button>
+                    <button type="submit" formaction="?handler=ConfirmDelete" class="govuk-button govuk-button--warning" data-module="govuk-button">Delete block</button>
+                    <button type="submit" formaction="?handler=Copy" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy to samples</button>
+                }
+            }
+            @* "Block ref search" — legacy btnBlockRefSearch, navigates to SearchBlockRefs.aspx?HistologyRef=... *@
+            <a asp-page="/Search/SearchBlockRefs" asp-route-SenderRef="@Model.Animal?.SenderRef" asp-route-HistologyRef="@Model.Animal?.HistologyRef"
+               asp-route-ReturnPage="@Url.Page("/Submissions/SubmissionDetailsBlock", new { batchId = Model.BatchId, animalId = Model.AnimalId })"
+               class="govuk-button govuk-button--secondary" data-module="govuk-button">Block ref search</a>
+        </div>
+    </form>
+}

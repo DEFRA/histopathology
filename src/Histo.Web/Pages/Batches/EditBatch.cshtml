@@ -1,0 +1,424 @@
+@page
+@model Histo.Web.Pages.Batches.EditBatchModel
+@using Histo.Core.Domain
+@using Histo.Submissions.Models
+@{
+    ViewData["Title"] = "Edit submission";
+    ViewData["PageTitle"] = "Edit submission";
+}
+
+@section BeforeHeading {
+    <a href="@Model.ReturnUrl" class="govuk-back-link">Back</a>
+}
+
+@if (!string.IsNullOrEmpty(Model.SaveError))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.SaveError</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+<form method="post" asp-page="/Batches/EditBatch">
+    <h2 class="govuk-heading-m">Submission details</h2>
+
+    @* Read-only — fixed at submission creation, never editable here (legacy Batch.ascx / Edit Submission). *@
+    <dl class="govuk-summary-list govuk-!-margin-bottom-6">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Entered by</dt>
+            <dd class="govuk-summary-list__value">@(Model.EnteredByName ?? "Not recorded")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Entered area</dt>
+            <dd class="govuk-summary-list__value">@(Model.EnteredAreaName ?? "Not recorded")</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submitted as</dt>
+            <dd class="govuk-summary-list__value">@(Model.SubmittedAsDescription ?? "Not recorded")</dd>
+        </div>
+    </dl>
+
+    @* Submission category — read-only during Edit Submission: legacy's Cassetted.aspx type-selection
+       step is a one-time first step of the Create journey and is never re-shown when editing an
+       existing submission, so the category can never be changed after creation. *@
+    <div class="govuk-form-group">
+        <fieldset class="govuk-fieldset">
+            <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Submission category</legend>
+            <div class="govuk-radios govuk-radios--inline" data-module="govuk-radios">
+                <div class="govuk-radios__item">
+                    <input class="govuk-radios__input" type="radio" name="BatchTypeFieldDisplay"
+                           value="@BatchTypeConstants.Tse" id="batchTypeField-tse"
+                           checked="@(Model.BatchTypeField == BatchTypeConstants.Tse)" disabled />
+                    <label class="govuk-label govuk-radios__label" for="batchTypeField-tse">TSE</label>
+                </div>
+                <div class="govuk-radios__item">
+                    <input class="govuk-radios__input" type="radio" name="BatchTypeFieldDisplay"
+                           value="@BatchTypeConstants.NonTse" id="batchTypeField-nontse"
+                           checked="@(Model.BatchTypeField == BatchTypeConstants.NonTse)" disabled />
+                    <label class="govuk-label govuk-radios__label" for="batchTypeField-nontse">Non-TSE</label>
+                </div>
+            </div>
+        </fieldset>
+        <input type="hidden" asp-for="BatchTypeField" />
+    </div>
+
+    @* Two-column layout mirrors the Create submission field pairing (left/right dropdown pairs).
+       Each pair is its own govuk-grid-row so the two labels/controls line up on the same row —
+       a single tall pair (e.g. a "Manage ..." button under the select) no longer pushes every
+       row below it out of alignment with its right-column counterpart. *@
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-two-thirds">
+            @* External submitter *@
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="OtherSubmittedBy">Submitted by (external)</label>
+                <select class="govuk-select app-select-stack" asp-for="OtherSubmittedBy">
+                    <option value="">-- None --</option>
+                    @foreach (var u in Model.AllUsers)
+                    {
+                        <option value="@u.UserID" selected="@(Model.OtherSubmittedBy == u.UserID)">@u.Name</option>
+                    }
+                </select>
+                @* Replaces legacy btnNewSubmittedBy — the "Submitted by" list is user-backed, so it is
+                   maintained on User maintenance rather than a lookup table. *@
+                <button type="submit" asp-page-handler="ManagePickList" name="field" value="submittedBy" formnovalidate
+                        class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+                    Manage submitted by list
+                </button>
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-third">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="OtherSubmittedAreaDisplay">Submitted area (external)</label>
+                <select class="govuk-select" id="OtherSubmittedAreaDisplay" disabled>
+                    <option value="">-- None --</option>
+                    @foreach (var a in Model.UserAreas)
+                    {
+                        <option value="@a.ID" selected="@(Model.OtherSubmittedArea == a.ID.ToString())">@a.Name</option>
+                    }
+                </select>
+                <input type="hidden" asp-for="OtherSubmittedArea" />
+            </div>
+        </div>
+    </div>
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-two-thirds">
+            @* Project / contract code *@
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="ProjectContractCode">Project / contract code</label>
+                <select class="govuk-select app-select-stack" asp-for="ProjectContractCode">
+                    <option value="">-- Not specified --</option>
+                    @foreach (var p in Model.Projects)
+                    {
+                        <option value="@p.ID" selected="@(Model.ProjectContractCode == p.ID.ToString())">@p.Name</option>
+                    }
+                </select>
+                @* Replaces legacy btnNewProject — opens the Projects pick list (LOOKUP_PROJECTS = 19). *@
+                <button type="submit" asp-page-handler="ManagePickList" name="field" value="project" formnovalidate
+                        class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+                    Manage project / contract codes
+                </button>
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-third">
+            @* Submission date *@
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="BatchDateStr">Date of submission</label>
+                @{
+                    var batchDateIso = DateTime.TryParseExact(Model.BatchDateStr, ["dd/MM/yyyy", "d/M/yyyy", "yyyy-MM-dd"],
+                        System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var parsedBatchDate)
+                        ? parsedBatchDate.ToString("yyyy-MM-dd")
+                        : null;
+                }
+                <input class="govuk-input govuk-input--width-10" type="date" id="BatchDateStr" name="BatchDateStr"
+                       value="@batchDateIso" autocomplete="off" />
+            </div>
+        </div>
+    </div>
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-two-thirds">
+            @* Pathologist *@
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="ContactName">Pathologist</label>
+                <select class="govuk-select app-select-stack" asp-for="ContactName">
+                    <option value="">-- Not specified --</option>
+                    @foreach (var c in Model.Contacts)
+                    {
+                        <option value="@c.ID" selected="@(Model.ContactName == c.ID.ToString())">@c.Name</option>
+                    }
+                </select>
+                @* Replaces legacy btnNewContact — opens the Contacts pick list (LOOKUP_CONTACTS = 18). *@
+                <button type="submit" asp-page-handler="ManagePickList" name="field" value="pathologist" formnovalidate
+                        class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" data-module="govuk-button">
+                    Manage pathologists
+                </button>
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-third">
+            @* Fixation *@
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="Fixation">Fixation</label>
+                <select class="govuk-select" asp-for="Fixation">
+                    <option value="">-- Not specified --</option>
+                    @foreach (var f in Model.Fixations)
+                    {
+                        <option value="@(f.Code ?? f.ID.ToString())" selected="@(Model.Fixation == (f.Code ?? f.ID.ToString()))">@f.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-two-thirds">
+            @* Species *@
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="SpeciesId">Species</label>
+                <select class="govuk-select app-select-stack" asp-for="SpeciesId">
+                    <option value="">-- Not specified --</option>
+                    @foreach (var s in Model.SpeciesList)
+                    {
+                        <option value="@s.ID" selected="@(Model.SpeciesId == s.ID.ToString())">@s.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-third">
+            @* Is it adequately fixed? — legacy ddlSafeToHandle (Yes/No dropdown), migrated to
+               GDS radios: a native select isn't recommended for a binary choice. *@
+            <div class="govuk-form-group">
+                <fieldset class="govuk-fieldset">
+                    <legend class="govuk-fieldset__legend">Is it adequately fixed?</legend>
+                    <div class="govuk-radios govuk-radios--inline" data-module="govuk-radios">
+                        <div class="govuk-radios__item">
+                            <input class="govuk-radios__input" type="radio" id="SafeToHandle" name="SafeToHandle" value="true" checked="@(Model.SafeToHandle == true)" />
+                            <label class="govuk-label govuk-radios__label" for="SafeToHandle">Yes</label>
+                        </div>
+                        <div class="govuk-radios__item">
+                            <input class="govuk-radios__input" type="radio" id="SafeToHandle-no" name="SafeToHandle" value="false" checked="@(Model.SafeToHandle == false)" />
+                            <label class="govuk-label govuk-radios__label" for="SafeToHandle-no">No</label>
+                        </div>
+                    </div>
+                </fieldset>
+            </div>
+        </div>
+    </div>
+
+    @* Histology, antibodies and special stains — merged from the former EditBatchTests page for a
+       consistent editing experience with Create Submission. *@
+
+    @* Selected test types — mirrors the read-only tag summary on BatchDetails.cshtml (view mode),
+       kept in sync with the checkboxes below via JS as the user ticks/unticks them. *@
+    <div class="govuk-form-group">
+        <h2 class="govuk-heading-s govuk-!-margin-bottom-2">Selected test types</h2>
+        <dl class="govuk-summary-list govuk-summary-list--no-border">
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">Histology</dt>
+                <dd class="govuk-summary-list__value" id="selected-histology-tags">
+                    @if (Model.SelectedHistologyCodes.Count == 0)
+                    {
+                        <span class="govuk-hint">None selected</span>
+                    }
+                    else
+                    {
+                        foreach (var code in Model.SelectedHistologyCodes)
+                        {
+                            var name = Model.HistologyOptions.FirstOrDefault(o => (o.Code ?? o.ID.ToString()) == code)?.Name ?? code;
+                            <strong class="govuk-tag govuk-tag--blue govuk-!-margin-right-1">@name</strong>
+                        }
+                    }
+                </dd>
+            </div>
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">Antibodies</dt>
+                <dd class="govuk-summary-list__value" id="selected-antibody-tags">
+                    @if (Model.SelectedAntibodyCodes.Count == 0)
+                    {
+                        <span class="govuk-hint">None selected</span>
+                    }
+                    else
+                    {
+                        foreach (var code in Model.SelectedAntibodyCodes)
+                        {
+                            var name = Model.AntibodyOptions.FirstOrDefault(o => (o.Code ?? o.ID.ToString()) == code)?.Name ?? code;
+                            <strong class="govuk-tag govuk-tag--purple govuk-!-margin-right-1">@name</strong>
+                        }
+                    }
+                </dd>
+            </div>
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">Special stains</dt>
+                <dd class="govuk-summary-list__value" id="selected-stain-tags">
+                    @if (Model.SelectedStainCodes.Count == 0)
+                    {
+                        <span class="govuk-hint">None selected</span>
+                    }
+                    else
+                    {
+                        foreach (var code in Model.SelectedStainCodes)
+                        {
+                            var name = Model.StainOptions.FirstOrDefault(o => (o.Code ?? o.ID.ToString()) == code)?.Name ?? code;
+                            <strong class="govuk-tag govuk-tag--green govuk-!-margin-right-1">@name</strong>
+                        }
+                    }
+                </dd>
+            </div>
+        </dl>
+    </div>
+
+    @* ── Histology, antibody and stain checkboxes — mirrors the Create submission 3-column layout ── *@
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-third">
+            <div class="govuk-form-group @(Model.SaveError != null && Model.SelectedHistologyCodes.Count == 0 ? "govuk-form-group--error" : "")">
+                <fieldset class="govuk-fieldset">
+                    <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Histology</legend>
+                    <div class="govuk-hint">Select at least one histology type.</div>
+                    <div class="govuk-checkboxes" data-module="govuk-checkboxes" id="edit-histology-checkboxes">
+                        @foreach (var item in Model.HistologyOptions)
+                        {
+                            var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
+                            var checkboxId = $"edit-histology-{code}";
+                            <div class="govuk-checkboxes__item">
+                                <input class="govuk-checkboxes__input" id="@checkboxId" name="SelectedHistologyCodes"
+                                       type="checkbox" value="@code" data-histology-code="@code"
+                                       @(Model.SelectedHistologyCodes.Contains(code) ? "checked" : "") />
+                                <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+                            </div>
+                        }
+                    </div>
+                </fieldset>
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-third">
+            <div class="govuk-form-group" id="edit-antibodies-section" style="@(Model.ShowAntibodies ? "" : "display:none")">
+                <fieldset class="govuk-fieldset">
+                    <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Antibodies</legend>
+                    <div class="govuk-hint">Required when IHC is selected above.</div>
+                    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                        @foreach (var item in Model.AntibodyOptions)
+                        {
+                            var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
+                            var checkboxId = $"edit-antibody-{code}";
+                            <div class="govuk-checkboxes__item">
+                                <input class="govuk-checkboxes__input" id="@checkboxId" name="SelectedAntibodyCodes"
+                                       type="checkbox" value="@code"
+                                       @(Model.SelectedAntibodyCodes.Contains(code) ? "checked" : "") />
+                                <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+                            </div>
+                        }
+                    </div>
+                </fieldset>
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-third">
+            <div class="govuk-form-group" id="edit-stains-section" style="@(Model.ShowStains ? "" : "display:none")">
+                <fieldset class="govuk-fieldset">
+                    <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Special stains</legend>
+                    <div class="govuk-hint">Required when Special Stain is selected above.</div>
+                    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                        @foreach (var item in Model.StainOptions)
+                        {
+                            var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
+                            var checkboxId = $"edit-stain-{code}";
+                            <div class="govuk-checkboxes__item">
+                                <input class="govuk-checkboxes__input" id="@checkboxId" name="SelectedStainCodes"
+                                       type="checkbox" value="@code"
+                                       @(Model.SelectedStainCodes.Contains(code) ? "checked" : "") />
+                                <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+                            </div>
+                        }
+                    </div>
+                </fieldset>
+            </div>
+        </div>
+    </div>
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Comments">Comments</label>
+        <textarea class="govuk-textarea" asp-for="Comments" rows="4"></textarea>
+    </div>
+
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
+        <a href="@Model.ReturnUrl" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        @* "Samples" — this page only edits submission header fields; sample/animal/block details
+           (Add sample, Edit sample, Copy sample, Delete sample) are on SampleSummary, matching
+           the same "Samples" entry point already used from BatchDetails.cshtml. *@
+        <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples</a>
+    </div>
+</form>
+
+@* Show/hide antibody and stain sections when histology checkboxes change; Archive is mutually
+   exclusive with all other histology types. Also keeps the "Selected test types" tag summary
+   above in sync with every checkbox tick/untick. *@
+<script>
+(function () {
+    var archiveCode = '@Histo.Submissions.Models.HistologyCode.Archive';
+    var ihcCodes     = ['@Histo.Submissions.Models.HistologyCode.IhcPrp', '@Histo.Submissions.Models.HistologyCode.IhcOther'];
+    var stainCode    = '@Histo.Submissions.Models.HistologyCode.SpecialStain';
+    var checkboxes   = document.querySelectorAll('#edit-histology-checkboxes input[type=checkbox]');
+    var antibodyCheckboxes = document.querySelectorAll('#edit-antibodies-section input[type=checkbox]');
+    var stainCheckboxes    = document.querySelectorAll('#edit-stains-section input[type=checkbox]');
+
+    function enforceArchiveExclusivity(changed) {
+        if (changed.value === archiveCode && changed.checked) {
+            checkboxes.forEach(function (cb) { if (cb !== changed) cb.checked = false; });
+        } else if (changed.value !== archiveCode && changed.checked) {
+            checkboxes.forEach(function (cb) { if (cb.value === archiveCode) cb.checked = false; });
+        }
+    }
+
+    function syncTestSections() {
+        var codes = Array.from(checkboxes).filter(function (cb) { return cb.checked; }).map(function (cb) { return cb.value; });
+        var showAntibodies = codes.some(function (c) { return ihcCodes.indexOf(c) >= 0; });
+        var showStains = codes.indexOf(stainCode) >= 0;
+
+        document.getElementById('edit-antibodies-section').style.display = showAntibodies ? '' : 'none';
+        // Hidden checkboxes are still real form fields — clear them so a deselected IHC type
+        // doesn't leave stale antibody codes checked (submitted on Save, and still shown above).
+        if (!showAntibodies) antibodyCheckboxes.forEach(function (cb) { cb.checked = false; });
+
+        document.getElementById('edit-stains-section').style.display = showStains ? '' : 'none';
+        if (!showStains) stainCheckboxes.forEach(function (cb) { cb.checked = false; });
+    }
+
+    function renderTags(container, checkedBoxes) {
+        container.innerHTML = '';
+        if (checkedBoxes.length === 0) {
+            var hint = document.createElement('span');
+            hint.className = 'govuk-hint';
+            hint.textContent = 'None selected';
+            container.appendChild(hint);
+            return;
+        }
+        checkedBoxes.forEach(function (cb) {
+            var tag = document.createElement('strong');
+            tag.className = container.dataset.tagClass + ' govuk-!-margin-right-1';
+            tag.textContent = cb.nextElementSibling.textContent;
+            container.appendChild(tag);
+        });
+    }
+
+    function syncSelectedTags() {
+        renderTags(document.getElementById('selected-histology-tags'), Array.from(checkboxes).filter(function (cb) { return cb.checked; }));
+        renderTags(document.getElementById('selected-antibody-tags'), Array.from(antibodyCheckboxes).filter(function (cb) { return cb.checked; }));
+        renderTags(document.getElementById('selected-stain-tags'), Array.from(stainCheckboxes).filter(function (cb) { return cb.checked; }));
+    }
+
+    document.getElementById('selected-histology-tags').dataset.tagClass = 'govuk-tag govuk-tag--blue';
+    document.getElementById('selected-antibody-tags').dataset.tagClass = 'govuk-tag govuk-tag--purple';
+    document.getElementById('selected-stain-tags').dataset.tagClass = 'govuk-tag govuk-tag--green';
+
+    document.getElementById('edit-histology-checkboxes').addEventListener('change', function (e) {
+        enforceArchiveExclusivity(e.target);
+        syncTestSections();
+        syncSelectedTags();
+    });
+    document.getElementById('edit-antibodies-section').addEventListener('change', syncSelectedTags);
+    document.getElementById('edit-stains-section').addEventListener('change', syncSelectedTags);
+})();
+</script>

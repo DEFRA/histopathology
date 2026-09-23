@@ -1,0 +1,202 @@
+@page
+@model Histo.Web.Pages.Batches.BatchBlocksModel
+@{
+    ViewData["Title"] = "Blocks";
+    ViewData["PageTitle"] = "Blocks";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Batches/BatchDetails" asp-route-BatchId="@Model.BatchId" class="govuk-back-link">Back</a>
+}
+
+@* Batch-wide overview — replaces legacy's BatchBlocks.aspx. Reached only from BatchDetails'
+   "Assign blocks" button; each row's Select checkbox drives the Edit sample/Delete sample/
+   Copy selected blocks actions below the grid, matching legacy's single-select grid + action
+   button row (Add Sample/Edit Sample/Delete Sample/Copy From Prev. Submission/Cancel/Done). *@
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list"><li>@Model.ErrorMessage</li></ul>
+            </div>
+        </div>
+    </div>
+}
+
+@if (Model.ConfirmDeleteAnimalId is int confirmAnimalId and > 0)
+{
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <strong class="govuk-warning-text__text">
+            <span class="govuk-visually-hidden">Warning</span>
+            Are you sure you want to delete sample @(Model.SenderRefsByAnimalId.GetValueOrDefault(confirmAnimalId, "this sample"))? This will remove all of its blocks.
+        </strong>
+    </div>
+    <form method="post" asp-page-handler="DeleteSample" class="govuk-!-display-inline">
+        <input type="hidden" name="animalId" value="@confirmAnimalId" />
+        <input type="hidden" asp-for="BatchId" />
+        <button type="submit" class="govuk-button govuk-button--warning" data-module="govuk-button">Yes, delete sample</button>
+        <a asp-page="/Batches/BatchBlocks" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    </form>
+}
+
+<form method="post" asp-page="/Batches/BatchBlocks">
+    <input type="hidden" asp-for="BatchId" />
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Select</th>
+                <th scope="col" class="govuk-table__header">Sender ref</th>
+                <th scope="col" class="govuk-table__header">Histology ref</th>
+                <th scope="col" class="govuk-table__header">Block ref</th>
+                <th scope="col" class="govuk-table__header">Tissue details</th>
+                <th scope="col" class="govuk-table__header">Archive</th>
+                <th scope="col" class="govuk-table__header">EO</th>
+                <th scope="col" class="govuk-table__header">H&amp;E</th>
+                @if (Model.IsTse)
+                {
+                    <th scope="col" class="govuk-table__header">H&amp;E (BSE)</th>
+                    <th scope="col" class="govuk-table__header">IHC Prp</th>
+                }
+                else
+                {
+                    <th scope="col" class="govuk-table__header">IHC Other</th>
+                }
+                <th scope="col" class="govuk-table__header">Special stain</th>
+                <th scope="col" class="govuk-table__header">Status</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var b in Model.Blocks)
+            {
+                var blockTissues = Model.TissuesByBlockId.TryGetValue(b.ID, out var bt) ? bt : (IReadOnlyList<Histo.Submissions.Models.Tissue>)[];
+                var histCodes = Model.HistologyCodesByBlockId.GetValueOrDefault(b.ID, []);
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" type="checkbox" name="blockIds" value="@b.ID" />
+                            <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">Select block @b.BlockRef</span></label>
+                        </div>
+                    </td>
+                    <td class="govuk-table__cell">@Model.SenderRefsByAnimalId.GetValueOrDefault(b.AnimalID, "—")</td>
+                    <td class="govuk-table__cell">@(Model.HistologyRefsByAnimalId.GetValueOrDefault(b.AnimalID) ?? "—")</td>
+                    <td class="govuk-table__cell">@b.BlockRef</td>
+                    <td class="govuk-table__cell">
+                        @if (blockTissues.Any())
+                        {
+                            <details class="govuk-details govuk-!-margin-bottom-0">
+                                <summary class="govuk-details__summary">
+                                    <span class="govuk-details__summary-text">@blockTissues.Count tissue(s)</span>
+                                </summary>
+                                <div class="govuk-details__text">
+                                    <ul class="govuk-list">
+                                        @foreach (var t in blockTissues)
+                                        {
+                                            <li>@t.NoPieces x @Model.TissueName(t.TissueCode)</li>
+                                        }
+                                    </ul>
+                                </div>
+                            </details>
+                        }
+                        else
+                        {
+                            <span>None</span>
+                        }
+                    </td>
+                    <td class="govuk-table__cell">
+                        <div class="govuk-checkboxes govuk-checkboxes--small">
+                            <div class="govuk-checkboxes__item">
+                                <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.Archive)" />
+                                <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">Archived</span></label>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="govuk-table__cell">
+                        <div class="govuk-checkboxes govuk-checkboxes--small">
+                            <div class="govuk-checkboxes__item">
+                                <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.EO)" />
+                                <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">EO</span></label>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="govuk-table__cell">
+                        <div class="govuk-checkboxes govuk-checkboxes--small">
+                            <div class="govuk-checkboxes__item">
+                                <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.HAndE)" />
+                                <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">H&amp;E</span></label>
+                            </div>
+                        </div>
+                    </td>
+                    @if (Model.IsTse)
+                    {
+                        <td class="govuk-table__cell">
+                            <div class="govuk-checkboxes govuk-checkboxes--small">
+                                <div class="govuk-checkboxes__item">
+                                    <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.HeBse)" />
+                                    <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">H&amp;E (BSE)</span></label>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="govuk-table__cell">
+                            <div class="govuk-checkboxes govuk-checkboxes--small">
+                                <div class="govuk-checkboxes__item">
+                                    <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcPrp)" />
+                                    <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">IHC Prp</span></label>
+                                </div>
+                            </div>
+                        </td>
+                    }
+                    else
+                    {
+                        <td class="govuk-table__cell">
+                            <div class="govuk-checkboxes govuk-checkboxes--small">
+                                <div class="govuk-checkboxes__item">
+                                    <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcOther)" />
+                                    <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">IHC Other</span></label>
+                                </div>
+                            </div>
+                        </td>
+                    }
+                    <td class="govuk-table__cell">
+                        <div class="govuk-checkboxes govuk-checkboxes--small">
+                            <div class="govuk-checkboxes__item">
+                                <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.SpecialStain)" />
+                                <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">Special stain</span></label>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="govuk-table__cell">@b.Status</td>
+                </tr>
+            }
+            @if (!Model.Blocks.Any())
+            {
+                <tr class="govuk-table__row"><td colspan="@(Model.IsTse ? 12 : 11)" class="govuk-table__cell">No blocks found for this batch.</td></tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="govuk-button-group">
+        @if (!Model.IsViewMode)
+        {
+            <a asp-page="/Submissions/AddSubmission" asp-route-BatchId="@Model.BatchId" class="govuk-button" data-module="govuk-button">Add sample</a>
+            <button type="submit" formaction="?handler=EditSampleSelect" class="govuk-button govuk-button--secondary" data-module="govuk-button">Edit sample</button>
+            <button type="submit" formaction="?handler=DeleteSampleSelect" class="govuk-button govuk-button--warning" data-module="govuk-button">Delete sample</button>
+        }
+        @* Legacy "Copy From Prev. Submission" — copies samples/blocks from a DIFFERENT, earlier
+           submission into this one. Named distinctly from SampleSummary's "Copy sample" (which
+           duplicates one sample's own tissue list to a new sample within THIS submission) so the
+           two aren't confused regardless of which journey led here. *@
+        <a asp-page="/Blocks/CopySamples" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy from a previous submission</a>
+        @if (Model.Blocks.Any() && !Model.IsViewMode)
+        {
+            <button type="submit" formaction="?handler=Copy" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy selected blocks</button>
+        }
+        @if (!Model.IsViewMode)
+        {
+            <button type="submit" formaction="?handler=Done" class="govuk-button" data-module="govuk-button">Done</button>
+        }
+    </div>
+</form>

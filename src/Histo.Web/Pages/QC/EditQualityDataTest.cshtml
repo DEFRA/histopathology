@@ -1,0 +1,231 @@
+@page "{TestId:int}"
+@model Histo.Web.Pages.QC.EditQualityDataTestModel
+@{
+    ViewData["Title"] = "Edit quality data test";
+    ViewData["PageTitle"] = "Edit quality data test";
+}
+
+@section BeforeHeading {
+    <a asp-page="/QC/QualityData" class="govuk-back-link">Back</a>
+}
+
+<partial name="_ErrorSummary" model="Model.Errors" />
+
+@if (!string.IsNullOrEmpty(Model.ConcurrencyError))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.ConcurrencyError</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+<p class="govuk-body">
+    <strong>Histology ref:</strong> @Model.Test?.HistologyRef —
+    <strong>Block ref:</strong> @Model.Test?.BlockRef —
+    <strong>Test:</strong> @(Model.Test?.TestDetails ?? Model.Test?.Code)
+</p>
+
+<form method="post" asp-page="/QC/EditQualityDataTest">
+    <input type="hidden" asp-for="TestId" />
+
+    <div class="govuk-form-group">
+        <fieldset class="govuk-fieldset">
+            <legend class="govuk-fieldset__legend">Test result</legend>
+            <div class="govuk-radios" data-module="govuk-radios">
+                <div class="govuk-radios__item">
+                    <input class="govuk-radios__input" type="radio" asp-for="Result" id="ResultPassed"
+                           value="@Histo.Histology.Models.BlockTestResult.Passed"
+                           data-aria-controls="conditional-qc-note">
+                    <label class="govuk-label govuk-radios__label" for="ResultPassed">Passed</label>
+                </div>
+                <div class="govuk-radios__conditional govuk-radios__conditional--hidden" id="conditional-qc-note">
+                    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" type="checkbox" asp-for="QCNote" id="QCNote">
+                            <label class="govuk-label govuk-checkboxes__label" for="QCNote">Raise a QC note</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="govuk-radios__item">
+                    <input class="govuk-radios__input" type="radio" asp-for="Result" id="ResultFailed" value="@Histo.Histology.Models.BlockTestResult.Failed">
+                    <label class="govuk-label govuk-radios__label" for="ResultFailed">Failed</label>
+                </div>
+                <div class="govuk-radios__item">
+                    <input class="govuk-radios__input" type="radio" asp-for="Result" id="ResultNotTested" value="">
+                    <label class="govuk-label govuk-radios__label" for="ResultNotTested">Not tested</label>
+                </div>
+            </div>
+        </fieldset>
+    </div>
+
+    <div class="govuk-form-group">
+        <p class="govuk-body govuk-!-margin-bottom-1"><strong>QC note ref:</strong>
+            @if (Model.Test?.QCNoteRef is > 0)
+            {
+                <a asp-page="/Reports/QCNote" asp-route-qcNoteRef="@Model.Test.QCNoteRef" class="govuk-link">@Model.Test.QCNoteRef</a>
+            }
+            else
+            {
+                <span>None</span>
+            }
+        </p>
+    </div>
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="StainRef">Stain ref</label>
+        <input class="govuk-input govuk-input--width-20" asp-for="StainRef" maxlength="20" />
+    </div>
+
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("QCCode") ? "govuk-form-group--error" : "")">
+        <label class="govuk-label" for="QCCode">QC code</label>
+        @if (Model.Errors.TryGetValue("QCCode", out var qcCodeErr))
+        {
+            <p id="QCCode-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @qcCodeErr</p>
+        }
+        <select class="govuk-select @(Model.Errors.ContainsKey("QCCode") ? "govuk-select--error" : "")" asp-for="QCCode"
+                aria-describedby="@(Model.Errors.ContainsKey("QCCode") ? "QCCode-error" : null)">
+            <option value="">Select</option>
+            @foreach (var c in Model.QCCodes)
+            {
+                <option value="@(c.Code ?? c.Name)">@c.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("RemedialAction") ? "govuk-form-group--error" : "")">
+        <label class="govuk-label" for="RemedialAction">Remedial action</label>
+        @if (Model.Errors.TryGetValue("RemedialAction", out var remedialErr))
+        {
+            <p id="RemedialAction-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @remedialErr</p>
+        }
+        <select class="govuk-select @(Model.Errors.ContainsKey("RemedialAction") ? "govuk-select--error" : "")" asp-for="RemedialAction"
+                aria-describedby="@(Model.Errors.ContainsKey("RemedialAction") ? "RemedialAction-error" : null)">
+            <option value="">Select</option>
+            @foreach (var r in Model.RemedialActions)
+            {
+                <option value="@(r.Code ?? r.Name)">@r.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="govuk-form-group">
+        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" type="checkbox" asp-for="Dispatched" id="Dispatched"
+                       data-aria-controls="conditional-dispatched">
+                <label class="govuk-label govuk-checkboxes__label" for="Dispatched">Dispatched</label>
+            </div>
+            <div class="govuk-checkboxes__conditional govuk-checkboxes__conditional--hidden" id="conditional-dispatched">
+                <div class="govuk-form-group govuk-!-margin-top-4 @(Model.Errors.ContainsKey("DispatchedDate") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="DispatchedDate">Dispatched date</label>
+                    @if (Model.Errors.TryGetValue("DispatchedDate", out var dispatchedDateErr))
+                    {
+                        <p id="DispatchedDate-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @dispatchedDateErr</p>
+                    }
+                    <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("DispatchedDate") ? "govuk-input--error" : "")" type="date" asp-for="DispatchedDate"
+                           aria-describedby="@(Model.Errors.ContainsKey("DispatchedDate") ? "DispatchedDate-error" : null)" />
+                </div>
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("DispatchedBy") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="DispatchedBy">Dispatched by</label>
+                    @if (Model.Errors.TryGetValue("DispatchedBy", out var dispatchedByErr))
+                    {
+                        <p id="DispatchedBy-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @dispatchedByErr</p>
+                    }
+                    <select class="govuk-select @(Model.Errors.ContainsKey("DispatchedBy") ? "govuk-select--error" : "")" asp-for="DispatchedBy"
+                            aria-describedby="@(Model.Errors.ContainsKey("DispatchedBy") ? "DispatchedBy-error" : null)">
+                        <option value="">Select</option>
+                        @foreach (var u in Model.Users)
+                        {
+                            <option value="@u.UserID">@u.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("DispatchedTo") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="DispatchedTo">Dispatched to</label>
+                    @if (Model.Errors.TryGetValue("DispatchedTo", out var dispatchedToErr))
+                    {
+                        <p id="DispatchedTo-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @dispatchedToErr</p>
+                    }
+                    <input class="govuk-input govuk-input--width-30 @(Model.Errors.ContainsKey("DispatchedTo") ? "govuk-input--error" : "")" asp-for="DispatchedTo" maxlength="30"
+                           aria-describedby="@(Model.Errors.ContainsKey("DispatchedTo") ? "DispatchedTo-error" : null)" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("ArchiveLocation") ? "govuk-form-group--error" : "")">
+        <label class="govuk-label" for="ArchiveLocation">Archive location</label>
+        @if (Model.Errors.TryGetValue("ArchiveLocation", out var archiveLocationErr))
+        {
+            <p id="ArchiveLocation-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @archiveLocationErr</p>
+        }
+        <select class="govuk-select @(Model.Errors.ContainsKey("ArchiveLocation") ? "govuk-select--error" : "")" asp-for="ArchiveLocation"
+                aria-describedby="@(Model.Errors.ContainsKey("ArchiveLocation") ? "ArchiveLocation-error" : null)">
+            <option value="">Select</option>
+            @foreach (var a in Model.ArchiveLocations)
+            {
+                <option value="@(a.Code ?? a.Name)">@a.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="govuk-form-group @(Model.Errors.ContainsKey("ArchivedDate") ? "govuk-form-group--error" : "")">
+        <label class="govuk-label" for="ArchivedDate">Archive date</label>
+        @if (Model.Errors.TryGetValue("ArchivedDate", out var archivedDateErr))
+        {
+            <p id="ArchivedDate-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @archivedDateErr</p>
+        }
+        <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("ArchivedDate") ? "govuk-input--error" : "")" type="date" asp-for="ArchivedDate"
+               aria-describedby="@(Model.Errors.ContainsKey("ArchivedDate") ? "ArchivedDate-error" : null)" />
+    </div>
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="ArchiveComment">Archive comment</label>
+        <textarea class="govuk-textarea" asp-for="ArchiveComment" rows="2" maxlength="200"></textarea>
+    </div>
+
+    @if (Model.PremiumCharges.Any())
+    {
+        <div class="govuk-form-group">
+            <fieldset class="govuk-fieldset">
+                <legend class="govuk-fieldset__legend">Charges</legend>
+                <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                    @foreach (var charge in Model.PremiumCharges)
+                    {
+                        var chargeCode = charge.Code ?? charge.Name;
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input"
+                                   type="checkbox"
+                                   name="SelectedCharges"
+                                   value="@chargeCode"
+                                   id="charge-@chargeCode"
+                                   @(Model.SelectedCharges.Contains(chargeCode) ? "checked" : "")>
+                            <label class="govuk-label govuk-checkboxes__label" for="charge-@chargeCode">@charge.Name</label>
+                        </div>
+                    }
+                </div>
+            </fieldset>
+        </div>
+    }
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="NumberOfSlides">Number of blocks/slides</label>
+        <input class="govuk-input govuk-input--width-5" type="number" min="1" max="9999" asp-for="NumberOfSlides" />
+    </div>
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Comment">Comments</label>
+        <textarea class="govuk-textarea" asp-for="Comment" rows="4" maxlength="2000"></textarea>
+    </div>
+
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
+        <a asp-page="/QC/QualityData" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    </div>
+</form>
