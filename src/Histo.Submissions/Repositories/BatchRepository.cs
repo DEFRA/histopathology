@@ -686,4 +686,37 @@ public sealed class BatchRepository : IBatchRepository
         var rows = await multi.ReadAsync<BatchTestSelectionRow>();
         return rows.ToList();
     }
+
+    /// <inheritdoc/>
+    public async Task CompleteBlockAssignmentAsync(int batchId, bool allTissuesAssigned, int userId, CancellationToken ct = default)
+    {
+        // TODO: Implement block completion and status transition to InProgress.
+        // Legacy: BatchSummary.aspx.vb::btSubmit_Click sets IsBlocked=True and status to InProgress.
+        // Stub: currently a no-op pending clarification of exact stored procedure contract.
+        await Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<Models.TestPremiumChargeCount>> GetTestPremiumChargeCountsAsync(
+        string? projectDesc, int batchType,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        DateTime? startDate = null, DateTime? endDate = null,
+        CancellationToken ct = default)
+    {
+        // TODO: Implement premium-charge analytics from SearchTest legacy screen.
+        // Stub: returns empty list pending full analytics engine porting.
+        return await Task.FromResult<IReadOnlyList<Models.TestPremiumChargeCount>>([]);
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<Models.TestPremiumChargeBatchRef>> GetTestPremiumChargeBatchesAsync(
+        string? projectDesc, int batchType,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        DateTime? startDate = null, DateTime? endDate = null,
+        CancellationToken ct = default)
+    {
+        // TODO: Implement premium-charge batch listing from SearchTest legacy screen.
+        // Stub: returns empty list pending full analytics engine porting.
+        return await Task.FromResult<IReadOnlyList<Models.TestPremiumChargeBatchRef>>([]);
+    }
 }

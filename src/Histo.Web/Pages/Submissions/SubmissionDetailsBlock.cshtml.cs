@@ -92,12 +92,16 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     public Batch? Batch { get; private set; }
     public IReadOnlyList<Block> Blocks { get; private set; } = [];
     public IReadOnlyList<BlockRefRangeHelpers.BlockRefRangeRow> UsedBlockRefResults { get; private set; } = [];
+    public BatchTestSelections? BatchTestSelections { get; private set; }
 
     /// <summary>True for pre-cassetted submissions, where the block ref must come from the pre-booked list and histology ref is mandatory.</summary>
     public bool IsPreCassetted => Batch?.IsPreCassetted == true;
 
     /// <summary>True for TSE submissions — shows H&amp;E (BSE)/IHC Prp grid columns instead of IHC Other, matching legacy HideColumns.</summary>
     public bool IsTse => Batch?.BatchType != BatchTypeConstants.NonTse;
+
+    /// <summary>True when at least one batch-level test type (histology, antibodies, or stains) has been selected.</summary>
+    public bool ShowTestDetails => BatchTestSelections?.HasAny == true;
 
     public IReadOnlyDictionary<int, IReadOnlyList<Tissue>> TissuesByBlockId { get; private set; } =
         new Dictionary<int, IReadOnlyList<Tissue>>();
@@ -461,10 +465,11 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         return null;
     }
 
-    /// <summary>Loads the batch (for the pre-cassetted flag), per-block tissues, the tissue-code lookup, and per-block Histology test-selection indicators.</summary>
+    /// <summary>Loads the batch (for the pre-cassetted flag), per-block tissues, the tissue-code lookup, per-block Histology test-selection indicators, and batch-level test selections.</summary>
     private async Task LoadSupportingDataAsync()
     {
         Batch = await _batches.GetByIdAsync(BatchId ?? 0);
+        BatchTestSelections = await _batches.GetBatchTestSelectionsAsync(BatchId ?? 0);
         TissueOptions = await _lookups.GetLookupDataAsync(LookupTissueCode);
 
         var allTissues = await _submissions.GetTissuesByBatchAsync(BatchId ?? 0);

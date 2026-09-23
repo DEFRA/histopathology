@@ -280,14 +280,19 @@ public class SampleSummaryModel : HistoPageModel
         // jump it straight to In Progress before Histopathology has even received it.
         var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId.Value);
         var isWetTissue = ValidationHelpers.IsWetTissueDescription(await ResolveSubmittedAsDescriptionAsync(submittedAsCode));
+
+        // Legacy flow continues to the printable confirmation page after finishing a submission,
+        // with the follow-up return target kept as the awaiting-receipt list.
+        Session.ReturnPage = "/Batches/BatchesNotReceived";
+
         if (isWetTissue)
-            return RedirectToPage("/Batches/BatchesNotReceived");
+            return RedirectToPage("/Batches/PrintSubmission");
 
         var blocks = await _blocks.GetByBatchAsync(batchId.Value);
         var allTissuesAssigned = animals.All(a => blocks.Any(b => b.AnimalID == a.ID));
 
         await _batches.CompleteBlockAssignmentAsync(batchId.Value, allTissuesAssigned, Session.UserID);
-        return RedirectToPage("/Batches/BatchesNotReceived");
+        return RedirectToPage("/Batches/PrintSubmission");
     }
 
     /// <summary>

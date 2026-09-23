@@ -216,4 +216,31 @@ public interface IBatchRepository
     /// Legacy source: <c>HistopathologyLib/clsCheckBoxData.vb</c> — table type 4 (BATCH_POSTFIXATION_TABLE).
     /// </summary>
     Task SavePostFixationCodesAsync(int batchId, IReadOnlyList<string> codes, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Marks a batch as having all tissues assigned and transitions status to InProgress.
+    /// Updates the AllTissuesAssigned flag and batch status.
+    /// Legacy source: <c>BatchSummary.aspx.vb::btSubmit_Click</c>.
+    /// </summary>
+    Task CompleteBlockAssignmentAsync(int batchId, bool allTissuesAssigned, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns premium/TC charge test counts aggregated by charge type for a project/date range.
+    /// Legacy source: <c>SearchTest.aspx.vb</c> — premium-charge analytics engine (not fully ported).
+    /// </summary>
+    Task<IReadOnlyList<TestPremiumChargeCount>> GetTestPremiumChargeCountsAsync(
+        string? projectDesc, int batchType,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        DateTime? startDate = null, DateTime? endDate = null,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns premium/TC charge test rows by batch reference for a project/date range.
+    /// Legacy source: <c>SearchTest.aspx.vb</c> — premium-charge analytics engine (not fully ported).
+    /// </summary>
+    Task<IReadOnlyList<TestPremiumChargeBatchRef>> GetTestPremiumChargeBatchesAsync(
+        string? projectDesc, int batchType,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        DateTime? startDate = null, DateTime? endDate = null,
+        CancellationToken ct = default);
 }
