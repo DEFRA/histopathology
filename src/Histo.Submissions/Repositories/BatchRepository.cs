@@ -696,10 +696,47 @@ public sealed class BatchRepository : IBatchRepository
     /// <inheritdoc/>
     public async Task CompleteBlockAssignmentAsync(int batchId, bool allTissuesAssigned, int userId, CancellationToken ct = default)
     {
-        // TODO: Implement block completion and status transition to InProgress.
-        // Legacy: BatchSummary.aspx.vb::btSubmit_Click sets IsBlocked=True and status to InProgress.
-        // Stub: currently a no-op pending clarification of exact stored procedure contract.
-        await Task.CompletedTask;
+        var existing = await GetByIdAsync(batchId, ct);
+        if (existing is null) return;
+
+        // Legacy: BatchBlocks.aspx.vb::btSubmit_Click and BatchSummary.aspx.vb::btSubmit_Click
+        // both persist a blocked/in-progress state together with the all-tissues-assigned flag.
+        // This is the real transition, not the generic EditBatchStatus path, which never updates
+        // those fields and therefore cannot advance the batch to the correct workflow state.
+        var updated = new Batch
+        {
+            ID = existing.ID,
+            Status = BatchStatus.InProgress,
+            Comments = existing.Comments,
+            StatusComments = existing.StatusComments,
+            BatchDate = existing.BatchDate,
+            ReceivedDate = existing.ReceivedDate,
+            CompletedDate = existing.CompletedDate,
+            SubmittedByUserID = existing.SubmittedByUserID,
+            UserAreaCode = existing.UserAreaCode,
+            IsPreCassetted = existing.IsPreCassetted,
+            ByPassSort = existing.ByPassSort,
+            RowStamp = existing.RowStamp,
+            BatchType = existing.BatchType,
+            ProjectContractCode = existing.ProjectContractCode,
+            ContactName = existing.ContactName,
+            Species = existing.Species,
+            Fixation = existing.Fixation,
+            CustomerReceivedDate = existing.CustomerReceivedDate,
+            SubmittedBy = existing.SubmittedBy,
+            SubmittedArea = existing.SubmittedArea,
+            OtherSubmittedBy = existing.OtherSubmittedBy,
+            OtherSubmittedArea = existing.OtherSubmittedArea,
+            SafeToHandle = existing.SafeToHandle,
+            IsBlocked = true,
+            SampleSameProjects = existing.SampleSameProjects,
+            AllTissuesAssigned = allTissuesAssigned,
+            TimeReceived = existing.TimeReceived,
+            ReceivedBy = existing.ReceivedBy,
+            PostFixationOther = existing.PostFixationOther,
+        };
+
+        await UpdateAsync(updated, userId, ct);
     }
 
     /// <inheritdoc/>
