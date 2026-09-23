@@ -28,7 +28,7 @@ LegacyRows AS (
       AND u.NTLogin NOT LIKE '[a-zA-Z][a-zA-Z]%'
 )
 UPDATE u
-SET u.IsActive = 0,
+SET u.Active = 0,
     u.Email = CONCAT(l.Email, '__LEGACY')
 FROM dbo.[User] u
 INNER JOIN LegacyRows l ON l.ID = u.ID;
