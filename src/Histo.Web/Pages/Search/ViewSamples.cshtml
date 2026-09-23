@@ -101,6 +101,10 @@
                 <tr class="govuk-table__row">
                     @{ ViewData["Label"] = "Sub. number"; ViewData["Column"] = "ID"; }
                     <partial name="_SortableHeaderPost" />
+                    @{ ViewData["Label"] = "Sender ref"; ViewData["Column"] = "SenderRef"; }
+                    <partial name="_SortableHeaderPost" />
+                    @{ ViewData["Label"] = "Histology ref"; ViewData["Column"] = "HistologyRef"; }
+                    <partial name="_SortableHeaderPost" />
                     @{ ViewData["Label"] = "Date submitted"; ViewData["Column"] = "DateSubmitted"; }
                     <partial name="_SortableHeaderPost" />
                     @{
@@ -111,7 +115,6 @@
                         ViewData["Label"] = "Time Received / Rejected"; ViewData["Column"] = "TimeReceived";
                     }
                     <partial name="_SortableHeaderPost" />
-
 
                     @{ ViewData["Label"] = "Date completed"; ViewData["Column"] = "DateCompleted"; }
                     <partial name="_SortableHeaderPost" />
@@ -143,6 +146,8 @@
                 {
                     <tr class="govuk-table__row">
                         <td class="govuk-table__cell">@r.ID</td>
+                        <td class="govuk-table__cell">@r.SenderRef</td>
+                        <td class="govuk-table__cell">@r.HistologyRef</td>
                         <td class="govuk-table__cell">@r.DateSubmitted?.ToShortDateString()</td>
                         <td class="govuk-table__cell">@r.DateReceived?.ToShortDateString()</td>
                         <td class="govuk-table__cell">@r.TimeReceived</td>

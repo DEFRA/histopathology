@@ -141,18 +141,28 @@ public class ViewSamplesModel : HistoPageModel
         var isBlockMode = Mode == "Block";
 
         var headers = isBlockMode
-            ? (IReadOnlyList<string>)new[] { "Sub. number", "Date submitted", "Date received", "Time received", "Date completed", "Customer received date", "Submitted as", "Block ref", "Tissue", "No pieces" }
-            : (IReadOnlyList<string>)new[] { "Sub. number", "Date submitted", "Date received", "Time received", "Date completed", "Customer received date", "Submitted as", "Tissue", "No pieces" };
+            ? (IReadOnlyList<string>)new[]
+              {
+                  "Sub. number", "Sender ref", "Histology ref", "Date submitted", "Date received",
+                  "Time received", "Date completed", "Customer received date", "Submitted as",
+                  "Block ref", "Tissue", "No pieces"
+              }
+            : (IReadOnlyList<string>)new[]
+              {
+                  "Sub. number", "Sender ref", "Histology ref", "Date submitted", "Date received",
+                  "Time received", "Date completed", "Customer received date", "Submitted as",
+                  "Tissue", "No pieces"
+              };
 
         var rows = results.Select(r => isBlockMode
             ? (IReadOnlyList<object?>)new object?[]
               {
-                  r.ID, r.DateSubmitted, r.DateReceived, r.TimeReceived,
+                  r.ID, r.SenderRef, r.HistologyRef, r.DateSubmitted, r.DateReceived, r.TimeReceived,
                   r.DateCompleted, r.CustomerReceivedDate, r.SubmittedAs, r.BlockRef, r.TissueDescription, r.NoPieces,
               }
             : (IReadOnlyList<object?>)new object?[]
               {
-                  r.ID, r.DateSubmitted, r.DateReceived, r.TimeReceived,
+                  r.ID, r.SenderRef, r.HistologyRef, r.DateSubmitted, r.DateReceived, r.TimeReceived,
                   r.DateCompleted, r.CustomerReceivedDate, r.SubmittedAs, r.TissueDescription, r.NoPieces,
               });
 

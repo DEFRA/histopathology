@@ -194,6 +194,8 @@ public sealed class TissueArchiveInfo
 public sealed class AnimalTissueSearchResult
 {
     public int ID { get; init; }
+    public string? SenderRef { get; init; }
+    public string? HistologyRef { get; init; }
     public DateTime? DateSubmitted { get; init; }
     public DateTime? DateReceived { get; init; }
     public string? TimeReceived { get; init; }
