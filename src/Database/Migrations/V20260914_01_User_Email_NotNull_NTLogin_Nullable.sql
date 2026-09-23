@@ -7,6 +7,32 @@ GO
 
 BEGIN TRANSACTION;
 
+-- Duplicate emails can exist where the same person has two User rows: an older
+-- NTLogin using the legacy single-character-prefix convention (e.g. x0391401)
+-- and a newer one using the current multi-character prefix convention
+-- (e.g. ns000060). For each such duplicate pair, deactivate the legacy row and
+-- rename its email so it no longer collides with the active row's email,
+-- before the NOT NULL/UNIQUE constraints below are enforced.
+;WITH DuplicateEmails AS (
+    SELECT Email
+    FROM dbo.[User]
+    WHERE Email IS NOT NULL
+    GROUP BY Email
+    HAVING COUNT(*) > 1
+),
+LegacyRows AS (
+    SELECT u.ID, u.Email, u.NTLogin
+    FROM dbo.[User] u
+    INNER JOIN DuplicateEmails d ON d.Email = u.Email
+    WHERE u.NTLogin LIKE '[a-zA-Z][0-9]%'
+      AND u.NTLogin NOT LIKE '[a-zA-Z][a-zA-Z]%'
+)
+UPDATE u
+SET u.IsActive = 0,
+    u.Email = CONCAT(l.Email, '__LEGACY')
+FROM dbo.[User] u
+INNER JOIN LegacyRows l ON l.ID = u.ID;
+
 UPDATE dbo.[User]
 SET Email = CONCAT('old_email_legacy', ID, '@apha.gov.uk')
 WHERE Email IS NULL;
