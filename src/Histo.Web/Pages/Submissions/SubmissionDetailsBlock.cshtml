@@ -34,23 +34,38 @@ else
         </div>
     }
 
-    @* PM date and Histology reference are read-only here — matching Sender ref's display and
-       GDS summary-list conventions. Histology reference is set only via "Get next ref" below
-       (there is no manual edit surface for either field on this page). *@
+    @* PM date and Histology reference are editable ONLY while unset — once assigned (here or via
+       Assign Tissues to Blocks), they become permanently read-only, matching legacy's
+       "populated and disabled once already assigned to the sender ref" behaviour. *@
     <dl class="govuk-summary-list">
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Sender ref</dt>
             <dd class="govuk-summary-list__value">@Model.Animal.SenderRef</dd>
         </div>
-        <div class="govuk-summary-list__row">
-            <dt class="govuk-summary-list__key">PM date</dt>
-            <dd class="govuk-summary-list__value">@(Model.Animal.PMDate ?? "Not recorded")</dd>
-        </div>
-        <div class="govuk-summary-list__row">
-            <dt class="govuk-summary-list__key">Histology reference</dt>
-            <dd class="govuk-summary-list__value">@(Model.Animal.HistologyRef ?? "Not recorded")</dd>
-        </div>
     </dl>
+
+    <form method="post" asp-page-handler="SaveHistologyDetails" class="govuk-!-margin-bottom-6">
+        <input type="hidden" asp-for="BatchId" />
+        <input type="hidden" asp-for="AnimalId" />
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="EditPMDate">PM date</label>
+            <input class="govuk-input govuk-input--width-10" asp-for="EditPMDate" type="date"
+                   readonly="@(Model.PMDateLocked ? "readonly" : null)" disabled="@(Model.IsViewMode ? "disabled" : null)" />
+        </div>
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="EditHistologyRef">Histology reference</label>
+            @if (!Model.HistologyRefLocked)
+            {
+                <div class="govuk-hint">Format: NN/NNNNN (e.g., 26/40004). Must be less than the next available reference number for its type.</div>
+            }
+            <input class="govuk-input govuk-input--width-10" asp-for="EditHistologyRef" placeholder="e.g., 26/40004" maxlength="8" pattern="\d{2}/\d{5}"
+                   readonly="@(Model.HistologyRefLocked ? "readonly" : null)" disabled="@(Model.IsViewMode ? "disabled" : null)" />
+        </div>
+        @if (!Model.IsViewMode && (!Model.HistologyRefLocked || !Model.PMDateLocked))
+        {
+            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Save details</button>
+        }
+    </form>
 
     @* "Or Pick" — assigns the next unused histology ref for a type and saves it immediately,
        replacing legacy's AutoPostBack dropdown with an explicit button per WCAG 3.2.2 (On Input). *@
