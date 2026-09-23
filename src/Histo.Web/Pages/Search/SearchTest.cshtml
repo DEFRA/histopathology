@@ -59,7 +59,7 @@
                         var item = Model.HistologyTests[i];
                         <div class="govuk-checkboxes__item">
                             <input class="govuk-checkboxes__input" type="checkbox" id="histology-@i" name="SelectedHistology" value="@item.Code"
-                                   checked="@(Model.SelectedHistology.Contains(item.Code ?? string.Empty))" />
+                                   checked="@(Model.SelectedHistology.Contains(item.Code ?? string.Empty) ? "checked" : null)" />
                             <label class="govuk-label govuk-checkboxes__label" for="histology-@i">@item.Name</label>
                         </div>
                     }
