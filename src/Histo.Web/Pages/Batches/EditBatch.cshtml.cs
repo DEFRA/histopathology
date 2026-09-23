@@ -277,10 +277,15 @@ public class EditBatchModel : HistoPageModel
             batchDate = parsedDate;
         }
 
+        // Legacy behaviour (per Help text): a Rejected submission reverts to Not Received
+        // ("Submitted") when the customer edits and resubmits it — otherwise it stays stuck
+        // as Rejected even though it has just been corrected and resubmitted.
+        var statusAfterSave = Batch.Status == BatchStatus.Rejected ? BatchStatus.Submitted : Batch.Status;
+
         var updated = new Batch
         {
             ID                  = Batch.ID,
-            Status              = Batch.Status,
+            Status              = statusAfterSave,
             Comments            = Comments,
             StatusComments      = Batch.StatusComments,
             BatchDate           = batchDate,

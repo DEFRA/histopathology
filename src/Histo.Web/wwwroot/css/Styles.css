@@ -163,6 +163,41 @@
     text-align: center;
 }
 
+/* User Maintenance table columns were sized purely by the longest value on the current page, so
+ * paging/sorting to a row with a much longer/shorter name or email visibly widened or shrank the
+ * whole table. Fixing the layout with explicit column widths keeps it stable across pages; long
+ * values are clipped with an ellipsis (the existing title="" attribute still exposes the full
+ * text on hover/focus). */
+#user-maintenance-table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+#user-maintenance-table th,
+#user-maintenance-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#user-maintenance-table th:nth-child(1),
+#user-maintenance-table td:nth-child(1) { width: 22%; }
+
+#user-maintenance-table th:nth-child(2),
+#user-maintenance-table td:nth-child(2) { width: 28%; }
+
+#user-maintenance-table th:nth-child(3),
+#user-maintenance-table td:nth-child(3) { width: 18%; }
+
+#user-maintenance-table th:nth-child(4),
+#user-maintenance-table td:nth-child(4) { width: 16%; }
+
+#user-maintenance-table th:nth-child(5),
+#user-maintenance-table td:nth-child(5) { width: 8%; }
+
+#user-maintenance-table th:nth-child(6),
+#user-maintenance-table td:nth-child(6) { width: 8%; }
+
 
 
 

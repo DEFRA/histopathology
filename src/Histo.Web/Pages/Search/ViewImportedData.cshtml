@@ -6,7 +6,9 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="@Model.BackLinkPage" class="govuk-back-link">Back</a>
+    @* BackLinkPage may be a fully-resolved URL (e.g. from SearchBlockRefs), not a Razor page
+       name, so asp-page can't be used here — it silently produced a dead link. *@
+    <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
 }
 
 <form method="get">

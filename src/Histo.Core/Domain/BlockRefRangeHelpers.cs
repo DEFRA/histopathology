@@ -73,11 +73,12 @@ public static class BlockRefRangeHelpers
 
     private static string FormatRef(int blockRef) => blockRef < 10 ? $"0{blockRef}" : blockRef.ToString();
 
+    // Legacy wraps every range/ref in single quotes (e.g. '01 - 02') — lost in the migration.
     private static string FormatRange(int rangeFrom, int rangeTo)
     {
         var last = rangeTo - 1;
-        if (rangeFrom == last) return FormatRef(rangeFrom);
-        if (rangeFrom == 0) return last == 1 ? FormatRef(last) : $"01 - {FormatRef(last)}";
-        return $"{FormatRef(rangeFrom)} - {FormatRef(last)}";
+        if (rangeFrom == last) return $"'{FormatRef(rangeFrom)}'";
+        if (rangeFrom == 0) return last == 1 ? $"'{FormatRef(last)}'" : $"'01 - {FormatRef(last)}'";
+        return $"'{FormatRef(rangeFrom)} - {FormatRef(last)}'";
     }
 }

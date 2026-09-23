@@ -271,8 +271,18 @@ public class SampleSummaryModel : HistoPageModel
             return RedirectToPage(new { batchId });
         }
 
-        // AllTissuesAssigned has no meaning for Wet Tissue (no Block table rows exist at all),
-        // so it naturally computes false there — harmless, since nothing reads it for that type.
+        // Wet Tissue has no Block table rows at submission time — blocks are only created later,
+        // once Histopathology receives the sample. Legacy's BatchSummary.aspx.vb::btSubmit_Click
+        // (the Wet Tissue journey) only inserted the samples and left the batch's status as
+        // Submitted ("Not received"); only the block-based journey (BatchBlocks.aspx.vb, reached
+        // via BatchBlockSummary.aspx for Wax Block/Pre-Cassetted/Stained-Section submissions)
+        // advances status to In Progress at this step. Finishing a Wet Tissue submission must not
+        // jump it straight to In Progress before Histopathology has even received it.
+        var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId.Value);
+        var isWetTissue = ValidationHelpers.IsWetTissueDescription(await ResolveSubmittedAsDescriptionAsync(submittedAsCode));
+        if (isWetTissue)
+            return RedirectToPage("/Batches/BatchesNotReceived");
+
         var blocks = await _blocks.GetByBatchAsync(batchId.Value);
         var allTissuesAssigned = animals.All(a => blocks.Any(b => b.AnimalID == a.ID));
 
