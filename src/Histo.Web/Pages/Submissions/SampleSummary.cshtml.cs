@@ -218,7 +218,9 @@ public class SampleSummaryModel : HistoPageModel
     private async Task<string?> ResolveSubmittedAsDescriptionAsync(string? submittedAsCode)
     {
         if (string.IsNullOrEmpty(submittedAsCode)) return null;
-        var items = await _lookups.GetLookupDataAsync(11); // LOOKUP_SUBMITTEDAS
+        // includeInactive: true — a batch may have been submitted under a type since deactivated
+        // (e.g. code 6 "Fresh Frozen"), which the active-only default would silently omit.
+        var items = await _lookups.GetLookupDataAsync(11, includeInactive: true); // LOOKUP_SUBMITTEDAS
         return items.FirstOrDefault(i => i.Code == submittedAsCode)?.Name;
     }
 

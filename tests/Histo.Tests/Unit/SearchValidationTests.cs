@@ -72,10 +72,11 @@ public class SearchValidationTests
     public async Task SearchPMDates_ReversedRange_AddsErrorAndDoesNotQuery()
     {
         var sut = CreateSearchPmDates();
+        sut.Submitted = true;
         sut.StartDate = Parts(10, 5, 2026);
         sut.EndDate = Parts(1, 5, 2026);
 
-        await sut.OnPostSearchAsync();
+        await sut.OnGetAsync();
 
         Assert.True(sut.Errors.ContainsKey("StartDate"));
         Assert.False(sut.Searched);
@@ -86,10 +87,11 @@ public class SearchValidationTests
     public async Task SearchPMDates_EqualDates_IsValidAndQueries()
     {
         var sut = CreateSearchPmDates();
+        sut.Submitted = true;
         sut.StartDate = Parts(1, 5, 2026);
         sut.EndDate = Parts(1, 5, 2026);
 
-        await sut.OnPostSearchAsync();
+        await sut.OnGetAsync();
 
         Assert.Empty(sut.Errors);
         Assert.True(sut.Searched);
@@ -101,8 +103,9 @@ public class SearchValidationTests
     public async Task SearchPMDates_MissingDates_TreatedAsOpenRangeAndSearches()
     {
         var sut = CreateSearchPmDates();
+        sut.Submitted = true;
 
-        await sut.OnPostSearchAsync();
+        await sut.OnGetAsync();
 
         Assert.Empty(sut.Errors);
         Assert.True(sut.Searched);
@@ -315,8 +318,9 @@ public class SearchValidationTests
         var sut = CreateViewSamples();
         sut.SenderRef = "S1";
         sut.HistologyRef = "H1";
+        sut.Submitted = true;
 
-        await sut.OnPostSearchAsync();
+        await sut.OnGetAsync();
 
         Assert.Empty(sut.Errors);
         Assert.True(sut.Searched);
@@ -326,8 +330,9 @@ public class SearchValidationTests
     public async Task ViewSamples_NoCriteria_ShowsValidationError()
     {
         var sut = CreateViewSamples();
+        sut.Submitted = true;
 
-        await sut.OnPostSearchAsync();
+        await sut.OnGetAsync();
 
         Assert.True(sut.Errors.ContainsKey(nameof(sut.SenderRef)));
         Assert.False(sut.Searched);
@@ -343,8 +348,9 @@ public class SearchValidationTests
         var sut = CreateViewSamples();
         sut.SenderRef = "";
         sut.HistologyRef = "H1";
+        sut.Submitted = true;
 
-        await sut.OnPostSearchAsync();
+        await sut.OnGetAsync();
 
         Assert.Empty(sut.Errors);
         _submissions.Verify(s => s.GetAnimalTissuesAsync(null, "H1", null, null, It.IsAny<CancellationToken>()), Times.Once);

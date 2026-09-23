@@ -20,6 +20,12 @@ namespace Histo.Web.Pages.Search;
 ///
 /// Legacy's result grids have no sorting or paging — matched here by not
 /// inheriting <c>GridPageModel</c>.
+///
+/// GET-based (all filters bound via <c>SupportsGet</c>): results/filters live in the
+/// query string, so they're restored correctly by the browser Back button and are
+/// bookmarkable/shareable — matching the established pattern already used by
+/// <see cref="Histo.Web.Pages.Search.SearchSubmissionsModel"/>. Previously this page
+/// used a POST form, which loses all of this on Back.
 /// </summary>
 public class SearchArchiveLocationModel : HistoPageModel
 {
@@ -38,12 +44,16 @@ public class SearchArchiveLocationModel : HistoPageModel
         _lookups = lookups;
     }
 
-    [BindProperty] public string ArchiveType { get; set; } = "Tissue";
-    [BindProperty] public string? HistologyRef { get; set; }
-    [BindProperty] public string? SenderRef { get; set; }
-    [BindProperty] public string? ArchiveLocation { get; set; }
-    [BindProperty] public string? TissueCode { get; set; }
-    [BindProperty] public string? BlockRef { get; set; }
+    [BindProperty(SupportsGet = true)] public string ArchiveType { get; set; } = "Tissue";
+    [BindProperty(SupportsGet = true)] public string? HistologyRef { get; set; }
+    [BindProperty(SupportsGet = true)] public string? SenderRef { get; set; }
+    [BindProperty(SupportsGet = true)] public string? ArchiveLocation { get; set; }
+    [BindProperty(SupportsGet = true)] public string? TissueCode { get; set; }
+    [BindProperty(SupportsGet = true)] public string? BlockRef { get; set; }
+
+    // Distinguishes "user clicked Search with nothing filled in" from a first, bare page
+    // visit — both would otherwise look identical (no query string at all).
+    [BindProperty(SupportsGet = true)] public bool Submitted { get; set; }
 
     public Dictionary<string, string> Errors { get; } = [];
     public bool Searched { get; private set; }
@@ -68,13 +78,9 @@ public class SearchArchiveLocationModel : HistoPageModel
         ViewData["Title"] = "Search Archive Location";
         ViewData["PageTitle"] = "Search Archive Location";
         await LoadLookupsAsync();
-    }
 
-    public async Task<IActionResult> OnPostAsync()
-    {
-        ViewData["Title"] = "Search Archive Location";
-        ViewData["PageTitle"] = "Search Archive Location";
-        await LoadLookupsAsync();
+        // A bare first visit (no query string) shows the empty form only.
+        if (!Submitted) return;
 
         var hasSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
         var hasHistologyRef = !string.IsNullOrWhiteSpace(HistologyRef);
@@ -84,7 +90,7 @@ public class SearchArchiveLocationModel : HistoPageModel
         if (!hasSenderRef && !hasHistologyRef)
         {
             Errors[nameof(HistologyRef)] = "Enter the Sender Ref or the Histology Ref.";
-            return Page();
+            return;
         }
 
         Searched = true;
@@ -105,8 +111,6 @@ public class SearchArchiveLocationModel : HistoPageModel
                 TissueResults = await _submissions.GetTissueArchiveAsync(senderRef, histologyRef, archiveLocation, NullIfEmpty(TissueCode));
                 break;
         }
-
-        return Page();
     }
 
     // The stored procedures treat an unapplied filter as "@Param IS NULL" — an empty string
@@ -121,7 +125,7 @@ public class SearchArchiveLocationModel : HistoPageModel
     }
 
     /// <summary>Replaces the legacy ExcelExport.aspx link — exports the current results as .xlsx.</summary>
-    public async Task<IActionResult> OnPostExportExcelAsync()
+    public async Task<IActionResult> OnGetExportExcelAsync()
     {
         var senderRef = NullIfEmpty(SenderRef);
         var histologyRef = NullIfEmpty(HistologyRef);

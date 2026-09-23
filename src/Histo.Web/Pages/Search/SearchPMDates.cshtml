@@ -11,7 +11,11 @@
 
 <partial name="_ErrorSummary" model="Model.Errors" />
 
-<form method="post" asp-page-handler="Search">
+@* GET so the search is bookmarkable/deep-linkable and results/filters survive the browser
+   Back button — browser history only caches GET responses, not POST results. *@
+<form method="get" id="pmdates-form">
+    <input type="hidden" name="Submitted" value="true" />
+    <input type="hidden" name="ReturnPage" value="@Model.ReturnPage" />
     <div class="govuk-grid-row">
         <div class="govuk-grid-column-one-half">
             <div class="govuk-form-group @(Model.Errors.ContainsKey("StartDate") ? "govuk-form-group--error" : "")">
@@ -36,33 +40,26 @@
 
 @if (Model.Results.Any())
 {
-    @* Carrier form holding the current criteria so sort/page/export re-run the same search.
-       asp-page triggers FormTagHelper to inject the antiforgery token. *@
-    <form id="pmdates-action-form" method="post" asp-page="/Search/SearchPMDates">
-        <input type="hidden" name="StartDate" value="@Model.StartDate?.ToString("yyyy-MM-dd")" />
-        <input type="hidden" name="EndDate"   value="@Model.EndDate?.ToString("yyyy-MM-dd")" />
-    </form>
-
     <table class="govuk-table">
         <caption class="govuk-table__caption govuk-table__caption--m govuk-visually-hidden">Submissions matching the selected PM date range</caption>
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
                 @{ ViewData["Label"] = "Sub. number"; ViewData["Column"] = "ID"; }
-                <partial name="_SortableHeaderPost" />
+                <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "Sender ref"; ViewData["Column"] = "SenderRef"; }
-                <partial name="_SortableHeaderPost" />
+                <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "PM date"; ViewData["Column"] = "PMDate"; }
-                <partial name="_SortableHeaderPost" />
+                <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "Date submitted"; ViewData["Column"] = "BatchDate"; }
-                <partial name="_SortableHeaderPost" />
+                <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "Date received / rejected"; ViewData["Column"] = "DateReceived"; }
-                <partial name="_SortableHeaderPost" />
+                <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "Time received / rejected"; ViewData["Column"] = "TimeReceived"; }
-                <partial name="_SortableHeaderPost" />
+                <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "Date completed"; ViewData["Column"] = "CompletedDate"; }
-                <partial name="_SortableHeaderPost" />
+                <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "Customer received date"; ViewData["Column"] = "CustomerReceivedDate"; }
-                <partial name="_SortableHeaderPost" />
+                <partial name="_SortableHeader" />
             </tr>
         </thead>
         <tbody class="govuk-table__body">
@@ -82,15 +79,13 @@
         </tbody>
     </table>
 
-    <partial name="_PaginationPost" />
+    <partial name="_Pagination" />
 
-    <button form="pmdates-action-form"
-            formaction="?handler=ExportExcel"
-            type="submit"
-            class="govuk-button govuk-button--secondary"
-            data-module="govuk-button">
+    <a asp-page="/Search/SearchPMDates" asp-page-handler="ExportExcel"
+       asp-route-StartDate="@Model.StartDate?.ToString("yyyy-MM-dd")" asp-route-EndDate="@Model.EndDate?.ToString("yyyy-MM-dd")"
+       class="govuk-button govuk-button--secondary" data-module="govuk-button">
         Export to excel
-    </button>
+    </a>
 }
 else if (Model.Searched)
 {

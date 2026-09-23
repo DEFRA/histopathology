@@ -37,20 +37,23 @@ else
     @* PM date and Histology reference are editable ONLY while unset — once assigned (here or via
        Assign Tissues to Blocks), they become permanently read-only, matching legacy's
        "populated and disabled once already assigned to the sender ref" behaviour. *@
-    <dl class="govuk-summary-list">
-        <div class="govuk-summary-list__row">
-            <dt class="govuk-summary-list__key">Sender ref</dt>
-            <dd class="govuk-summary-list__value">@Model.Animal.SenderRef</dd>
-        </div>
-    </dl>
-
     <form method="post" asp-page-handler="SaveHistologyDetails" class="govuk-!-margin-bottom-6">
         <input type="hidden" asp-for="BatchId" />
         <input type="hidden" asp-for="AnimalId" />
-        <div class="govuk-form-group">
-            <label class="govuk-label" for="EditPMDate">PM date</label>
-            <input class="govuk-input govuk-input--width-10" asp-for="EditPMDate" type="date"
-                   readonly="@(Model.PMDateLocked ? "readonly" : null)" disabled="@(Model.IsViewMode ? "disabled" : null)" />
+        <div class="govuk-grid-row">
+            <div class="govuk-grid-column-one-half">
+                <div class="govuk-form-group">
+                    <label class="govuk-label">Sender ref</label>
+                    <p class="govuk-body govuk-!-font-weight-bold">@Model.Animal.SenderRef</p>
+                </div>
+            </div>
+            <div class="govuk-grid-column-one-half">
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="EditPMDate">PM date</label>
+                    <input class="govuk-input govuk-input--width-10" asp-for="EditPMDate" type="date"
+                           readonly="@(Model.PMDateLocked ? "readonly" : null)" disabled="@(Model.IsViewMode ? "disabled" : null)" />
+                </div>
+            </div>
         </div>
         <div class="govuk-form-group">
             <label class="govuk-label" for="EditHistologyRef">Histology reference</label>

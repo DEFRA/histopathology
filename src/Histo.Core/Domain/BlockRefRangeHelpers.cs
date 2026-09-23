@@ -73,12 +73,15 @@ public static class BlockRefRangeHelpers
 
     private static string FormatRef(int blockRef) => blockRef < 10 ? $"0{blockRef}" : blockRef.ToString();
 
-    // Legacy wraps every range/ref in single quotes (e.g. '01 - 02') — lost in the migration.
+    // Legacy source: SearchBlockRefs.aspx.vb::FormatString — a single ref (or a 0-based range that
+    // only ever implies one ref, e.g. "0 to 1") is shown UNQUOTED; only a genuine multi-ref range
+    // is wrapped in single quotes (e.g. '01 - 02'). Quoting every case (as a stale comment here used
+    // to claim) does not match legacy and was itself a migration regression.
     private static string FormatRange(int rangeFrom, int rangeTo)
     {
         var last = rangeTo - 1;
-        if (rangeFrom == last) return $"'{FormatRef(rangeFrom)}'";
-        if (rangeFrom == 0) return last == 1 ? $"'{FormatRef(last)}'" : $"'01 - {FormatRef(last)}'";
+        if (rangeFrom == last) return FormatRef(rangeFrom);
+        if (rangeFrom == 0) return last == 1 ? FormatRef(last) : $"'01 - {FormatRef(last)}'";
         return $"'{FormatRef(rangeFrom)} - {FormatRef(last)}'";
     }
 }

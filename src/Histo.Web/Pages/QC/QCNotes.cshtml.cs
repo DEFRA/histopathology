@@ -64,7 +64,7 @@ public class QCNotesModel : GridPageModel
     {
         if (!QuickGoRef.HasValue || QuickGoRef.Value <= 0)
         {
-            Errors["QuickGoRef"] = "QC Number is mandatory.";
+            Errors["QuickGoRef"] = "Enter a QC number";
             ViewData["Title"] = "QC notes";
             ViewData["PageTitle"] = "Quality control notes";
             Notes = await _qc.GetAllAsync();

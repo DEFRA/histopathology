@@ -9,7 +9,11 @@
     <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
 }
 
-<form method="post" asp-antiforgery="true">
+@* GET so results/filters survive the browser Back button and are bookmarkable/deep-linkable
+   — browser history only caches GET responses, not POST results. *@
+<form method="get">
+    <input type="hidden" name="Submitted" value="true" />
+    <input type="hidden" name="ReturnPage" value="@Model.ReturnPage" />
     <div class="govuk-grid-row">
         <div class="govuk-grid-column-one-half">
             <div class="govuk-form-group">
@@ -59,7 +63,7 @@
                         var item = Model.HistologyTests[i];
                         <div class="govuk-checkboxes__item">
                             <input class="govuk-checkboxes__input" type="checkbox" id="histology-@i" name="SelectedHistology" value="@item.Code"
-                                   checked="@(Model.SelectedHistology.Contains(item.Code ?? string.Empty) ? "checked" : null)" />
+                                   checked="@(Model.SelectedHistology.Contains(item.Code ?? string.Empty))" />
                             <label class="govuk-label govuk-checkboxes__label" for="histology-@i">@item.Name</label>
                         </div>
                     }
@@ -148,7 +152,7 @@
             </tfoot>
         </table>
 
-        <form method="post" asp-page-handler="ExportOutputsExcel">
+        <form method="get">
             <input type="hidden" name="ProjectDescription" value="@Model.ProjectDescription" />
             <input type="hidden" name="SubmissionType" value="@Model.SubmissionType" />
             <input type="hidden" name="StartDate" value="@Model.StartDate?.ToString("yyyy-MM-dd")" />
@@ -156,7 +160,7 @@
             @foreach (var c in Model.SelectedHistology) { <input type="hidden" name="SelectedHistology" value="@c" /> }
             @foreach (var c in Model.SelectedAntibodies) { <input type="hidden" name="SelectedAntibodies" value="@c" /> }
             @foreach (var c in Model.SelectedSpecialStain) { <input type="hidden" name="SelectedSpecialStain" value="@c" /> }
-            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export outputs to excel</button>
+            <button type="submit" formaction="?handler=ExportOutputsExcel" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export outputs to excel</button>
         </form>
     }
     else
@@ -193,7 +197,7 @@
             </tbody>
         </table>
 
-        <form method="post" asp-page-handler="ExportSubmissionsExcel">
+        <form method="get">
             <input type="hidden" name="ProjectDescription" value="@Model.ProjectDescription" />
             <input type="hidden" name="SubmissionType" value="@Model.SubmissionType" />
             <input type="hidden" name="StartDate" value="@Model.StartDate?.ToString("yyyy-MM-dd")" />
@@ -201,7 +205,7 @@
             @foreach (var c in Model.SelectedHistology) { <input type="hidden" name="SelectedHistology" value="@c" /> }
             @foreach (var c in Model.SelectedAntibodies) { <input type="hidden" name="SelectedAntibodies" value="@c" /> }
             @foreach (var c in Model.SelectedSpecialStain) { <input type="hidden" name="SelectedSpecialStain" value="@c" /> }
-            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export submissions to excel</button>
+            <button type="submit" formaction="?handler=ExportSubmissionsExcel" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export submissions to excel</button>
         </form>
     }
     else

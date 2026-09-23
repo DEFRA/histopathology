@@ -30,10 +30,11 @@ public class BatchBlocksModel : HistoPageModel
     private readonly IBatchService _batches;
     private readonly ILookupService _lookups;
     private readonly IBlockTestService _blockTests;
+    private readonly IUserService _users;
     private readonly ILogger<BatchBlocksModel> _logger;
 
     public BatchBlocksModel(ISessionService session, ISubmissionService submissions, IBlockService blocks,
-        IBatchService batches, ILookupService lookups, IBlockTestService blockTests, ILogger<BatchBlocksModel> logger)
+        IBatchService batches, ILookupService lookups, IBlockTestService blockTests, IUserService users, ILogger<BatchBlocksModel> logger)
         : base(session)
     {
         _submissions = submissions;
@@ -41,6 +42,7 @@ public class BatchBlocksModel : HistoPageModel
         _batches = batches;
         _lookups = lookups;
         _blockTests = blockTests;
+        _users = users;
         _logger = logger;
     }
 
@@ -52,6 +54,16 @@ public class BatchBlocksModel : HistoPageModel
 
     public Batch? Batch { get; private set; }
     public IReadOnlyList<Block> Blocks { get; private set; } = [];
+
+    /// <summary>Batch header summary fields (Entered/Submitted by/area, Project, Pathologist, Species) —
+    /// present on legacy BatchBlocks.aspx via the shared Batch.ascx user control, omitted during migration.</summary>
+    public string? ProjectName { get; private set; }
+    public string? PathologistName { get; private set; }
+    public string? SpeciesName { get; private set; }
+    public string? EnteredByName { get; private set; }
+    public string? EnteredAreaName { get; private set; }
+    public string? SubmittedByName { get; private set; }
+    public string? SubmittedAreaName { get; private set; }
 
     /// <summary>True for TSE submissions — shows H&amp;E (BSE)/IHC Prp grid columns instead of IHC Other, matching legacy HideColumns.</summary>
     public bool IsTse => Batch?.BatchType != BatchTypeConstants.NonTse;
@@ -229,6 +241,17 @@ public class BatchBlocksModel : HistoPageModel
     private async Task LoadSupportingDataAsync()
     {
         Batch = await _batches.GetByIdAsync(BatchId ?? 0);
+        if (Batch is not null)
+        {
+            var summary = await BatchSummaryDisplayResolver.ResolveAsync(Batch, _lookups, _users);
+            ProjectName = summary.ProjectName;
+            PathologistName = summary.PathologistName;
+            SpeciesName = summary.SpeciesName;
+            EnteredByName = summary.EnteredByName;
+            EnteredAreaName = summary.EnteredAreaName;
+            SubmittedByName = summary.SubmittedByName;
+            SubmittedAreaName = summary.SubmittedAreaName;
+        }
         TissueOptions = await _lookups.GetLookupDataAsync(LookupTissueCode);
 
         var allTissues = await _submissions.GetTissuesByBatchAsync(BatchId ?? 0);

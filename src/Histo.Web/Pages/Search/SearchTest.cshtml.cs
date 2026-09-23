@@ -24,6 +24,12 @@ namespace Histo.Web.Pages.Search;
 ///
 /// No date filter is offered, matching the prior scope decision: the legacy StartDate/EndDate
 /// calendar controls were never wired to a query parameter here either.
+///
+/// GET-based (all filters/checkboxes bound via <c>SupportsGet</c>): results live in the query
+/// string, so they're restored correctly by the browser Back button and are bookmarkable/
+/// shareable — matching the established pattern already used by
+/// <see cref="Histo.Web.Pages.Search.SearchSubmissionsModel"/>. Previously this page used a
+/// POST form, which loses all of this on Back.
 /// </summary>
 public class SearchTestModel : HistoPageModel
 {
@@ -42,21 +48,25 @@ public class SearchTestModel : HistoPageModel
         _lookups = lookups;
     }
 
-    [BindProperty] public string? ProjectDescription { get; set; }
-    [BindProperty] public int SubmissionType { get; set; }
+    [BindProperty(SupportsGet = true)] public string? ProjectDescription { get; set; }
+    [BindProperty(SupportsGet = true)] public int SubmissionType { get; set; }
 
     /// <summary>Legacy <c>StartDate</c>/<c>EndDate</c> CalendarDate controls — filters dispatched tests by <c>DispatchedDate</c>.</summary>
-    [BindProperty] public DateTime? StartDate { get; set; }
-    [BindProperty] public DateTime? EndDate { get; set; }
+    [BindProperty(SupportsGet = true)] public DateTime? StartDate { get; set; }
+    [BindProperty(SupportsGet = true)] public DateTime? EndDate { get; set; }
 
     /// <summary>Selected Histology test codes (legacy <c>chkblHistology</c>).</summary>
-    [BindProperty] public List<string> SelectedHistology { get; set; } = [];
+    [BindProperty(SupportsGet = true)] public List<string> SelectedHistology { get; set; } = [];
 
     /// <summary>Selected Antibody test codes (legacy <c>chkblAntibodies</c>) — TSE or NonTSE list depending on <see cref="SubmissionType"/>.</summary>
-    [BindProperty] public List<string> SelectedAntibodies { get; set; } = [];
+    [BindProperty(SupportsGet = true)] public List<string> SelectedAntibodies { get; set; } = [];
 
     /// <summary>Selected Special Stain test codes (legacy <c>chkblSpecialStain</c>).</summary>
-    [BindProperty] public List<string> SelectedSpecialStain { get; set; } = [];
+    [BindProperty(SupportsGet = true)] public List<string> SelectedSpecialStain { get; set; } = [];
+
+    // Distinguishes "user clicked Analyse results with nothing selected" from a first, bare
+    // page visit — both would otherwise look identical (no query string at all).
+    [BindProperty(SupportsGet = true)] public bool Submitted { get; set; }
 
     public IReadOnlyList<LookupItem> Projects { get; private set; } = [];
     public IReadOnlyList<LookupItem> HistologyTests { get; private set; } = [];
@@ -82,24 +92,18 @@ public class SearchTestModel : HistoPageModel
     {
         SetTitles();
         await LoadLookupsAsync();
-    }
 
-    /// <summary>Legacy <c>btnCount_Click</c> ("Analyse Results").</summary>
-    public async Task<IActionResult> OnPostAsync()
-    {
-        SetTitles();
-        await LoadLookupsAsync();
+        // A bare first visit (no query string) shows the empty form only.
+        if (!Submitted) return;
 
         var raw = await _batches.GetTestPremiumChargeCountsAsync(
             ProjectDescription, SubmissionType, SelectedHistology, SelectedAntibodies, SelectedSpecialStain, StartDate, EndDate);
         BuildCrossTab(raw);
         Searched = true;
-
-        return Page();
     }
 
     /// <summary>Legacy <c>bntBatch_Click</c> ("Analyse Submissions").</summary>
-    public async Task<IActionResult> OnPostAnalyseSubmissionsAsync()
+    public async Task OnGetAnalyseSubmissionsAsync()
     {
         SetTitles();
         await LoadLookupsAsync();
@@ -108,12 +112,10 @@ public class SearchTestModel : HistoPageModel
             ProjectDescription, SubmissionType, SelectedHistology, SelectedAntibodies, SelectedSpecialStain, StartDate, EndDate);
         BuildSubmissionGroups(raw);
         SubmissionsSearched = true;
-
-        return Page();
     }
 
     /// <summary>Replaces the legacy <c>hlbExcel</c> ("Export Outputs to Excel") link.</summary>
-    public async Task<IActionResult> OnPostExportOutputsExcelAsync()
+    public async Task<IActionResult> OnGetExportOutputsExcelAsync()
     {
         await LoadLookupsAsync();
         var raw = await _batches.GetTestPremiumChargeCountsAsync(
@@ -137,7 +139,7 @@ public class SearchTestModel : HistoPageModel
     }
 
     /// <summary>Replaces the legacy <c>hlbBatchExcel</c> ("Export Submissions to Excel") link.</summary>
-    public async Task<IActionResult> OnPostExportSubmissionsExcelAsync()
+    public async Task<IActionResult> OnGetExportSubmissionsExcelAsync()
     {
         await LoadLookupsAsync();
         var raw = await _batches.GetTestPremiumChargeBatchesAsync(

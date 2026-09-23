@@ -51,7 +51,7 @@ public class SearchTestModelTests
         };
 
     [Fact]
-    public async Task OnPostAsync_PivotsCountsPerProjectAndPremiumCode_FillingZeroForMissingCombinations()
+    public async Task OnGetAsync_PivotsCountsPerProjectAndPremiumCode_FillingZeroForMissingCombinations()
     {
         _batches.Setup(b => b.GetTestPremiumChargeCountsAsync(
                 It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
@@ -63,9 +63,10 @@ public class SearchTestModelTests
                 new() { ProjectDescription = "Project B", PremiumCode = "TC 0008", Count = 5 },
             ]);
         var sut = CreateSut();
+        sut.Submitted = true;
         sut.SelectedHistology = ["1"];
 
-        await sut.OnPostAsync();
+        await sut.OnGetAsync();
 
         Assert.True(sut.Searched);
         Assert.Equal(2, sut.CrossTabRows.Count);
@@ -86,7 +87,7 @@ public class SearchTestModelTests
     }
 
     [Fact]
-    public async Task OnPostAnalyseSubmissionsAsync_GroupsByPremiumCode_WithDistinctSortedBatchIds()
+    public async Task OnGetAnalyseSubmissionsAsync_GroupsByPremiumCode_WithDistinctSortedBatchIds()
     {
         _batches.Setup(b => b.GetTestPremiumChargeBatchesAsync(
                 It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
@@ -101,7 +102,7 @@ public class SearchTestModelTests
         var sut = CreateSut();
         sut.SelectedAntibodies = ["Hantavirus"];
 
-        await sut.OnPostAnalyseSubmissionsAsync();
+        await sut.OnGetAnalyseSubmissionsAsync();
 
         Assert.True(sut.SubmissionsSearched);
         Assert.Equal(2, sut.SubmissionGroups.Count);
@@ -114,15 +115,16 @@ public class SearchTestModelTests
     }
 
     [Fact]
-    public async Task OnPostAsync_NoTestCodesSelected_QueriesWithEmptyListsAndShowsNoResults()
+    public async Task OnGetAsync_NoTestCodesSelected_QueriesWithEmptyListsAndShowsNoResults()
     {
         _batches.Setup(b => b.GetTestPremiumChargeCountsAsync(
                 It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
                 It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<TestPremiumChargeCount>)[]);
         var sut = CreateSut();
+        sut.Submitted = true;
 
-        await sut.OnPostAsync();
+        await sut.OnGetAsync();
 
         Assert.True(sut.Searched);
         Assert.Empty(sut.CrossTabRows);

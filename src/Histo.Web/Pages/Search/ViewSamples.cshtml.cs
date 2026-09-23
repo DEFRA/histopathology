@@ -32,8 +32,14 @@ namespace Histo.Web.Pages.Search;
 /// "Tissue Information") and <c>GetAnimalBlockTissues</c> (SP
 /// <c>GetAnimalBlockTissues</c>, "Block Information") — see
 /// <see cref="AnimalTissueSearchResult"/> for the resulting column shape.
+///
+/// GET-based (all filters/sort/page bound via <c>SupportsGet</c>): results/filters live in
+/// the query string, so they're restored correctly by the browser Back button and are
+/// bookmarkable/shareable — matching the established pattern already used by
+/// <see cref="Histo.Web.Pages.Search.SearchSubmissionsModel"/>. Previously this page used a
+/// POST form, which loses all of this on Back.
 /// </summary>
-public class ViewSamplesModel : HistoPageModel
+public class ViewSamplesModel : GridPageModel
 {
     private const int LookupTissueCode = 9;  // Legacy source: HistopathologySystem/Common.vb — LOOKUP_TISSUE_CODE
     private const int LookupProjects = 19;   // Legacy source: HistopathologySystem/Common.vb — LOOKUP_PROJECTS
@@ -48,30 +54,34 @@ public class ViewSamplesModel : HistoPageModel
         _lookups = lookups;
     }
 
-    [BindProperty] public string? SenderRef { get; set; }
-    [BindProperty] public string? HistologyRef { get; set; }
-    [BindProperty] public string? TissueCode { get; set; }
-    [BindProperty] public string? ProjectDesc { get; set; }
+    [BindProperty(SupportsGet = true)] public string? SenderRef { get; set; }
+    [BindProperty(SupportsGet = true)] public string? HistologyRef { get; set; }
+    [BindProperty(SupportsGet = true)] public string? TissueCode { get; set; }
+    [BindProperty(SupportsGet = true)] public string? ProjectDesc { get; set; }
 
     /// <summary>"Tissue" = legacy "Tissue Information" mode (default); "Block" = "Block Information" mode.</summary>
-    [BindProperty] public string Mode { get; set; } = "Tissue";
+    [BindProperty(SupportsGet = true)] public string Mode { get; set; } = "Tissue";
 
-    // Sort/page state bound the same way as the filter criteria — [BindProperty] carries it
-    // through the POST-based sort/page buttons (see _SortableHeaderPost/_PaginationPost), which
-    // resubmit this same form rather than navigating via a GET link.
-    private const int PageSize = 10;
-    [BindProperty] public string? SortColumn { get; set; }
-    [BindProperty] public bool SortDesc { get; set; }
-    [BindProperty] public int PageNumber { get; set; } = 1;
+    // Distinguishes "user clicked Search with nothing filled in" from a first, bare page
+    // visit — both would otherwise look identical (no query string at all).
+    [BindProperty(SupportsGet = true)] public bool Submitted { get; set; }
 
     public Dictionary<string, string> Errors { get; } = [];
     public bool Searched { get; private set; }
+
+    /// <summary>
+    /// Legacy source: <c>ViewSamples.aspx.vb::FillviewGrid</c> — shows whichever ref was NOT
+    /// entered by the user, resolved from the matched sample. Sender ref takes precedence when
+    /// both are given (matching this page's own "either or both" relaxation).
+    /// </summary>
+    public string? OtherFieldLabel { get; private set; }
 
     public IReadOnlyList<LookupItem> Tissues { get; private set; } = [];
     public IReadOnlyList<LookupItem> Projects { get; private set; } = [];
     public IReadOnlyList<AnimalTissueSearchResult> Results { get; private set; } = [];
 
     [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
+
 
     /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
     public string BackLinkPage =>
@@ -94,76 +104,57 @@ public class ViewSamplesModel : HistoPageModel
         .Take(PageSize)
         .ToList();
 
-    private void PopulateGridViewData()
-    {
-        var totalPages = Results.Count == 0 ? 1 : (int)Math.Ceiling(Results.Count / (double)PageSize);
-        if (PageNumber < 1) PageNumber = 1;
-        else if (PageNumber > totalPages) PageNumber = totalPages;
-        ViewData["SortColumn"] = SortColumn;
-        ViewData["SortDesc"] = SortDesc;
-        ViewData["CurrentPage"] = PageNumber;
-        ViewData["TotalPages"] = totalPages;
-        ViewData["FormId"] = "view-samples-form";
-        ViewData["Handler"] = "Search";
-    }
-
     public async Task OnGetAsync()
     {
         SetTitle();
         await LoadLookupsAsync();
-    }
 
-    public async Task<IActionResult> OnPostSearchAsync()
-    {
-        SetTitle();
-        await LoadLookupsAsync();
+        // A bare first visit (no query string) shows the empty form only.
+        if (!Submitted)
+        {
+            PopulateGridViewData(0);
+            return;
+        }
 
         if (!Validate())
-            return Page();
+        {
+            PopulateGridViewData(0);
+            return;
+        }
 
         Searched = true;
         Results = await SearchAsync();
-        PopulateGridViewData();
-
-        return Page();
+        OtherFieldLabel = !string.IsNullOrWhiteSpace(SenderRef)
+            ? $"Histology Ref: {Results.FirstOrDefault()?.HistologyRef}"
+            : !string.IsNullOrWhiteSpace(HistologyRef)
+                ? $"Sender Ref: {Results.FirstOrDefault()?.SenderRef}"
+                : null;
+        PopulateGridViewData(Results.Count);
     }
 
     /// <summary>Replaces the legacy ExcelExport.aspx links (hlTissuesExcelExport / hlExcelExport).</summary>
-    public async Task<IActionResult> OnPostExportExcelAsync()
+    public async Task<IActionResult> OnGetExportExcelAsync()
     {
-        SetTitle();
-        await LoadLookupsAsync();
-
         if (!Validate())
-            return Page();
+            return RedirectToPage("/Search/ViewSamples");
 
         var results = await SearchAsync();
         var isBlockMode = Mode == "Block";
 
         var headers = isBlockMode
-            ? (IReadOnlyList<string>)new[]
-              {
-                  "Sub. number", "Sender ref", "Histology ref", "Date submitted", "Date received",
-                  "Time received", "Date completed", "Customer received date", "Submitted as",
-                  "Block ref", "Tissue", "No pieces"
-              }
-            : (IReadOnlyList<string>)new[]
-              {
-                  "Sub. number", "Sender ref", "Histology ref", "Date submitted", "Date received",
-                  "Time received", "Date completed", "Customer received date", "Submitted as",
-                  "Tissue", "No pieces"
-              };
+            ? (IReadOnlyList<string>)new[] { "Sub. number", "Date submitted", "Date received", "Time received", "Date completed", "Customer received date", "Block ref", "Tissue description", "No pieces", "Histology ref", "Sender ref", "Submitted as" }
+            : (IReadOnlyList<string>)new[] { "Sub. number", "Date submitted", "Date received", "Time received", "Date completed", "Customer received date", "Tissue description", "No pieces", "Histology ref", "Sender ref", "Submitted as" };
 
         var rows = results.Select(r => isBlockMode
             ? (IReadOnlyList<object?>)new object?[]
               {
-                  r.ID, r.SenderRef, r.HistologyRef, r.DateSubmitted, r.DateReceived, r.TimeReceived,
-                  r.DateCompleted, r.CustomerReceivedDate, r.SubmittedAs, r.BlockRef, r.TissueDescription, r.NoPieces,
+                  r.ID, r.DateSubmitted, r.DateReceived, r.TimeReceived,
+                  r.DateCompleted, r.CustomerReceivedDate, r.BlockRef, r.TissueDescription, r.NoPieces, r.HistologyRef, r.SenderRef, r.SubmittedAs,
               }
             : (IReadOnlyList<object?>)new object?[]
               {
-                  r.ID, r.SenderRef, r.HistologyRef, r.DateSubmitted, r.DateReceived, r.TimeReceived,
-                  r.DateCompleted, r.CustomerReceivedDate, r.SubmittedAs, r.TissueDescription, r.NoPieces,
+                  r.ID, r.DateSubmitted, r.DateReceived, r.TimeReceived,
+                  r.DateCompleted, r.CustomerReceivedDate, r.TissueDescription, r.NoPieces, r.HistologyRef, r.SenderRef, r.SubmittedAs,
               });
 
         return ExcelExportHelper.BuildXlsx(isBlockMode ? "BlockInformation.xlsx" : "TissueInformation.xlsx", headers, rows);

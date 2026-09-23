@@ -194,7 +194,8 @@ public class AddSubmissionModel : HistoPageModel
     private async Task<bool> IsWetTissueCodeAsync(string? submittedAsCode)
     {
         if (string.IsNullOrEmpty(submittedAsCode)) return false;
-        var items = await _lookups.GetLookupDataAsync(11); // LOOKUP_SUBMITTEDAS
+        // includeInactive: true — same gap as SampleSummaryModel's identical resolver.
+        var items = await _lookups.GetLookupDataAsync(11, includeInactive: true); // LOOKUP_SUBMITTEDAS
         var match = items.FirstOrDefault(i => i.Code == submittedAsCode);
         return ValidationHelpers.IsWetTissueDescription(match?.Name);
     }

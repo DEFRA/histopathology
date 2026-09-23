@@ -405,7 +405,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         }
 
         TempData["CopyBlockIds"] = string.Join(",", blockIds);
-        return RedirectToPage("/Blocks/CopyBlocks");
+        return RedirectToPage("/Blocks/CopyBlocks", new { batchId = BatchId, animalId = AnimalId });
     }
 
     /// <summary>

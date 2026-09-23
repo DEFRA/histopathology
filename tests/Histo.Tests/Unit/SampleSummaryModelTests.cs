@@ -89,7 +89,7 @@ public class SampleSummaryModelTests
             .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1, SenderRef = "S1" }]);
         _batches.Setup(b => b.GetSubmittedAsCodeAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync("1");
-        _lookups.Setup(l => l.GetLookupDataAsync(11, false, It.IsAny<CancellationToken>()))
+        _lookups.Setup(l => l.GetLookupDataAsync(11, true, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 1, Code = "1", Name = "Wet Tissue" }]);
 
         var sut = CreateSut();
