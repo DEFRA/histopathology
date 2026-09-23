@@ -119,7 +119,7 @@ public sealed class BatchRepository : IBatchRepository
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<BatchListResult>(
-            "GetBatchesToBeBlocked",
+            "GetReceivedBatches",
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
@@ -316,32 +316,6 @@ public sealed class BatchRepository : IBatchRepository
     }
 
     /// <inheritdoc/>
-    public async Task CompleteBlockAssignmentAsync(int batchId, bool allTissuesAssigned, int userId, CancellationToken ct = default)
-    {
-        var existing = await GetByIdAsync(batchId, ct);
-        if (existing is null) return;
-        var updated = new Batch
-        {
-            ID = existing.ID, Status = BatchStatus.InProgress, Comments = existing.Comments,
-            StatusComments = existing.StatusComments, BatchDate = existing.BatchDate,
-            ReceivedDate = existing.ReceivedDate, CompletedDate = existing.CompletedDate,
-            SubmittedByUserID = existing.SubmittedByUserID, UserAreaCode = existing.UserAreaCode,
-            IsPreCassetted = existing.IsPreCassetted, ByPassSort = existing.ByPassSort,
-            RowStamp = existing.RowStamp, BatchType = existing.BatchType,
-            ProjectContractCode = existing.ProjectContractCode, ContactName = existing.ContactName,
-            Species = existing.Species, Fixation = existing.Fixation,
-            CustomerReceivedDate = existing.CustomerReceivedDate,
-            SubmittedBy = existing.SubmittedBy, SubmittedArea = existing.SubmittedArea,
-            OtherSubmittedBy = existing.OtherSubmittedBy, OtherSubmittedArea = existing.OtherSubmittedArea,
-            SafeToHandle = existing.SafeToHandle, IsBlocked = true,
-            SampleSameProjects = existing.SampleSameProjects, AllTissuesAssigned = allTissuesAssigned,
-            TimeReceived = existing.TimeReceived, ReceivedBy = existing.ReceivedBy,
-            PostFixationOther = existing.PostFixationOther,
-        };
-        await UpdateAsync(updated, userId, ct);
-    }
-
-    /// <inheritdoc/>
     public async Task SetByPassSortAsync(int batchId, bool byPassSort, int userId, CancellationToken ct = default)
     {
         var existing = await GetByIdAsync(batchId, ct);
@@ -365,6 +339,33 @@ public sealed class BatchRepository : IBatchRepository
             PostFixationOther = existing.PostFixationOther,
         };
         await UpdateAsync(updated, userId, ct);
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> UpdateStatusAsync(int batchId, string newStatus, int userId, CancellationToken ct = default)
+    {
+        if (!int.TryParse(newStatus, out var batchStatusInt)) batchStatusInt = 1;
+
+        // When marking as Received, auto-populate DateReceived (mirrors legacy ReceiveBatch.aspx).
+        DateTime? dateReceived = newStatus == BatchStatus.Received ? DateTime.Now : null;
+
+        using var conn = _db.CreateConnection();
+        var p = new DynamicParameters();
+        p.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
+        p.Add("ID",              batchId);
+        p.Add("BatchStatus",     batchStatusInt);
+        p.Add("DateReceived",    dateReceived);
+        p.Add("TimeReceived",    (int?)null);
+        p.Add("ReceivedBy",      userId);
+        p.Add("StatusComments",  (string?)null);
+        p.Add("PostFixationOther", (string?)null);
+
+        await conn.ExecuteAsync("EditBatchStatus", p, commandType: System.Data.CommandType.StoredProcedure);
+
+        var returnValue = p.Get<int>("RETURN_VALUE");
+        // SP returns -1 when no rows were updated (concurrency conflict or batch not found).
+        if (returnValue == -1) throw new BatchConcurrencyException();
+        return returnValue == 0;
     }
 
     /// <inheritdoc/>
@@ -453,12 +454,6 @@ public sealed class BatchRepository : IBatchRepository
             CustomerReceivedDate  = ParseDate(dict, "CustomerReceivedDate"),
             Status                = batchStatusInt > 0 ? batchStatusInt.ToString() : Str(dict, "Status"),
             SubmittedBy           = Str(dict, "SubmittedBy"),
-            BatchType             = Str(dict, "BatchType"),
-            SafeToHandle          = Str(dict, "SafeToHandle"),
-            ReceivedTime          = Str(dict, "ReceivedTime"),
-            ReceivedBy            = Str(dict, "ReceivedBy"),
-            OtherSubmittedBy      = Str(dict, "OtherSubmittedBy"),
-            Comments              = Str(dict, "Comments"),
         };
     }
 
@@ -473,117 +468,6 @@ public sealed class BatchRepository : IBatchRepository
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
-
-    /// <inheritdoc/>
-    public async Task<IReadOnlyList<TestPremiumChargeCount>> GetTestPremiumChargeCountsAsync(
-        string? projectDesc,
-        int batchType,
-        IReadOnlyList<string> histologyCodes,
-        IReadOnlyList<string> antibodyCodes,
-        IReadOnlyList<string> stainCodes,
-        DateTime? startDate = null,
-        DateTime? endDate = null,
-        CancellationToken ct = default)
-    {
-        var (sql, param) = BuildTestQuery(
-            "lp.[Description] AS ProjectDescription, tc.[Code] AS PremiumCode, COUNT(*) AS Count",
-            "GROUP BY lp.[Description], tc.[Code]",
-            projectDesc, batchType, histologyCodes, antibodyCodes, stainCodes, startDate, endDate);
-        if (sql is null) return [];
-
-        using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<TestPremiumChargeCount>(new CommandDefinition(sql, param, cancellationToken: ct));
-        return rows.ToList();
-    }
-
-    /// <inheritdoc/>
-    public async Task<IReadOnlyList<TestPremiumChargeBatchRef>> GetTestPremiumChargeBatchesAsync(
-        string? projectDesc,
-        int batchType,
-        IReadOnlyList<string> histologyCodes,
-        IReadOnlyList<string> antibodyCodes,
-        IReadOnlyList<string> stainCodes,
-        DateTime? startDate = null,
-        DateTime? endDate = null,
-        CancellationToken ct = default)
-    {
-        var (sql, param) = BuildTestQuery(
-            "DISTINCT tc.[Code] AS PremiumCode, b.[ID] AS BatchID",
-            null,
-            projectDesc, batchType, histologyCodes, antibodyCodes, stainCodes, startDate, endDate);
-        if (sql is null) return [];
-
-        using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<TestPremiumChargeBatchRef>(new CommandDefinition(sql, param, cancellationToken: ct));
-        return rows.ToList();
-    }
-
-    /// <summary>
-    /// Builds the UNION ALL query across Histology/Antibodies/Special-Stain, one branch per
-    /// non-empty selected-code list (an empty list omits that test type entirely, matching
-    /// legacy's per-checkbox-group conditional branches in <c>btnCount_Click</c>). Returns
-    /// (null, null) when no test type has any code selected — nothing to query.
-    /// </summary>
-    private static (string? Sql, DynamicParameters Param) BuildTestQuery(
-        string selectList,
-        string? groupBy,
-        string? projectDesc,
-        int batchType,
-        IReadOnlyList<string> histologyCodes,
-        IReadOnlyList<string> antibodyCodes,
-        IReadOnlyList<string> stainCodes,
-        DateTime? startDate,
-        DateTime? endDate)
-    {
-        var param = new DynamicParameters();
-        param.Add("ProjectContractDesc", projectDesc);
-        param.Add("BatchType", batchType);
-        param.Add("StartDate", startDate);
-        param.Add("EndDate", endDate);
-
-        var branches = new List<string>();
-        if (histologyCodes.Count > 0)
-        {
-            branches.Add(BuildTestBranch("BlockHistology", "HistologyTCCodes", "@HistologyCodes", selectList, groupBy));
-            param.Add("HistologyCodes", histologyCodes);
-        }
-        if (antibodyCodes.Count > 0)
-        {
-            branches.Add(BuildTestBranch("BlockAntibodies", "AntibodiesTCCodes", "@AntibodyCodes", selectList, groupBy));
-            param.Add("AntibodyCodes", antibodyCodes);
-        }
-        if (stainCodes.Count > 0)
-        {
-            branches.Add(BuildTestBranch("BlockStain", "SpecialStainTCCodes", "@StainCodes", selectList, groupBy));
-            param.Add("StainCodes", stainCodes);
-        }
-
-        return branches.Count == 0 ? (null, param) : (string.Join("\nUNION ALL\n", branches), param);
-    }
-
-    /// <summary>
-    /// One UNION branch: dispatched tests of the given type, joined to their TC-code junction
-    /// table, block, batch and project — filtered to the batch type, project (if given), the
-    /// caller's selected test codes, and an optional dispatched-date range (legacy StartDate/EndDate
-    /// calendar controls — this analytics page counts DISPATCHED tests within a period, so the
-    /// range applies to <c>DispatchedDate</c>, not the submission date). <c>BatchBlock.BatchID</c>
-    /// is used for the block→batch join (the legacy <c>GetTestRows</c> SP incorrectly joins on
-    /// <c>BatchBlock.ID</c> instead — confirmed live; not reproduced here).
-    /// </summary>
-    private static string BuildTestBranch(string testTable, string tcTable, string codesParam, string selectList, string? groupBy) => $@"
-SELECT {selectList}
-FROM [{testTable}] t
-INNER JOIN [{tcTable}] tc ON tc.[TestID] = t.[ID]
-INNER JOIN [BatchBlock] bb ON bb.[ID] = t.[BlockID]
-INNER JOIN [Batch] b ON b.[ID] = bb.[BatchID]
-INNER JOIN [luProjects] lp ON lp.[ID] = b.[ProjectContractCode]
-WHERE b.[BatchType] = @BatchType
-  AND t.[Dispatched] = 1
-  AND (lp.[Description] = @ProjectContractDesc OR @ProjectContractDesc IS NULL)
-  AND (@StartDate IS NULL OR t.[DispatchedDate] >= @StartDate)
-  AND (@EndDate IS NULL OR t.[DispatchedDate] < DATEADD(day, 1, @EndDate))
-  AND t.[Code] IN {codesParam}
-{groupBy}";
 
     // -----------------------------------------------------------------------
     // Fix Completed Dates (admin data-correction utility)

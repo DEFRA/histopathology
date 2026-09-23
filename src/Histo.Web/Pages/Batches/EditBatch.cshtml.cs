@@ -411,8 +411,11 @@ public class EditBatchModel : HistoPageModel
             : histologyTask.Result.Where(i => i.Code != HistologyCode.IhcOther).ToList();
         // includeInactive:true surfaces a legacy "Others" row that would otherwise be hidden, but can
         // also surface blank placeholder rows with no name — filter those out rather than render an
-        // unlabelled checkbox.
-        AntibodyOptions = antibodyTask.Result.Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList();
-        StainOptions    = stainTask.Result.Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList();
+        // unlabelled checkbox. The edit flow must also expose an explicit Other option on both
+        // antibody and special-stain lists to match legacy behaviour and the backend report logic.
+        AntibodyOptions = BatchTestListOptions.EnsureOtherOption(
+            antibodyTask.Result.Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList()).ToList();
+        StainOptions = BatchTestListOptions.EnsureOtherOption(
+            stainTask.Result.Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList()).ToList();
     }
 }
