@@ -454,6 +454,12 @@ public sealed class BatchRepository : IBatchRepository
             CustomerReceivedDate  = ParseDate(dict, "CustomerReceivedDate"),
             Status                = batchStatusInt > 0 ? batchStatusInt.ToString() : Str(dict, "Status"),
             SubmittedBy           = Str(dict, "SubmittedBy"),
+            BatchType             = Str(dict, "BatchType"),
+            SafeToHandle          = Str(dict, "SafeToHandle"),
+            ReceivedTime          = Str(dict, "ReceivedTime"),
+            ReceivedBy            = Str(dict, "ReceivedBy"),
+            OtherSubmittedBy      = Str(dict, "OtherSubmittedBy"),
+            Comments              = Str(dict, "Comments"),
         };
     }
 
