@@ -19,6 +19,15 @@ parameters:
     type: boolean
     default: false
 
+  - name: runSonar
+    displayName: Run SonarCloud analysis
+    type: boolean
+    default: false
+
+  - name: sonarServiceConnection
+    type: string
+    default: 'SonarCloud-Histo'
+
   # - name: deployToProd
   #   displayName: Deploy to PROD
   #   type: boolean
@@ -43,7 +52,7 @@ stages:
           vmImage: 'ubuntu-24.04'
         steps:
           - checkout: self
-            fetchDepth: 2
+            fetchDepth: 0
             persistCredentials: false
 
           - task: UseDotNet@2
@@ -51,6 +60,19 @@ stages:
             inputs:
               version: '10.0.x'
               includePreviewVersions: true
+
+          - ${{ if eq(parameters.runSonar, true) }}:
+            - task: SonarCloudPrepare@4
+              displayName: 'Prepare Sonar analysis'
+              condition: ne(variables['Build.Reason'], 'PullRequest')
+              inputs:
+                SonarCloud: ${{ parameters.sonarServiceConnection }}
+                organization: 'defra'
+                scannerMode: 'dotnet'
+                projectKey: 'DEFRA_histopathology'
+                projectName: 'Histopathology'
+                extraProperties: |
+                  sonar.cs.opencover.reportsPaths=$(Agent.TempDirectory)/**/coverage.opencover.xml
 
           - script: |
               dotnet --info
@@ -64,7 +86,7 @@ stages:
           - script: dotnet build $(solution) --configuration $(buildConfiguration) --no-restore
             displayName: 'Build'
 
-          - script: dotnet test $(solution) --configuration $(buildConfiguration) --no-build --logger trx
+          - script: dotnet test $(solution) --configuration $(buildConfiguration) --no-build --logger trx --collect:"XPlat Code Coverage;Format=opencover" --results-directory $(Agent.TempDirectory)
             displayName: 'Run tests'
 
           - task: PublishTestResults@2
@@ -73,6 +95,7 @@ stages:
             inputs:
               testResultsFormat: VSTest
               testResultsFiles: '**/*.trx'
+              searchFolder: '$(Agent.TempDirectory)'
 
           - task: DotNetCoreCLI@2
             displayName: 'Publish Histo.Web'
@@ -119,6 +142,17 @@ stages:
           - publish: '$(Build.ArtifactStagingDirectory)'
             artifact: drop
             displayName: 'Publish artifact'
+
+          - ${{ if eq(parameters.runSonar, true) }}:
+            - task: SonarCloudAnalyze@4
+              displayName: 'Run Sonar analysis'
+              condition: and(succeededOrFailed(), ne(variables['Build.Reason'], 'PullRequest'))
+
+            - task: SonarCloudPublish@4
+              displayName: 'Publish quality gate result'
+              condition: and(succeededOrFailed(), ne(variables['Build.Reason'], 'PullRequest'))
+              inputs:
+                pollingTimeoutSec: '300'
 
   - stage: DEV
     displayName: DEV
