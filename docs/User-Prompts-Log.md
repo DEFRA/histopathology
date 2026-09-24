@@ -1829,6 +1829,25 @@ Confirmed via `sys.parameters` against LocalDB that `DeleteBlock` accepts only `
 
 Appended Run Log entries #85–#91 (`run-log-v2.md`), Session Metrics rows #145–#153 (`session-metrics.md` — also backfilled 2 missing historical rows for Runs #84/#85 that a prior `git pull` had reverted out of the file), and Prompts 115–124 (this file) covering the git-revert/reapply, `SampleSummary` lookup fix, 4-part UI fix, `BatchBlocks` missing-fields fix, `ViewSamples` export/label fix, `SearchBlockRefs` quoting fix, and `DeleteBlock` SP fix.
 
+---
+
+## Prompt 125 — Assign Tissue to BatchBlocks.aspx workflow review (2026-09-24)
+
+> Assign Tissue to BatchBlocks.aspx workflow review — two scenarios: (1) no existing sample, via Add Sample; (2) existing sample and block, via direct Edit. Requirements: PM Date must be editable; Histology Reference must be editable; full Block CRUD operations must work; Copy to Sample / Block Reference Search / Done button must continue working. Any changes made for this workflow must not impact the Create Submission or Edit Submission journeys.
+
+Root-caused: `Submissions/SubmissionDetailsBlock.cshtml(.cs)` is shared by both the Assign Tissue journey (`Batches/BatchBlocks`) and the Create/Edit/View Submission journey (`SampleSummary`), with PM Date/Histology Ref previously locked-once-set for both. Added `IsAssignTissueMode` (derived from the existing `Session.SampleDetailReturnPage` breadcrumb) so the two journeys can diverge without touching shared markup/handlers otherwise. Fixed a Scenario-1 gap where a brand-new sample added via `BatchBlocks` incorrectly inherited Submission-journey (locked) behaviour, by adding a `ReturnPage`/`BackLinkPage` to `AddSubmissionModel`. Restored a previously dead histology-ref-type dropdown for Scenario 1. Verified Block CRUD, Copy to Sample, Block Reference Search and Done were already correct and untouched. Added first-ever test coverage for `SubmissionDetailsBlockModel` (3 tests) proving both journeys behave correctly in both directions. Build 0 errors; `dotnet test` 296 total, 295 passed, 1 skipped.
+
+---
+
+## Prompt 126 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-24)
+
+> update the
+> - `run-log-v2.md` —
+> - `session-metrics.md`
+> - `User-Prompts-Log.md` —
+
+Appended Run Log entry #92 (`run-log-v2.md`), Session Metrics row #154 (`session-metrics.md`), and Prompts 125–126 (this file) covering the Assign Tissue to BatchBlocks journey-scoped PM Date/Histology Ref fix.
+
 
 ## Prompt 113 — Run the journal updater for this session (2026-09-02)
 
