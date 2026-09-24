@@ -1,3 +1,4 @@
+using Histo.Reporting.Services;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -13,10 +14,12 @@ namespace Histo.Web.Pages.Batches;
 public class PrintSubmissionModel : HistoPageModel
 {
     private readonly IBatchService _batches;
+    private readonly SubmissionNotesDataSetBuilder _notes;
 
-    public PrintSubmissionModel(ISessionService session, IBatchService batches) : base(session)
+    public PrintSubmissionModel(ISessionService session, IBatchService batches, SubmissionNotesDataSetBuilder notes) : base(session)
     {
         _batches = batches;
+        _notes = notes;
     }
 
     public Batch? Batch { get; private set; }
@@ -43,7 +46,7 @@ public class PrintSubmissionModel : HistoPageModel
         Batch = await _batches.GetByIdAsync(Session.BatchID.Value);
         if (Batch is null) return RedirectToPage("/Batches/BatchesNotReceived");
 
-        HasNotes = !string.IsNullOrWhiteSpace(Batch.Comments) || !string.IsNullOrWhiteSpace(Batch.StatusComments);
+        HasNotes = await _notes.HasAnyNotesAsync(Session.BatchID.Value);
 
         return Page();
     }

@@ -29,17 +29,6 @@ public class SubmissionDetailsBlockModel : HistoPageModel
 {
     private const int LookupTissueCode = 9;
 
-    /// <summary>Legacy source: Common.vb::HistologyRefType enum — fixed, not database-driven.</summary>
-    public static readonly IReadOnlyList<(int Value, string Label)> HistologyRefTypeOptions =
-    [
-        (1, "Neuropath"),
-        (2, "Abattoir survey"),
-        (3, "TB diagnostics"),
-        (4, "General pool"),
-        (5, "Mouse projects"),
-        (6, "Use PG number"),
-    ];
-
     private readonly ISubmissionService _submissions;
     private readonly IBlockService _blocks;
     private readonly IBatchService _batches;
@@ -78,9 +67,6 @@ public class SubmissionDetailsBlockModel : HistoPageModel
 
     /// <summary>Set when the user has requested the inline "Check used block refs" lookup for this sample.</summary>
     [BindProperty(SupportsGet = true)] public bool ShowUsedRefs { get; set; }
-
-    /// <summary>Histology Ref Type selected from the "or Pick" dropdown — legacy Common.vb::HistologyRefType.</summary>
-    [BindProperty] public int? HistologyRefType { get; set; }
 
     /// <summary>Histology Reference for the sample (NN/NNNNN format). Only postable while unset — see <see cref="HistologyRefLocked"/>.</summary>
     [BindProperty] public string? EditHistologyRef { get; set; }
@@ -352,53 +338,6 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         }
 
         return RedirectToPage("/Blocks/BlockDetails", new { batchId = BatchId, animalId = AnimalId, blockId = blockIds[0] });
-    }
-
-    /// <summary>
-    /// "Or Pick" — assigns the next unused histology ref for the selected type and saves it
-    /// immediately (PM date/Histology ref are read-only display elsewhere on this page, so this
-    /// is now the only way to change the Histology ref here — there is no separate Save action).
-    /// Legacy source: SubmissionDetailsBlock.aspx.vb::ddlHistologyType_SelectedIndexChanged.
-    /// Uses the existing <see cref="IHistologyRefService.GetUnusedRefsAsync"/> — no new stored procedure.
-    /// Explicit submit rather than AutoPostBack, per WCAG 3.2.2 (On Input).
-    /// </summary>
-    public async Task<IActionResult> OnPostGetNextHistologyRefAsync()
-    {
-        var redirect = await LoadAnimalAsync();
-        if (redirect is not null) return redirect;
-        if (Animal is null) return RedirectToPage("/Submissions/SampleSummary", new { batchId = BatchId });
-
-        if (HistologyRefType is > 0)
-        {
-            var unused = await _histologyRefs.GetUnusedRefsAsync(HistologyRefType.Value);
-            var nextRef = unused.FirstOrDefault()?.Ref;
-            if (nextRef is not null)
-            {
-                var updated = new Animal
-                {
-                    ID = Animal.ID,
-                    BatchSubmissionID = Animal.BatchSubmissionID,
-                    SenderRef = Animal.SenderRef,
-                    NextBlockRef = Animal.NextBlockRef,
-                    HistoRefSet = true,
-                    HistologyRef = nextRef,
-                    OnHold = Animal.OnHold,
-                    PMDate = Animal.PMDate,
-                    PMDateSet = Animal.PMDateSet,
-                    IsPGNumber = Animal.IsPGNumber,
-                    BookedHistologyRef = Animal.BookedHistologyRef,
-                    RowStamp = Animal.RowStamp,
-                };
-                await _submissions.UpdateAnimalAsync(updated, Session.UserID);
-                Animal.HistologyRef = nextRef;
-            }
-        }
-
-        var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
-        Blocks = allBlocks.Where(b => b.AnimalID == Animal.ID).ToList();
-        await LoadSupportingDataAsync();
-
-        return Page();
     }
 
     /// <summary>

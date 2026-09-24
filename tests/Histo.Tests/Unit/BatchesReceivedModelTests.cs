@@ -1,4 +1,3 @@
-using Histo.Core.Domain;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.Batches;
@@ -54,56 +53,50 @@ public class BatchesReceivedModelTests
         var result = sut.OnPostSelect(42);
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
-        Assert.Equal("/Batches/BatchBlocks", redirect.PageName);
+        Assert.Equal("/Batches/BatchDetails", redirect.PageName);
         Assert.Equal(42, _session.Object.BatchID);
         Assert.False(_session.Object.IsViewSubmissionMode);
     }
 
     [Fact]
-    public async Task OnPostGoAsync_QuickGoIdSet_SetsSessionAndRedirects()
+    public void OnPostGoAsync_QuickGoIdSet_SetsSessionAndRedirects()
     {
         var sut = CreateSut();
         sut.QuickGoId = 99;
-        _batches.Setup(b => b.GetReceivedAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<BatchListResult>)[]);
-        _batches.Setup(b => b.GetByIdAsync(99, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Batch { ID = 99, Status = BatchStatus.Received });
 
-        var result = await sut.OnPostGoAsync();
+        var result = sut.OnPostGoAsync();
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
-        Assert.Equal("/Batches/BatchBlocks", redirect.PageName);
+        Assert.Equal("/Batches/BatchDetails", redirect.PageName);
         Assert.Equal(99, _session.Object.BatchID);
     }
 
     [Fact]
-    public async Task OnPostGoAsync_ZeroQuickGoId_ShouldRejectInvalidInput()
+    public void OnPostGoAsync_ZeroQuickGoId_ShouldRejectInvalidInput()
     {
         var sut = CreateSut();
         sut.QuickGoId = 0;
-        _batches.Setup(b => b.GetReceivedAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<BatchListResult>)[]);
 
-        var result = await sut.OnPostGoAsync();
+        var result = sut.OnPostGoAsync();
 
         Assert.IsType<PageResult>(result);
         Assert.Null(_session.Object.BatchID);
     }
 
     [Fact]
-    public async Task OnPostGoAsync_NullQuickGoId_ShowsValidationError()
+    public void OnPostGoAsync_NoQuickGoId_StillRedirectsWithoutSettingSession_BUG()
     {
-        // Production code validates null the same as zero ("Enter a submission number.")
-        // and returns Page() without touching Session.BatchID — the older "redirects anyway
-        // without validation" behaviour this test used to document has since been fixed.
+        // BUG: unlike every other "Go" handler in this module (BatchesForEditing,
+        // BatchesForDispatch, BatchesNotReceived), this one has no validation at all —
+        // when QuickGoId is null it redirects to BatchDetails anyway, without setting
+        // Session.BatchID, silently loading whatever batch (if any) was already in session.
         var sut = CreateSut();
         sut.QuickGoId = null;
-        _batches.Setup(b => b.GetReceivedAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<BatchListResult>)[]);
 
-        var result = await sut.OnPostGoAsync();
+        var result = sut.OnPostGoAsync();
 
-        Assert.IsType<PageResult>(result);
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Batches/BatchDetails", redirect.PageName);
         Assert.Null(_session.Object.BatchID);
     }
 }

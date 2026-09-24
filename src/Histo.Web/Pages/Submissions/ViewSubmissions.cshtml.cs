@@ -1,6 +1,7 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
 using Histo.Core.Domain;
+using Histo.Reporting.Services;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -27,6 +28,7 @@ public class ViewSubmissionsModel : HistoPageModel
     private readonly IBatchService   _batches;
     private readonly IUserService    _users;
     private readonly ILookupService  _lookups;
+    private readonly SubmissionNotesDataSetBuilder _notes;
 
     /// <summary>Single source of truth for the results table header — (display label, sort key) pairs, in column order.</summary>
     public static readonly IReadOnlyList<(string Label, string Column)> GridColumns =
@@ -47,12 +49,13 @@ public class ViewSubmissionsModel : HistoPageModel
     private const int LookupContacts = 18;
     private const int LookupProjects = 19;
 
-    public ViewSubmissionsModel(ISessionService session, IBatchService batches, IUserService users, ILookupService lookups)
+    public ViewSubmissionsModel(ISessionService session, IBatchService batches, IUserService users, ILookupService lookups, SubmissionNotesDataSetBuilder notes)
         : base(session)
     {
         _batches = batches;
         _users   = users;
         _lookups = lookups;
+        _notes   = notes;
     }
 
     [BindProperty] public int?      SubmissionNumber    { get; set; }
@@ -221,8 +224,7 @@ public class ViewSubmissionsModel : HistoPageModel
             Session.ReturnPage  = "/Submissions/ViewSubmissions";  // GAP-3: context-aware back link on BatchDetails
             Session.IsViewSubmissionMode = true;
 
-            var selectedBatch = await _batches.GetByIdAsync(SelectedBatchId);
-            HasNotes = !string.IsNullOrWhiteSpace(selectedBatch?.Comments) || !string.IsNullOrWhiteSpace(selectedBatch?.StatusComments);
+            HasNotes = await _notes.HasAnyNotesAsync(SelectedBatchId);
         }
 
         Results  = await resultsTask;

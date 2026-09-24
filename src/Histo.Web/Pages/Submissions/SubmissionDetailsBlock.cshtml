@@ -70,32 +70,6 @@ else
         }
     </form>
 
-    @* "Or Pick" — assigns the next unused histology ref for a type and saves it immediately.
-       Shown only in the Assign Tissues to Blocks journey while no ref has been entered yet — the
-       Create/Edit/View Submission journey keeps its existing manual-entry-only behaviour. *@
-    @if (Model.IsAssignTissueMode && !Model.IsViewMode && string.IsNullOrWhiteSpace(Model.Animal.HistologyRef))
-    {
-        <form method="post" asp-page-handler="GetNextHistologyRef" class="govuk-!-margin-bottom-6">
-            <input type="hidden" asp-for="BatchId" />
-            <input type="hidden" asp-for="AnimalId" />
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="HistologyRefType">Or pick a histology reference type</label>
-                @if (Model.IsPreCassetted)
-                {
-                    <div class="govuk-hint">Mandatory for pre-cassetted submissions.</div>
-                }
-                <select class="govuk-select" asp-for="HistologyRefType">
-                    <option value="">-- Select --</option>
-                    @foreach (var t in Histo.Web.Pages.Submissions.SubmissionDetailsBlockModel.HistologyRefTypeOptions)
-                    {
-                        <option value="@t.Value">@t.Label</option>
-                    }
-                </select>
-            </div>
-            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Get next ref</button>
-        </form>
-    }
-
     <h2 class="govuk-heading-m">Blocks</h2>
 
     @* Inline GOV.UK confirmation panel — replaces the browser confirm() dialog for Delete. *@

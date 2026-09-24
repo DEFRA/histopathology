@@ -1,13 +1,10 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
 using Histo.Core.Domain;
-using Histo.Histology.Interfaces;
-using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.Submissions;
 using Histo.Web.Services;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -17,87 +14,126 @@ using Moq;
 namespace Histo.Tests.Unit;
 
 /// <summary>
-/// Unit tests for <see cref="SampleSummaryModel"/>'s <c>OnPostFinishAsync</c> handler —
-/// the create-flow's "Finish" gate, equivalent to legacy's <c>btSubmit_Click</c>
-/// (<c>BatchBlocks.aspx.vb</c> / <c>BatchSummary.aspx.vb</c> / <c>BatchBlockSummary.aspx.vb</c>),
-/// which only proceeded once <c>dtBatch.Rows.Count &gt; 0</c>.
+/// Unit tests for <see cref="SampleSummaryModel"/> — the flat sample list reached from
+/// <c>BatchDetails</c>'s "Samples" button (replaces legacy BatchSummary/BatchBlockSummary).
 /// </summary>
 public class SampleSummaryModelTests
 {
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<ISubmissionService> _submissions = new();
     private readonly Mock<IBatchService> _batches = new();
-    private readonly Mock<IBlockService> _blocks = new();
     private readonly Mock<ILookupService> _lookups = new();
 
     public SampleSummaryModelTests()
     {
         _session.SetupProperty(s => s.BatchID);
-        _session.SetupProperty(s => s.ReturnPage);
-        _session.SetupProperty(s => s.ReturnPageQuery);
-        _session.Setup(s => s.UserID).Returns(42);
-        _blocks.Setup(b => b.GetByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<Block>)[]);
-        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _session.SetupProperty(s => s.AnimalID);
+        _session.SetupProperty(s => s.BatchSubmissionID);
+        _session.Setup(s => s.IsHistoUser).Returns(true);
+        _session.Setup(s => s.UserID).Returns(99);
+
+        _batches.Setup(b => b.GetSubmittedAsCodeAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((string?)null);
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _lookups.Setup(l => l.GetLookupDataAsync(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(0);
     }
 
     private SampleSummaryModel CreateSut() =>
-        new(_session.Object, _submissions.Object, _batches.Object, _blocks.Object, _lookups.Object)
+        new(_session.Object, _submissions.Object, _batches.Object, _lookups.Object)
         {
             PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
-            TempData = new TempDataDictionary(new DefaultHttpContext(), Mock.Of<Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataProvider>()),
-            BatchId = 5,
+            TempData = Mock.Of<ITempDataDictionary>(),
         };
 
     [Fact]
-    public async Task OnPostFinishAsync_NoSamples_ReturnsErrorAndDoesNotChangeStatus()
+    public async Task OnGetAsync_NoBatchId_RedirectsToIndex()
     {
-        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<Animal>)[]);
-
         var sut = CreateSut();
-        var result = await sut.OnPostFinishAsync();
+        sut.BatchId = null;
+
+        var result = await sut.OnGetAsync();
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
-        Assert.Null(redirect.PageName);
-        Assert.Equal("You must add at least one sample before finishing this submission.", sut.TempData["SampleSummary_Error"]);
-        _batches.Verify(b => b.CompleteBlockAssignmentAsync(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal("/Index", redirect.PageName);
     }
 
     [Fact]
-    public async Task OnPostFinishAsync_HasSamples_UpdatesStatusAndRedirectsToPrintSubmission()
+    public async Task OnGetAsync_ValidBatch_LoadsPageAndSyncsSession()
     {
-        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1, SenderRef = "S1" }]);
-        _batches.Setup(b => b.CompleteBlockAssignmentAsync(5, It.IsAny<bool>(), 42, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
-
+        _batches.Setup(b => b.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 1 });
         var sut = CreateSut();
-        var result = await sut.OnPostFinishAsync();
+        sut.BatchId = 1;
 
-        var redirect = Assert.IsType<RedirectToPageResult>(result);
-        Assert.Equal("/Batches/PrintSubmission", redirect.PageName);
-        Assert.Equal("/Batches/BatchesNotReceived", sut.Session.ReturnPage);
-        _batches.Verify(b => b.CompleteBlockAssignmentAsync(5, It.IsAny<bool>(), 42, It.IsAny<CancellationToken>()), Times.Once);
+        var result = await sut.OnGetAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal(1, _session.Object.BatchID);
     }
 
     [Fact]
-    public async Task OnPostFinishAsync_WetTissue_DoesNotAdvanceStatusAndRedirectsToPrintSubmission()
+    public async Task OnPostSelect_NoBatchId_RedirectsToIndex()
     {
-        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1, SenderRef = "S1" }]);
-        _batches.Setup(b => b.GetSubmittedAsCodeAsync(5, It.IsAny<CancellationToken>()))
-            .ReturnsAsync("1");
-        _lookups.Setup(l => l.GetLookupDataAsync(11, true, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 1, Code = "1", Name = "Wet Tissue" }]);
-
         var sut = CreateSut();
-        var result = await sut.OnPostFinishAsync();
+        sut.BatchId = null;
+
+        var result = await sut.OnPostSelect(5);
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
-        Assert.Equal("/Batches/PrintSubmission", redirect.PageName);
-        Assert.Equal("/Batches/BatchesNotReceived", sut.Session.ReturnPage);
-        _batches.Verify(b => b.CompleteBlockAssignmentAsync(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal("/Index", redirect.PageName);
+    }
+
+    [Fact]
+    public async Task OnPostSelect_WetTissue_RoutesToSubmissionDetails()
+    {
+        _batches.Setup(b => b.GetSubmittedAsCodeAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync("4");
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        var result = await sut.OnPostSelect(5);
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Submissions/SubmissionDetails", redirect.PageName);
+        Assert.Equal(5, _session.Object.AnimalID);
+    }
+
+    [Fact]
+    public async Task OnPostSelect_NotWetTissue_RoutesToSubmissionDetailsBlock()
+    {
+        _batches.Setup(b => b.GetSubmittedAsCodeAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync("5");
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        var result = await sut.OnPostSelect(5);
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Submissions/SubmissionDetailsBlock", redirect.PageName);
+    }
+
+    [Theory]
+    [InlineData(BatchStatus.Submitted, true)]
+    [InlineData(BatchStatus.Rejected, true)]
+    [InlineData(BatchStatus.Received, false)]
+    [InlineData(BatchStatus.Completed, false)]
+    public async Task CanModifySamples_ReflectsBatchStatus(string status, bool expected)
+    {
+        _batches.Setup(b => b.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 1, Status = status });
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        await sut.OnGetAsync();
+
+        Assert.Equal(expected, sut.CanModifySamples);
+    }
+
+    [Fact]
+    public void IsViewMode_ReflectsSessionFlag()
+    {
+        _session.Setup(s => s.IsViewSubmissionMode).Returns(true);
+        var sut = CreateSut();
+
+        Assert.True(sut.IsViewMode);
     }
 }

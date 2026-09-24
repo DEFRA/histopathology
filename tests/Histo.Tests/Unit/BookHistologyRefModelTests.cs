@@ -16,6 +16,12 @@ public class BookHistologyRefModelTests
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<IHistologyRefService> _refs = new();
 
+    public BookHistologyRefModelTests()
+    {
+        _session.SetupProperty(s => s.AnimalID);
+        _session.Setup(s => s.UserID).Returns(99);
+    }
+
     private BookHistologyRefModel CreateSut() =>
         new(_session.Object, _refs.Object)
         {
@@ -23,76 +29,82 @@ public class BookHistologyRefModelTests
         };
 
     [Fact]
-    public async Task OnGetAsync_LoadsCounters()
+    public async Task OnGetAsync_LoadsUnusedRefsForType1()
     {
-        _refs.Setup(r => r.GetCountersAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<HistologyRefCounter>)[new HistologyRefCounter { Type = 1, Description = "Neuropath", NextHistologyRef = "10000" }]);
+        _refs.Setup(r => r.GetUnusedRefsAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<HistologyRef>)[new HistologyRef { Ref = "24/00001" }]);
         var sut = CreateSut();
 
         await sut.OnGetAsync();
 
-        Assert.Single(sut.Counters);
+        Assert.Single(sut.AvailableRefs);
     }
 
     [Fact]
-    public async Task OnPostAsync_NoTypeSelected_ReturnsErrorWithoutBooking()
+    public async Task OnPostAsync_NullAnimalIdInSession_DoesNotRedirect_BUG()
     {
-        _refs.Setup(r => r.GetCountersAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<HistologyRefCounter>)[]);
+        // BUG: `Session.AnimalID <= 0` is false when AnimalID is null (nullable relational
+        // comparisons against null are always false in C#), so this guard silently fails to
+        // catch the "never selected an animal" case and falls through to book against
+        // AnimalID 0 instead of redirecting like the explicit-zero case does below.
+        _session.Object.AnimalID = null;
+        _refs.Setup(r => r.BookRefAsync("24/00001", 0, 99, It.IsAny<CancellationToken>())).ReturnsAsync(true);
         var sut = CreateSut();
-        sut.HistologyType = 0;
-        sut.NumberToBook = 5;
 
-        var result = await sut.OnPostAsync();
+        var result = await sut.OnPostAsync("24/00001");
 
-        Assert.IsType<PageResult>(result);
-        Assert.Equal("You must select a Histology Ref Range Type.", sut.Error);
-        _refs.Verify(r => r.BookCounterRangeAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.IsType<RedirectToPageResult>(result);
+        _refs.Verify(r => r.BookRefAsync("24/00001", 0, 99, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task OnPostAsync_NoNumberEntered_ReturnsErrorWithoutBooking()
+    public async Task OnPostAsync_ZeroAnimalIdInSession_RedirectsToIndex()
     {
-        _refs.Setup(r => r.GetCountersAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<HistologyRefCounter>)[]);
+        _session.Object.AnimalID = 0;
         var sut = CreateSut();
-        sut.HistologyType = HistologyRefTypeCode.Neuropath;
-        sut.NumberToBook = null;
 
-        var result = await sut.OnPostAsync();
+        var result = await sut.OnPostAsync("24/00001");
 
-        Assert.IsType<PageResult>(result);
-        Assert.Equal("You must enter a valid Number Required (a whole number greater than zero).", sut.Error);
-        _refs.Verify(r => r.BookCounterRangeAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Index", redirect.PageName);
     }
 
     [Fact]
-    public async Task OnPostAsync_BookingFails_ReturnsPageWithError()
+    public async Task OnPostAsync_EmptyHistoRef_DoesNotBookReference()
     {
-        _refs.Setup(r => r.GetCountersAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<HistologyRefCounter>)[]);
-        _refs.Setup(r => r.BookCounterRangeAsync(HistologyRefTypeCode.Neuropath, 5, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new HistologyBookingResult { Success = false, Error = "Cannot book the required histology numbers as the maximum neuropath histology number is 19999." });
+        _session.Object.AnimalID = 42;
         var sut = CreateSut();
-        sut.HistologyType = HistologyRefTypeCode.Neuropath;
-        sut.NumberToBook = 5;
 
-        var result = await sut.OnPostAsync();
+        var result = await sut.OnPostAsync(string.Empty);
 
         Assert.IsType<PageResult>(result);
-        Assert.Equal("Cannot book the required histology numbers as the maximum neuropath histology number is 19999.", sut.Error);
+        _refs.Verify(r => r.BookRefAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task OnPostAsync_BookingSucceeds_ReturnsPageWithSuccessMessage()
+    public async Task OnPostAsync_BookingFails_ReturnsPageWithErrorAndReloadsRefs()
     {
-        _refs.Setup(r => r.GetCountersAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<HistologyRefCounter>)[]);
-        _refs.Setup(r => r.BookCounterRangeAsync(HistologyRefTypeCode.Neuropath, 5, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new HistologyBookingResult { Success = true, FirstBooked = 10000, LastBooked = 10004 });
+        _session.Object.AnimalID = 42;
+        _refs.Setup(r => r.BookRefAsync("24/00001", 42, 99, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _refs.Setup(r => r.GetUnusedRefsAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<HistologyRef>)[]);
         var sut = CreateSut();
-        sut.HistologyType = HistologyRefTypeCode.Neuropath;
-        sut.NumberToBook = 5;
 
-        var result = await sut.OnPostAsync();
+        var result = await sut.OnPostAsync("24/00001");
 
         Assert.IsType<PageResult>(result);
-        Assert.Equal("You have successfully booked Histology numbers in the range 10000 - 10004, inclusive.", sut.SuccessMessage);
+        Assert.Equal("Could not book the selected reference.", sut.Error);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_BookingSucceeds_RedirectsToSampleSummary()
+    {
+        _session.Object.AnimalID = 42;
+        _refs.Setup(r => r.BookRefAsync("24/00001", 42, 99, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        var sut = CreateSut();
+
+        var result = await sut.OnPostAsync("24/00001");
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Submissions/SampleSummary", redirect.PageName);
     }
 }

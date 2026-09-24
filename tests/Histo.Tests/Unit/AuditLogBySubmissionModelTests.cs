@@ -2,6 +2,7 @@ using Histo.AuditLog.Interfaces;
 using Histo.AuditLog.Models;
 using Histo.Web.Pages.AuditLog;
 using Histo.Web.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -26,21 +27,10 @@ public class AuditLogBySubmissionModelTests
         {
             PageContext = new PageContext
             {
+                HttpContext = new DefaultHttpContext(),
                 ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()),
-                HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext(),
             },
         };
-
-    [Fact]
-    public void OnGet_NoBatchIdInSession_LeavesSubmissionIdBlank()
-    {
-        _session.Object.BatchID = null;
-        var sut = CreateSut();
-
-        sut.OnGet();
-
-        Assert.Null(sut.SubmissionID);
-    }
 
     [Fact]
     public void OnGet_BatchIdInSession_PrePopulatesSubmissionId()
@@ -54,30 +44,39 @@ public class AuditLogBySubmissionModelTests
     }
 
     [Fact]
-    public async Task OnPostAsync_NullSubmissionId_ReturnsError()
+    public void OnGet_NoBatchIdInSession_LeavesSubmissionIdAtDefault()
+    {
+        _session.Object.BatchID = null;
+        var sut = CreateSut();
+
+        sut.OnGet();
+
+        Assert.Equal(0, sut.SubmissionID);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_NoSubmissionId_ReturnsPageWithError()
     {
         var sut = CreateSut();
-        sut.SubmissionID = null;
+        sut.SubmissionID = 0;
 
         var result = await sut.OnPostAsync();
 
         Assert.IsType<PageResult>(result);
         Assert.Contains("Enter a submission number.", sut.Errors);
-        _auditLog.Verify(a => a.GetBySubmissionAsync(It.IsAny<int>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task OnPostAsync_ValidSubmissionId_SearchesAndReturnsResults()
     {
-        _auditLog.Setup(a => a.GetBySubmissionAsync(42, null, null, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<AuditLogEntry>)[new AuditLogEntry { TableName = "Batch" }]);
+        _auditLog.Setup(a => a.GetBySubmissionAsync(42, It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<AuditLogEntry>)[new AuditLogEntry { FieldName = "Status" }]);
         var sut = CreateSut();
         sut.SubmissionID = 42;
 
         var result = await sut.OnPostAsync();
 
         Assert.IsType<PageResult>(result);
-        Assert.True(sut.Searched);
         Assert.Single(sut.Results);
     }
 }

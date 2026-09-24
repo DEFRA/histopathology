@@ -1,5 +1,7 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
+using Histo.Infrastructure;
+using Histo.Reporting.Services;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.Submissions;
@@ -25,6 +27,8 @@ public class ViewSubmissionsModelTests
     private readonly Mock<IBatchService> _batches = new();
     private readonly Mock<IUserService> _users = new();
     private readonly Mock<ILookupService> _lookups = new();
+    // Concrete sealed type — not exercised by these tests, so a real instance with a stub connection factory suffices.
+    private readonly SubmissionNotesDataSetBuilder _notes = new(Mock.Of<IDbConnectionFactory>());
 
     public ViewSubmissionsModelTests()
     {
@@ -37,7 +41,7 @@ public class ViewSubmissionsModelTests
     }
 
     private ViewSubmissionsModel CreateSut() =>
-        new(_session.Object, _batches.Object, _users.Object, _lookups.Object)
+        new(_session.Object, _batches.Object, _users.Object, _lookups.Object, _notes)
         {
             PageContext = new PageContext
             {
