@@ -128,11 +128,22 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     /// Legacy source: SubmissionDetailsBlock.aspx.vb::DisableEnableControls (SV_ViewSubmission branch).</summary>
     public bool IsViewMode => Session.IsViewSubmissionMode;
 
-    /// <summary>Once a Histology Ref has been assigned to this sample it becomes read-only here — matches legacy, which only allows entry while unset.</summary>
-    public bool HistologyRefLocked => Animal?.HistoRefSet == true;
+    /// <summary>
+    /// True when this page was reached via the batch-wide "Assign Tissues to Blocks" journey
+    /// (<see cref="Histo.Web.Pages.Batches.BatchBlocksModel"/>) rather than the Create/Edit/View
+    /// Submission journey (<c>SampleSummary</c>) — detected from the same breadcrumb
+    /// <see cref="BackLinkPage"/> already uses. PM date/Histology reference are always editable in
+    /// this journey (never locked once set); the Submission journeys keep the existing
+    /// editable-only-while-unset behaviour.
+    /// </summary>
+    public bool IsAssignTissueMode => (Session.SampleDetailReturnPage ?? string.Empty)
+        .Contains("/Batches/BatchBlocks", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>Once a PM Date has been assigned to this sample it becomes read-only here — matches legacy, which only allows entry while unset.</summary>
-    public bool PMDateLocked => Animal?.PMDateSet == true;
+    /// <summary>Once a Histology Ref has been assigned to this sample it becomes read-only here — matches legacy, which only allows entry while unset. Always editable in the Assign Tissues to Blocks journey.</summary>
+    public bool HistologyRefLocked => !IsAssignTissueMode && Animal?.HistoRefSet == true;
+
+    /// <summary>Once a PM Date has been assigned to this sample it becomes read-only here — matches legacy, which only allows entry while unset. Always editable in the Assign Tissues to Blocks journey.</summary>
+    public bool PMDateLocked => !IsAssignTissueMode && Animal?.PMDateSet == true;
 
     // Set by whichever page navigated here (SampleSummary/BatchBlocks/AddSubmission) right before
     // redirecting — falls back to SampleSummary if reached without that breadcrumb (e.g. a stale/direct link).

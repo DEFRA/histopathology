@@ -229,7 +229,9 @@
     <div class="govuk-button-group">
         @if (!Model.IsViewMode)
         {
-            <a asp-page="/Submissions/AddSubmission" asp-route-BatchId="@Model.BatchId" class="govuk-button" data-module="govuk-button">Add sample</a>
+            <a asp-page="/Submissions/AddSubmission" asp-route-BatchId="@Model.BatchId"
+               asp-route-ReturnPage="@Url.Page("/Batches/BatchBlocks", new { batchId = Model.BatchId })"
+               class="govuk-button" data-module="govuk-button">Add sample</a>
             <button type="submit" formaction="?handler=EditSampleSelect" class="govuk-button govuk-button--secondary" data-module="govuk-button">Edit sample</button>
             <button type="submit" formaction="?handler=DeleteSampleSelect" class="govuk-button govuk-button--warning" data-module="govuk-button">Delete sample</button>
         }

@@ -35,6 +35,18 @@ public class AddSubmissionModel : HistoPageModel
     [BindProperty] public string SenderRef   { get; set; } = string.Empty;
 
     /// <summary>
+    /// Set when reached from a caller other than <c>SampleSummary</c> (currently only
+    /// <c>Batches/BatchBlocks</c>'s "Add sample", the Assign Tissues to Blocks journey) so the
+    /// Back link and the post-add redirect return there instead of defaulting to SampleSummary.
+    /// </summary>
+    [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
+
+    /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
+    public string BackLinkPage => !string.IsNullOrWhiteSpace(ReturnPage) && Url.IsLocalUrl(ReturnPage)
+        ? ReturnPage
+        : $"/Submissions/SampleSummary?batchId={BatchId}";
+
+    /// <summary>
     /// Set when this form was reached via "Copy sample" — the animal whose tissues should be
     /// duplicated onto the newly created sample. Round-tripped via a hidden field so it survives
     /// the POST (and the SearchSender picker detour, which only restores <see cref="SenderRef"/>).
@@ -175,14 +187,14 @@ public class AddSubmissionModel : HistoPageModel
                 return RedirectToPage("/Submissions/SampleSummary", new { batchId });
             }
 
-            Session.SampleDetailReturnPage = $"/Submissions/SampleSummary?batchId={batchId}";
+            Session.SampleDetailReturnPage = BackLinkPage;
             return RedirectToPage("/Submissions/SubmissionDetails", new { batchId, animalId = newAnimalId });
         }
 
         if (SourceAnimalId is > 0)
             return RedirectToPage("/Submissions/SampleSummary", new { batchId });
 
-        Session.SampleDetailReturnPage = $"/Submissions/SampleSummary?batchId={batchId}";
+        Session.SampleDetailReturnPage = BackLinkPage;
         return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = newAnimalId });
     }
 

@@ -1748,6 +1748,88 @@ Analysed the legacy flow via two parallel `Explore` subagents (`BatchDetails.asp
 
 ---
 
+## Prompt 115 — Git pull scenario: revert local changes, reapply after (2026-09-23)
+
+> My team member had worked on these file, can i revert the changes after pull can you make this changes ?
+
+Investigated whether a teammate's `git pull` would overwrite the Run #85 GET-based Search-module fix before any revert happened; confirmed the fix was still intact on disk at that point. Saved a full verbatim snapshot of all affected files (`ViewSamples`, `SearchTest`, `SearchPMDates`, `SearchArchiveLocation` — `.cshtml`/`.cshtml.cs`) to repo memory so the fix could be reapplied on request without needing git tooling.
+
+---
+
+## Prompt 116 — Reapply the Run #85 changes (2026-09-23)
+
+> eapply the Run #85 changes
+
+Confirmed via direct file reads that all 4 pages plus 2 dependent test files had indeed reverted to their pre-fix POST-based state after the pull. Restored the exact GET-based content from the earlier memory snapshot, fixed the two test files' stale handler names, and found/fixed a leftover duplicate `PageSize`/`SortColumn` block hiding `GridPageModel`'s own members. Build 0 errors; `dotnet test` 287 total, 286 passed, 1 skipped.
+
+---
+
+## Prompt 117 — SampleSummary "Unknown submission type" investigation (2026-09-23)
+
+> Investigate the issue on SampleSummary.cshtml where the Batch No is displayed as "Unknown submission type". Review the logic used to determine and display the Batch Number and identify why the application is resolving the value to "Unknown submission type". Verify that the correct submission type is being passed, mapped, and rendered from the underlying data source. Confirm whether this is a data issue, mapping issue, or a regression introduced during migration, and implement a fix so that the correct Batch Number is displayed consistently.
+
+Root-caused to `GetLookupDataAsync(11)` (LOOKUP_SUBMITTEDAS) missing `includeInactive: true` — `luSubmittedAs` code 6 ("Fresh Frozen") is confirmed inactive, so batches submitted under it (or any other since-deactivated type) silently failed to resolve a description. A migration regression, not a data issue — same bug class already fixed elsewhere in the app. Fixed `SampleSummaryModel` and the identical `AddSubmissionModel.IsWetTissueCodeAsync`. Build 0 errors; `dotnet test` 287 total, 286 passed, 1 skipped.
+
+---
+
+## Prompt 118 — Is the "Unknown submission type" bug related to the Neuropath/Mouse Bioassay removal? (2026-09-23)
+
+> Is it because of the change that is removal of Nuropath and bioassay ?
+
+Confirmed no — the Neuropath/Mouse Bioassay removal only deactivates rows in `luUserArea` (table 13); the "Unknown submission type" bug is caused by `luSubmittedAs` (table 11), a different lookup table whose code 6 was already inactive before that removal ever happened.
+
+---
+
+## Prompt 119 — Four-part UI fix: BlockDetails PM Date, button alignment, two-column layout, Copy-to-samples navigation (2026-09-23)
+
+> 1. Batchdetails.aspx page doesn't have the PM Date in new applicatin batchdetails.cshtml - in edit block shows, can you check is this needed for any other journey other remove this fields if not necessary
+> 2. BlockDetails.cshtml Nextblock and Done button can bring it in same line.
+> 3. SubmissionDetailsBlock.cshtml - Review the Sample Block page layout and two-column grid structure. sender REf and PM date leave Histology reference as its.
+> 4. SubmissionDetailsBlock.cshtml Investigate the navigation flow for the following user journey: Sample Block → Copy to Samples → Back. Currently, when the user clicks the Back button after completing Copy to Samples, they are redirected to BatchBlock instead of returning to SubmissionDetailsBlock.cshtml, which was the previous page in the workflow. Review the navigation logic and ensure that the Back action returns the user to the correct page (SubmissionDetailsBlock.cshtml) while preserving the expected navigation context and user experience.
+
+Confirmed via legacy `BlockDetails.aspx.vb` that PM Date has no visible control on that page at all — removed the duplicate field from `Blocks/BlockDetails.cshtml`. Grouped "Next block"/"Done" into one button group. Converted `SubmissionDetailsBlock.cshtml`'s header to a two-column layout (Sender ref/PM date; Histology reference left as-is). Root-caused the Copy-to-samples Back-navigation bug to `CopyBlocks.cshtml(.cs)` hardcoding every redirect to the batch-wide `BatchBlocks` page; added an `AnimalId` route param + `BackLinkPage` so it now returns to the correct originating page. Build 0 errors; `dotnet test` 287 total, 286 passed, 1 skipped.
+
+---
+
+## Prompt 120 — BatchBlocks missing legacy fields + Copy Selected Blocks provenance (2026-09-23)
+
+> Please review the Batch Blocks page against the legacy batchblocks.aspx screen and investigate the following: The following fields appear to be missing from the new application: Entered By, Entered Area, Submitted By, Submitted Area, Project or Contract Code, Submission Date, Pathologies, Species. These fields are available in the legacy batchblocks.aspx page. Confirm whether they have been intentionally removed or omitted during migration, and assess the impact. Implement the theser field using two-column layout. The new application includes a "Copy Selected Blocks" button. Please clarify the purpose of this functionality and identify the user journey(s) that require it. In the legacy application, the Assign Tissue to Block process does not include this option. Confirm whether this is a new business requirement or whether it has been introduced inadvertently during migration.
+
+Confirmed via legacy `BatchBlocks.aspx`'s embedded `Batch.ascx` control that all 8 fields are genuinely present in legacy, in a two-column layout — an unintentional migration omission. Restored via the existing shared `BatchSummaryDisplayResolver`, in a matching two-column `govuk-grid-row` header. Confirmed "Copy Selected Blocks" is NOT a legacy `BatchBlocks.aspx` feature (its real owner is `SubmissionDetailsBlock.aspx`'s "Copy To Samples") — concluded it was carried over inadvertently during the 2026-09-07 page split, flagged for the user's decision rather than removed. Build 0 errors; `dotnet test` 287 total, 286 passed, 1 skipped.
+
+---
+
+## Prompt 121 — ViewSamples Excel export columns + legacy "other ref" label (2026-09-23)
+
+> In viewsample.cshtml export to excel when block information selcted below column and values populated in excel as per legacy, it should be the same in new excel, ID can keep like Submission Number [legacy column list and sample row supplied]. When Tissue Information selcted below column and values populated in excel [legacy column list supplied]. In viewsample.aspx page there is lable values will be show like below, can we have similar kind of filed and values in viewsample.cshtml [legacy `lblOtherFieldValue` VB snippet supplied].
+
+Fixed `ViewSamplesModel.OnGetExportExcelAsync`'s column set/order to match the supplied legacy columns exactly for both modes (added missing `HistologyRef`/`SenderRef`, moved `SubmittedAs` to the end). Ported legacy `ViewSamples.aspx.vb`'s `lblOtherFieldValue` label (shows the DB-resolved counterpart ref) as `OtherFieldLabel`, rendered above the results table. Build 0 errors; `dotnet test` 287 total, 286 passed, 1 skipped.
+
+---
+
+## Prompt 122 — SearchBlockRefs pre-booked block ref quoting (2026-09-23)
+
+> In searchblock.ref screen Pre boocked block refs in single quote '01 - 02' in old system but shown. but in new sysstem show without quotes
+
+An existing code comment in `BlockRefRangeHelpers.FormatRange` claimed legacy quotes every range/ref — reading the real `SearchBlockRefs.aspx.vb::FormatString` proved this wrong: only a genuine multi-ref range is quoted, a single ref is not. Fixed `FormatRange` to match the verified legacy rule exactly and added this helper's first-ever unit test file. Build 0 errors; `dotnet test` 293 total, 292 passed, 1 skipped (6 new tests).
+
+---
+
+## Prompt 123 — DeleteBlock SqlException (2026-09-24)
+
+> Microsoft.Data.SqlClient.SqlException: 'Procedure or function DeleteBlock has too many arguments specified.' [call stack: BlockRepository.DeleteAsync → BlockService.DeleteBlockAsync]
+
+Confirmed via `sys.parameters` against LocalDB that `DeleteBlock` accepts only `@ID`; `BlockRepository.DeleteAsync` was also passing `@UserID`. Removed the extra parameter; kept the C# method signature unchanged for interface consistency. Build 0 errors; `dotnet test` 293 total, 292 passed, 1 skipped.
+
+---
+
+## Prompt 124 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-24)
+
+> update the run log v2 and session metric and prompt
+
+Appended Run Log entries #85–#91 (`run-log-v2.md`), Session Metrics rows #145–#153 (`session-metrics.md` — also backfilled 2 missing historical rows for Runs #84/#85 that a prior `git pull` had reverted out of the file), and Prompts 115–124 (this file) covering the git-revert/reapply, `SampleSummary` lookup fix, 4-part UI fix, `BatchBlocks` missing-fields fix, `ViewSamples` export/label fix, `SearchBlockRefs` quoting fix, and `DeleteBlock` SP fix.
+
+
 ## Prompt 113 — Run the journal updater for this session (2026-09-02)
 
 > Can you run the selected agent and update run-log-v2, session metrics and user prompts log
