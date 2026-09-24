@@ -34,27 +34,46 @@ else
         </div>
     }
 
-    @* PM date and Histology reference are read-only here — matching Sender ref's display and
-       GDS summary-list conventions. Histology reference is set only via "Get next ref" below
-       (there is no manual edit surface for either field on this page). *@
-    <dl class="govuk-summary-list">
-        <div class="govuk-summary-list__row">
-            <dt class="govuk-summary-list__key">Sender ref</dt>
-            <dd class="govuk-summary-list__value">@Model.Animal.SenderRef</dd>
+    @* PM date and Histology reference are editable ONLY while unset — once assigned (here or via
+       Assign Tissues to Blocks), they become permanently read-only, matching legacy's
+       "populated and disabled once already assigned to the sender ref" behaviour. *@
+    <form method="post" asp-page-handler="SaveHistologyDetails" class="govuk-!-margin-bottom-6">
+        <input type="hidden" asp-for="BatchId" />
+        <input type="hidden" asp-for="AnimalId" />
+        <div class="govuk-grid-row">
+            <div class="govuk-grid-column-one-half">
+                <div class="govuk-form-group">
+                    <label class="govuk-label">Sender ref</label>
+                    <p class="govuk-body govuk-!-font-weight-bold">@Model.Animal.SenderRef</p>
+                </div>
+            </div>
+            <div class="govuk-grid-column-one-half">
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="EditPMDate">PM date</label>
+                    <input class="govuk-input govuk-input--width-10" asp-for="EditPMDate" type="date"
+                           readonly="@(Model.PMDateLocked ? "readonly" : null)" disabled="@(Model.IsViewMode ? "disabled" : null)" />
+                </div>
+            </div>
         </div>
-        <div class="govuk-summary-list__row">
-            <dt class="govuk-summary-list__key">PM date</dt>
-            <dd class="govuk-summary-list__value">@(Model.Animal.PMDate ?? "Not recorded")</dd>
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="EditHistologyRef">Histology reference</label>
+            @if (!Model.HistologyRefLocked)
+            {
+                <div class="govuk-hint">Format: NN/NNNNN (e.g., 26/40004). Must be less than the next available reference number for its type.</div>
+            }
+            <input class="govuk-input govuk-input--width-10" asp-for="EditHistologyRef" placeholder="e.g., 26/40004" maxlength="8" pattern="\d{2}/\d{5}"
+                   readonly="@(Model.HistologyRefLocked ? "readonly" : null)" disabled="@(Model.IsViewMode ? "disabled" : null)" />
         </div>
-        <div class="govuk-summary-list__row">
-            <dt class="govuk-summary-list__key">Histology reference</dt>
-            <dd class="govuk-summary-list__value">@(Model.Animal.HistologyRef ?? "Not recorded")</dd>
-        </div>
-    </dl>
+        @if (!Model.IsViewMode && (!Model.HistologyRefLocked || !Model.PMDateLocked))
+        {
+            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Save details</button>
+        }
+    </form>
 
-    @* "Or Pick" — assigns the next unused histology ref for a type and saves it immediately,
-       replacing legacy's AutoPostBack dropdown with an explicit button per WCAG 3.2.2 (On Input). *@
-   @*  @if (!Model.IsViewMode)
+    @* "Or Pick" — assigns the next unused histology ref for a type and saves it immediately.
+       Shown only in the Assign Tissues to Blocks journey while no ref has been entered yet — the
+       Create/Edit/View Submission journey keeps its existing manual-entry-only behaviour. *@
+    @if (Model.IsAssignTissueMode && !Model.IsViewMode && string.IsNullOrWhiteSpace(Model.Animal.HistologyRef))
     {
         <form method="post" asp-page-handler="GetNextHistologyRef" class="govuk-!-margin-bottom-6">
             <input type="hidden" asp-for="BatchId" />
@@ -75,7 +94,7 @@ else
             </div>
             <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Get next ref</button>
         </form>
-    } *@
+    }
 
     <h2 class="govuk-heading-m">Blocks</h2>
 
@@ -112,19 +131,22 @@ else
                 <tr class="govuk-table__row">
                     <th scope="col" class="govuk-table__header">Block ref</th>
                     <th scope="col" class="govuk-table__header">Tissue details</th>
-                    <th scope="col" class="govuk-table__header">Archive</th>
-                    <th scope="col" class="govuk-table__header">EO</th>
-                    <th scope="col" class="govuk-table__header">H&amp;E</th>
-                    @if (Model.IsTse)
+                    @if (Model.ShowTestDetails)
                     {
-                        <th scope="col" class="govuk-table__header">H&amp;E (BSE)</th>
-                        <th scope="col" class="govuk-table__header">IHC Prp</th>
+                        <th scope="col" class="govuk-table__header">Archive</th>
+                        <th scope="col" class="govuk-table__header">EO</th>
+                        <th scope="col" class="govuk-table__header">H&amp;E</th>
+                        @if (Model.IsTse)
+                        {
+                            <th scope="col" class="govuk-table__header">H&amp;E (BSE)</th>
+                            <th scope="col" class="govuk-table__header">IHC Prp</th>
+                        }
+                        else
+                        {
+                            <th scope="col" class="govuk-table__header">IHC Other</th>
+                        }
+                        <th scope="col" class="govuk-table__header">Special stain</th>
                     }
-                    else
-                    {
-                        <th scope="col" class="govuk-table__header">IHC Other</th>
-                    }
-                    <th scope="col" class="govuk-table__header">Special stain</th>
                     <th scope="col" class="govuk-table__header">Select</th>
                 </tr>
             </thead>
@@ -157,68 +179,71 @@ else
                                 <span>None</span>
                             }
                         </td>
-                        <td class="govuk-table__cell">
-                            <div class="govuk-checkboxes govuk-checkboxes--small">
-                                <div class="govuk-checkboxes__item">
-                                    <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.Archive)" />
-                                    <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">Archived</span></label>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="govuk-table__cell">
-                            <div class="govuk-checkboxes govuk-checkboxes--small">
-                                <div class="govuk-checkboxes__item">
-                                    <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.EO)" />
-                                    <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">EO</span></label>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="govuk-table__cell">
-                            <div class="govuk-checkboxes govuk-checkboxes--small">
-                                <div class="govuk-checkboxes__item">
-                                    <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.HAndE)" />
-                                    <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">H&amp;E</span></label>
-                                </div>
-                            </div>
-                        </td>
-                        @if (Model.IsTse)
+                        @if (Model.ShowTestDetails)
                         {
                             <td class="govuk-table__cell">
                                 <div class="govuk-checkboxes govuk-checkboxes--small">
                                     <div class="govuk-checkboxes__item">
-                                        <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.HeBse)" />
-                                        <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">H&amp;E (BSE)</span></label>
+                                        <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.Archive)" />
+                                        <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">Archived</span></label>
                                     </div>
                                 </div>
                             </td>
                             <td class="govuk-table__cell">
                                 <div class="govuk-checkboxes govuk-checkboxes--small">
                                     <div class="govuk-checkboxes__item">
-                                        <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcPrp)" />
-                                        <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">IHC Prp</span></label>
+                                        <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.EO)" />
+                                        <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">EO</span></label>
                                     </div>
                                 </div>
                             </td>
-                        }
-                        else
-                        {
                             <td class="govuk-table__cell">
                                 <div class="govuk-checkboxes govuk-checkboxes--small">
                                     <div class="govuk-checkboxes__item">
-                                        <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcOther)" />
-                                        <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">IHC Other</span></label>
+                                        <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.HAndE)" />
+                                        <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">H&amp;E</span></label>
+                                    </div>
+                                </div>
+                            </td>
+                            @if (Model.IsTse)
+                            {
+                                <td class="govuk-table__cell">
+                                    <div class="govuk-checkboxes govuk-checkboxes--small">
+                                        <div class="govuk-checkboxes__item">
+                                            <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.HeBse)" />
+                                            <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">H&amp;E (BSE)</span></label>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="govuk-table__cell">
+                                    <div class="govuk-checkboxes govuk-checkboxes--small">
+                                        <div class="govuk-checkboxes__item">
+                                            <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcPrp)" />
+                                            <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">IHC Prp</span></label>
+                                        </div>
+                                    </div>
+                                </td>
+                            }
+                            else
+                            {
+                                <td class="govuk-table__cell">
+                                    <div class="govuk-checkboxes govuk-checkboxes--small">
+                                        <div class="govuk-checkboxes__item">
+                                            <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcOther)" />
+                                            <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">IHC Other</span></label>
+                                        </div>
+                                    </div>
+                                </td>
+                            }
+                            <td class="govuk-table__cell">
+                                <div class="govuk-checkboxes govuk-checkboxes--small">
+                                    <div class="govuk-checkboxes__item">
+                                        <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.SpecialStain)" />
+                                        <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">Special stain</span></label>
                                     </div>
                                 </div>
                             </td>
                         }
-                        <td class="govuk-table__cell">
-                            <div class="govuk-checkboxes govuk-checkboxes--small">
-                                <div class="govuk-checkboxes__item">
-                                    <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.SpecialStain)" />
-                                    <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">Special stain</span></label>
-                                </div>
-                            </div>
-                        </td>
                         <td class="govuk-table__cell">
                             <div class="govuk-checkboxes__item">
                                 <input class="govuk-checkboxes__input" type="checkbox" name="blockIds" value="@b.ID" form="blocks-grid-form" />

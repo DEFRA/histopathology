@@ -37,21 +37,31 @@
 }
 
 <form method="post" id="audit-log-form">
-    <div class="govuk-form-group @(Model.Errors.Any(e => e.Contains("submission")) ? "govuk-form-group--error" : "")">
-        <label class="govuk-label" for="SubmissionID">Submission number</label>
-        @if (Model.Errors.Any(e => e.Contains("submission")))
-        {
-            <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> Enter a submission number.</p>
-        }
-        <input class="govuk-input govuk-input--width-10 @(Model.Errors.Any(e => e.Contains("submission")) ? "govuk-input--error" : "")" type="number" asp-for="SubmissionID" />
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group @(Model.Errors.Any(e => e.Contains("submission")) ? "govuk-form-group--error" : "")">
+                <label class="govuk-label" for="SubmissionID">Submission number</label>
+                @if (Model.Errors.Any(e => e.Contains("submission")))
+                {
+                    <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> Enter a submission number.</p>
+                }
+                <input class="govuk-input govuk-input--width-10 @(Model.Errors.Any(e => e.Contains("submission")) ? "govuk-input--error" : "")" type="number" asp-for="SubmissionID" />
+            </div>
+        </div>
     </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="StartDate">From</label>
-        <input class="govuk-input govuk-input--width-10" type="date" asp-for="StartDate" />
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="EndDate">To</label>
-        <input class="govuk-input govuk-input--width-10" type="date" asp-for="EndDate" />
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="StartDate">From</label>
+                <input class="govuk-input govuk-input--width-10" type="date" asp-for="StartDate" />
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="EndDate">To</label>
+                <input class="govuk-input govuk-input--width-10" type="date" asp-for="EndDate" />
+            </div>
+        </div>
     </div>
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>

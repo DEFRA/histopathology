@@ -316,32 +316,6 @@ public sealed class BatchRepository : IBatchRepository
     }
 
     /// <inheritdoc/>
-    public async Task CompleteBlockAssignmentAsync(int batchId, bool allTissuesAssigned, int userId, CancellationToken ct = default)
-    {
-        var existing = await GetByIdAsync(batchId, ct);
-        if (existing is null) return;
-        var updated = new Batch
-        {
-            ID = existing.ID, Status = BatchStatus.InProgress, Comments = existing.Comments,
-            StatusComments = existing.StatusComments, BatchDate = existing.BatchDate,
-            ReceivedDate = existing.ReceivedDate, CompletedDate = existing.CompletedDate,
-            SubmittedByUserID = existing.SubmittedByUserID, UserAreaCode = existing.UserAreaCode,
-            IsPreCassetted = existing.IsPreCassetted, ByPassSort = existing.ByPassSort,
-            RowStamp = existing.RowStamp, BatchType = existing.BatchType,
-            ProjectContractCode = existing.ProjectContractCode, ContactName = existing.ContactName,
-            Species = existing.Species, Fixation = existing.Fixation,
-            CustomerReceivedDate = existing.CustomerReceivedDate,
-            SubmittedBy = existing.SubmittedBy, SubmittedArea = existing.SubmittedArea,
-            OtherSubmittedBy = existing.OtherSubmittedBy, OtherSubmittedArea = existing.OtherSubmittedArea,
-            SafeToHandle = existing.SafeToHandle, IsBlocked = true,
-            SampleSameProjects = existing.SampleSameProjects, AllTissuesAssigned = allTissuesAssigned,
-            TimeReceived = existing.TimeReceived, ReceivedBy = existing.ReceivedBy,
-            PostFixationOther = existing.PostFixationOther,
-        };
-        await UpdateAsync(updated, userId, ct);
-    }
-
-    /// <inheritdoc/>
     public async Task SetByPassSortAsync(int batchId, bool byPassSort, int userId, CancellationToken ct = default)
     {
         var existing = await GetByIdAsync(batchId, ct);
@@ -365,6 +339,33 @@ public sealed class BatchRepository : IBatchRepository
             PostFixationOther = existing.PostFixationOther,
         };
         await UpdateAsync(updated, userId, ct);
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> UpdateStatusAsync(int batchId, string newStatus, int userId, CancellationToken ct = default)
+    {
+        if (!int.TryParse(newStatus, out var batchStatusInt)) batchStatusInt = 1;
+
+        // When marking as Received, auto-populate DateReceived (mirrors legacy ReceiveBatch.aspx).
+        DateTime? dateReceived = newStatus == BatchStatus.Received ? DateTime.Now : null;
+
+        using var conn = _db.CreateConnection();
+        var p = new DynamicParameters();
+        p.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
+        p.Add("ID",              batchId);
+        p.Add("BatchStatus",     batchStatusInt);
+        p.Add("DateReceived",    dateReceived);
+        p.Add("TimeReceived",    (int?)null);
+        p.Add("ReceivedBy",      userId);
+        p.Add("StatusComments",  (string?)null);
+        p.Add("PostFixationOther", (string?)null);
+
+        await conn.ExecuteAsync("EditBatchStatus", p, commandType: System.Data.CommandType.StoredProcedure);
+
+        var returnValue = p.Get<int>("RETURN_VALUE");
+        // SP returns -1 when no rows were updated (concurrency conflict or batch not found).
+        if (returnValue == -1) throw new BatchConcurrencyException();
+        return returnValue == 0;
     }
 
     /// <inheritdoc/>
@@ -690,5 +691,75 @@ public sealed class BatchRepository : IBatchRepository
 
         var rows = await multi.ReadAsync<BatchTestSelectionRow>();
         return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task CompleteBlockAssignmentAsync(int batchId, bool allTissuesAssigned, int userId, CancellationToken ct = default)
+    {
+        var existing = await GetByIdAsync(batchId, ct);
+        if (existing is null) return;
+
+        // Legacy: BatchBlocks.aspx.vb::btSubmit_Click and BatchSummary.aspx.vb::btSubmit_Click
+        // both persist a blocked/in-progress state together with the all-tissues-assigned flag.
+        // This is the real transition, not the generic EditBatchStatus path, which never updates
+        // those fields and therefore cannot advance the batch to the correct workflow state.
+        var updated = new Batch
+        {
+            ID = existing.ID,
+            Status = BatchStatus.InProgress,
+            Comments = existing.Comments,
+            StatusComments = existing.StatusComments,
+            BatchDate = existing.BatchDate,
+            ReceivedDate = existing.ReceivedDate,
+            CompletedDate = existing.CompletedDate,
+            SubmittedByUserID = existing.SubmittedByUserID,
+            UserAreaCode = existing.UserAreaCode,
+            IsPreCassetted = existing.IsPreCassetted,
+            ByPassSort = existing.ByPassSort,
+            RowStamp = existing.RowStamp,
+            BatchType = existing.BatchType,
+            ProjectContractCode = existing.ProjectContractCode,
+            ContactName = existing.ContactName,
+            Species = existing.Species,
+            Fixation = existing.Fixation,
+            CustomerReceivedDate = existing.CustomerReceivedDate,
+            SubmittedBy = existing.SubmittedBy,
+            SubmittedArea = existing.SubmittedArea,
+            OtherSubmittedBy = existing.OtherSubmittedBy,
+            OtherSubmittedArea = existing.OtherSubmittedArea,
+            SafeToHandle = existing.SafeToHandle,
+            IsBlocked = true,
+            SampleSameProjects = existing.SampleSameProjects,
+            AllTissuesAssigned = allTissuesAssigned,
+            TimeReceived = existing.TimeReceived,
+            ReceivedBy = existing.ReceivedBy,
+            PostFixationOther = existing.PostFixationOther,
+        };
+
+        await UpdateAsync(updated, userId, ct);
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<Models.TestPremiumChargeCount>> GetTestPremiumChargeCountsAsync(
+        string? projectDesc, int batchType,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        DateTime? startDate = null, DateTime? endDate = null,
+        CancellationToken ct = default)
+    {
+        // TODO: Implement premium-charge analytics from SearchTest legacy screen.
+        // Stub: returns empty list pending full analytics engine porting.
+        return await Task.FromResult<IReadOnlyList<Models.TestPremiumChargeCount>>([]);
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<Models.TestPremiumChargeBatchRef>> GetTestPremiumChargeBatchesAsync(
+        string? projectDesc, int batchType,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        DateTime? startDate = null, DateTime? endDate = null,
+        CancellationToken ct = default)
+    {
+        // TODO: Implement premium-charge batch listing from SearchTest legacy screen.
+        // Stub: returns empty list pending full analytics engine porting.
+        return await Task.FromResult<IReadOnlyList<Models.TestPremiumChargeBatchRef>>([]);
     }
 }

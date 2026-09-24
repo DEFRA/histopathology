@@ -344,7 +344,8 @@
 
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
-        <a href="@Model.ReturnUrl" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        <a href="@Model.ReturnUrl" class="govuk-button govuk-button--secondary" data-module="govuk-button"
+           onclick="return confirm('Are you sure you want to cancel? Any changes you have made will be lost.');">Cancel</a>
         @* "Samples" — this page only edits submission header fields; sample/animal/block details
            (Add sample, Edit sample, Copy sample, Delete sample) are on SampleSummary, matching
            the same "Samples" entry point already used from BatchDetails.cshtml. *@

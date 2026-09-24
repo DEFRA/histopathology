@@ -5,8 +5,17 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Histo.Web.Pages.Search;
 
-/// <summary>Replaces <c>SearchPMDates.aspx</c>.</summary>
-public class SearchPMDatesModel : HistoPageModel
+/// <summary>
+/// Replaces <c>SearchPMDates.aspx</c>.
+///
+/// GET-based (all filters/sort/page bound via <c>SupportsGet</c>): results, sort order and
+/// paging all live in the query string, so they're restored correctly by the browser Back
+/// button and are bookmarkable/shareable — matching the established pattern already used by
+/// <see cref="SearchSubmissionsModel"/>/<see cref="SearchBlockRefsModel"/>. Previously this
+/// page used a POST form, which loses all of this on Back (browser history only caches GET
+/// responses).
+/// </summary>
+public class SearchPMDatesModel : GridPageModel
 {
     private readonly ISubmissionService _submissions;
 
@@ -15,21 +24,18 @@ public class SearchPMDatesModel : HistoPageModel
 
     // Legacy ctlFromDate/ctlToDate were CalendarDate controls and both were mandatory
     // (IsDateRangeValid). Blank on first load, matching the legacy page.
-    [BindProperty] public DateTime? StartDate { get; set; }
-    [BindProperty] public DateTime? EndDate { get; set; }
+    [BindProperty(SupportsGet = true)] public DateTime? StartDate { get; set; }
+    [BindProperty(SupportsGet = true)] public DateTime? EndDate { get; set; }
+
+    // Distinguishes "user clicked Search with nothing filled in" from a first, bare page
+    // visit — both would otherwise look identical (no query string at all).
+    [BindProperty(SupportsGet = true)] public bool Submitted { get; set; }
 
     public IReadOnlyList<PmDateSearchResult> Results { get; private set; } = [];
     public bool Searched { get; private set; }
 
     /// <summary>Field id → message, rendered by the GDS error summary and inline field errors.</summary>
     public Dictionary<string, string> Errors { get; } = [];
-
-    // Sort/page state binds from the query string appended by the POST sort/page buttons,
-    // so the POST-bound date criteria are preserved (see _SortableHeaderPost/_PaginationPost).
-    private const int PageSize = 10;
-    [BindProperty] public string? SortColumn { get; set; }
-    [BindProperty] public bool SortDesc { get; set; }
-    [BindProperty] public int PageNumber { get; set; } = 1;
 
     [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
 
@@ -53,31 +59,24 @@ public class SearchPMDatesModel : HistoPageModel
         .Take(PageSize)
         .ToList();
 
-    private void PopulateGridViewData()
-    {
-        var totalPages = Results.Count == 0 ? 1 : (int)Math.Ceiling(Results.Count / (double)PageSize);
-        if (PageNumber < 1) PageNumber = 1;
-        else if (PageNumber > totalPages) PageNumber = totalPages;
-        ViewData["SortColumn"] = SortColumn;
-        ViewData["SortDesc"] = SortDesc;
-        ViewData["CurrentPage"] = PageNumber;
-        ViewData["TotalPages"] = totalPages;
-        ViewData["FormId"] = "pmdates-action-form";
-        ViewData["Handler"] = "Search";
-    }
-
-    public void OnGet()
-    {
-        ViewData["Title"] = "Search PM Dates";
-        ViewData["PageTitle"] = "Search by PM Date";
-    }
-
-    public async Task<IActionResult> OnPostSearchAsync()
+    public async Task OnGetAsync()
     {
         ViewData["Title"] = "Search PM Dates";
         ViewData["PageTitle"] = "Search by PM Date";
 
-        if (!TryBuildRange(out var from, out var to)) return Page();
+        // A bare first visit (no query string) shows the empty form only — matches the
+        // previous GET/POST split, now distinguished by the Submitted marker instead.
+        if (!Submitted)
+        {
+            PopulateGridViewData(0);
+            return;
+        }
+
+        if (!TryBuildRange(out var from, out var to))
+        {
+            PopulateGridViewData(0);
+            return;
+        }
 
         // Default to Submission number descending until the user explicitly picks a column.
         if (string.IsNullOrEmpty(SortColumn))
@@ -88,14 +87,14 @@ public class SearchPMDatesModel : HistoPageModel
 
         Results = await _submissions.GetByPmDateRangeAsync(from, to);
         Searched = true;
-        PopulateGridViewData();
-        return Page();
+        PopulateGridViewData(Results.Count);
     }
 
     /// <summary>Replaces the legacy <c>hlbExcel</c> link. Exports every result row, not just the current page.</summary>
-    public async Task<IActionResult> OnPostExportExcelAsync()
+    public async Task<IActionResult> OnGetExportExcelAsync()
     {
-        if (!TryBuildRange(out var from, out var to)) return RedirectToPage("/Search/SearchPMDates");
+        if (!TryBuildRange(out var from, out var to))
+            return RedirectToPage("/Search/SearchPMDates");
 
         var results = await _submissions.GetByPmDateRangeAsync(from, to);
         return ExcelExportHelper.BuildXlsx(

@@ -9,66 +9,208 @@
     <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
 }
 
-<form method="post" asp-antiforgery="true">
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="ProjectDescription">Project or contract code</label>
-        <select class="govuk-select" asp-for="ProjectDescription">
-            <option value="">-- Any --</option>
-            @foreach (var p in Model.Projects)
-            {
-                <option value="@p.Name">@p.Name</option>
-            }
-        </select>
+@* GET so results/filters survive the browser Back button and are bookmarkable/deep-linkable
+   — browser history only caches GET responses, not POST results. *@
+<form method="get">
+    <input type="hidden" name="Submitted" value="true" />
+    <input type="hidden" name="ReturnPage" value="@Model.ReturnPage" />
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="ProjectDescription">Project or contract code</label>
+                <select class="govuk-select" asp-for="ProjectDescription">
+                    <option value="">-- Any --</option>
+                    @foreach (var p in Model.Projects)
+                    {
+                        <option value="@p.Name">@p.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="SubmissionType">Submission type</label>
+                <select class="govuk-select" asp-for="SubmissionType">
+                    <option value="0">TSE</option>
+                    <option value="1">Non-TSE</option>
+                </select>
+            </div>
+        </div>
     </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="SubmissionType">Submission type</label>
-        <select class="govuk-select" asp-for="SubmissionType">
-            <option value="0">TSE</option>
-            <option value="1">Non-TSE</option>
-        </select>
+
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="StartDate">Start date</label>
+                <input class="govuk-input govuk-input--width-10" type="date" asp-for="StartDate" />
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="EndDate">End date</label>
+                <input class="govuk-input govuk-input--width-10" type="date" asp-for="EndDate" />
+            </div>
+        </div>
     </div>
-    <button type="submit" class="govuk-button" data-module="govuk-button">Analyse results</button>
+
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-third">
+            <fieldset class="govuk-fieldset">
+                <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Histology</legend>
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                    @for (var i = 0; i < Model.HistologyTests.Count; i++)
+                    {
+                        var item = Model.HistologyTests[i];
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" type="checkbox" id="histology-@i" name="SelectedHistology" value="@item.Code"
+                                   checked="@(Model.SelectedHistology.Contains(item.Code ?? string.Empty))" />
+                            <label class="govuk-label govuk-checkboxes__label" for="histology-@i">@item.Name</label>
+                        </div>
+                    }
+                </div>
+            </fieldset>
+        </div>
+        <div class="govuk-grid-column-one-third">
+            <fieldset class="govuk-fieldset">
+                <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Antibodies</legend>
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                    @for (var i = 0; i < Model.AntibodyTests.Count; i++)
+                    {
+                        var item = Model.AntibodyTests[i];
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" type="checkbox" id="antibodies-@i" name="SelectedAntibodies" value="@item.Code"
+                                   checked="@(Model.SelectedAntibodies.Contains(item.Code ?? string.Empty))" />
+                            <label class="govuk-label govuk-checkboxes__label" for="antibodies-@i">@item.Name</label>
+                        </div>
+                    }
+                </div>
+            </fieldset>
+        </div>
+        <div class="govuk-grid-column-one-third">
+            <fieldset class="govuk-fieldset">
+                <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Special stain</legend>
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                    @for (var i = 0; i < Model.SpecialStainTests.Count; i++)
+                    {
+                        var item = Model.SpecialStainTests[i];
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" type="checkbox" id="specialstain-@i" name="SelectedSpecialStain" value="@item.Code"
+                                   checked="@(Model.SelectedSpecialStain.Contains(item.Code ?? string.Empty))" />
+                            <label class="govuk-label govuk-checkboxes__label" for="specialstain-@i">@item.Name</label>
+                        </div>
+                    }
+                </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Analyse results</button>
+        <button type="submit" asp-page-handler="AnalyseSubmissions" class="govuk-button govuk-button--secondary" data-module="govuk-button">Analyse submissions</button>
+        <a asp-page="/Search/SearchMenu" class="govuk-button govuk-button--secondary" data-module="govuk-button">Outputs menu</a>
+    </div>
 </form>
 
 @if (Model.Searched)
 {
-    @if (Model.Results.Any())
+    @if (Model.CrossTabRows.Any())
     {
-        @* Carrier form so Export re-runs the same query. asp-page injects the antiforgery token. *@
-        <form id="searchtest-action-form" method="post" asp-page="/Search/SearchTest">
-            <input type="hidden" name="ProjectDescription" value="@Model.ProjectDescription" />
-            <input type="hidden" name="SubmissionType"     value="@Model.SubmissionType" />
-        </form>
-
         <table class="govuk-table">
-            <caption class="govuk-table__caption govuk-table__caption--m govuk-visually-hidden">Test item totals</caption>
+            <caption class="govuk-table__caption govuk-table__caption--m">Quality totals</caption>
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
                     <th scope="col" class="govuk-table__header">Description</th>
-                    <th scope="col" class="govuk-table__header">Count</th>
+                    @foreach (var code in Model.CrossTabColumnTotals.Keys)
+                    {
+                        <th scope="col" class="govuk-table__header">@code</th>
+                    }
+                    <th scope="col" class="govuk-table__header">Project totals</th>
                 </tr>
             </thead>
             <tbody class="govuk-table__body">
-                @foreach (var r in Model.Results)
+                @foreach (var r in Model.CrossTabRows)
                 {
                     <tr class="govuk-table__row">
-                        <td class="govuk-table__cell">@r.Description</td>
-                        <td class="govuk-table__cell">@r.Count</td>
+                        <td class="govuk-table__cell">@r.ProjectDescription</td>
+                        @foreach (var code in Model.CrossTabColumnTotals.Keys)
+                        {
+                            <td class="govuk-table__cell">@r.CountsByPremiumCode.GetValueOrDefault(code)</td>
+                        }
+                        <td class="govuk-table__cell">@r.Total</td>
                     </tr>
                 }
             </tbody>
+            <tfoot class="govuk-table__body">
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell govuk-!-font-weight-bold">Quality totals</td>
+                    @foreach (var code in Model.CrossTabColumnTotals.Keys)
+                    {
+                        <td class="govuk-table__cell govuk-!-font-weight-bold">@Model.CrossTabColumnTotals[code]</td>
+                    }
+                    <td class="govuk-table__cell govuk-!-font-weight-bold">@Model.CrossTabGrandTotal</td>
+                </tr>
+            </tfoot>
         </table>
 
-        <button form="searchtest-action-form"
-                formaction="?handler=ExportExcel"
-                type="submit"
-                class="govuk-button govuk-button--secondary"
-                data-module="govuk-button">
-            Export to CSV
-        </button>
+        <form method="get">
+            <input type="hidden" name="ProjectDescription" value="@Model.ProjectDescription" />
+            <input type="hidden" name="SubmissionType" value="@Model.SubmissionType" />
+            <input type="hidden" name="StartDate" value="@Model.StartDate?.ToString("yyyy-MM-dd")" />
+            <input type="hidden" name="EndDate" value="@Model.EndDate?.ToString("yyyy-MM-dd")" />
+            @foreach (var c in Model.SelectedHistology) { <input type="hidden" name="SelectedHistology" value="@c" /> }
+            @foreach (var c in Model.SelectedAntibodies) { <input type="hidden" name="SelectedAntibodies" value="@c" /> }
+            @foreach (var c in Model.SelectedSpecialStain) { <input type="hidden" name="SelectedSpecialStain" value="@c" /> }
+            <button type="submit" formaction="?handler=ExportOutputsExcel" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export outputs to excel</button>
+        </form>
     }
     else
     {
         <p class="govuk-body">No test items found matching the search criteria.</p>
     }
 }
+
+@if (Model.SubmissionsSearched)
+{
+    @if (Model.SubmissionGroups.Any())
+    {
+        <table class="govuk-table">
+            <caption class="govuk-table__caption govuk-table__caption--m">Quality submissions</caption>
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">Premium</th>
+                    <th scope="col" class="govuk-table__header">Submissions</th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @foreach (var g in Model.SubmissionGroups)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@g.PremiumDescription</td>
+                        <td class="govuk-table__cell">
+                            @foreach (var id in g.BatchIds)
+                            {
+                                <a class="govuk-link" asp-page="/Batches/BatchDetails" asp-route-batchId="@id">@id</a> @: 
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <form method="get">
+            <input type="hidden" name="ProjectDescription" value="@Model.ProjectDescription" />
+            <input type="hidden" name="SubmissionType" value="@Model.SubmissionType" />
+            <input type="hidden" name="StartDate" value="@Model.StartDate?.ToString("yyyy-MM-dd")" />
+            <input type="hidden" name="EndDate" value="@Model.EndDate?.ToString("yyyy-MM-dd")" />
+            @foreach (var c in Model.SelectedHistology) { <input type="hidden" name="SelectedHistology" value="@c" /> }
+            @foreach (var c in Model.SelectedAntibodies) { <input type="hidden" name="SelectedAntibodies" value="@c" /> }
+            @foreach (var c in Model.SelectedSpecialStain) { <input type="hidden" name="SelectedSpecialStain" value="@c" /> }
+            <button type="submit" formaction="?handler=ExportSubmissionsExcel" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export submissions to excel</button>
+        </form>
+    }
+    else
+    {
+        <p class="govuk-body">No submissions found matching the search criteria.</p>
+    }
+}
+

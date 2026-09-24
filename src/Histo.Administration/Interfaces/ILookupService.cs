@@ -45,6 +45,9 @@ public interface ILookupService
     /// </summary>
     Task<IReadOnlyList<LookupItem>> GetHistologyTypesAsync(CancellationToken ct = default);
 
+    /// <summary>Returns all active premium/TC charge codes from <c>GetluPremiumCharges</c>.</summary>
+    Task<IReadOnlyList<LookupItem>> GetPremiumChargesAsync(CancellationToken ct = default);
+
     /// <summary>Creates a new pick-list row. Returns <see langword="false"/> on failure.</summary>
     Task<bool> CreateLookupItemAsync(int tableId, LookupItem item, int userId, CancellationToken ct = default);
 

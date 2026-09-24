@@ -194,6 +194,28 @@ public sealed class BatchService : IBatchService
         catch (Exception ex) { _logger.LogError("Failed to retrieve test item rows.", ex); return []; }
     }
 
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<TestPremiumChargeCount>> GetTestPremiumChargeCountsAsync(
+        string? projectDesc, int batchType,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        DateTime? startDate = null, DateTime? endDate = null,
+        CancellationToken ct = default)
+    {
+        try { return await _batches.GetTestPremiumChargeCountsAsync(projectDesc, batchType, histologyCodes, antibodyCodes, stainCodes, startDate, endDate, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to count tests by premium charge.", ex); return []; }
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<TestPremiumChargeBatchRef>> GetTestPremiumChargeBatchesAsync(
+        string? projectDesc, int batchType,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        DateTime? startDate = null, DateTime? endDate = null,
+        CancellationToken ct = default)
+    {
+        try { return await _batches.GetTestPremiumChargeBatchesAsync(projectDesc, batchType, histologyCodes, antibodyCodes, stainCodes, startDate, endDate, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to list submissions by premium charge.", ex); return []; }
+    }
+
     /// <summary>
     /// Recomputes and corrects the <c>CompletedDate</c> of every cassetted batch whose
     /// histology, antibodies and special-stain tests have all been dispatched, setting

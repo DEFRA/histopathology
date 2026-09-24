@@ -14,6 +14,54 @@
    Copy selected blocks actions below the grid, matching legacy's single-select grid + action
    button row (Add Sample/Edit Sample/Delete Sample/Copy From Prev. Submission/Cancel/Done). *@
 
+@* Batch header summary — legacy's shared Batch.ascx control (two-column layout: Entered
+   by/area, Submitted by/area, Project/contract code, Pathologist, Submission date, Species). *@
+@if (Model.Batch is not null)
+{
+    <div class="govuk-grid-row govuk-!-margin-bottom-6">
+        <div class="govuk-grid-column-one-half">
+            <dl class="govuk-summary-list">
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">Entered by</dt>
+                    <dd class="govuk-summary-list__value">@(Model.EnteredByName ?? "—")</dd>
+                </div>
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">Submitted by</dt>
+                    <dd class="govuk-summary-list__value">@(Model.SubmittedByName ?? "—")</dd>
+                </div>
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">Project or Contract code</dt>
+                    <dd class="govuk-summary-list__value">@(Model.ProjectName ?? "—")</dd>
+                </div>
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">Pathologist</dt>
+                    <dd class="govuk-summary-list__value">@(Model.PathologistName ?? "—")</dd>
+                </div>
+            </dl>
+        </div>
+        <div class="govuk-grid-column-one-half">
+            <dl class="govuk-summary-list">
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">Entered area</dt>
+                    <dd class="govuk-summary-list__value">@(Model.EnteredAreaName ?? "—")</dd>
+                </div>
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">Submitted area</dt>
+                    <dd class="govuk-summary-list__value">@(Model.SubmittedAreaName ?? "—")</dd>
+                </div>
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">Submission date</dt>
+                    <dd class="govuk-summary-list__value">@(Model.Batch.BatchDate?.ToShortDateString() ?? "—")</dd>
+                </div>
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">Species</dt>
+                    <dd class="govuk-summary-list__value">@(Model.SpeciesName ?? "—")</dd>
+                </div>
+            </dl>
+        </div>
+    </div>
+}
+
 @if (Model.ErrorMessage is not null)
 {
     <div class="govuk-error-summary" data-module="govuk-error-summary">
@@ -181,7 +229,9 @@
     <div class="govuk-button-group">
         @if (!Model.IsViewMode)
         {
-            <a asp-page="/Submissions/AddSubmission" asp-route-BatchId="@Model.BatchId" class="govuk-button" data-module="govuk-button">Add sample</a>
+            <a asp-page="/Submissions/AddSubmission" asp-route-BatchId="@Model.BatchId"
+               asp-route-ReturnPage="@Url.Page("/Batches/BatchBlocks", new { batchId = Model.BatchId })"
+               class="govuk-button" data-module="govuk-button">Add sample</a>
             <button type="submit" formaction="?handler=EditSampleSelect" class="govuk-button govuk-button--secondary" data-module="govuk-button">Edit sample</button>
             <button type="submit" formaction="?handler=DeleteSampleSelect" class="govuk-button govuk-button--warning" data-module="govuk-button">Delete sample</button>
         }

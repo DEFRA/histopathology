@@ -137,6 +137,35 @@ public sealed class TestItemRow
 }
 
 /// <summary>
+/// One raw (project, premium/TC charge code) dispatched-test count, before pivoting for display
+/// on <c>SearchTest.cshtml</c>'s "Analyse results" grid.
+///
+/// Legacy source: <c>SearchTest.aspx.vb</c> — <c>clsBatch.CountHistologysTestItems</c>/
+/// <c>CountAntibodesTestItems</c>/<c>CountStainTestItems</c>. Those 3 stored procedures do NOT
+/// exist in this database (confirmed live, 2026-09-22) — the counting logic they implemented is
+/// reproduced directly here against <c>BlockHistology</c>/<c>BlockAntibodies</c>/<c>BlockStain</c>
+/// joined to their <c>HistologyTCCodes</c>/<c>AntibodiesTCCodes</c>/<c>SpecialStainTCCodes</c>
+/// junction tables and <c>luPremiumCharges</c>, instead of calling a missing SP.
+/// </summary>
+public sealed class TestPremiumChargeCount
+{
+    public string? ProjectDescription { get; init; }
+    public string? PremiumCode { get; init; }
+    public int Count { get; init; }
+}
+
+/// <summary>
+/// One dispatched test's owning submission, grouped by premium/TC charge code — feeds the
+/// "Analyse submissions" drill-down grid (legacy <c>bntBatch_Click</c>/<c>pnlSubmissions</c>).
+/// See <see cref="TestPremiumChargeCount"/> for why this bypasses the (missing) legacy SPs.
+/// </summary>
+public sealed class TestPremiumChargeBatchRef
+{
+    public string? PremiumCode { get; init; }
+    public int BatchID { get; init; }
+}
+
+/// <summary>
 /// One result row for the Tissue Archive search mode of SearchArchiveLocation.
 ///
 /// Legacy source: HistopathologyLib/clsAnimal.vb — <c>GetAnimalTissuesArchiveInformation</c>,
@@ -165,6 +194,8 @@ public sealed class TissueArchiveInfo
 public sealed class AnimalTissueSearchResult
 {
     public int ID { get; init; }
+    public string? SenderRef { get; init; }
+    public string? HistologyRef { get; init; }
     public DateTime? DateSubmitted { get; init; }
     public DateTime? DateReceived { get; init; }
     public string? TimeReceived { get; init; }

@@ -277,10 +277,15 @@ public class EditBatchModel : HistoPageModel
             batchDate = parsedDate;
         }
 
+        // Legacy behaviour (per Help text): a Rejected submission reverts to Not Received
+        // ("Submitted") when the customer edits and resubmits it — otherwise it stays stuck
+        // as Rejected even though it has just been corrected and resubmitted.
+        var statusAfterSave = Batch.Status == BatchStatus.Rejected ? BatchStatus.Submitted : Batch.Status;
+
         var updated = new Batch
         {
             ID                  = Batch.ID,
-            Status              = Batch.Status,
+            Status              = statusAfterSave,
             Comments            = Comments,
             StatusComments      = Batch.StatusComments,
             BatchDate           = batchDate,
@@ -406,8 +411,11 @@ public class EditBatchModel : HistoPageModel
             : histologyTask.Result.Where(i => i.Code != HistologyCode.IhcOther).ToList();
         // includeInactive:true surfaces a legacy "Others" row that would otherwise be hidden, but can
         // also surface blank placeholder rows with no name — filter those out rather than render an
-        // unlabelled checkbox.
-        AntibodyOptions = antibodyTask.Result.Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList();
-        StainOptions    = stainTask.Result.Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList();
+        // unlabelled checkbox. The edit flow must also expose an explicit Other option on both
+        // antibody and special-stain lists to match legacy behaviour and the backend report logic.
+        AntibodyOptions = BatchTestListOptions.EnsureOtherOption(
+            antibodyTask.Result.Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList()).ToList();
+        StainOptions = BatchTestListOptions.EnsureOtherOption(
+            stainTask.Result.Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList()).ToList();
     }
 }

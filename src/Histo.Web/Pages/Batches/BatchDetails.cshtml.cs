@@ -611,8 +611,12 @@ public class BatchDetailsModel : HistoPageModel
             : histologyTask.Result.Where(i => i.Code != HistologyCode.IhcOther).ToList();
         // includeInactive:true surfaces a legacy "Others" row that would otherwise be hidden, but can
         // also surface blank placeholder rows with no name — filter those out rather than render an
-        // unlabelled checkbox.
-        Create_AntibodyOptions = antibodyTask.Result.Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList();
-        Create_StainOptions    = stainTask.Result.Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList();
+        // unlabelled checkbox. The create flow must also expose an explicit Other option on both
+        // antibody and special-stain lists, matching the legacy checkbox lists and the validation
+        ///reporting logic that treats "Other" as a valid selectable value.
+        Create_AntibodyOptions = BatchTestListOptions.EnsureOtherOption(
+            antibodyTask.Result.Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList()).ToList();
+        Create_StainOptions = BatchTestListOptions.EnsureOtherOption(
+            stainTask.Result.Where(i => !string.IsNullOrWhiteSpace(i.Name)).ToList()).ToList();
     }
 }

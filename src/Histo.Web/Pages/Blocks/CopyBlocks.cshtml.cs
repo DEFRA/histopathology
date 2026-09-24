@@ -38,12 +38,23 @@ public class CopyBlocksModel : HistoPageModel
 
     [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
 
+    /// <summary>
+    /// Set only when reached from the per-animal <see cref="Histo.Web.Pages.Submissions.SubmissionDetailsBlockModel"/>
+    /// (as opposed to the batch-wide <see cref="Histo.Web.Pages.Batches.BatchBlocksModel"/>) — drives
+    /// <see cref="BackLinkPage"/> so Back/Cancel/Done return to whichever page actually sent the user here.
+    /// </summary>
+    [BindProperty(SupportsGet = true)] public int? AnimalId { get; set; }
+
     [BindProperty] public List<int> BlockIds { get; set; } = [];
     [BindProperty] public List<int> TargetAnimalIds { get; set; } = [];
 
     public IReadOnlyList<Block> SourceBlocks { get; private set; } = [];
     public IReadOnlyList<Animal> TargetAnimals { get; private set; } = [];
     public string? Error { get; private set; }
+
+    public string BackLinkPage => AnimalId is > 0
+        ? $"/Submissions/SubmissionDetailsBlock?BatchId={BatchId}&AnimalId={AnimalId}"
+        : $"/Batches/BatchBlocks?BatchId={BatchId}";
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -53,7 +64,7 @@ public class CopyBlocksModel : HistoPageModel
         var blockIdsCsv = TempData.Peek("CopyBlockIds") as string;
         var batchId = BatchId ?? Session.BatchID;
         if (string.IsNullOrEmpty(blockIdsCsv) || batchId is null)
-            return RedirectToPage("/Batches/BatchBlocks", new { batchId });
+            return RedirectToOrigin(batchId);
 
         var forbidden = await CheckBatchAccessAsync(_batches, batchId.Value);
         if (forbidden is not null) return forbidden;
@@ -62,7 +73,7 @@ public class CopyBlocksModel : HistoPageModel
         BatchId = batchId;
         BlockIds = ParseIds(blockIdsCsv);
         var loaded = await LoadDisplayDataAsync();
-        return loaded ? Page() : RedirectToPage("/Batches/BatchBlocks", new { batchId });
+        return loaded ? Page() : RedirectToOrigin(batchId);
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -72,7 +83,7 @@ public class CopyBlocksModel : HistoPageModel
 
         var batchId = BatchId ?? Session.BatchID;
         if (batchId is null || BlockIds.Count == 0)
-            return RedirectToPage("/Batches/BatchBlocks", new { batchId });
+            return RedirectToOrigin(batchId);
 
         var forbidden = await CheckBatchAccessAsync(_batches, batchId.Value);
         if (forbidden is not null) return forbidden;
@@ -94,8 +105,12 @@ public class CopyBlocksModel : HistoPageModel
             await CopyBlocksToAnimalAsync(sourceBlocks, allBlocks, batchId.Value, targetAnimalId, userId);
 
         TempData["StatusMessage"] = $"Copied {sourceBlocks.Count} block(s) to {TargetAnimalIds.Count} sample(s).";
-        return RedirectToPage("/Batches/BatchBlocks", new { batchId = batchId.Value });
+        return RedirectToOrigin(batchId.Value);
     }
+
+    private IActionResult RedirectToOrigin(int? batchId) => AnimalId is > 0
+        ? RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = AnimalId })
+        : RedirectToPage("/Batches/BatchBlocks", new { batchId });
 
     /// <summary>
     /// Copies each source block (and its tissues) onto the target animal,
