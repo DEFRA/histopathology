@@ -7,6 +7,20 @@
 
 ---
 
+## Phase status snapshot (verified 2026-09-24)
+
+> Cross-checked against actual repo source, not re-estimated. See `docs/PHASE_COMPLETION_REPORT.md` for the full breakdown and sources.
+
+| Phase | Status | Evidence rows in this table |
+|---|---|---|
+| 1 — Authentication (Entra ID SAML 2.0) | **Complete** | Rows 71–72 (`Identity-migration`), row 73 (`gds-ui` — AccessDenied/ServiceProblem), row 77 (Live Dev SAML sign-in chain debugging, 2026-08-28) |
+| 2 — Reporting (Crystal Reports â†’ QuestPDF) | **Complete** â€” all 9 reports confirmed (HistologyReport + HistologySubReport, QCNote, SubmissionNotes + its 5 embedded sub-reports rendered as `SubmissionNotesRenderer.cs` tables) | Row 137 (HistologyReport/SubmissionForm parity rebuild), row 138 (QCNoteRenderer fix), row 144 (QCNoteRenderer PR-review fix); 5-sub-report mapping verified 2026-09-24 directly against `SubmissionNotesDataSetBuilder.cs`/`SubmissionNotesRenderer.cs` |
+| 3 — Platform Migration (VBâ†’C#/.NET 10) | **Complete** â€” zero `.vb` files remain under `src/`; `HistopathologySystem.vbproj` not referenced in the active `.slnx` | Row 34 (`modernise-to-modular-monolith`), Run #68 in `migration-run-journal.md` (9 `IService` interfaces + 5 DI modules); verified 2026-09-24 by grep across `src/` |
+| 5 — UI Migration | **Complete** (63/64 pages per `Parity-Audit-Report.md`) | Rows 8–70 and surrounding UI-fix rows throughout this table |
+| 6 — Testing & Cutover | **In progress** — no dedicated Playwright/E2E project confirmed; xUnit suite large and growing | Ongoing `dotnet test` counts cited throughout this table |
+
+---
+
 ## Agent Run Timing Table
 
 | # | Date | Agent | Start Time | End Time | Duration | Notes |
