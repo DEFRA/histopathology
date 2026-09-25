@@ -56,10 +56,10 @@ public abstract class HistoPageModel : PageModel
             return;
         }
 
-        // Populate session from claims on first request after sign-in (session is empty
-        // immediately after SAML ACS redirect until the next request populates it).
-        if (string.IsNullOrEmpty(Session.GroupName))
-            Session.PopulateFromClaims(User);
+        // Refresh session from the claims on every request. The claims themselves are re-read
+        // from tblUser per request by HistopathologyClaimsTransformation, so a Group or Area
+        // change is reflected on the next page load instead of persisting for the whole session.
+        Session.PopulateFromClaims(User);
 
         await next();
     }

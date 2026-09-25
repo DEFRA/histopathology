@@ -134,6 +134,12 @@ public sealed class BatchService : IBatchService
         catch (Exception ex) { _logger.LogError("Failed to complete block assignment for batch {BatchId}.",ex, batchId); return false; }
     }
 
+    public async Task<bool> SetCompletedAsync(int batchId, DateTime completedDate, int userId, CancellationToken ct = default)
+    {
+        try { await _batches.SetCompletedAsync(batchId, completedDate, userId, ct); return true; }
+        catch (Exception ex) { _logger.LogError("Failed to mark batch {BatchId} completed.", ex, batchId); return false; }
+    }
+
     public async Task<bool> SetByPassSortAsync(int batchId, bool byPassSort, int userId, CancellationToken ct = default)
     {
         try { await _batches.SetByPassSortAsync(batchId, byPassSort, userId, ct); return true; }

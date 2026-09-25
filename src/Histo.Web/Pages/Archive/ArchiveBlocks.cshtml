@@ -74,8 +74,50 @@
     </div>
 }
 
+@* Legacy rblFilter + ddlHistologyRefList + ddlBlockRefList + "Go". GET so the criteria sit in
+   the query string and are preserved by the sort/paging links. *@
+<form method="get" class="govuk-!-margin-bottom-6">
+    <input type="hidden" name="batchId" value="@Model.BatchId" />
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-third">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="FilterHistologyRef">Histology ref</label>
+                <select class="govuk-select" id="FilterHistologyRef" name="FilterHistologyRef">
+                    <option value="">-- All --</option>
+                    @foreach (var h in Model.HistologyRefOptions)
+                    {
+                        <option value="@h" selected="@(Model.FilterHistologyRef == h)">@h</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-third">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="FilterBlockRef">Block ref</label>
+                <select class="govuk-select" id="FilterBlockRef" name="FilterBlockRef">
+                    <option value="">-- All --</option>
+                    @foreach (var b in Model.BlockRefOptions)
+                    {
+                        <option value="@b" selected="@(Model.FilterBlockRef == b)">@b</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Go</button>
+        @if (Model.FilterApplied)
+        {
+            <a asp-page="/Archive/ArchiveBlocks" asp-route-batchId="@Model.BatchId" class="govuk-link">Clear filter</a>
+        }
+    </div>
+</form>
+
 <form method="post" asp-page-handler="Update">
     <input type="hidden" name="BatchId" value="@Model.BatchId" />
+    @* Keep the current filter so "Update selected" redisplays the same filtered view. *@
+    <input type="hidden" name="FilterHistologyRef" value="@Model.FilterHistologyRef" />
+    <input type="hidden" name="FilterBlockRef" value="@Model.FilterBlockRef" />
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
@@ -111,9 +153,9 @@
                     <td class="govuk-table__cell">@r.ArchiveLocationName</td>
                 </tr>
             }
-            @if (!Model.Rows.Any())
+            @if (!Model.PagedEntries.Any())
             {
-                <tr class="govuk-table__row"><td colspan="5" class="govuk-table__cell">No blocks to archive.</td></tr>
+                <tr class="govuk-table__row"><td colspan="6" class="govuk-table__cell">@(Model.FilterApplied ? "No blocks match the selected filter." : "No blocks to archive.")</td></tr>
             }
         </tbody>
     </table>

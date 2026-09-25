@@ -63,7 +63,7 @@
                         var item = Model.HistologyTests[i];
                         <div class="govuk-checkboxes__item">
                             <input class="govuk-checkboxes__input" type="checkbox" id="histology-@i" name="SelectedHistology" value="@item.Code"
-                                   checked="@(Model.SelectedHistology.Contains(item.Code ?? string.Empty))" />
+                                   checked="@(!string.IsNullOrEmpty(item.Code) && Model.SelectedHistology.Contains(item.Code))" />
                             <label class="govuk-label govuk-checkboxes__label" for="histology-@i">@item.Name</label>
                         </div>
                     }
@@ -79,7 +79,7 @@
                         var item = Model.AntibodyTests[i];
                         <div class="govuk-checkboxes__item">
                             <input class="govuk-checkboxes__input" type="checkbox" id="antibodies-@i" name="SelectedAntibodies" value="@item.Code"
-                                   checked="@(Model.SelectedAntibodies.Contains(item.Code ?? string.Empty))" />
+                                   checked="@(!string.IsNullOrEmpty(item.Code) && Model.SelectedAntibodies.Contains(item.Code))" />
                             <label class="govuk-label govuk-checkboxes__label" for="antibodies-@i">@item.Name</label>
                         </div>
                     }
@@ -95,7 +95,7 @@
                         var item = Model.SpecialStainTests[i];
                         <div class="govuk-checkboxes__item">
                             <input class="govuk-checkboxes__input" type="checkbox" id="specialstain-@i" name="SelectedSpecialStain" value="@item.Code"
-                                   checked="@(Model.SelectedSpecialStain.Contains(item.Code ?? string.Empty))" />
+                                   checked="@(!string.IsNullOrEmpty(item.Code) && Model.SelectedSpecialStain.Contains(item.Code))" />
                             <label class="govuk-label govuk-checkboxes__label" for="specialstain-@i">@item.Name</label>
                         </div>
                     }

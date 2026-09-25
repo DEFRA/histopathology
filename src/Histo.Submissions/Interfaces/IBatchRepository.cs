@@ -76,6 +76,14 @@ public interface IBatchRepository
     Task<bool> UpdateStatusAsync(int batchId, string newStatus, int userId, CancellationToken ct = default);
 
     /// <summary>
+    /// Marks a batch Completed and stamps its completed date, preserving every other field.
+    /// Legacy source: <c>QualityData.aspx.vb</c> — <c>UpdateSessionWithQualityData</c> sets
+    /// <c>BatchStatus = STATUS_COMPLETED</c> and <c>DateCompleted</c> once every test on the
+    /// batch has been dispatched.
+    /// </summary>
+    Task SetCompletedAsync(int batchId, DateTime completedDate, int userId, CancellationToken ct = default);
+
+    /// <summary>
     /// Persists the ByPassSort flag. Reloads current batch to supply the full EditBatch parameter set.
     /// Legacy source: <c>BatchBlockSummary.aspx.vb</c>::<c>chkByPassSort_CheckedChanged</c>.
     /// </summary>

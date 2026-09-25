@@ -342,12 +342,48 @@ public sealed class BatchRepository : IBatchRepository
     }
 
     /// <inheritdoc/>
+    public async Task SetCompletedAsync(int batchId, DateTime completedDate, int userId, CancellationToken ct = default)
+    {
+        var existing = await GetByIdAsync(batchId, ct);
+        if (existing is null) return;
+        // Goes through EditBatch rather than EditBatchStatus, which would null out the
+        // receipt columns (DateReceived/TimeReceived/StatusComments/PostFixationOther).
+        var updated = new Batch
+        {
+            ID = existing.ID, Status = BatchStatus.Completed, Comments = existing.Comments,
+            StatusComments = existing.StatusComments, BatchDate = existing.BatchDate,
+            ReceivedDate = existing.ReceivedDate, CompletedDate = completedDate,
+            SubmittedByUserID = existing.SubmittedByUserID, UserAreaCode = existing.UserAreaCode,
+            IsPreCassetted = existing.IsPreCassetted, ByPassSort = existing.ByPassSort,
+            RowStamp = existing.RowStamp, BatchType = existing.BatchType,
+            ProjectContractCode = existing.ProjectContractCode, ContactName = existing.ContactName,
+            Species = existing.Species, Fixation = existing.Fixation,
+            CustomerReceivedDate = existing.CustomerReceivedDate,
+            SubmittedBy = existing.SubmittedBy, SubmittedArea = existing.SubmittedArea,
+            OtherSubmittedBy = existing.OtherSubmittedBy, OtherSubmittedArea = existing.OtherSubmittedArea,
+            SafeToHandle = existing.SafeToHandle, IsBlocked = existing.IsBlocked,
+            SampleSameProjects = existing.SampleSameProjects, AllTissuesAssigned = existing.AllTissuesAssigned,
+            TimeReceived = existing.TimeReceived, ReceivedBy = existing.ReceivedBy,
+            PostFixationOther = existing.PostFixationOther,
+        };
+        await UpdateAsync(updated, userId, ct);
+    }
+
+    /// <inheritdoc/>
     public async Task<bool> UpdateStatusAsync(int batchId, string newStatus, int userId, CancellationToken ct = default)
     {
         if (!int.TryParse(newStatus, out var batchStatusInt)) batchStatusInt = 1;
 
-        // When marking as Received, auto-populate DateReceived (mirrors legacy ReceiveBatch.aspx).
-        DateTime? dateReceived = newStatus == BatchStatus.Received ? DateTime.Now : null;
+        // EditBatchStatus overwrites the receipt columns unconditionally, so the current values
+        // must be read and passed straight back — otherwise any status change blanks out
+        // DateReceived/TimeReceived/ReceivedBy/StatusComments/PostFixationOther.
+        var existing = await GetByIdAsync(batchId, ct);
+
+        // When marking as Received, auto-populate the receipt stamp (mirrors legacy ReceiveBatch.aspx).
+        var isReceiving = newStatus == BatchStatus.Received;
+        var dateReceived = isReceiving ? existing?.ReceivedDate ?? DateTime.Now : existing?.ReceivedDate;
+        var receivedBy = isReceiving ? userId : existing?.ReceivedBy;
+        int? timeReceived = int.TryParse(existing?.TimeReceived, out var tr) ? tr : null;
 
         using var conn = _db.CreateConnection();
         var p = new DynamicParameters();
@@ -355,10 +391,10 @@ public sealed class BatchRepository : IBatchRepository
         p.Add("ID",              batchId);
         p.Add("BatchStatus",     batchStatusInt);
         p.Add("DateReceived",    dateReceived);
-        p.Add("TimeReceived",    (int?)null);
-        p.Add("ReceivedBy",      userId);
-        p.Add("StatusComments",  (string?)null);
-        p.Add("PostFixationOther", (string?)null);
+        p.Add("TimeReceived",    timeReceived);
+        p.Add("ReceivedBy",      receivedBy);
+        p.Add("StatusComments",  existing?.StatusComments);
+        p.Add("PostFixationOther", existing?.PostFixationOther);
 
         await conn.ExecuteAsync("EditBatchStatus", p, commandType: System.Data.CommandType.StoredProcedure);
 

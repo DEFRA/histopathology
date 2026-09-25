@@ -9,9 +9,10 @@ namespace Histo.Web.Auth;
 /// application-specific claims (<see cref="AppClaimTypes"/>) to the principal.
 ///
 /// Called once per cookie deserialization by ASP.NET Core's authentication middleware.
-/// The idempotency guard (HasClaim check) prevents repeated DB lookups because
-/// the app claims are baked into the auth cookie at ACS time by
-/// <see cref="Controllers.AuthController.AssertionConsumerService"/>.
+/// The user's row is re-read on every request and any previously issued app claims are
+/// replaced, so a Group or Area change takes effect on the next page load rather than
+/// persisting until the auth cookie expires. Costs one indexed lookup per request, which
+/// matches the legacy behaviour (<c>VLAHeader.GetUserDetails()</c> ran on every page load).
 ///
 /// SECURITY:
 ///   - Never log raw assertion XML, email addresses, or full claim values.
@@ -34,10 +35,6 @@ public sealed class HistopathologyClaimsTransformation : IClaimsTransformation
 
     public async Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
     {
-        // Idempotent — if app claims are already present (baked in at ACS), return immediately.
-        if (principal.HasClaim(c => c.Type == AppClaimTypes.GroupName))
-            return principal;
-
         if (principal.Identity?.IsAuthenticated != true)
             return principal;
 
@@ -61,6 +58,13 @@ public sealed class HistopathologyClaimsTransformation : IClaimsTransformation
         }
 
         var identity = (ClaimsIdentity)principal.Identity!;
+
+        // Drop any app claims carried in the auth cookie from a previous request before
+        // re-adding them. AddClaim appends rather than replaces, and FindFirst returns the
+        // earliest match — so without this the stale Group/Area would continue to win.
+        foreach (var stale in identity.FindAll(c => AppClaimTypes.All.Contains(c.Type)).ToList())
+            identity.RemoveClaim(stale);
+
         identity.AddClaim(new Claim(AppClaimTypes.GroupName,  user.GroupName));
         identity.AddClaim(new Claim(AppClaimTypes.UserDbId,   user.UserID.ToString()));
         identity.AddClaim(new Claim(AppClaimTypes.GroupId,    user.GroupCode.ToString()));

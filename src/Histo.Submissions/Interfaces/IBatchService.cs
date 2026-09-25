@@ -72,6 +72,13 @@ public interface IBatchService
     /// </summary>
     Task<bool> CompleteBlockAssignmentAsync(int batchId, bool allTissuesAssigned, int userId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Marks a batch Completed with the supplied completed date, leaving all other fields intact.
+    /// Returns <see langword="false"/> on failure.
+    /// Legacy source: <c>QualityData.aspx.vb</c> — <c>UpdateSessionWithQualityData</c>.
+    /// </summary>
+    Task<bool> SetCompletedAsync(int batchId, DateTime completedDate, int userId, CancellationToken ct = default);
+
     // -----------------------------------------------------------------------
     // Batch-level test type selections (Histology / Antibodies / Special Stains)
     // -----------------------------------------------------------------------

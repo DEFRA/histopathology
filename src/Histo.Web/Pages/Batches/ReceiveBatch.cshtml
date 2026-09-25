@@ -99,7 +99,9 @@ else
             </div>
             <div class="govuk-summary-list__row">
                 <dt class="govuk-summary-list__key">Time received/rejected</dt>
-                <dd class="govuk-summary-list__value">@(Model.TimeReceivedOptions.FirstOrDefault(o => o.Code == Model.TimeReceived)?.Name ?? "Not recorded")</dd>
+                @* Batch.TimeReceived is an int column holding the lookup ID, but the entry
+                   dropdown posts Code — match either so historical rows still resolve. *@
+                <dd class="govuk-summary-list__value">@(Model.TimeReceivedOptions.FirstOrDefault(o => o.Code == Model.TimeReceived || o.ID.ToString() == Model.TimeReceived)?.Name ?? "Not recorded")</dd>
             </div>
             <div class="govuk-summary-list__row">
                 <dt class="govuk-summary-list__key">Post fixation</dt>
@@ -186,7 +188,7 @@ else
                                     <option value="">Select a time</option>
                                     @foreach (var t in Model.TimeReceivedOptions)
                                     {
-                                        <option value="@t.Code" selected="@(Model.TimeReceived == t.Code)">@t.Name</option>
+                                        <option value="@t.Code" selected="@(Model.TimeReceived == t.Code || Model.TimeReceived == t.ID.ToString())">@t.Name</option>
                                     }
                                 </select>
                             </div>
