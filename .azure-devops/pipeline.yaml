@@ -2,6 +2,7 @@ trigger:
   branches:
     include:
       - develop
+      - main
 
 parameters:
   - name: deployToDev
@@ -27,6 +28,11 @@ parameters:
 variables:
   - name: buildConfiguration
     value: 'Release'
+    variables:
+  - name: isDevelop
+    value: $[eq(variables['Build.SourceBranch'], 'refs/heads/develop')]
+  - name: isMain
+    value: $[eq(variables['Build.SourceBranch'], 'refs/heads/main')]
   - name: solution
     value: 'HistopathologySystem.slnx'
   - name: webProject
@@ -121,9 +127,8 @@ stages:
             displayName: 'Publish artifact'
 
   - stage: DEV
-    displayName: DEV
     dependsOn: Build
-    condition: and(succeeded(), eq('${{ parameters.deployToDev }}', true))
+    condition: and(succeeded(), eq(variables.isDevelop, true), eq('${{ parameters.deployToDev }}', true))
     variables:
     - name: appName
       value: 'DEVCDEWEBAW1401'
@@ -199,11 +204,10 @@ stages:
 
 
   - stage: TST
-    displayName: TST
     dependsOn:
       - DEV
       - Build
-    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.DEV.result, 'Succeeded', 'Skipped'), eq('${{ parameters.deployToTest }}', true))
+    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.DEV.result, 'Succeeded', 'Skipped'), eq(variables.isDevelop, true), eq('${{ parameters.deployToTest }}', true))
     variables:
     - name: appName
       value: 'TSTCDEWEBAW1401'
@@ -278,11 +282,8 @@ stages:
                       -ConnectionStrings__HistologyDb "Server=tcp:$(sqlServer);Database=$(dbName);Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Managed Identity;"
 
   - stage: PreProd
-    displayName: Pre-Prod
-    dependsOn:
-      - TST
-      - Build
-    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.TST.result, 'Succeeded', 'Skipped'), eq('${{ parameters.deployToPreProd }}', true))
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables.isMain, true), eq('${{ parameters.deployToPreProd }}', true))
     variables:
     - name: appName
       value: 'PRE-CDE-Web-App'
@@ -356,10 +357,12 @@ stages:
                       -Authentication__Bypass "false"
                       -ConnectionStrings__HistologyDb "Server=tcp:$(sqlServer);Database=$(dbName);Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Managed Identity;"
 
-  # - stage: Prod
-  #   displayName: PROD
-  #   dependsOn: Build
-  #   condition: and(succeeded(), eq('${{ parameters.deployToProd }}', true))
+  #- stage: Prod
+  #  displayName: PROD
+  # dependsOn:
+  #    - PreProd
+  #    - Build
+  #  condition: and(succeeded(), eq(variables.isMain, true), eq('${{ parameters.deployToProd }}', true)))
   #   variables:
   #   - name: appName
   #     value: 'PRD-CDE-Web-App'
