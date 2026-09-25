@@ -1848,6 +1848,87 @@ Root-caused: `Submissions/SubmissionDetailsBlock.cshtml(.cs)` is shared by both 
 
 Appended Run Log entry #92 (`run-log-v2.md`), Session Metrics row #154 (`session-metrics.md`), and Prompts 125–126 (this file) covering the Assign Tissue to BatchBlocks journey-scoped PM Date/Histology Ref fix.
 
+---
+
+## Prompt 127 — EditUser ANSI_NULLS/QUOTED_IDENTIFIER SqlException + Application Insights logging gap (2026-09-24)
+
+> UPDATE failed because the following SET options have incorrect settings: 'ANSI_NULLS, QUOTED_IDENTIFIER' ... also it's very hard to find this exception in Application Insights, also some error is not properly captured — why is the exception not coming through in `UserService.UpdateUserAsync`'s catch block?
+
+Diagnosed two issues. (1) Traced the SET-options error to the `UpdateUser` call path (`UserRepository.UpdateUserAsync` → SP `EditUser`), triggered by a new filtered/unique index added to `dbo.[User]` requiring correct SET options on any calling procedure — asked for the migration script and `EditUser`/`GetUserByEmail` SP source to confirm. (2) Corrected an earlier (wrong) claim about `IAppLogger.LogError`'s argument order — the codebase's custom interface signature is `(message, exception, args)`, not `ILogger`'s `(exception, message, args)`; confirmed via reading `AppLogger.cs`/`IAppLogger.cs` directly.
+
+---
+
+## Prompt 128 — Provided V20260914 migration script + confirmed EditUser fix (2026-09-24)
+
+> here is the V20260914_01_User_Email_NotNull_NTLogin_Nullable.sql file which may [have] some issue after execution of this script we couldn't update the user from application, it was working before adding this
+
+Confirmed the migration script itself is correct (explicitly sets `ANSI_NULLS ON`/`QUOTED_IDENTIFIER ON` before creating a filtered unique index on `NTLogin`). Root cause is that `EditUser`/`AddUser` predate this repo's stored-procedure source control and were almost certainly compiled with the wrong SET options years ago — harmless until this migration added the filtered index. Added `V20260924_01_Fix_EditUser_AddUser_AnsiNulls_QuotedIdentifier.sql` (recompiles both procs in place via `OBJECT_DEFINITION`, no need to know their source), wired into `Deploy.sql`.
+
+---
+
+## Prompt 129 — How to see the exception in Application Insights after the AppLogger fix (2026-09-24)
+
+> after this fix how can i see error message in application insights logs? `_logger.LogError("Failed to update user {UserId}.", ex, user.UserID);`
+
+Fixed a bug in my own first-pass `AppLogger.TrackException` call — it was passing the raw unformatted message template (`{UserId}` literal) instead of the substituted value. Added a small placeholder-substitution helper so the `exceptions` table's `message` custom property now shows the real value. Provided a KQL query example (`exceptions | where customDimensions.message has "..."`) and explained the `operation_Id` correlation caveat vs. exceptions tracked through the global exception handler's `TelemetryHelper`.
+
+---
+
+## Prompt 130 — Search Archive Location 4-part fix (2026-09-24/25)
+
+> Please investigate and fix: (1) Slide Archive Search missing columns; (2) Block Archive "Archive" field should be a dropdown, not free text; (3) Block Archive Excel export missing Archive Comment; (4) Slide Archive Excel export missing No Pieces/Description.
+
+Added `NoPieces`/`ArchiveComment` to `SlideArchiveInfo`/`BlockArchiveInfo` (Dapper auto-maps if the underlying SPs return them, unverified live). Changed Block Archive's "Archive location" field from free text to the same dropdown Tissue/Slide modes already use. Renamed the "Slide" export/grid column to "Description" (matching the model's actual property/doc comment) and added the missing "No pieces"/"Archive comment" columns to both the on-screen tables and Excel exports. Build 0 errors; archive-related tests 19/19 pass.
+
+---
+
+## Prompt 131 — Remove Group/Area validation added during Mouse Bioassay/Neuropath removal (2026-09-25)
+
+> why i'm getting below error message, there [is no] restriction assigning user group and area, it can [be] any area that could be assigned, it has like legacy no restriction on this: "The selected area is not valid for the selected group."
+
+Removed the `GroupAreaMappingHelpers.IsAllowedCombination` check from `AddUser`/`EditUser`'s `Validate()` methods per explicit confirmation that legacy has no cross-field restriction between Group and Area — restoring "any Group with any Area" behaviour. Deleted the now-fully-unused `GroupAreaMappingHelpers` class. Build 0 errors; full test suite 295 passed, 1 pre-existing skip.
+
+---
+
+## Prompt 132 — Session.UserID showing a hardcoded, nonexistent ID + FK_AuditLog_User violation (2026-09-25)
+
+> Getting below exception when i edit the user also noticed that Session.UserID show 234, actual user id is 2002, where this session is captured: Microsoft.Data.SqlClient.SqlException: 'The INSERT statement conflicted with the FOREIGN KEY constraint "FK_AuditLog_User"...'
+
+Root-caused to `Program.cs`'s `DevAuthBypass` middleware hardcoding every claim (including `UserDbId`) to a literal test value — used as the audit-log `@UserID` FK, which fails whenever that literal ID has no matching `dbo.[User]` row. Made the impersonated identity configurable via a new `DevAuthBypassNTLogin` setting, resolved through the same `IUserService.ResolveUserAsync` production auth uses, so `Session.UserID` always references a real, FK-safe row. Build 0 errors.
+
+---
+
+## Prompt 133 — ViewSamples reciprocal Sender/Histology ref not shown in its own input box (2026-09-25)
+
+> In viewsample.cshtml If a Sender Ref has been entered, then it should also display the Histology Ref in the HistologyRef input box, the reverse should also happen — but it's not working in [the] label[s].
+
+Populated `SenderRef`/`HistologyRef` directly from the resolved search result (previously only shown in a separate text label) so the actual input boxes display the counterpart ref. On a follow-up request, restored the original `OtherFieldLabel` text display alongside the now-populated input boxes, matching legacy exactly.
+
+---
+
+## Prompt 134 — ViewSamples Histology ref input still not populating (2026-09-25)
+
+> still viewsample.cshtml is not showing value Histology ref input field when enter values Sender ref field
+
+Root-caused to an ASP.NET Core Razor Pages gotcha: the `<input asp-for="HistologyRef">` tag helper renders the stale `ModelState` entry (bound from the empty query string) in preference to the model property's current, correctly-resolved value. Fixed by calling `ModelState.Remove(nameof(SenderRef))`/`ModelState.Remove(nameof(HistologyRef))` after resolving the counterpart ref. Build 0 errors; ViewSamples tests 3/3 pass.
+
+---
+
+## Prompt 135 — ViewSubmissions Species filter not working + button-group wrapping (2026-09-25)
+
+> In viewsumbssion.cshtml Filtering issue: Search functions for Species not working, and [please] bring [the] button to [the] same line — seems like Date Returned shows [on the] next line.
+
+Root-caused the Species filter to the same "dropdown posts display name, SP filters by ID" bug class already fixed on `SearchSubmissions` in an earlier session — `ViewSubmissions.cshtml` never received that fix. Applied the identical `@s.ID`-bound dropdown fix. Investigated the button-group wrapping and confirmed no structural markup bug — GOV.UK's `govuk-button-group` is intentionally `flex-wrap`; asked the user whether to override GDS's default responsive behaviour, and left it as-is per their choice. Build 0 errors; ViewSubmissions tests 3/3 pass.
+
+---
+
+## Prompt 136 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-25)
+
+> update run log, session metric and user prompt
+
+Appended Run Log entry #93 (`run-log-v2.md`), Session Metrics row #155 (`session-metrics.md`), and Prompts 127–136 (this file) covering the 9-part multi-bug-fix session: EditUser/AddUser ANSI_NULLS fix, Application Insights exception visibility fix, Search Archive Location 4-part fix, Group/Area whitelist removal, DevAuthBypass hardcoded-user fix, ViewSamples reciprocal-ref/ModelState fix, and ViewSubmissions Species filter fix.
+
+---
 
 ## Prompt 113 — Run the journal updater for this session (2026-09-02)
 
