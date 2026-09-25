@@ -29,6 +29,7 @@ public sealed class BlockArchiveInfo
     public DateTime? ArchivedDate { get; init; }
     public string? TissueDescription { get; init; }
     public short? NoPieces { get; init; }
+    public string? ArchiveComment { get; init; }
 }
 
 /// <summary>
@@ -47,4 +48,5 @@ public sealed class SlideArchiveInfo
     public DateTime? ArchivedDate { get; init; }
     public string? Description { get; init; }
     public string? TissueDescription { get; init; }
+    public short? NoPieces { get; init; }
 }

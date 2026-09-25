@@ -26,28 +26,17 @@
                 <label class="govuk-label" for="SenderRef">Sender ref</label>
                 <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" />
             </div>
-            @* Tissue/Slide archive locations are picked from the Archive Location pick list (table 16);
-               Block archive locations are freeform text, matching legacy's per-mode field behaviour. *@
-            @if (Model.ArchiveType == "Block")
-            {
-                <div class="govuk-form-group">
-                    <label class="govuk-label" for="ArchiveLocation">Archive location</label>
-                    <input class="govuk-input" asp-for="ArchiveLocation" />
-                </div>
-            }
-            else
-            {
-                <div class="govuk-form-group">
-                    <label class="govuk-label" for="ArchiveLocation">Archive location</label>
-                    <select class="govuk-select" asp-for="ArchiveLocation">
-                        <option value="">-- Any --</option>
-                        @foreach (var loc in Model.ArchiveLocations)
-                        {
-                            <option value="@loc.Code">@loc.Name</option>
-                        }
-                    </select>
-                </div>
-            }
+            @* Archive location is picked from the Archive Location pick list (table 16) for all three archive modes. *@
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="ArchiveLocation">Archive location</label>
+                <select class="govuk-select" asp-for="ArchiveLocation">
+                    <option value="">-- Any --</option>
+                    @foreach (var loc in Model.ArchiveLocations)
+                    {
+                        <option value="@loc.Code">@loc.Name</option>
+                    }
+                </select>
+            </div>
         </div>
         <div class="govuk-grid-column-one-half">
             <div class="govuk-form-group">

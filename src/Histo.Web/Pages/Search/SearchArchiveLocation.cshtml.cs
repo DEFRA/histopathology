@@ -61,7 +61,7 @@ public class SearchArchiveLocationModel : HistoPageModel
     /// <summary>Tissue pick list (table 9) — populates the Tissue code dropdown for Tissue archive mode.</summary>
     public IReadOnlyList<LookupItem> Tissues { get; private set; } = [];
 
-    /// <summary>Archive location pick list (table 16) — only Tissue/Slide archive use a dropdown; Block archive is free text.</summary>
+    /// <summary>Archive location pick list (table 16) — used as a dropdown by all three archive search modes.</summary>
     public IReadOnlyList<LookupItem> ArchiveLocations { get; private set; } = [];
 
     public IReadOnlyList<TissueArchiveInfo> TissueResults { get; private set; } = [];
@@ -136,28 +136,28 @@ public class SearchArchiveLocationModel : HistoPageModel
             case "Block":
                 var blockResults = await _blocks.GetBlockArchiveAsync(senderRef, histologyRef, NullIfEmpty(BlockRef), archiveLocation);
                 return ExcelExportHelper.BuildXlsx(
-                    "BlockArchive.xlsx",
-                    ["Submission number", "Block ref", "Archive location", "Archived date", "Tissue", "No pieces"],
+                    "Animal Block Archive.xlsx",
+                    ["ID", "Block Ref", "Archive Location", "Archived Date", "Archive comment", "Tissue description", "No pieces" ],
                     blockResults.Select(r => (IReadOnlyList<object?>)new object?[]
                     {
-                        r.ID, r.BlockRef, r.ArchiveLocation, r.ArchivedDate, r.TissueDescription, r.NoPieces
+                        r.ID, r.BlockRef, r.ArchiveLocation, r.ArchivedDate, r.ArchiveComment, r.TissueDescription, r.NoPieces
                     }));
 
             case "Slide":
                 var slideResults = await _blocks.GetSlideArchiveAsync(senderRef, histologyRef, archiveLocation);
                 return ExcelExportHelper.BuildXlsx(
-                    "SlideArchive.xlsx",
-                    ["Submission number", "Block ref", "Archive location", "Archived date", "Slide", "Tissue"],
+                    "Animal Slide Archive.xlsx",
+                    ["Batch ID", "Block Ref", "Archived Date", "Archive Location", "Description", "Tissue Description", "No pieces"],
                     slideResults.Select(r => (IReadOnlyList<object?>)new object?[]
                     {
-                        r.BatchID, r.BlockRef, r.ArchiveLocation, r.ArchivedDate, r.Description, r.TissueDescription
+                        r.BatchID, r.BlockRef,r.ArchivedDate, r.ArchiveLocation, r.Description, r.TissueDescription, r.NoPieces
                     }));
 
             default:
                 var tissueResults = await _submissions.GetTissueArchiveAsync(senderRef, histologyRef, archiveLocation, NullIfEmpty(TissueCode));
                 return ExcelExportHelper.BuildXlsx(
-                    "TissueArchive.xlsx",
-                    ["Submission number", "Tissue", "Archive location", "Archived date", "No pieces"],
+                    "Animal Tissue Archive.xlsx",
+                    ["Batch ID", "Tissue Description", "Archive Location", "Archived Date", "No pieces"],
                     tissueResults.Select(r => (IReadOnlyList<object?>)new object?[]
                     {
                         r.BatchID, r.TissueDescription, r.ArchiveLocation, r.ArchivedDate, r.NoPieces

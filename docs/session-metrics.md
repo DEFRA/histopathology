@@ -7,6 +7,20 @@
 
 ---
 
+## Phase status snapshot (verified 2026-09-24)
+
+> Cross-checked against actual repo source, not re-estimated. See `docs/PHASE_COMPLETION_REPORT.md` for the full breakdown and sources.
+
+| Phase | Status | Evidence rows in this table |
+|---|---|---|
+| 1 — Authentication (Entra ID SAML 2.0) | **Complete** | Rows 71–72 (`Identity-migration`), row 73 (`gds-ui` — AccessDenied/ServiceProblem), row 77 (Live Dev SAML sign-in chain debugging, 2026-08-28) |
+| 2 — Reporting (Crystal Reports â†’ QuestPDF) | **Complete** â€” all 9 reports confirmed (HistologyReport + HistologySubReport, QCNote, SubmissionNotes + its 5 embedded sub-reports rendered as `SubmissionNotesRenderer.cs` tables) | Row 137 (HistologyReport/SubmissionForm parity rebuild), row 138 (QCNoteRenderer fix), row 144 (QCNoteRenderer PR-review fix); 5-sub-report mapping verified 2026-09-24 directly against `SubmissionNotesDataSetBuilder.cs`/`SubmissionNotesRenderer.cs` |
+| 3 — Platform Migration (VBâ†’C#/.NET 10) | **Complete** â€” zero `.vb` files remain under `src/`; `HistopathologySystem.vbproj` not referenced in the active `.slnx` | Row 34 (`modernise-to-modular-monolith`), Run #68 in `migration-run-journal.md` (9 `IService` interfaces + 5 DI modules); verified 2026-09-24 by grep across `src/` |
+| 5 — UI Migration | **Complete** (63/64 pages per `Parity-Audit-Report.md`) | Rows 8–70 and surrounding UI-fix rows throughout this table |
+| 6 — Testing & Cutover | **In progress** — no dedicated Playwright/E2E project confirmed; xUnit suite large and growing | Ongoing `dotnet test` counts cited throughout this table |
+
+---
+
 ## Agent Run Timing Table
 
 | # | Date | Agent | Start Time | End Time | Duration | Notes |
@@ -167,6 +181,7 @@
 | 152 | 2026-09-23 | `GitHub Copilot` | — | — | **~25 min (complexity-based estimate)** | Run #98 — `SearchBlockRefs` pre-booked block ref quoting fixed. An existing code comment claimed legacy quotes every range/ref; reading the real `SearchBlockRefs.aspx.vb::FormatString` proved this false — only a genuine multi-ref range is quoted, single refs are not. Fixed `BlockRefRangeHelpers.FormatRange` to match and added its first-ever unit test file (6 tests). Build 0 errors; `dotnet test` 293 total, 292 passed, 1 skipped. |
 | 153 | 2026-09-24 | `GitHub Copilot` | — | — | **~15 min (complexity-based estimate)** | Run #99 — `SqlException: 'Procedure or function DeleteBlock has too many arguments specified.'` fixed. Confirmed via `sys.parameters` the real SP accepts only `@ID`; `BlockRepository.DeleteAsync` was also passing `@UserID`. Removed the extra parameter; C# method signature kept unchanged for interface consistency. Build 0 errors; `dotnet test` 293 total, 292 passed, 1 skipped. |
 | 154 | 2026-09-24 | `GitHub Copilot` | — | — | **~30 min (complexity-based estimate)** | Run #100 — "Assign Tissue to BatchBlocks" journey-scoped PM Date/Histology Ref editability fix. Added `SubmissionDetailsBlockModel.IsAssignTissueMode` (derived from the `Session.SampleDetailReturnPage` breadcrumb) so PM Date/Histology Ref are always editable in the Assign Tissue journey while the Create/Edit/View Submission journeys sharing the same page keep their existing locked-once-set behaviour unchanged. Fixed a Scenario-1 gap in `AddSubmissionModel` (hardcoded return path caused new Assign-Tissue samples to land in locked mode) via a new `ReturnPage`/`BackLinkPage`. Restored a previously dead histology-ref-type dropdown for Assign Tissue mode. Added `SubmissionDetailsBlockModelTests.cs` (3 new tests, first-ever coverage for this model). Build 0 errors; `dotnet test` 296 total, 295 passed, 1 skipped (up from 293/292). |
+| 155 | 2026-09-25 | `GitHub Copilot` | — | — | **~120 min (complexity-based estimate, multi-part session)** | Run #101 — Multi-bug fix session, 9 root causes: (1) `EditUser`/`AddUser` SET-options (`ANSI_NULLS`/`QUOTED_IDENTIFIER`) FK/index bug fixed via a new self-contained recompile migration; (2) Application Insights exception visibility fixed by having `AppLogger<T>` call `TelemetryClient.TrackException` directly rather than relying solely on the Serilog→AI sink's `TelemetryConverter.Traces`; (3) Search Archive Location 4-part fix (missing Slide Archive `No pieces` column, Block Archive location dropdown, Block Archive `Archive comment` export, mislabelled "Slide"→"Description" column); (4) removed the Group/Area whitelist validation from `AddUser`/`EditUser` per explicit confirmation legacy has no such restriction; (5) `DevAuthBypass` hardcoded `UserDbId` root-caused as the source of an `FK_AuditLog_User` violation, made configurable and resolved via the real `IUserService`; (6)–(7) `ViewSamples` reciprocal Sender/Histology ref not appearing in its own input box, root-caused to the `asp-for` tag helper preferring stale `ModelState` over the updated model value, fixed via `ModelState.Remove`; (8) `ViewSubmissions` Species filter silent no-op, fixed to post the species ID (matching an equivalent fix already applied to `SearchSubmissions` in an earlier session); (9) button-group wrapping investigated and confirmed as intentional GOV.UK Design System behaviour, not a bug. Build 0 errors throughout; `dotnet test` 296 total, 295 passed, 1 skipped (unchanged). |
 
 ## Run #87 sub-task breakdown (2026-08-27)
 

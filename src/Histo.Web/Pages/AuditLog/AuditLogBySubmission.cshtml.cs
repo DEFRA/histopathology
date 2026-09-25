@@ -73,10 +73,10 @@ public class AuditLogBySubmissionModel : GridPageModel
         var results = await _auditLog.GetBySubmissionAsync(SubmissionID.Value, StartDate, EndDate);
         return ExcelExportHelper.BuildXlsx(
             "SubmissionAuditlog.xlsx",
-            ["Table", "Field", "Date/Time", "User", "Before", "After", "Reason", "Key"],
+            ["ID", "Table Name", "Field Name", "Date/Time", "User Name", "Before", "After", "Reason", "Key"],
             results.Select(e => (IReadOnlyList<object?>)new object?[]
             {
-                e.TableName, e.FieldName, e.ChangedAt, e.UserName,
+                e.ID, e.TableName, e.FieldName, e.ChangedAt, e.UserName,
                 e.BeforeValue, e.AfterValue, e.Reason, e.KeyID
             }));
     }

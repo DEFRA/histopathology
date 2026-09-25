@@ -98,7 +98,8 @@ try
     builder.Services.AddTransient<IAppLogger>(sp =>
     {
         var factory = sp.GetRequiredService<ILoggerFactory>();
-        return new AppLogger<IAppLogger>(factory.CreateLogger<IAppLogger>());
+        var telemetryClient = sp.GetRequiredService<TelemetryClient>();
+        return new AppLogger<IAppLogger>(factory.CreateLogger<IAppLogger>(), telemetryClient);
     });
     builder.Services.AddScoped<TelemetryHelper>();
 
