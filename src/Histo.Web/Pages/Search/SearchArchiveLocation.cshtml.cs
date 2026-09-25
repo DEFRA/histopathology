@@ -137,7 +137,7 @@ public class SearchArchiveLocationModel : HistoPageModel
                 var blockResults = await _blocks.GetBlockArchiveAsync(senderRef, histologyRef, NullIfEmpty(BlockRef), archiveLocation);
                 return ExcelExportHelper.BuildXlsx(
                     "Animal Block Archive.xlsx",
-                    ["Submission Number", "Block ref", "Archive Location", "Archived Date", "Archive comment", "Tissue description", "No pieces" ],
+                    ["ID", "Block Ref", "Archive Location", "Archived Date", "Archive comment", "Tissue description", "No pieces" ],
                     blockResults.Select(r => (IReadOnlyList<object?>)new object?[]
                     {
                         r.ID, r.BlockRef, r.ArchiveLocation, r.ArchivedDate, r.ArchiveComment, r.TissueDescription, r.NoPieces
@@ -147,7 +147,7 @@ public class SearchArchiveLocationModel : HistoPageModel
                 var slideResults = await _blocks.GetSlideArchiveAsync(senderRef, histologyRef, archiveLocation);
                 return ExcelExportHelper.BuildXlsx(
                     "Animal Slide Archive.xlsx",
-                    ["Batch ID", "Block ref", "Archived Date", "Archive Location", "Description", "Tissue Description", "No pieces"],
+                    ["Batch ID", "Block Ref", "Archived Date", "Archive Location", "Description", "Tissue Description", "No pieces"],
                     slideResults.Select(r => (IReadOnlyList<object?>)new object?[]
                     {
                         r.BatchID, r.BlockRef,r.ArchivedDate, r.ArchiveLocation, r.Description, r.TissueDescription, r.NoPieces
@@ -157,7 +157,7 @@ public class SearchArchiveLocationModel : HistoPageModel
                 var tissueResults = await _submissions.GetTissueArchiveAsync(senderRef, histologyRef, archiveLocation, NullIfEmpty(TissueCode));
                 return ExcelExportHelper.BuildXlsx(
                     "Animal Tissue Archive.xlsx",
-                    ["Submission Number", "Tissue Description", "Archive Location", "Archived date", "No pieces"],
+                    ["Batch ID", "Tissue Description", "Archive Location", "Archived Date", "No pieces"],
                     tissueResults.Select(r => (IReadOnlyList<object?>)new object?[]
                     {
                         r.BatchID, r.TissueDescription, r.ArchiveLocation, r.ArchivedDate, r.NoPieces
