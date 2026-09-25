@@ -346,15 +346,14 @@ public sealed class BatchRepository : IBatchRepository
     {
         if (!int.TryParse(newStatus, out var batchStatusInt)) batchStatusInt = 1;
 
-        // When marking as Received, auto-populate DateReceived (mirrors legacy ReceiveBatch.aspx).
-        DateTime? dateReceived = newStatus == BatchStatus.Received ? DateTime.Now : null;
-
+        // Receipt is an explicit user action. Never auto-mark a submission as received by a
+        // generic status update path; the receive workflow is responsible for that manual choice.
         using var conn = _db.CreateConnection();
         var p = new DynamicParameters();
         p.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
         p.Add("ID",              batchId);
         p.Add("BatchStatus",     batchStatusInt);
-        p.Add("DateReceived",    dateReceived);
+        p.Add("DateReceived",    (DateTime?)null);
         p.Add("TimeReceived",    (int?)null);
         p.Add("ReceivedBy",      userId);
         p.Add("StatusComments",  (string?)null);

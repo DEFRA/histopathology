@@ -93,6 +93,12 @@ public class BatchBlocksModel : HistoPageModel
 
     public string? ErrorMessage { get; private set; }
 
+    /// <summary>Page path for the back link, populated from <see cref="ISessionService.ReturnPage"/>.
+    /// Falls back to the batch list when no caller has been recorded.</summary>
+    public string BackLinkPage => string.IsNullOrWhiteSpace(Session.ReturnPage)
+        ? "/Batches/BatchesReceived"
+        : Session.ReturnPage;
+
     /// <summary>Mirrors SampleSummaryModel — hides all mutation actions (Add/Delete/Copy/Done) in the View Submission journey.
     /// Legacy source: BatchBlocks.aspx.vb::DisableEnableControls (SV_ViewSubmission branch).</summary>
     public bool IsViewMode => Session.IsViewSubmissionMode;
@@ -159,19 +165,6 @@ public class BatchBlocksModel : HistoPageModel
     {
         await _submissions.DeleteAnimalAsync(animalId, Session.UserID);
         return RedirectToPage(new { batchId = BatchId });
-    }
-
-    /// <summary>
-    /// Stores the selected block IDs and redirects to the "Copy blocks" workflow.
-    /// Legacy source: <c>BatchBlocks.aspx.vb</c> grid's per-row copy action → <c>CopyBlocks.aspx</c>.
-    /// </summary>
-    public IActionResult OnPostCopyAsync(List<int>? blockIds)
-    {
-        if (blockIds is null || blockIds.Count == 0)
-            return RedirectToPage(new { batchId = BatchId });
-
-        TempData["CopyBlockIds"] = string.Join(",", blockIds);
-        return RedirectToPage("/Blocks/CopyBlocks", new { batchId = BatchId });
     }
 
     /// <summary>

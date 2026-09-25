@@ -1,6 +1,8 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
 using Histo.Core.Domain;
+using Histo.Histology.Interfaces;
+using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.Submissions;
@@ -22,6 +24,7 @@ public class SampleSummaryModelTests
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<ISubmissionService> _submissions = new();
     private readonly Mock<IBatchService> _batches = new();
+    private readonly Mock<IBlockService> _blocks = new();
     private readonly Mock<ILookupService> _lookups = new();
 
     public SampleSummaryModelTests()
@@ -42,7 +45,7 @@ public class SampleSummaryModelTests
     }
 
     private SampleSummaryModel CreateSut() =>
-        new(_session.Object, _submissions.Object, _batches.Object, _lookups.Object)
+        new(_session.Object, _submissions.Object, _batches.Object, _blocks.Object, _lookups.Object)
         {
             PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
             TempData = Mock.Of<ITempDataDictionary>(),
@@ -135,5 +138,44 @@ public class SampleSummaryModelTests
         var sut = CreateSut();
 
         Assert.True(sut.IsViewMode);
+    }
+
+    [Fact]
+    public async Task OnPostSelect_UsesSampleSummaryReturnPageAsDetailReturnTarget()
+    {
+        _session.Setup(s => s.SampleSummaryReturnPage).Returns("/Batches/EditBatch");
+        _batches.Setup(b => b.GetSubmittedAsCodeAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync("4");
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        var result = await sut.OnPostSelect(5);
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Submissions/SubmissionDetails", redirect.PageName);
+        Assert.Equal("/Batches/EditBatch", _session.Object.SampleDetailReturnPage);
+    }
+
+    [Fact]
+    public async Task OnPostFinishAsync_RedirectsToSampleSummaryReturnPage()
+    {
+        _session.Setup(s => s.SampleSummaryReturnPage).Returns("/Batches/EditBatch");
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new[]
+        {
+            new Animal { ID = 5, SenderRef = "S1" }
+        });
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new[]
+        {
+            new Animal { ID = 5, SenderRef = "S1" }
+        });
+        _batches.Setup(b => b.GetSubmittedAsCodeAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync("5");
+        _blocks.Setup(b => b.GetByBatchAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
+
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        var result = await sut.OnPostFinishAsync();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Batches/EditBatch", redirect.PageName);
     }
 }

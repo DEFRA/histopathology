@@ -142,18 +142,18 @@ else
                     <div class="govuk-radios" data-module="govuk-radios">
                         <div class="govuk-radios__item">
                             <input class="govuk-radios__input" type="radio" id="status-submitted" name="Status"
-                                   value="@BatchStatus.Submitted" checked="@(Model.Status == BatchStatus.Submitted)" aria-expanded="false" />
+                                   value="@BatchStatus.Submitted" @(Model.Status == BatchStatus.Submitted ? "checked" : null) aria-expanded="false" />
                             <label class="govuk-label govuk-radios__label" for="status-submitted">Not received</label>
                         </div>
                         <div class="govuk-radios__item">
                             <input class="govuk-radios__input" type="radio" id="status-received" name="Status"
-                                   value="@BatchStatus.Received" checked="@(Model.Status == BatchStatus.Received)"
+                                   value="@BatchStatus.Received" @(Model.Status == BatchStatus.Received ? "checked" : null)
                                    aria-expanded="@(Model.Status == BatchStatus.Received ? "true" : "false")" />
                             <label class="govuk-label govuk-radios__label" for="status-received">Received</label>
                         </div>
                         <div class="govuk-radios__item">
                             <input class="govuk-radios__input" type="radio" id="status-rejected" name="Status"
-                                   value="@BatchStatus.Rejected" checked="@(Model.Status == BatchStatus.Rejected)"
+                                   value="@BatchStatus.Rejected" @(Model.Status == BatchStatus.Rejected ? "checked" : null)
                                    aria-expanded="@(Model.Status == BatchStatus.Rejected ? "true" : "false")" />
                             <label class="govuk-label govuk-radios__label" for="status-rejected">Rejected</label>
                         </div>

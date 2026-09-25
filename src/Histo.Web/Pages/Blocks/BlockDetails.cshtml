@@ -116,10 +116,6 @@ else
                 </div>
             </div>
         </div>
-        <div class="govuk-form-group">
-            <label class="govuk-label" for="NewComment">Comments and details of other tests</label>
-            <textarea class="govuk-textarea" asp-for="NewComment" rows="3"></textarea>
-        </div>
     </form>
 
     @if (Model.Block is not null)
@@ -346,6 +342,11 @@ else
                 <div class="govuk-hint">Saves this block's tests (as currently saved), then creates the next block for this sample.</div>
             </div>
         </form>
+
+        <div class="govuk-form-group govuk-!-margin-top-6">
+            <label class="govuk-label" for="NewComment">Comments and details of other tests</label>
+            <textarea class="govuk-textarea" asp-for="NewComment" rows="3" form="block-details-form"></textarea>
+        </div>
 
         <div class="govuk-button-group">
             <button type="submit" form="next-block-form" class="govuk-button govuk-button--secondary" data-module="govuk-button">Next block</button>

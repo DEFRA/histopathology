@@ -60,6 +60,7 @@ public class BatchesReceivedModel : GridPageModel
     {
         Session.BatchID = batchId;
         Session.IsViewSubmissionMode = false;
+        Session.ReturnPage = "/Batches/BatchesReceived";
         return RedirectToPage("/Batches/BatchBlocks");
     }
 
@@ -90,6 +91,7 @@ public class BatchesReceivedModel : GridPageModel
 
         Session.BatchID = QuickGoId.Value;
         Session.IsViewSubmissionMode = false;
+        Session.ReturnPage = "/Batches/BatchesReceived";
         return RedirectToPage("/Batches/BatchBlocks");
     }
 }

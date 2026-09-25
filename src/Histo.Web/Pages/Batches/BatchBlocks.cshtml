@@ -6,7 +6,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Batches/BatchDetails" asp-route-BatchId="@Model.BatchId" class="govuk-back-link">Back</a>
+    <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
 }
 
 @* Batch-wide overview — replaces legacy's BatchBlocks.aspx. Reached only from BatchDetails'
@@ -240,10 +240,6 @@
            duplicates one sample's own tissue list to a new sample within THIS submission) so the
            two aren't confused regardless of which journey led here. *@
         <a asp-page="/Blocks/CopySamples" asp-route-BatchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy from a previous submission</a>
-        @if (Model.Blocks.Any() && !Model.IsViewMode)
-        {
-            <button type="submit" formaction="?handler=Copy" class="govuk-button govuk-button--secondary" data-module="govuk-button">Copy selected blocks</button>
-        }
         @if (!Model.IsViewMode)
         {
             <button type="submit" formaction="?handler=Done" class="govuk-button" data-module="govuk-button">Done</button>

@@ -37,6 +37,14 @@ public class AddSubmissionModel : HistoPageModel
     /// </summary>
     [BindProperty] public int? SourceAnimalId { get; set; }
 
+    /// <summary>Explicit return page for this flow, used by the Back/Cancel links when the user arrives from a page other than the default batch list.</summary>
+    [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
+
+    /// <summary>Resolved back-link for this page. Falls back to any session-scoped return context, then to the batch list.</summary>
+    public string BackLinkPage => string.IsNullOrWhiteSpace(ReturnPage)
+        ? string.IsNullOrWhiteSpace(Session.ReturnPage) ? "/Batches/BatchesNotReceived" : Session.ReturnPage
+        : ReturnPage;
+
     public string? ModelError { get; private set; }
 
     public async Task OnGetAsync(string? senderRef, int? sourceAnimalId)
@@ -92,7 +100,12 @@ public class AddSubmissionModel : HistoPageModel
         // Legacy source: AddSubmission.aspx.vb — bNeuropath is derived from the user's area
         // (SV_HeaderUserArea = "Neuropath"), never from a manual form control.
         var isNeuropath = Session.UserArea == "Neuropath";
-        var newAnimalId = await _submissions.AddAnimalAsync(submissionId.Value, SenderRef, isNeuropath, Session.UserID);
+        var newAnimalId = await _submissions.AddAnimalAsync(
+            submissionId.Value,
+            SenderRef,
+            Session.UserID,
+            pmDate: null,
+            pmDateSet: false);
         if (newAnimalId <= 0)
         {
             // AddAnimalAsync swallows the underlying SQL exception and returns 0 on failure —

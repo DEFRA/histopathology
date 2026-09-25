@@ -200,9 +200,11 @@ public class SampleSummaryModel : HistoPageModel
         var batchId = BatchId ?? Session.BatchID;
         if (batchId is null or <= 0) return RedirectToPage("/Index");
 
-        // Preserve the current sample summary as the landing point when the user hits Back from
-        // the detail screen, rather than forcing a fixed jump back to the batch summary.
-        Session.SampleDetailReturnPage = $"/Submissions/SampleSummary?batchId={batchId.Value}";
+        // Preserve the user's originating submission page as the landing point when the user hits
+        // Back/Save from the detail screen, rather than forcing a fixed jump back to the sample list.
+        Session.SampleDetailReturnPage = string.IsNullOrWhiteSpace(Session.SampleSummaryReturnPage)
+            ? $"/Submissions/SampleSummary?batchId={batchId.Value}"
+            : Session.SampleSummaryReturnPage;
 
         // Re-resolve submission type server-side on POST.
         // Do not trust the hidden field from the view for routing decisions.
@@ -282,6 +284,11 @@ public class SampleSummaryModel : HistoPageModel
         // jump it straight to In Progress before Histopathology has even received it.
         var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId.Value);
         var isWetTissue = ValidationHelpers.IsWetTissueDescription(await ResolveSubmittedAsDescriptionAsync(submittedAsCode));
+
+        // When the user reached this page from Edit Submission/Submission Details, the logical
+        // completion target is the originating submission page rather than the final print screen.
+        if (!string.IsNullOrWhiteSpace(Session.SampleSummaryReturnPage))
+            return RedirectToPage(Session.SampleSummaryReturnPage);
 
         // Legacy flow continues to the printable confirmation page after finishing a submission,
         // with the follow-up return target kept as the awaiting-receipt list.
