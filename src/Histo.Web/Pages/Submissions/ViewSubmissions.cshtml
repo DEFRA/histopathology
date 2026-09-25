@@ -51,11 +51,12 @@
             </div>
             <div class="govuk-form-group">
                 <label class="govuk-label" for="Species">Species</label>
+                @* GetSearchBatchDetails filters Batch.Species, which stores tlkpSpecies.SpeciesID (an int FK), not the species name. *@
                 <select class="govuk-select" asp-for="Species">
                     <option value="">-- Any --</option>
                     @foreach (var s in Model.SpeciesList.Where(s => !string.IsNullOrWhiteSpace(s.Name)))
                     {
-                        <option value="@s.Name">@s.Name</option>
+                        <option value="@s.ID">@s.Name</option>
                     }
                 </select>
             </div>
