@@ -10,6 +10,7 @@ public sealed class PmDateSearchResult
 {
     public int ID { get; init; }
     public string? SenderRef { get; init; }
+    public string? HistologyRef { get; init; }
     public DateTime? PMDate { get; init; }
     public DateTime? BatchDate { get; init; }
     public DateTime? DateReceived { get; init; }
