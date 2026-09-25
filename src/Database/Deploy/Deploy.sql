@@ -20,6 +20,8 @@ GO
 GO
 :r ../StoredProcedures/dbo.EditUser.sql
 GO
+:r ../StoredProcedures/dbo.GetAnimalBlockArchiveInformation.sql
+GO
 
 -- Step 2: Deployment script to used to alter/create tables, columns etc
 PRINT '--- Create or Alter Table, Column  ---';

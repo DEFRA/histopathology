@@ -137,10 +137,10 @@ public class SearchArchiveLocationModel : HistoPageModel
                 var blockResults = await _blocks.GetBlockArchiveAsync(senderRef, histologyRef, NullIfEmpty(BlockRef), archiveLocation);
                 return ExcelExportHelper.BuildXlsx(
                     "Animal Block Archive.xlsx",
-                    ["ID", "Block Ref", "Archive Location", "Archived Date", "Archive comment", "Tissue description", "No pieces" ],
+                    ["Block ID", "Block Ref", "Archive Location", "Archived Date", "Archive comment", "Tissue description", "No pieces", "Batch ID",],
                     blockResults.Select(r => (IReadOnlyList<object?>)new object?[]
                     {
-                        r.ID, r.BlockRef, r.ArchiveLocation, r.ArchivedDate, r.ArchiveComment, r.TissueDescription, r.NoPieces
+                        r.BlockID, r.BlockRef, r.ArchiveLocation, r.ArchivedDate, r.ArchiveComment, r.TissueDescription, r.NoPieces, r.ID,
                     }));
 
             case "Slide":
