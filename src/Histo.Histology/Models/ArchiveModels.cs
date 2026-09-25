@@ -20,10 +20,17 @@ public sealed class UsedBlockRef
 /// Legacy source: HistopathologyLib/clsAnimal.vb — <c>GetAnimalBlockArchiveInformation</c>,
 /// column shape from SearchArchiveLocation.aspx grdBlockArchive BoundColumns
 /// (flattened — the legacy expand/collapse hierarchy is not reproduced).
+///
+/// The SP's SELECT list returns two distinct row identifiers: <c>Batch.ID</c> (the
+/// submission number, aliased in the SP simply as <c>ID</c>) and <c>BatchBlock.ID</c> (the
+/// block's own row id, aliased as <c>BlockID</c> to avoid a same-named-column collision —
+/// Dapper's typed mapper sets a property once per matching column name, so two columns both
+/// named "ID" would silently leave <see cref="ID"/> holding whichever one came last).
 /// </summary>
 public sealed class BlockArchiveInfo
 {
     public int ID { get; init; }
+    public int BlockID { get; init; }
     public string? BlockRef { get; init; }
     public string? ArchiveLocation { get; init; }
     public DateTime? ArchivedDate { get; init; }

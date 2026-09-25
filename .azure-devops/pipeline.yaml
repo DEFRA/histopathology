@@ -323,7 +323,7 @@ stages:
     - name: tenantId
       value: '770a2450-0227-4c62-90c7-4e38537f1102'
     - name: appId
-      value: '__PREPROD_APP_ID__'
+      value: 'f7c254a0-c424-4f68-b38c-842e01824a2b'
     - name: sqlServer
       value: 'precdeinfsq1401.database.windows.net,1433'
     - name: sqlServerHost
