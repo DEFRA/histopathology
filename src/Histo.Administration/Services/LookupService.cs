@@ -177,6 +177,20 @@ public sealed class LookupService : ILookupService
         }
     }
 
+    /// <summary>Returns all active premium/TC charge codes from <c>GetluPremiumCharges</c>.</summary>
+    public async Task<IReadOnlyList<LookupItem>> GetPremiumChargesAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _lookups.GetPremiumChargesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get premium charges.", ex);
+            return [];
+        }
+    }
+
     /// <summary>
     /// Creates a new pick-list row in the table identified by <paramref name="tableId"/>.
     /// Replaces the legacy <c>LookupData.SaveLookupData</c> insert path

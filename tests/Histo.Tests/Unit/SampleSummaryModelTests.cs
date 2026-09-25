@@ -1,4 +1,5 @@
 using Histo.Administration.Interfaces;
+using Histo.Administration.Models;
 using Histo.Core.Domain;
 using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
@@ -32,6 +33,8 @@ public class SampleSummaryModelTests
     public SampleSummaryModelTests()
     {
         _session.SetupProperty(s => s.BatchID);
+        _session.SetupProperty(s => s.ReturnPage);
+        _session.SetupProperty(s => s.ReturnPageQuery);
         _session.Setup(s => s.UserID).Returns(42);
         _blocks.Setup(b => b.GetByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Block>)[]);
@@ -63,7 +66,7 @@ public class SampleSummaryModelTests
     }
 
     [Fact]
-    public async Task OnPostFinishAsync_HasSamples_UpdatesStatusAndRedirectsToBatchesNotReceived()
+    public async Task OnPostFinishAsync_HasSamples_UpdatesStatusAndRedirectsToPrintSubmission()
     {
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1, SenderRef = "S1" }]);
@@ -74,7 +77,27 @@ public class SampleSummaryModelTests
         var result = await sut.OnPostFinishAsync();
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
-        Assert.Equal("/Batches/BatchesNotReceived", redirect.PageName);
+        Assert.Equal("/Batches/PrintSubmission", redirect.PageName);
+        Assert.Equal("/Batches/BatchesNotReceived", sut.Session.ReturnPage);
         _batches.Verify(b => b.CompleteBlockAssignmentAsync(5, It.IsAny<bool>(), 42, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostFinishAsync_WetTissue_DoesNotAdvanceStatusAndRedirectsToPrintSubmission()
+    {
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1, SenderRef = "S1" }]);
+        _batches.Setup(b => b.GetSubmittedAsCodeAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync("1");
+        _lookups.Setup(l => l.GetLookupDataAsync(11, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 1, Code = "1", Name = "Wet Tissue" }]);
+
+        var sut = CreateSut();
+        var result = await sut.OnPostFinishAsync();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Batches/PrintSubmission", redirect.PageName);
+        Assert.Equal("/Batches/BatchesNotReceived", sut.Session.ReturnPage);
+        _batches.Verify(b => b.CompleteBlockAssignmentAsync(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

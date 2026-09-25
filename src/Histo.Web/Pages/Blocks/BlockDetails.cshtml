@@ -74,6 +74,26 @@ else
                     }
                     <input class="govuk-input govuk-input--width-3" asp-for="NewBlockRef" maxlength="3" />
                 </div>
+                @if (Model.IsAddFlow)
+                {
+                    <div class="govuk-form-group">
+                        <label class="govuk-label" for="NewNumberOfBlocks">Number of blocks</label>
+                        <div class="govuk-hint">Creates this many identical blocks, with auto-incrementing block refs.</div>
+                        <input class="govuk-input govuk-input--width-3" asp-for="NewNumberOfBlocks" />
+                    </div>
+                }
+                
+            </div>
+            <div class="govuk-grid-column-one-half">
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="EditHistologyRef">Histology reference</label>
+                    <div class="govuk-hint">Format: NN/NNNNN (e.g., 26/40004). Year (first 2 digits) must not exceed current year.</div>
+                    <input class="govuk-input govuk-input--width-10" asp-for="EditHistologyRef" placeholder="e.g., 26/40004" maxlength="8" pattern="\d{2}/\d{5}" readonly="@(Model.HistologyRefLocked ? "readonly" : null)" />
+                </div>
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="NewCustomerRef">Customer reference</label>
+                    <input class="govuk-input govuk-input--width-20" asp-for="NewCustomerRef" />
+                </div>
                 <div class="govuk-form-group">
                     <div class="govuk-checkboxes" data-module="govuk-checkboxes">
                         <div class="govuk-checkboxes__item">
@@ -94,30 +114,6 @@ else
                         <div class="govuk-hint">Not available for this submission type.</div>
                     }
                 </div>
-            </div>
-            <div class="govuk-grid-column-one-half">
-                <div class="govuk-form-group">
-                    <label class="govuk-label" for="EditHistologyRef">Histology reference</label>
-                    <div class="govuk-hint">Format: NN/NNNNN (e.g., 26/40004). Year (first 2 digits) must not exceed current year.</div>
-                    <input class="govuk-input govuk-input--width-10" asp-for="EditHistologyRef" placeholder="e.g., 26/40004" maxlength="8" pattern="\d{2}/\d{5}" readonly="@(Model.HistologyRefLocked ? "readonly" : null)" />
-                </div>
-                <div class="govuk-form-group">
-                    <label class="govuk-label" for="EditPMDate">PM Date</label>
-                    <div class="govuk-hint">Date sample was collected for post-mortem examination.</div>
-                    <input class="govuk-input govuk-input--width-10" asp-for="EditPMDate" type="date" readonly="@(Model.PMDateLocked ? "readonly" : null)" />
-                </div>
-                <div class="govuk-form-group">
-                    <label class="govuk-label" for="NewCustomerRef">Customer reference</label>
-                    <input class="govuk-input govuk-input--width-20" asp-for="NewCustomerRef" />
-                </div>
-                @if (Model.IsAddFlow)
-                {
-                    <div class="govuk-form-group">
-                        <label class="govuk-label" for="NewNumberOfBlocks">Number of blocks</label>
-                        <div class="govuk-hint">Creates this many identical blocks, with auto-incrementing block refs.</div>
-                        <input class="govuk-input govuk-input--width-3" asp-for="NewNumberOfBlocks" />
-                    </div>
-                }
             </div>
         </div>
         <div class="govuk-form-group">
@@ -324,7 +320,7 @@ else
         }
         </div>
 
-        <form method="post" asp-page-handler="NextBlock">
+        <form method="post" asp-page-handler="NextBlock" id="next-block-form">
             <input type="hidden" asp-for="BatchId" />
             <input type="hidden" asp-for="AnimalId" />
             <input type="hidden" asp-for="BlockId" />
@@ -349,10 +345,10 @@ else
                 </div>
                 <div class="govuk-hint">Saves this block's tests (as currently saved), then creates the next block for this sample.</div>
             </div>
-            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Next block</button>
         </form>
 
         <div class="govuk-button-group">
+            <button type="submit" form="next-block-form" class="govuk-button govuk-button--secondary" data-module="govuk-button">Next block</button>
             <button type="submit" form="block-details-form" class="govuk-button" data-module="govuk-button">Done</button>
         </div>
     }

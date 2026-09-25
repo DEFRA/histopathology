@@ -82,16 +82,26 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     /// <summary>Histology Ref Type selected from the "or Pick" dropdown — legacy Common.vb::HistologyRefType.</summary>
     [BindProperty] public int? HistologyRefType { get; set; }
 
+    /// <summary>Histology Reference for the sample (NN/NNNNN format). Only postable while unset — see <see cref="HistologyRefLocked"/>.</summary>
+    [BindProperty] public string? EditHistologyRef { get; set; }
+
+    /// <summary>Post-mortem date for the sample. Only postable while unset — see <see cref="PMDateLocked"/>.</summary>
+    [BindProperty] public string? EditPMDate { get; set; }
+
     public Animal? Animal { get; private set; }
     public Batch? Batch { get; private set; }
     public IReadOnlyList<Block> Blocks { get; private set; } = [];
     public IReadOnlyList<BlockRefRangeHelpers.BlockRefRangeRow> UsedBlockRefResults { get; private set; } = [];
+    public BatchTestSelections? BatchTestSelections { get; private set; }
 
     /// <summary>True for pre-cassetted submissions, where the block ref must come from the pre-booked list and histology ref is mandatory.</summary>
     public bool IsPreCassetted => Batch?.IsPreCassetted == true;
 
     /// <summary>True for TSE submissions — shows H&amp;E (BSE)/IHC Prp grid columns instead of IHC Other, matching legacy HideColumns.</summary>
     public bool IsTse => Batch?.BatchType != BatchTypeConstants.NonTse;
+
+    /// <summary>True when at least one batch-level test type (histology, antibodies, or stains) has been selected.</summary>
+    public bool ShowTestDetails => BatchTestSelections?.HasAny == true;
 
     public IReadOnlyDictionary<int, IReadOnlyList<Tissue>> TissuesByBlockId { get; private set; } =
         new Dictionary<int, IReadOnlyList<Tissue>>();
@@ -118,6 +128,23 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     /// Legacy source: SubmissionDetailsBlock.aspx.vb::DisableEnableControls (SV_ViewSubmission branch).</summary>
     public bool IsViewMode => Session.IsViewSubmissionMode;
 
+    /// <summary>
+    /// True when this page was reached via the batch-wide "Assign Tissues to Blocks" journey
+    /// (<see cref="Histo.Web.Pages.Batches.BatchBlocksModel"/>) rather than the Create/Edit/View
+    /// Submission journey (<c>SampleSummary</c>) — detected from the same breadcrumb
+    /// <see cref="BackLinkPage"/> already uses. PM date/Histology reference are always editable in
+    /// this journey (never locked once set); the Submission journeys keep the existing
+    /// editable-only-while-unset behaviour.
+    /// </summary>
+    public bool IsAssignTissueMode => (Session.SampleDetailReturnPage ?? string.Empty)
+        .Contains("/Batches/BatchBlocks", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Once a Histology Ref has been assigned to this sample it becomes read-only here — matches legacy, which only allows entry while unset. Always editable in the Assign Tissues to Blocks journey.</summary>
+    public bool HistologyRefLocked => !IsAssignTissueMode && Animal?.HistoRefSet == true;
+
+    /// <summary>Once a PM Date has been assigned to this sample it becomes read-only here — matches legacy, which only allows entry while unset. Always editable in the Assign Tissues to Blocks journey.</summary>
+    public bool PMDateLocked => !IsAssignTissueMode && Animal?.PMDateSet == true;
+
     // Set by whichever page navigated here (SampleSummary/BatchBlocks/AddSubmission) right before
     // redirecting — falls back to SampleSummary if reached without that breadcrumb (e.g. a stale/direct link).
     public string BackLinkPage => string.IsNullOrWhiteSpace(Session.SampleDetailReturnPage)
@@ -138,6 +165,9 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         if (redirect is not null) return redirect;
 
         if (Animal is null) return Page();
+
+        EditHistologyRef = Animal.HistologyRef;
+        EditPMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
 
         var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
         Blocks = allBlocks.Where(b => b.AnimalID == Animal.ID).ToList();
@@ -163,6 +193,123 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     {
         ConfirmDeleteBlockIds = blockIds ?? [];
         return await OnGetAsync();
+    }
+
+    /// <summary>
+    /// Saves a manually-entered Histology Ref/PM Date — only possible while each field is unset
+    /// (<see cref="HistologyRefLocked"/>/<see cref="PMDateLocked"/>); once assigned, either here or
+    /// via "Assign Tissues to Blocks", they become permanently read-only, matching legacy.
+    /// </summary>
+    public async Task<IActionResult> OnPostSaveHistologyDetailsAsync()
+    {
+        if (IsViewMode) return Forbid();
+
+        var redirect = await LoadAnimalAsync();
+        if (redirect is not null) return redirect;
+
+        // Locked fields can't be changed by a crafted POST — silently keep the existing value
+        // rather than trusting the submitted one, mirroring the readonly inputs in the view.
+        if (HistologyRefLocked) EditHistologyRef = Animal.HistologyRef;
+        if (PMDateLocked) EditPMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
+
+        var histoRefError = await ValidateHistologyRefAsync(EditHistologyRef);
+        if (histoRefError is not null)
+        {
+            ErrorMessage = histoRefError;
+            var allBlocksForError = await _blocks.GetByBatchAsync(BatchId ?? 0);
+            Blocks = allBlocksForError.Where(b => b.AnimalID == Animal.ID).ToList();
+            await LoadSupportingDataAsync();
+            return Page();
+        }
+
+        if (Animal.HistologyRef != EditHistologyRef || Animal.PMDate != DateFormatHelpers.ToLegacyDate(EditPMDate))
+        {
+            var updated = new Animal
+            {
+                ID = Animal.ID,
+                BatchSubmissionID = Animal.BatchSubmissionID,
+                SenderRef = Animal.SenderRef,
+                NextBlockRef = Animal.NextBlockRef,
+                HistoRefSet = !string.IsNullOrWhiteSpace(EditHistologyRef),
+                HistologyRef = EditHistologyRef,
+                OnHold = Animal.OnHold,
+                PMDate = DateFormatHelpers.ToLegacyDate(EditPMDate),
+                PMDateSet = !string.IsNullOrWhiteSpace(EditPMDate),
+                IsPGNumber = Animal.IsPGNumber,
+                BookedHistologyRef = Animal.BookedHistologyRef,
+                RowStamp = Animal.RowStamp,
+            };
+            await _submissions.UpdateAnimalAsync(updated, Session.UserID);
+        }
+
+        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
+    }
+
+    /// <summary>
+    /// Validates Histology Reference format (NN/NNNNN) and business rules — mirrors
+    /// <c>Blocks/BlockDetails.cshtml.cs::ValidateHistologyRefAsync</c>. Returns an error message if
+    /// invalid, null if valid (including when empty — clearing the field is allowed).
+    /// </summary>
+    private async Task<string?> ValidateHistologyRefAsync(string? histologyRef)
+    {
+        if (string.IsNullOrWhiteSpace(histologyRef))
+            return null;
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(histologyRef, @"^\d{2}/\d{5}$"))
+            return "Histology Reference must be in NN/NNNNN format (e.g., 26/40004).";
+
+        var yearStr = histologyRef[..2];
+        if (!int.TryParse(yearStr, out var year))
+            return "Invalid year in Histology Reference.";
+
+        var currentYear = DateTime.Now.Year % 100;
+        if (year > currentYear)
+            return $"Histology Reference year ({year}) cannot be greater than current year ({currentYear}).";
+
+        var numStr = histologyRef[3..];
+        if (!int.TryParse(numStr, out var refNumber))
+            return "Invalid Histology Reference number.";
+
+        var histologyType = DetermineHistologyTypeFromRef(refNumber);
+        if (histologyType != 0 && !IsPreviousYearHistoRef(year))
+        {
+            var counters = await _histologyRefs.GetCountersAsync();
+            var counter = counters.FirstOrDefault(c => c.Type == histologyType);
+            if (counter is not null && int.TryParse(counter.NextHistologyRef, out var nextRef) && refNumber >= nextRef)
+                return $"Histology Reference entered ({histologyRef}) must be less than the next available reference number ({counter.NextHistologyRef}) for this type.";
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Determines histology type code from the numeric range of the reference — mirrors
+    /// <c>Common.vb::CheckRange</c> (via <c>Blocks/BlockDetails.cshtml.cs::DetermineHistologyTypeFromRef</c>).
+    /// Ranges: Neuropath 10000-19999, AbattoirSurvey 20000-29999, TBDiag 30000-39999,
+    /// GeneralPool 40000-59999, MouseProjects 60000-89999. Out-of-range (e.g. &lt;10000 or &gt;=90000)
+    /// returns 0 — legacy leaves the type unset and skips the next-ref check entirely for these.
+    /// </summary>
+    private static int DetermineHistologyTypeFromRef(int refNumber)
+    {
+        if (refNumber is >= 10000 and < 20000) return 1; // Neuropath
+        if (refNumber is >= 20000 and < 30000) return 2; // AbattoirSurvey
+        if (refNumber is >= 30000 and < 40000) return 3; // TBDiag
+        if (refNumber is >= 40000 and < 60000) return 4; // GeneralPool
+        if (refNumber is >= 60000 and < 90000) return 5; // MouseProjects
+        return 0; // out of range — no counter to check against
+    }
+
+    /// <summary>
+    /// Legacy source: Common.vb::IsPreviousYearHistoRef (plus IsPre00's Y2K rollover pivot, which
+    /// only matters when the current year is '00' or '01' — practically dormant until 2100).
+    /// When true, the ref's year is before the current year, so the "must be less than next ref"
+    /// check is skipped entirely.
+    /// </summary>
+    private static bool IsPreviousYearHistoRef(int histoRefYear)
+    {
+        var currentYear = DateTime.Now.Year % 100;
+        if (histoRefYear < currentYear) return true;
+        return currentYear is 0 or 1 && histoRefYear is >= 70 and <= 99;
     }
 
     /// <summary>
@@ -269,7 +416,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         }
 
         TempData["CopyBlockIds"] = string.Join(",", blockIds);
-        return RedirectToPage("/Blocks/CopyBlocks");
+        return RedirectToPage("/Blocks/CopyBlocks", new { batchId = BatchId, animalId = AnimalId });
     }
 
     /// <summary>
@@ -330,10 +477,11 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         return null;
     }
 
-    /// <summary>Loads the batch (for the pre-cassetted flag), per-block tissues, the tissue-code lookup, and per-block Histology test-selection indicators.</summary>
+    /// <summary>Loads the batch (for the pre-cassetted flag), per-block tissues, the tissue-code lookup, per-block Histology test-selection indicators, and batch-level test selections.</summary>
     private async Task LoadSupportingDataAsync()
     {
         Batch = await _batches.GetByIdAsync(BatchId ?? 0);
+        BatchTestSelections = await _batches.GetBatchTestSelectionsAsync(BatchId ?? 0);
         TissueOptions = await _lookups.GetLookupDataAsync(LookupTissueCode);
 
         var allTissues = await _submissions.GetTissuesByBatchAsync(BatchId ?? 0);

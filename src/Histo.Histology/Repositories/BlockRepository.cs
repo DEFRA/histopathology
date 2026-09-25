@@ -96,7 +96,7 @@ public sealed class BlockRepository : IBlockRepository
         using var conn = _db.CreateConnection();
         await conn.ExecuteAsync(
             "DeleteBlock",
-            new { ID = blockId, UserID = userId },
+            new { ID = blockId }, // DeleteBlock has no @UserID parameter — confirmed via sys.parameters.
             commandType: System.Data.CommandType.StoredProcedure);
     }
 

@@ -9,11 +9,19 @@
     <a asp-page="/Batches/BatchDetails" class="govuk-back-link">Back</a>
 }
 
-<div class="govuk-form-group">
+<partial name="_ErrorSummary" model="Model.Errors" />
+
+<div class="govuk-form-group @(Model.Errors.ContainsKey("QuickGoRef") ? "govuk-form-group--error" : "")">
     <form method="post" asp-page-handler="Go">
         <label class="govuk-label" asp-for="QuickGoRef">Go directly to QC note ref</label>
+        @if (Model.Errors.TryGetValue("QuickGoRef", out var quickGoRefError))
+        {
+            <p id="QuickGoRef-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @quickGoRefError</p>
+        }
         <div class="app-field-with-button">
-            <input class="govuk-input govuk-input--width-10" type="number" asp-for="QuickGoRef" min="1" />
+            <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("QuickGoRef") ? "govuk-input--error" : "")"
+                   type="number" asp-for="QuickGoRef" min="1"
+                   aria-describedby="@(Model.Errors.ContainsKey("QuickGoRef") ? "QuickGoRef-error" : null)" />
             <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Go</button>
         </div>
     </form>

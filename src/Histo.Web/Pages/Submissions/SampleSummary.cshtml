@@ -121,8 +121,11 @@
                 <td class="govuk-table__cell">
                     <div class="govuk-button-group govuk-!-margin-bottom-0">
                     @* Routes to SubmissionDetails (Wet Tissue) or SubmissionDetailsBlock (block types),
-                       both of which already render read-only when IsViewMode — labelled to match. *@
-                    <form method="post" asp-page-handler="Select" class="govuk-!-display-inline">
+                       both of which already render read-only when IsViewMode — labelled to match.
+                       display:contents removes the form's own box from the flex layout so the button
+                       itself is the flex item, aligning it with the Copy/Delete sample buttons instead
+                       of rendering shorter/misaligned. *@
+                    <form method="post" asp-page-handler="Select" style="display:contents">
                         <input type="hidden" name="animalId" value="@a.ID" />
                         <input type="hidden" asp-for="BatchId" />
                         <button type="submit" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button">@(Model.IsViewMode ? "View sample" : "Edit sample")</button>

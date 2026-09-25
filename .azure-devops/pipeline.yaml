@@ -19,6 +19,15 @@ parameters:
     type: boolean
     default: false
 
+  - name: runSonar
+    displayName: Run SonarCloud analysis
+    type: boolean
+    default: false
+
+  - name: sonarServiceConnection
+    type: string
+    default: 'SonarCloud-Histo'
+
   # - name: deployToProd
   #   displayName: Deploy to PROD
   #   type: boolean
@@ -43,7 +52,7 @@ stages:
           vmImage: 'ubuntu-24.04'
         steps:
           - checkout: self
-            fetchDepth: 2
+            fetchDepth: 0
             persistCredentials: false
 
           - task: UseDotNet@2
@@ -51,6 +60,19 @@ stages:
             inputs:
               version: '10.0.x'
               includePreviewVersions: true
+
+          - ${{ if eq(parameters.runSonar, true) }}:
+            - task: SonarCloudPrepare@4
+              displayName: 'Prepare Sonar analysis'
+              condition: ne(variables['Build.Reason'], 'PullRequest')
+              inputs:
+                SonarCloud: ${{ parameters.sonarServiceConnection }}
+                organization: 'defra'
+                scannerMode: 'dotnet'
+                projectKey: 'DEFRA_histopathology'
+                projectName: 'Histopathology'
+                extraProperties: |
+                  sonar.cs.opencover.reportsPaths=$(Agent.TempDirectory)/**/coverage.opencover.xml
 
           - script: |
               dotnet --info
@@ -64,7 +86,7 @@ stages:
           - script: dotnet build $(solution) --configuration $(buildConfiguration) --no-restore
             displayName: 'Build'
 
-          - script: dotnet test $(solution) --configuration $(buildConfiguration) --no-build --logger trx
+          - script: dotnet test $(solution) --configuration $(buildConfiguration) --no-build --logger trx --collect:"XPlat Code Coverage;Format=opencover" --results-directory $(Agent.TempDirectory)
             displayName: 'Run tests'
 
           - task: PublishTestResults@2
@@ -73,6 +95,7 @@ stages:
             inputs:
               testResultsFormat: VSTest
               testResultsFiles: '**/*.trx'
+              searchFolder: '$(Agent.TempDirectory)'
 
           - task: DotNetCoreCLI@2
             displayName: 'Publish Histo.Web'
@@ -119,6 +142,17 @@ stages:
           - publish: '$(Build.ArtifactStagingDirectory)'
             artifact: drop
             displayName: 'Publish artifact'
+
+          - ${{ if eq(parameters.runSonar, true) }}:
+            - task: SonarCloudAnalyze@4
+              displayName: 'Run Sonar analysis'
+              condition: and(succeededOrFailed(), ne(variables['Build.Reason'], 'PullRequest'))
+
+            - task: SonarCloudPublish@4
+              displayName: 'Publish quality gate result'
+              condition: and(succeededOrFailed(), ne(variables['Build.Reason'], 'PullRequest'))
+              inputs:
+                pollingTimeoutSec: '300'
 
   - stage: DEV
     displayName: DEV
@@ -285,11 +319,11 @@ stages:
     condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.TST.result, 'Succeeded', 'Skipped'), eq('${{ parameters.deployToPreProd }}', true))
     variables:
     - name: appName
-      value: 'PRE-CDE-Web-App'
+      value: 'PRECDEWEBAW1401'
     - name: tenantId
       value: '770a2450-0227-4c62-90c7-4e38537f1102'
     - name: appId
-      value: '__PREPROD_APP_ID__'
+      value: 'f7c254a0-c424-4f68-b38c-842e01824a2b'
     - name: sqlServer
       value: 'precdeinfsq1401.database.windows.net,1433'
     - name: sqlServerHost

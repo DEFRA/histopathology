@@ -1748,6 +1748,188 @@ Analysed the legacy flow via two parallel `Explore` subagents (`BatchDetails.asp
 
 ---
 
+## Prompt 115 — Git pull scenario: revert local changes, reapply after (2026-09-23)
+
+> My team member had worked on these file, can i revert the changes after pull can you make this changes ?
+
+Investigated whether a teammate's `git pull` would overwrite the Run #85 GET-based Search-module fix before any revert happened; confirmed the fix was still intact on disk at that point. Saved a full verbatim snapshot of all affected files (`ViewSamples`, `SearchTest`, `SearchPMDates`, `SearchArchiveLocation` — `.cshtml`/`.cshtml.cs`) to repo memory so the fix could be reapplied on request without needing git tooling.
+
+---
+
+## Prompt 116 — Reapply the Run #85 changes (2026-09-23)
+
+> eapply the Run #85 changes
+
+Confirmed via direct file reads that all 4 pages plus 2 dependent test files had indeed reverted to their pre-fix POST-based state after the pull. Restored the exact GET-based content from the earlier memory snapshot, fixed the two test files' stale handler names, and found/fixed a leftover duplicate `PageSize`/`SortColumn` block hiding `GridPageModel`'s own members. Build 0 errors; `dotnet test` 287 total, 286 passed, 1 skipped.
+
+---
+
+## Prompt 117 — SampleSummary "Unknown submission type" investigation (2026-09-23)
+
+> Investigate the issue on SampleSummary.cshtml where the Batch No is displayed as "Unknown submission type". Review the logic used to determine and display the Batch Number and identify why the application is resolving the value to "Unknown submission type". Verify that the correct submission type is being passed, mapped, and rendered from the underlying data source. Confirm whether this is a data issue, mapping issue, or a regression introduced during migration, and implement a fix so that the correct Batch Number is displayed consistently.
+
+Root-caused to `GetLookupDataAsync(11)` (LOOKUP_SUBMITTEDAS) missing `includeInactive: true` — `luSubmittedAs` code 6 ("Fresh Frozen") is confirmed inactive, so batches submitted under it (or any other since-deactivated type) silently failed to resolve a description. A migration regression, not a data issue — same bug class already fixed elsewhere in the app. Fixed `SampleSummaryModel` and the identical `AddSubmissionModel.IsWetTissueCodeAsync`. Build 0 errors; `dotnet test` 287 total, 286 passed, 1 skipped.
+
+---
+
+## Prompt 118 — Is the "Unknown submission type" bug related to the Neuropath/Mouse Bioassay removal? (2026-09-23)
+
+> Is it because of the change that is removal of Nuropath and bioassay ?
+
+Confirmed no — the Neuropath/Mouse Bioassay removal only deactivates rows in `luUserArea` (table 13); the "Unknown submission type" bug is caused by `luSubmittedAs` (table 11), a different lookup table whose code 6 was already inactive before that removal ever happened.
+
+---
+
+## Prompt 119 — Four-part UI fix: BlockDetails PM Date, button alignment, two-column layout, Copy-to-samples navigation (2026-09-23)
+
+> 1. Batchdetails.aspx page doesn't have the PM Date in new applicatin batchdetails.cshtml - in edit block shows, can you check is this needed for any other journey other remove this fields if not necessary
+> 2. BlockDetails.cshtml Nextblock and Done button can bring it in same line.
+> 3. SubmissionDetailsBlock.cshtml - Review the Sample Block page layout and two-column grid structure. sender REf and PM date leave Histology reference as its.
+> 4. SubmissionDetailsBlock.cshtml Investigate the navigation flow for the following user journey: Sample Block → Copy to Samples → Back. Currently, when the user clicks the Back button after completing Copy to Samples, they are redirected to BatchBlock instead of returning to SubmissionDetailsBlock.cshtml, which was the previous page in the workflow. Review the navigation logic and ensure that the Back action returns the user to the correct page (SubmissionDetailsBlock.cshtml) while preserving the expected navigation context and user experience.
+
+Confirmed via legacy `BlockDetails.aspx.vb` that PM Date has no visible control on that page at all — removed the duplicate field from `Blocks/BlockDetails.cshtml`. Grouped "Next block"/"Done" into one button group. Converted `SubmissionDetailsBlock.cshtml`'s header to a two-column layout (Sender ref/PM date; Histology reference left as-is). Root-caused the Copy-to-samples Back-navigation bug to `CopyBlocks.cshtml(.cs)` hardcoding every redirect to the batch-wide `BatchBlocks` page; added an `AnimalId` route param + `BackLinkPage` so it now returns to the correct originating page. Build 0 errors; `dotnet test` 287 total, 286 passed, 1 skipped.
+
+---
+
+## Prompt 120 — BatchBlocks missing legacy fields + Copy Selected Blocks provenance (2026-09-23)
+
+> Please review the Batch Blocks page against the legacy batchblocks.aspx screen and investigate the following: The following fields appear to be missing from the new application: Entered By, Entered Area, Submitted By, Submitted Area, Project or Contract Code, Submission Date, Pathologies, Species. These fields are available in the legacy batchblocks.aspx page. Confirm whether they have been intentionally removed or omitted during migration, and assess the impact. Implement the theser field using two-column layout. The new application includes a "Copy Selected Blocks" button. Please clarify the purpose of this functionality and identify the user journey(s) that require it. In the legacy application, the Assign Tissue to Block process does not include this option. Confirm whether this is a new business requirement or whether it has been introduced inadvertently during migration.
+
+Confirmed via legacy `BatchBlocks.aspx`'s embedded `Batch.ascx` control that all 8 fields are genuinely present in legacy, in a two-column layout — an unintentional migration omission. Restored via the existing shared `BatchSummaryDisplayResolver`, in a matching two-column `govuk-grid-row` header. Confirmed "Copy Selected Blocks" is NOT a legacy `BatchBlocks.aspx` feature (its real owner is `SubmissionDetailsBlock.aspx`'s "Copy To Samples") — concluded it was carried over inadvertently during the 2026-09-07 page split, flagged for the user's decision rather than removed. Build 0 errors; `dotnet test` 287 total, 286 passed, 1 skipped.
+
+---
+
+## Prompt 121 — ViewSamples Excel export columns + legacy "other ref" label (2026-09-23)
+
+> In viewsample.cshtml export to excel when block information selcted below column and values populated in excel as per legacy, it should be the same in new excel, ID can keep like Submission Number [legacy column list and sample row supplied]. When Tissue Information selcted below column and values populated in excel [legacy column list supplied]. In viewsample.aspx page there is lable values will be show like below, can we have similar kind of filed and values in viewsample.cshtml [legacy `lblOtherFieldValue` VB snippet supplied].
+
+Fixed `ViewSamplesModel.OnGetExportExcelAsync`'s column set/order to match the supplied legacy columns exactly for both modes (added missing `HistologyRef`/`SenderRef`, moved `SubmittedAs` to the end). Ported legacy `ViewSamples.aspx.vb`'s `lblOtherFieldValue` label (shows the DB-resolved counterpart ref) as `OtherFieldLabel`, rendered above the results table. Build 0 errors; `dotnet test` 287 total, 286 passed, 1 skipped.
+
+---
+
+## Prompt 122 — SearchBlockRefs pre-booked block ref quoting (2026-09-23)
+
+> In searchblock.ref screen Pre boocked block refs in single quote '01 - 02' in old system but shown. but in new sysstem show without quotes
+
+An existing code comment in `BlockRefRangeHelpers.FormatRange` claimed legacy quotes every range/ref — reading the real `SearchBlockRefs.aspx.vb::FormatString` proved this wrong: only a genuine multi-ref range is quoted, a single ref is not. Fixed `FormatRange` to match the verified legacy rule exactly and added this helper's first-ever unit test file. Build 0 errors; `dotnet test` 293 total, 292 passed, 1 skipped (6 new tests).
+
+---
+
+## Prompt 123 — DeleteBlock SqlException (2026-09-24)
+
+> Microsoft.Data.SqlClient.SqlException: 'Procedure or function DeleteBlock has too many arguments specified.' [call stack: BlockRepository.DeleteAsync → BlockService.DeleteBlockAsync]
+
+Confirmed via `sys.parameters` against LocalDB that `DeleteBlock` accepts only `@ID`; `BlockRepository.DeleteAsync` was also passing `@UserID`. Removed the extra parameter; kept the C# method signature unchanged for interface consistency. Build 0 errors; `dotnet test` 293 total, 292 passed, 1 skipped.
+
+---
+
+## Prompt 124 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-24)
+
+> update the run log v2 and session metric and prompt
+
+Appended Run Log entries #85–#91 (`run-log-v2.md`), Session Metrics rows #145–#153 (`session-metrics.md` — also backfilled 2 missing historical rows for Runs #84/#85 that a prior `git pull` had reverted out of the file), and Prompts 115–124 (this file) covering the git-revert/reapply, `SampleSummary` lookup fix, 4-part UI fix, `BatchBlocks` missing-fields fix, `ViewSamples` export/label fix, `SearchBlockRefs` quoting fix, and `DeleteBlock` SP fix.
+
+---
+
+## Prompt 125 — Assign Tissue to BatchBlocks.aspx workflow review (2026-09-24)
+
+> Assign Tissue to BatchBlocks.aspx workflow review — two scenarios: (1) no existing sample, via Add Sample; (2) existing sample and block, via direct Edit. Requirements: PM Date must be editable; Histology Reference must be editable; full Block CRUD operations must work; Copy to Sample / Block Reference Search / Done button must continue working. Any changes made for this workflow must not impact the Create Submission or Edit Submission journeys.
+
+Root-caused: `Submissions/SubmissionDetailsBlock.cshtml(.cs)` is shared by both the Assign Tissue journey (`Batches/BatchBlocks`) and the Create/Edit/View Submission journey (`SampleSummary`), with PM Date/Histology Ref previously locked-once-set for both. Added `IsAssignTissueMode` (derived from the existing `Session.SampleDetailReturnPage` breadcrumb) so the two journeys can diverge without touching shared markup/handlers otherwise. Fixed a Scenario-1 gap where a brand-new sample added via `BatchBlocks` incorrectly inherited Submission-journey (locked) behaviour, by adding a `ReturnPage`/`BackLinkPage` to `AddSubmissionModel`. Restored a previously dead histology-ref-type dropdown for Scenario 1. Verified Block CRUD, Copy to Sample, Block Reference Search and Done were already correct and untouched. Added first-ever test coverage for `SubmissionDetailsBlockModel` (3 tests) proving both journeys behave correctly in both directions. Build 0 errors; `dotnet test` 296 total, 295 passed, 1 skipped.
+
+---
+
+## Prompt 126 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-24)
+
+> update the
+> - `run-log-v2.md` —
+> - `session-metrics.md`
+> - `User-Prompts-Log.md` —
+
+Appended Run Log entry #92 (`run-log-v2.md`), Session Metrics row #154 (`session-metrics.md`), and Prompts 125–126 (this file) covering the Assign Tissue to BatchBlocks journey-scoped PM Date/Histology Ref fix.
+
+---
+
+## Prompt 127 — EditUser ANSI_NULLS/QUOTED_IDENTIFIER SqlException + Application Insights logging gap (2026-09-24)
+
+> UPDATE failed because the following SET options have incorrect settings: 'ANSI_NULLS, QUOTED_IDENTIFIER' ... also it's very hard to find this exception in Application Insights, also some error is not properly captured — why is the exception not coming through in `UserService.UpdateUserAsync`'s catch block?
+
+Diagnosed two issues. (1) Traced the SET-options error to the `UpdateUser` call path (`UserRepository.UpdateUserAsync` → SP `EditUser`), triggered by a new filtered/unique index added to `dbo.[User]` requiring correct SET options on any calling procedure — asked for the migration script and `EditUser`/`GetUserByEmail` SP source to confirm. (2) Corrected an earlier (wrong) claim about `IAppLogger.LogError`'s argument order — the codebase's custom interface signature is `(message, exception, args)`, not `ILogger`'s `(exception, message, args)`; confirmed via reading `AppLogger.cs`/`IAppLogger.cs` directly.
+
+---
+
+## Prompt 128 — Provided V20260914 migration script + confirmed EditUser fix (2026-09-24)
+
+> here is the V20260914_01_User_Email_NotNull_NTLogin_Nullable.sql file which may [have] some issue after execution of this script we couldn't update the user from application, it was working before adding this
+
+Confirmed the migration script itself is correct (explicitly sets `ANSI_NULLS ON`/`QUOTED_IDENTIFIER ON` before creating a filtered unique index on `NTLogin`). Root cause is that `EditUser`/`AddUser` predate this repo's stored-procedure source control and were almost certainly compiled with the wrong SET options years ago — harmless until this migration added the filtered index. Added `V20260924_01_Fix_EditUser_AddUser_AnsiNulls_QuotedIdentifier.sql` (recompiles both procs in place via `OBJECT_DEFINITION`, no need to know their source), wired into `Deploy.sql`.
+
+---
+
+## Prompt 129 — How to see the exception in Application Insights after the AppLogger fix (2026-09-24)
+
+> after this fix how can i see error message in application insights logs? `_logger.LogError("Failed to update user {UserId}.", ex, user.UserID);`
+
+Fixed a bug in my own first-pass `AppLogger.TrackException` call — it was passing the raw unformatted message template (`{UserId}` literal) instead of the substituted value. Added a small placeholder-substitution helper so the `exceptions` table's `message` custom property now shows the real value. Provided a KQL query example (`exceptions | where customDimensions.message has "..."`) and explained the `operation_Id` correlation caveat vs. exceptions tracked through the global exception handler's `TelemetryHelper`.
+
+---
+
+## Prompt 130 — Search Archive Location 4-part fix (2026-09-24/25)
+
+> Please investigate and fix: (1) Slide Archive Search missing columns; (2) Block Archive "Archive" field should be a dropdown, not free text; (3) Block Archive Excel export missing Archive Comment; (4) Slide Archive Excel export missing No Pieces/Description.
+
+Added `NoPieces`/`ArchiveComment` to `SlideArchiveInfo`/`BlockArchiveInfo` (Dapper auto-maps if the underlying SPs return them, unverified live). Changed Block Archive's "Archive location" field from free text to the same dropdown Tissue/Slide modes already use. Renamed the "Slide" export/grid column to "Description" (matching the model's actual property/doc comment) and added the missing "No pieces"/"Archive comment" columns to both the on-screen tables and Excel exports. Build 0 errors; archive-related tests 19/19 pass.
+
+---
+
+## Prompt 131 — Remove Group/Area validation added during Mouse Bioassay/Neuropath removal (2026-09-25)
+
+> why i'm getting below error message, there [is no] restriction assigning user group and area, it can [be] any area that could be assigned, it has like legacy no restriction on this: "The selected area is not valid for the selected group."
+
+Removed the `GroupAreaMappingHelpers.IsAllowedCombination` check from `AddUser`/`EditUser`'s `Validate()` methods per explicit confirmation that legacy has no cross-field restriction between Group and Area — restoring "any Group with any Area" behaviour. Deleted the now-fully-unused `GroupAreaMappingHelpers` class. Build 0 errors; full test suite 295 passed, 1 pre-existing skip.
+
+---
+
+## Prompt 132 — Session.UserID showing a hardcoded, nonexistent ID + FK_AuditLog_User violation (2026-09-25)
+
+> Getting below exception when i edit the user also noticed that Session.UserID show 234, actual user id is 2002, where this session is captured: Microsoft.Data.SqlClient.SqlException: 'The INSERT statement conflicted with the FOREIGN KEY constraint "FK_AuditLog_User"...'
+
+Root-caused to `Program.cs`'s `DevAuthBypass` middleware hardcoding every claim (including `UserDbId`) to a literal test value — used as the audit-log `@UserID` FK, which fails whenever that literal ID has no matching `dbo.[User]` row. Made the impersonated identity configurable via a new `DevAuthBypassNTLogin` setting, resolved through the same `IUserService.ResolveUserAsync` production auth uses, so `Session.UserID` always references a real, FK-safe row. Build 0 errors.
+
+---
+
+## Prompt 133 — ViewSamples reciprocal Sender/Histology ref not shown in its own input box (2026-09-25)
+
+> In viewsample.cshtml If a Sender Ref has been entered, then it should also display the Histology Ref in the HistologyRef input box, the reverse should also happen — but it's not working in [the] label[s].
+
+Populated `SenderRef`/`HistologyRef` directly from the resolved search result (previously only shown in a separate text label) so the actual input boxes display the counterpart ref. On a follow-up request, restored the original `OtherFieldLabel` text display alongside the now-populated input boxes, matching legacy exactly.
+
+---
+
+## Prompt 134 — ViewSamples Histology ref input still not populating (2026-09-25)
+
+> still viewsample.cshtml is not showing value Histology ref input field when enter values Sender ref field
+
+Root-caused to an ASP.NET Core Razor Pages gotcha: the `<input asp-for="HistologyRef">` tag helper renders the stale `ModelState` entry (bound from the empty query string) in preference to the model property's current, correctly-resolved value. Fixed by calling `ModelState.Remove(nameof(SenderRef))`/`ModelState.Remove(nameof(HistologyRef))` after resolving the counterpart ref. Build 0 errors; ViewSamples tests 3/3 pass.
+
+---
+
+## Prompt 135 — ViewSubmissions Species filter not working + button-group wrapping (2026-09-25)
+
+> In viewsumbssion.cshtml Filtering issue: Search functions for Species not working, and [please] bring [the] button to [the] same line — seems like Date Returned shows [on the] next line.
+
+Root-caused the Species filter to the same "dropdown posts display name, SP filters by ID" bug class already fixed on `SearchSubmissions` in an earlier session — `ViewSubmissions.cshtml` never received that fix. Applied the identical `@s.ID`-bound dropdown fix. Investigated the button-group wrapping and confirmed no structural markup bug — GOV.UK's `govuk-button-group` is intentionally `flex-wrap`; asked the user whether to override GDS's default responsive behaviour, and left it as-is per their choice. Build 0 errors; ViewSubmissions tests 3/3 pass.
+
+---
+
+## Prompt 136 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-25)
+
+> update run log, session metric and user prompt
+
+Appended Run Log entry #93 (`run-log-v2.md`), Session Metrics row #155 (`session-metrics.md`), and Prompts 127–136 (this file) covering the 9-part multi-bug-fix session: EditUser/AddUser ANSI_NULLS fix, Application Insights exception visibility fix, Search Archive Location 4-part fix, Group/Area whitelist removal, DevAuthBypass hardcoded-user fix, ViewSamples reciprocal-ref/ModelState fix, and ViewSubmissions Species filter fix.
+
+---
+
 ## Prompt 113 — Run the journal updater for this session (2026-09-02)
 
 > Can you run the selected agent and update run-log-v2, session metrics and user prompts log
@@ -1769,676 +1951,5 @@ User suspected the earlier `BatchBlockSummary` → `SampleSummary` rename had ca
 **Build:** 0 errors, 3 pre-existing warnings. **Tests:** 145 passed, 1 skipped, 0 failed.
 
 **Files changed:** [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs).
-
----
-
-## Prompt 115 — Verify the Block Types vs Wet Tissue navigation rule; resolves ISS-R28 (2026-09-04)
-
-> #### Submission Types
->
-> The application must support the following submission types: Pre Cassetted Tissue, Stained Section, Unstained Section, Wax Block, Wet Tissue.
->
-> #### Navigation Rules
->
-> **Block Types** (Pre Cassetted Tissue, Stained Section, Unstained Section, Wax Block) — when a user selects any of these and adds a sample, navigate to **Sample Blocks**.
->
-> **Tissue Type** (Wet Tissue) — when a user selects Wet Tissue and adds a sample, navigate to **Sample Details**.
->
-> Ensure the navigation occurs immediately after the user adds a sample.
-
-Confirmed the stated rule was already implemented correctly (`SampleSummary.cshtml.cs`/`AddSubmission.cshtml.cs`), but reading the actual legacy source directly (`HistopathologySystem/HistopathologyLib/clsBatch.vb`, `HistopathologySystem/Common.vb`, `HistopathologySystem/Cassetted.aspx.vb`) rather than relying on prior docs revealed the underlying routing check was unsound: `Cassetted.aspx.vb::btnYes_Click` decides Wet Tissue by comparing the resolved lookup **description** (`chkblSubmittedAs.SelectedItem.Text.ToString() = "Wet Tissue"`), never a hardcoded numeric code — unlike `IsBatchPreCassetted`, which legitimately hardcodes `"5"` (confirmed directly in `Common.vb`). The migrated app's `submittedAsCode == "4"` guess for Wet Tissue (flagged unverified as ISS-R28) had no such confirmation and could have silently misrouted every Wet Tissue submission if the real database code differs. Fixed by adding `ValidationHelpers.IsWetTissueDescription` and resolving the code to its `LOOKUP_SUBMITTEDAS` (table 11) description via `ILookupService` before comparing, in both `SampleSummaryModel` and `AddSubmissionModel` (`ILookupService` newly injected). Closed out ISS-R28 in `run-log-v2.md` as Resolved.
-
-**Build:** 0 errors, 4 pre-existing warnings. **Tests:** 164 total, 163 passed, 1 skipped, 0 failed (+7 new `ValidationHelperTests` cases).
-
-**Files changed:** [src/Histo.Core/Domain/ValidationHelpers.cs](../src/Histo.Core/Domain/ValidationHelpers.cs), [src/Histo.Web/Pages/Submissions/SampleSummary.cshtml.cs](../src/Histo.Web/Pages/Submissions/SampleSummary.cshtml.cs), [src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs), [tests/Histo.Tests/Unit/ValidationHelperTests.cs](../tests/Histo.Tests/Unit/ValidationHelperTests.cs).
-
----
-
-## Prompt 116 — Implement sorting and pagination like UserMaintenance.cshtml (2026-09-04)
-
-> Can implement the sorting and pagination reference like as implmented in UserMaintenance.csthml
-
-Converted `QualityDataModel` from `HistoPageModel` to `GridPageModel`, closing the groundwork half of ISS-R06 ("Pagination not implemented — needed for large batches"). Added a `PagedEntries` property sorting the already-filtered `Tests` list across all 7 columns (Histology ref, Block ref, Test, Result, Dispatched, Archived, On hold); view converted to `_SortableHeader`/`_Pagination` partials, matching `UserMaintenance.cshtml` exactly. Confirmed `EditQualityDataTest.cshtml` has no grid, so the pattern doesn't apply there.
-
-**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
-
-**Files changed:** [src/Histo.Web/Pages/QC/QualityData.cshtml.cs](../src/Histo.Web/Pages/QC/QualityData.cshtml.cs), [src/Histo.Web/Pages/QC/QualityData.cshtml](../src/Histo.Web/Pages/QC/QualityData.cshtml).
-
----
-
-## Prompt 117 — Create submission auto-populate + grid sorting/pagination on 5 named pages (2026-09-04)
-
-> Implement the following changes in the submission workflow and related pages.
->
-> **1. Create Submission (`BatchDetails.cshtml`)** — Submitted By must auto-populate with the logged-in user's email address; Submitted Area must auto-populate with the logged-in user's area; both must remain editable and must not be disabled in Create mode.
->
-> **2. Grid Enhancements** — add sorting and pagination to `BatchesNotReceived.cshtml`, `ViewSubmissions.cshtml`, `BatchesForDispatch.cshtml`, `QCNotes.aspx`, `BatchesReceived`.
-
-`BatchDetails.cshtml.cs` Create mode now defaults "Submitted by" to `Session.UserID` and "Submitted area" to `Session.UserAreaID` on first visit only (not overriding a restored draft); both remain plain editable `<select>` dropdowns — no `disabled` attribute was present or added. "Submitted by" is a user-picker dropdown rather than a free-text box, so "populate with the user's email" is implemented as pre-selecting the matching user record.
-
-Grid audit against the `UserMaintenance.cshtml` reference: `BatchesNotReceived`, `BatchesForDispatch`, `BatchesReceived` already fully implemented sorting/pagination — verified, no changes needed. `QCNotes.cshtml(.cs)` converted to `GridPageModel` with sortable headers and pagination. `ViewSubmissions.cshtml(.cs)` is POST-driven (search criteria bound via `[BindProperty]`, not the query string) — the standard GET-based sort/page partials would have silently dropped every search filter, so two new POST-safe shared partials were created, `_SortableHeaderPost.cshtml` and `_PaginationPost.cshtml`, which submit the page's existing hidden carrier form instead of navigating via GET; added `SortColumn`/`SortDesc`/`PageNumber`/`PagedResults` to the model. Fixed a Razor `RZ1010` parse error found along the way (an inline `@{ }` block placed directly after `</table>`) by moving that `ViewData` assignment into the model's `PopulateGridViewData()`.
-
-**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
-
-**Files changed:** [src/Histo.Web/Pages/Batches/BatchDetails.cshtml.cs](../src/Histo.Web/Pages/Batches/BatchDetails.cshtml.cs), [src/Histo.Web/Pages/QC/QCNotes.cshtml.cs](../src/Histo.Web/Pages/QC/QCNotes.cshtml.cs), [src/Histo.Web/Pages/QC/QCNotes.cshtml](../src/Histo.Web/Pages/QC/QCNotes.cshtml), [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs), [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml), [src/Histo.Web/Pages/Shared/_SortableHeaderPost.cshtml](../src/Histo.Web/Pages/Shared/_SortableHeaderPost.cshtml), [src/Histo.Web/Pages/Shared/_PaginationPost.cshtml](../src/Histo.Web/Pages/Shared/_PaginationPost.cshtml).
-
----
-
-## Prompt 118 — Sort/pagination colour mismatch, then sort icon still not appearing (2026-09-04)
-
-> still same issue colur of header and sortable is not align with other screen `UserMaintenance.cshtml`
-
-> why changes requried in .css file, still sorting icon not showing why this discrpency if the style is working another it should work all other pages
-
-**Colour mismatch:** GOV.UK Frontend's `govuk-link`/`govuk-pagination__link` colour and hover rules are written against the `:link`/`:visited` pseudo-classes, which only ever match real `<a href>` elements — applying those classes to the POST-based `<button>` controls in `_SortableHeaderPost.cshtml`/`_PaginationPost.cshtml` had no visual effect at all, so they rendered in the browser's default button colour instead of GOV.UK blue. Rewrote `.app-link-button` in `Styles.css` to state the link colour/hover/focus states directly instead of relying on `govuk-link`, and removed the now-pointless `govuk-link` classes from both partials.
-
-**Sort icon still not appearing — a real functional bug, not styling:** the hidden carrier form on `ViewSubmissions.cshtml` carried `SortColumn`/`SortDesc`/`PageNumber` as hidden inputs. ASP.NET Core's default value provider checks the **Form body before the Query string**, so the sort-header button's `formaction="?handler=Search&SortColumn=X&SortDesc=true"` query override was always shadowed by the stale hidden-field value — the sort never actually changed server-side, which is why the arrow never appeared (same bug class the page's own code had already documented and avoided for `SelectedBatchId`, just not extended to the new sort/page fields). Fixed by removing the three hidden inputs entirely and carrying current sort/page state on the Select button's own `formaction` instead, which has no competing hidden field.
-
-**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
-
-**Files changed:** [src/Histo.Web/wwwroot/css/Styles.css](../src/Histo.Web/wwwroot/css/Styles.css), [src/Histo.Web/Pages/Shared/_SortableHeaderPost.cshtml](../src/Histo.Web/Pages/Shared/_SortableHeaderPost.cshtml), [src/Histo.Web/Pages/Shared/_PaginationPost.cshtml](../src/Histo.Web/Pages/Shared/_PaginationPost.cshtml), [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml).
-
----
-
-## Prompt 119 — Submission workflow issues: AddSubmission search, SearchSender picker, SampleSummary caption (2026-09-04)
-
-> Fix three issues in the submission workflow: (1) AddSubmission is not carrying through the Sender Ref search/select; (2) SearchSender's picker mode needs a second blank search before it shows results — it should search and show results straight away; (3) SampleSummary's submission type caption is showing the wrong label for some submission types.
-
-`AddSubmission.cshtml` — restored the Sender Ref search/select flow via the existing `SearchSender` picker, passing the selected value straight back into the form. `SearchSender.cshtml` — picker mode fixed with GET-binding so it auto-searches and shows results on first load instead of requiring a second blank search. `SampleSummary.cshtml` — the submission-type caption (`SubmittedAsDescription`) used a 2-way ternary collapsing all 4 distinct submission types into one generic label; corrected to the right per-type text.
-
-**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
-
-**Files changed:** [src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs), [src/Histo.Web/Pages/Submissions/SearchSender.cshtml.cs](../src/Histo.Web/Pages/Submissions/SearchSender.cshtml.cs), [src/Histo.Web/Pages/Submissions/SampleSummary.cshtml.cs](../src/Histo.Web/Pages/Submissions/SampleSummary.cshtml.cs).
-
----
-
-## Prompt 120 — Access Denied regression (2026-09-04)
-
-> I'm getting Access Denied again for a scenario that used to work — can you check `CheckBatchAccessAsync`, I think a fix from earlier in the session got lost.
-
-Re-read the current file state fresh rather than assuming the earlier fix was still in place, and found `HistoPageModel.CheckBatchAccessAsync` had silently regressed to `Session.IsHistoUser` only — the `|| Session.IsMaintenance` condition added earlier in the session was no longer present, so Maintenance-role dev-bypass test users were denied access to batches outside their hardcoded dev-area. Restored `|| Session.IsMaintenance` to the unrestricted-access check passed into `BatchAccessDecision.IsAllowed`.
-
-**Build:** 0 errors.
-
-**Files changed:** [src/Histo.Web/Pages/HistoPageModel.cs](../src/Histo.Web/Pages/HistoPageModel.cs).
-
----
-
-## Prompt 121 — Implement Legacy Submission Block Functionality in New Application (2026-09-04)
-
-> Re-implement the block management experience to closely match the legacy application. Separate block creation and editing functionality from the main page, similar to the legacy behavior where Add/Edit actions navigate to a dedicated Block Details page. Ensure the grid layout, columns, actions, and navigation flow match the legacy application. Header: Sender Ref, PM Date, Histology Ref. Grid columns: Block Ref, Tissue Details, Archive, EO, H&E, H&E(BSE), IHC Prp, Special Stain, Select. Actions: Add Block, Edit Block, Delete Block, Copy to Samples, Block Ref Search, Back, Done. Navigation: Add/Edit Block should go to a dedicated BlockDetails page. Verify that: Add Block, Edit Block, Delete Block, Copy to Samples, Block Ref Search, Back, Done functionality works identically to the legacy implementation.
-
-Re-read legacy `SubmissionDetailsBlock.aspx(.vb)`/`BlockDetails.aspx(.vb)` directly to confirm the exact fields, grid columns and navigation, reversing the Run #88 consolidation that the user reported had made the page cluttered. Trimmed `SubmissionDetailsBlock.cshtml(.cs)` back to a pure grid page — removed the inline Add/Edit-block form, tissue-add form and per-block test panels; added `ConfirmDeleteBlockIds` (multi-select delete/copy), `IsTse`/`HistologyCodeByName` helpers driving the read-only EO/H&E/H&E(BSE)/IHC Prp/IHC Other/Special Stain indicator columns (TSE vs Non-TSE column visibility matches legacy's `HideColumns` rule), and `OnPostEditBlockSelectAsync` (validates exactly one row selected before redirecting to Edit). Recreated `Blocks/BlockDetails.cshtml(.cs)` as the dedicated Add/Edit page (block ref or pre-booked ref, customer ref, number of blocks, repeat, tissues, Histology/Antibody/Special-stain test checkboxes), reached via "Add block"/"Edit block" and returning to the grid on Done. Added `Block.Archived` to back the grid's read-only Archive column, since no backing field existed for it at all.
-
-**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
-
-**Files changed:** [src/Histo.Histology/Models/Block.cs](../src/Histo.Histology/Models/Block.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml), [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs), [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml).
-
----
-
-## Prompt 122 — Investigate and align SubmissionDetailsBlock/BlockDetails with legacy: histology-ref picker, blocks grid not loading, Add Block screen (2026-09-04)
-
-> Requirement: Investigate and Align SubmissionDetailsBlock Functionality with Legacy Application
->
-> Issue 1: Histology Reference Controls Not Present in Legacy — verify whether the "Or pick a histology reference type" dropdown and "Get next ref" button exist in the legacy system; if not, assess whether they should be removed or redesigned.
->
-> Issue 2: Blocks Grid Not Loading Data — `SubmissionDetailsBlock?BatchId=30406&AnimalId=96839` shows "No blocks found for this sample" even though data exists in the database. Investigate why block records are not being retrieved or displayed, verify the Tissue Details column renders properly and matches legacy.
->
-> Issue 3: Add Block Screen Does Not Match Legacy — Block Ref is displayed as a dropdown (should behave like legacy, with default values populated as in the legacy system); tissue entry section and No Pieces functionality differ from legacy; "Use these tests for the next block?" checkbox, Comments field, and Details of other tests field need validation against legacy. Perform a full comparison between `BlockDetails.cshtml` and legacy `BlockDetails.aspx`, replicate legacy behaviour as closely as possible while maintaining GDS-compliant design.
-
-Read legacy `SubmissionDetailsBlock.aspx(.vb)`, `BlockDetails.aspx(.vb)` and `clsBatchSummary.vb` directly, and queried the real local database (`sqlcmd` against LocalDB) to confirm stored procedure names/columns rather than guessing. Confirmed Issue 1 is not a bug (legacy's `ddlHistologyType` AutoPostBack dropdown genuinely exists; the current explicit "Get next ref" button is a correct GDS redesign). Root-caused Issue 2 to `BlockRepository.GetByBatchAsync` calling a nonexistent stored procedure (`GetBlocksByBatchID`), silently swallowed by a catch-all, always returning an empty grid; fixed using the confirmed real `GetBatchBlockDetails`, verified live against the reported batch/animal. Also fixed the grid's Archive/IHC Prp/IHC Other/Special Stain columns (reading from the wrong test-type table) and Tissue Details (resolved name instead of raw code). Fixed Issue 3's Block Ref to always be free text with a legacy-matching default, and added the missing Comments field.
-
-**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
-
-**Files changed:** [src/Histo.Histology/Repositories/BlockRepository.cs](../src/Histo.Histology/Repositories/BlockRepository.cs), [src/Histo.Histology/Interfaces/IBlockRepository.cs](../src/Histo.Histology/Interfaces/IBlockRepository.cs), [src/Histo.Histology/Models/Block.cs](../src/Histo.Histology/Models/Block.cs), [src/Histo.Submissions/Models/BatchTestSelections.cs](../src/Histo.Submissions/Models/BatchTestSelections.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml), [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs), [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml).
-
----
-
-## Prompt 123 — Why weren't the documented Issue 3 gaps implemented? (2026-09-04)
-
-> why it is not implmented ?
-> - **Not implemented** (documented as gaps, not attempted to avoid rushed/risky changes): the "Use the entire tissue list?" toggle, "Use these tests for the next block?"/"Next Block" carry-forward workflow, and several fine-grained validation rules (EO exclusivity, Special Stain/IHC requiring a sub-selection, "Additional Request" enable/disable by submission type, pre-booked-ref conflict checks).
-
-Implemented all of the documented gaps. While researching the "Use the entire tissue list?" toggle, discovered the same nonexistent-stored-procedure bug class independently broke tissue loading across the app: `GetTissuesByBlockAsync`/`GetTissuesBySubmissionAsync` called invented SPs (`GetTissuesByBlockID`/`GetTissuesBySubmissionID`) that never existed in the database (one doc comment admitted this was guessed) — fixed using the confirmed real `GetBatchBlockTissues`/`GetBatchTissues`, updating both methods to require a batchId and updating all 6 call sites (`BlockDetails`, `CopyBlocks`, `CopySamples`, `CopyBatch`, `SubmissionDetails`, `SubmissionDetailsBlock`). Implemented: Additional Request enable/disable by `luSubmittedAs` code (DB-confirmed 1/3/5 disabled, 2/4 enabled) with a duplicate-block-ref check; Histology test-selection validation (EO/Archive mutual exclusivity, Special Stain requires a stain, IHC requires an antibody, at least one Histology code required); "Use these tests for the next block?" checkbox + Next Block handler (saves current tests, creates the next block respecting pre-booked refs, copies tests forward if checked); "Use the entire tissue list?" toggle (defaults to tissues already used on the submission, link to show the full list).
-
-**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
-
-**Files changed:** [src/Histo.Submissions/Repositories/SubmissionRepository.cs](../src/Histo.Submissions/Repositories/SubmissionRepository.cs), [src/Histo.Submissions/Services/SubmissionService.cs](../src/Histo.Submissions/Services/SubmissionService.cs), [src/Histo.Submissions/Interfaces/ISubmissionRepository.cs](../src/Histo.Submissions/Interfaces/ISubmissionRepository.cs), [src/Histo.Submissions/Interfaces/ISubmissionService.cs](../src/Histo.Submissions/Interfaces/ISubmissionService.cs), [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs), [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml), [src/Histo.Web/Pages/Blocks/CopyBlocks.cshtml.cs](../src/Histo.Web/Pages/Blocks/CopyBlocks.cshtml.cs), [src/Histo.Web/Pages/Blocks/CopySamples.cshtml.cs](../src/Histo.Web/Pages/Blocks/CopySamples.cshtml.cs), [src/Histo.Web/Pages/Batches/CopyBatch.cshtml.cs](../src/Histo.Web/Pages/Batches/CopyBatch.cshtml.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs).
-
----
-
-## Prompt 124 — SubmissionDetails.cshtml PM Date/Tissue Details load/Edit/Delete/Add parity (2026-09-04)
-
-> Requirement: Address SubmissionDetails.cshtml Issues and Ensure GDS-Compliant Functionality — (1) PM Date should be a proper date field matching legacy behaviour; (2) Tissue Details data not loading; (3) Tissue Details should support Edit and Delete; (4) Add Tissue functionality not working. Full review of data loading, Add/Edit/Delete, validation, database updates, workflow, and accessibility.
-
-Fixed PM Date from plain text to a native `type="date"` input via a new shared `DateFormatHelpers` (legacy stores dates as dd/MM/yyyy per `CalendarDate.ascx.vb::FormattedDate`; a date input requires yyyy-MM-dd). Built Edit tissue from scratch (`UpdateTissueAsync` existed at every layer but had zero callers anywhere in the app). Root-caused "Add tissue not working" to `AddTissueAsync` passing a `@UserID` parameter that the real `AddTissue`/`AddBlockTissue` SPs don't accept (confirmed via `clsTissue.vb`'s `AddInsertParam` list). Fixed Tissue Code from free text to a proper lookup-backed select, and the grid to show resolved tissue names.
-
-**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
-
-**Files changed:** [src/Histo.Core/Domain/DateFormatHelpers.cs](../src/Histo.Core/Domain/DateFormatHelpers.cs) (new), [src/Histo.Submissions/Repositories/SubmissionRepository.cs](../src/Histo.Submissions/Repositories/SubmissionRepository.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml).
-
----
-
-## Prompt 125 — PM date reuse question + token-consumption concern (2026-09-04)
-
-> PM date being used other place, did you used exisitng reference, going for don' take it as new implmentaiton
->
-> still it's not loading and see the newwork logs it's say not found ... i turned agent mode
-
-Confirmed no pre-existing shared date-conversion utility existed (each page duplicated its own inline `dd/MM/yyyy` parsing) — `DateFormatHelpers` consolidates that convention rather than inventing a new one; applied the same helper to `SubmissionDetailsBlock.cshtml.cs`'s identical `PMDate` field. User then reported tissues still not loading with live network-log evidence (200 OK but empty grid) and raised a token-consumption concern; terminal/edit tools were briefly disabled and re-enabled mid-conversation. First diagnosis attempt (patch `BatchSubmissionID` from `GetAnimalsByBatchAsync`) was applied once tools were back on.
-
-**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
-
-**Files changed:** [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml).
-
----
-
-## Prompt 126 — Still not loading; validate before querying the DB again (2026-09-04)
-
-> still it's not loading and see the newwork logs it's say not found ... why are you running will it be usefull, can you skipp this if itnot required ... Then go for it
-
-Explained why a targeted `sqlcmd` check was needed (rule out "no data exists" vs "code bug" before another speculative patch) and, once approved, ran it. Found the real root cause: `GetBatchAnimal` (backing `GetAnimalsByBatchAsync`, the fallback my first patch trusted) also never returns a `BatchSubmissionID` column — confirmed via `sp_helptext`. Animal 53042 also has `BatchSubmission` rows under two different batches (30407 and 9804), so a naive global lookup would be ambiguous. Fixed by resolving via the already-existing, already-fixed `GetSubmissionsByBatchAsync` (batch-scoped `AnimalID`→`ID`), and added the missing `AnimalID` property to the `BatchSubmission` model (a real SP column that was being silently discarded). Verified live: batch 30407/animal 53042 → `BatchSubmissionID` 65912, which has 1 real tissue row.
-
-**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
-
-**Files changed:** [src/Histo.Submissions/Models/BatchSubmission.cs](../src/Histo.Submissions/Models/BatchSubmission.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs).
-
----
-
-## Prompt 127 — Edit/Delete button variance, Add tissue pre-filled, Save tissue not working (2026-09-04)
-
-> I could see edit link and delete button, why this variance ? also when edit it's editable field, but there add tissue section also getting loaded the values. Save tissue is not working. also check if i add new tissue it should also save
-
-Made Edit a button matching Delete's style. Fixed the Add-tissue form being silently pre-filled with the row being edited — Edit and Add shared the same bind properties; split into dedicated `EditTissueCode`/`EditNoPieces`/`EditComment`. Root-caused "Save tissue not working" to `UpdateTissueAsync` missing the `@BatchSubmissionID`/`@BlockID` keyfield parameter that `EditTissue`/`EditBlockTissue` require (confirmed via `clsTissue.vb`'s `AddUpdateParam(sKeyField, ...)` — the same class of parameter-list omission as the earlier Add-tissue bug, just on the Update side this time).
-
-**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
-
-**Files changed:** [src/Histo.Submissions/Repositories/SubmissionRepository.cs](../src/Histo.Submissions/Repositories/SubmissionRepository.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml).
-
----
-
-## Prompt 128 — Review and align Submission editing and Submission Status functionality with legacy (2026-09-07)
-
-> Requirement: Review and Align Submission Editing and Submission Status Functionality with Legacy Application — (1) Edit Submission should disable Entered By, Entered Area, Submitted Area, Submitted As, per legacy; (2) Submissions On Hold shows all on-hold submissions instead of only the samples selected during the current On Hold action; (3) assess whether combining Edit Submission and Edit Submission Status into one screen aligns with GDS, and recommend a simpler approach if needed.
-
-Confirmed via `Batch.ascx.vb`/`EditBatch.aspx.vb` that Entered By/Entered Area/Submitted As were entirely missing from `EditBatch.cshtml` (not just editable) — added them as read-only, and made Submitted area (external) read-only too (Submitted by (external) stays editable, matching the spec). Root-caused `SubmissionsOnHold.cshtml` against `SubmissionsOnHold.aspx.vb`: legacy shows every sample of the CURRENT batch with a per-sample On Hold checkbox (reached from `EditBatch.aspx`'s "Put Samples On Hold" button), not a system-wide on-hold report — rewrote the page to match, reusing `SampleSummary`'s `MergeAnimals` pattern. Confirmed via `EditBatch.aspx.vb` that legacy's `EditBatch.aspx` genuinely is "Edit Submission Status" (its "Edit Submission" button redirects to `BatchDetails.aspx`, legacy's real full-edit screen — there's no separate dedicated edit-fields page in legacy either). Assessed a literal two-page split as out of scope for this pass (would need a new true edit mode in `BatchDetails.cshtml` plus ~6 navigation call-site updates); added clear GDS section separation ("Submission details"/"Submission status" headings) on the single page instead per the user's own fallback option, and flagged the full split as a follow-up.
-
-**Build:** 0 errors. **Tests:** 171 total, 170 passed, 1 skipped, 0 failed.
-
-**Files changed:** [src/Histo.Web/Pages/Batches/EditBatch.cshtml.cs](../src/Histo.Web/Pages/Batches/EditBatch.cshtml.cs), [src/Histo.Web/Pages/Batches/EditBatch.cshtml](../src/Histo.Web/Pages/Batches/EditBatch.cshtml), [src/Histo.Web/Pages/Batches/SubmissionsOnHold.cshtml.cs](../src/Histo.Web/Pages/Batches/SubmissionsOnHold.cshtml.cs), [src/Histo.Web/Pages/Batches/SubmissionsOnHold.cshtml](../src/Histo.Web/Pages/Batches/SubmissionsOnHold.cshtml).
-
----
-
-## Prompt 129 — GDS pagination ellipsis truncation + other pagination issues (2026-09-07)
-
-> As per GDS pagincation it shold work like beow, in this applciation has larger screen it show all the page numbers in it shold be ellips, also other pagination issue and fix it. For smaller screens, show page numbers for: the current page, previous and next pages, first and last pages. For larger screens, show page numbers for: the current page, at least one page immediately before and after the current page, first and last pages. Use ellipses (…) to replace any skipped pages. For example: [1] 2 3 … 100 / 1 … 4 [5] 6 … 100 / 1 … 99 [100] etc.
-
-Fetched the official GOV.UK Design System pagination documentation to confirm the exact algorithm and worked examples rather than guessing. Both `_Pagination.cshtml` (GET-based) and `_PaginationPost.cshtml` (POST-based, used by `ViewSubmissions` and other `[BindProperty]`-bound grids) previously rendered every single page number with a naive `@for` loop — exactly the reported "all the page numbers" bug. Created `PaginationHelpers.BuildPageItems` in `Histo.Core.Domain` implementing the GDS truncation rule (current page, first, last, ±1 neighbour, ellipses for gaps of 2+ skipped pages), confirmed it produces the identical output to every worked example on the GDS page, and rewrote both partials to use it. **Other pagination issue** (proactively identified in the same area): `GridPageModel.PopulateGridViewData` did not clamp an out-of-range `PageNumber` (e.g. a stale link, or filtered-down results), silently rendering an empty grid instead of a valid page — fixed by clamping to `[1, totalPages]`. Added `PaginationHelperTests.cs` with cases matching the GDS worked examples plus an out-of-range-current-page edge case (also caught and fixed a bug in the helper itself where the raw unclamped `currentPage` was used to compute neighbours, which could compute an out-of-range page).
-
-**Build:** 0 errors. **Tests:** 183 total, 182 passed, 1 skipped, 0 failed (up from 171/170, 12 new pagination tests added).
-
-**Files changed:** [src/Histo.Core/Domain/PaginationHelpers.cs](../src/Histo.Core/Domain/PaginationHelpers.cs), [src/Histo.Web/Pages/Shared/_Pagination.cshtml](../src/Histo.Web/Pages/Shared/_Pagination.cshtml), [src/Histo.Web/Pages/Shared/_PaginationPost.cshtml](../src/Histo.Web/Pages/Shared/_PaginationPost.cshtml), [src/Histo.Web/Pages/GridPageModel.cs](../src/Histo.Web/Pages/GridPageModel.cs), [tests/Histo.Tests/Unit/PaginationHelperTests.cs](../tests/Histo.Tests/Unit/PaginationHelperTests.cs).
-
----
-
-## Prompt 130 — Validate Tissue Details functionality in Create Submission journey (Wet Tissue) (2026-09-07)
-
-> Requirement: Validate Tissue Details Functionality in the Create Submission Journey - Submission type is Wet Tissue. Background: The issues below have already been addressed for the Edit Submission journey. Please analyse the Create Submission flow, specifically within `SubmissionDetails.cshtml` and the Add Sample workflow, to determine whether the same issues exist there. Issue 1: Tissue Details Data Not Loading. Issue 2: Tissue Details Should Support Edit and Delete. Issue 3: Add Tissue Functionality Not Working. [Full requirement covered data loading, Add/Edit/Delete, validation, persistence, UI rendering, accessibility and GDS/legacy consistency.]
-
-Confirmed the Razor markup in `SubmissionDetails.cshtml` is fully shared between Create and Edit journeys — no UI gap. Root-caused via legacy `clsBatchSubmission.vb::NewRecord(dtBatchSubmission, iBatchSubmissionID, iBatchID, iAnimalID)` (confirms the real `AddBatchSubmission` SP accepts a per-animal `AnimalID`): `AddSubmissionModel.OnPostAsync` (Add Sample) reused one shared `BatchSubmission` row (hardcoded `AnimalID=0`) for every new animal instead of linking each new animal to its own submission, so `SubmissionDetailsModel.LoadAnimalAsync`'s AnimalID-matching resolution (fixed for the Edit journey in Run #29) never found a freshly-created animal's real submission — `BatchSubmissionID` stayed `0`, silently breaking Tissue Details load/Add/Edit/Delete for every new Wet Tissue sample. Pre-existing seeded/production animals worked fine because their submissions already had real `AnimalID` values. Fixed `SubmissionRepository.AddSubmissionAsync` (was hardcoding `AnimalID=0` regardless of the model's value) and `AddSubmissionModel.OnPostAsync` (now creates a dedicated new submission linked to the new animal for Wet Tissue batches). Cassetted/block batches unaffected (Tissue there is Block-owned, not Submission-owned) — left unchanged. Flagged the same bug class in `CopyBatch`'s `CopyAnimalAsync` path as a follow-up (fixed in Prompt 131 below).
-
-**Build:** 0 errors. **Tests:** 183 total, 182 passed, 1 skipped, 0 failed (unchanged).
-
-**Files changed:** [src/Histo.Submissions/Repositories/SubmissionRepository.cs](../src/Histo.Submissions/Repositories/SubmissionRepository.cs), [src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs).
-
----
-
-## Prompt 131 — Fix the same class of bug in Copy Batch/Copy Samples' Wet Tissue flow (2026-09-07)
-
-> Can you fix this as well the same class of bug likely affects Copy Batch/Copy Samples' Wet Tissue flow (`CopyAnimalAsync`) —
-
-Confirmed `CopyBatchModel.OnPostAsync` had the identical root cause: it created the destination submission via `CopySubmissionAsync` BEFORE copying the animal via `CopyAnimalAsync`, so the new submission's `AnimalID` could never be linked to the copied animal (chicken-and-egg — `CopySubmissionAsync` didn't even accept an `AnimalID` parameter). Added an optional `animalId` parameter to `ISubmissionService.CopySubmissionAsync`/`SubmissionService.CopySubmissionAsync` (threaded into `BatchSubmission.AnimalID`, defaults to 0 for backward compatibility) and restructured `OnPostAsync` to copy the animal first (confirmed its `newBatchSubmissionId` parameter is inert at the SQL layer, same as the Add Sample fix, so a placeholder is safe), then create the destination submission linked to the real new animal ID, then copy tissues into that now-correctly-linked submission. Applies uniformly to both cassetted and non-cassetted copy paths — harmless for cassetted (Tissue there is Block-owned).
-
-**Build:** 0 errors. **Tests:** 183 total, 182 passed, 1 skipped, 0 failed (unchanged).
-
-**Files changed:** [src/Histo.Submissions/Interfaces/ISubmissionService.cs](../src/Histo.Submissions/Interfaces/ISubmissionService.cs), [src/Histo.Submissions/Services/SubmissionService.cs](../src/Histo.Submissions/Services/SubmissionService.cs), [src/Histo.Web/Pages/Batches/CopyBatch.cshtml.cs](../src/Histo.Web/Pages/Batches/CopyBatch.cshtml.cs).
-
----
-
-## Prompt 132 — Review and Fix View Submissions and Edit Submission Issues (2026-09-07)
-
-> Requirement: Review and Fix View Submissions and Edit Submission Issues. Issue 1: Customer Received Date Column Not Sortable in `ViewSubmissions.cshtml`. Issue 2: Submission Category radio buttons remain enabled during Edit Submission (legacy prevents this post-creation). Issue 3: Project/Contract Code and Pathologist dropdowns display incorrect selected values when editing a submission. Issue 4: Dropdown + management-button pairs (Project/Contract Code, Submitted By (External), Pathologist) not aligned on the same row. [Full requirement covered investigation, legacy comparison, and GDS/accessibility validation for each issue.]
-
-**(1)** Confirmed legacy `ViewSubmissions.aspx`'s grid has `AllowSorting="True"` and the Customer Received Date column has `SortExpression="CustomerReceivedDate"`, so it is sortable in legacy. The migrated page rendered it as a plain `<th>`; wrapped it in the existing `_SortableHeaderPost` partial and added a `CustomerReceivedDate` case to the `PagedResults` sort switch (the property is already `DateTime?`, so it sorts as a real date, not text). **(2)** Confirmed via `Cassetted.aspx.vb`/`EditBatch.aspx.vb` that legacy's TSE/Non-TSE type-selection step is a one-time first step of the Create journey only, never re-shown when editing an existing submission — so the category can never change post-creation in legacy. Changed the migrated `BatchTypeField` radios to `disabled` (still visible, value preserved via a hidden input, matching the established `OtherSubmittedAreaDisplay` pattern) and hardened `EditBatchModel.OnPostAsync` to always persist the original loaded `Batch.BatchType` instead of the posted value, so a crafted request can't bypass the UI-level disable. **(3)** Root-caused to `EditBatchModel.LoadLookupsAsync` calling `GetLookupDataAsync` with the default `includeInactive: false` (active-only pick-list SP variant) — a submission's saved Project/Pathologist that has since been deactivated silently has no matching `<option>`, so the browser defaults to selecting the first item in the list, which looks exactly like "the wrong value is shown". Fixed by passing `includeInactive: true` for both lookups, matching the established pattern already used in `EditLookupItem.cshtml.cs`. **(4)** Wrapped each `<select>` + "Manage …" button pair (Project/Contract Code, Pathologist, Submitted by (external)) in a new `.app-field-with-button` flex container (`Styles.css`) so they align on one row and wrap gracefully on narrow screens instead of overflowing.
-
-**Build:** 0 errors. **Tests:** 183 total, 182 passed, 1 skipped, 0 failed (unchanged).
-
-**Files changed:** [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml), [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs), [src/Histo.Web/Pages/Batches/EditBatch.cshtml](../src/Histo.Web/Pages/Batches/EditBatch.cshtml), [src/Histo.Web/Pages/Batches/EditBatch.cshtml.cs](../src/Histo.Web/Pages/Batches/EditBatch.cshtml.cs), [src/Histo.Web/wwwroot/css/Styles.css](../src/Histo.Web/wwwroot/css/Styles.css).
-
----
-
-## Prompt 133 — Review and Fix SubmissionDetailsBlock.cshtml and BlockDetails.cshtml Functionality (2026-09-07)
-
-> Requirement: Review and Fix SubmissionDetailsBlock.cshtml and BlockDetails.cshtml Functionality. SubmissionDetailsBlock.cshtml: (1) PM Date/Histology Reference should display read-only like Sender Ref; (2) Archive/EO/H&E/H&E(BSE)/IHC Prp/Special Stain columns showing empty despite data existing; (3) "Save Details" purpose unclear — review and recommend; (4) confirm whether "Or pick a histology reference type"/"Get next ref" exist in legacy and are needed; (5) full CRUD validation. BlockDetails.cshtml: (1) missing Histology Ref field; (2) missing Number of Blocks field; (3) Tissue table missing Edit (Delete-only); (4) full CRUD validation. [Full requirement covered accessibility, GDS compliance, and legacy parity for both pages.]
-
-**SubmissionDetailsBlock.cshtml:** Converted PM date/Histology reference from editable inputs to read-only `govuk-summary-list` rows matching Sender ref — confirmed via `DisableEnableControls` that legacy's own controls ARE editable there, so this was an explicit UX decision rather than a legacy-parity bug. Root-caused the empty Archive/EO/H&E/H&E(BSE)/IHC-Prp/Special Stain columns to a Dapper dynamic-row DBNull bug in `BlockTestRepository.Map`: `row.QCNote is bool b ? b : row.QCNote is not null && (int)row.QCNote != 0` looked null-safe but wasn't, because Dapper's dynamic rows return `DBNull.Value` (a real, non-null object) for NULL columns — `is not null` evaluated `true`, so `(int)row.QCNote` threw whenever QCNote/Dispatched was NULL (a very common state for not-yet-QC'd/dispatched tests), silently wiping every indicator column for the WHOLE batch via `BlockTestService`'s catch-all. Rewrote `Map` to read every nullable column via `IDictionary<string, object>` + explicit DBNull checks, matching the established codebase convention. Removed "Save details" as redundant now that nothing on the page is manually editable, and changed "Get next ref" (confirmed genuinely exists in legacy as `ddlHistologyType`) to persist the resolved Histology ref immediately via `UpdateAnimalAsync` instead of requiring a separate save click.
-
-**BlockDetails.cshtml:** Added a read-only Histology reference row matching Sender ref. Added Edit tissue functionality to the Tissue table (previously Delete-only), using the established inline-edit-row + separately-named bind-property pattern from `SubmissionDetails.cshtml`. Confirmed "Number of blocks" already exists (shown correctly only for non-pre-cassetted Add mode, matching legacy's pre-booked-list rule for pre-cassetted) — not actually missing.
-
-**Build:** 0 errors. **Tests:** 183 total, 182 passed, 1 skipped, 0 failed (unchanged).
-
-**Files changed:** [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml.cs), [src/Histo.Histology/Repositories/BlockTestRepository.cs](../src/Histo.Histology/Repositories/BlockTestRepository.cs), [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml), [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs).
-
----
-
-## Prompt 134 — Analyse and Fix Context-Sensitive Help Navigation (2026-09-07)
-
-> Requirement: Analyse and Fix Context-Sensitive Help Navigation. The application has a single Help page with multiple sections. When users click Help from a specific module (e.g. User Management), they're taken to the top of the Help page rather than the relevant section. Support deep linking using anchors/section IDs, maintain browser back/forward, ensure GDS/accessibility compliance, and verify the correct section is highlighted/focused on load.
-
-Confirmed `Help/Index.cshtml` already had a `<section id="kebab-case">` anchor per topic, each with a secondary legacy-page-name `id` on its `<h2>` (e.g. `id="UserMaintenance"`) — a ready-made map, but cross-referenced every entry against `docs/Functionality-Traceability-Matrix.md` since several legacy pages were renamed/consolidated during migration (e.g. `BatchSummary`+`BatchBlockSummary` → `SampleSummary`, `SamplesOnHold` → `SubmissionsOnHold`), so current page name doesn't always equal the legacy id. Added `Histo.Core.Domain.HelpSectionMap` (pure, unit-tested static dictionary keyed by current Razor Page path). `_NavPartial.cshtml`'s single global "Help" link now resolves `ViewContext.RouteData.Values["page"]` through the map and appends `#anchor` to the href when a mapping exists — a plain `<a href>` with no client-side routing, so browser back/forward and direct access to `Help/Index` both continue to work exactly as before. Added a small `@section Scripts` snippet to `Help/Index.cshtml` that sets `tabindex="-1"` and calls `.focus()` on the URL-fragment target on page load and on every `hashchange` (also benefits the page's own contents/"Back to top" links) — required because scrolling to an anchor does not itself move keyboard/screen-reader focus.
-
-**Build:** 0 errors. **Tests:** 191 total, 190 passed, 1 skipped, 0 failed (up from 183/182, 8 new tests).
-
-**Files changed:** [src/Histo.Core/Domain/HelpSectionMap.cs](../src/Histo.Core/Domain/HelpSectionMap.cs), [src/Histo.Web/Pages/Shared/_NavPartial.cshtml](../src/Histo.Web/Pages/Shared/_NavPartial.cshtml), [src/Histo.Web/Pages/Help/Index.cshtml](../src/Histo.Web/Pages/Help/Index.cshtml), [tests/Histo.Tests/Unit/HelpSectionMapTests.cs](../tests/Histo.Tests/Unit/HelpSectionMapTests.cs).
-
----
-
-## Prompt 135 — Fix PR review comment on ViewSubmissions.cshtml Select button formaction (2026-09-07)
-
-> Review comments on ViewSubmissions.cshtml line `formaction="?handler=Select&SortColumn=@Model.SortColumn&SortDesc=@Model.SortDesc&PageNumber=@Model.PageNumber"` — The Select button builds a query string using raw Model.SortColumn; because SortColumn is user-controllable via POST binding, this can produce malformed URLs and allow query-parameter injection (e.g. embedding '&' into SortColumn). Encode the value (or use asp-route* tag helpers) before putting it into formaction.
-
-Moved the formaction to a new `SelectFormAction` property on `ViewSubmissionsModel`, built with `Uri.EscapeDataString` on `SortColumn` — matching the existing `_SortableHeaderPost.cshtml`/`_PaginationPost.cshtml` encoding pattern. While rebuilding to verify, found and fixed two unrelated pre-existing regressions blocking compilation (from prior uncommitted/external edits, not this change): (1) placing the fix as an inline `@{ }` block directly after `</form>` inside a nested `@if {}` caused Razor error RZ1010 — resolved by moving the computation into the PageModel property instead (same fix pattern used in an earlier run); (2) `AddSubmissionModel.OnPostAsync` referenced a since-removed `IsNeuropath` bind property (`CS0103`) — the checkbox had been removed from `AddSubmission.cshtml` without updating the code-behind; fixed by deriving `isNeuropath` from `Session.UserArea == "Neuropath"`, matching legacy `AddSubmission.aspx.vb`'s actual derivation (a session user-area check, never a manual form control).
-
-**Build:** 0 errors. **Tests:** 191 total, 190 passed, 1 skipped, 0 failed (unchanged).
-
-**Files changed:** [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml), [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs), [src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs).
-
----
-
-## Prompt 136 — Analyse and Validate "Assign Tissues to Blocks" Functionality Against Legacy Application (2026-09-07)
-
-> Requirement: Analyse and Validate "Assign Tissues to Blocks" Functionality Against Legacy Application. Legacy workflow: BatchesReceived.aspx → BatchBlocks.aspx → FinalPrintBatch.aspx (batch/sample/block CRUD, Copy From Previous Submission). New application starting page: BatchesReceived.cshtml. Required: full navigation/CRUD/cross-journey comparison and resolution of any gaps, adhering to GDS.
-
-Read the legacy `BatchesReceived.aspx.vb`/`BatchBlocks.aspx.vb` source directly to document the exact journey: row-select or "Enter Submission Number" both set `SV_AssignBlocks/SV_Cassetted/SV_BatchID` and redirect to `BatchBlocks.aspx` — a batch-wide grid (Sender Ref/Histology Ref/Block Ref/Tissue Details/7 test-indicator checkboxes) with Add/Edit/Delete Sample, Copy From Prev. Submission, Cancel (→ `BatchesReceived.aspx`, discarding all in-memory changes), and Done (→ sets `IsBlocked=True`/status In progress/`AllTissuesAssigned`, persists, redirects to `FinalPrintBatch.aspx`). Confirmed the current equivalent chain is `BatchesReceived.cshtml` → `/Batches/BatchDetails` (a deliberate hub-page consolidation already used everywhere else in this app, one extra click vs legacy) → "Assign blocks" button → `/Submissions/SubmissionDetailsBlock` in batch-wide mode — verified via legacy's own `VLAHeader1.PageTitle = "Submission Block Summary"` matching the Help section id `BatchBlocks`.
-
-Found and fixed 3 real gaps in the batch-wide grid: **(1)** missing Histology Ref/Tissue Details/Archive/EO/H&E/H&E(BSE)/IHC-Prp/IHC-Other/Special Stain columns — added, reusing the existing `LoadSupportingDataAsync` (previously only invoked for the per-animal branch, now also called batch-wide). **(2)** No "Add sample" button at this level (legacy's `btnAddSample`) — added directly; previously required an extra hop via `SampleSummary`. **(3)** No "Done" action at all — legacy's `btSubmit_Click` sets `IsBlocked=True`, transitions status to In progress, and records `AllTissuesAssigned`, none of which existed anywhere in the current app (confirmed via grep these fields were only ever read/passed-through, never set) — added `IBatchService.CompleteBlockAssignmentAsync` (+ repository method) and a "Done" button/handler, computing `AllTissuesAssigned` as "every animal in the batch has at least one block" (a documented simplification of legacy's per-tissue-piece "green star" indicator, not an exact reproduction).
-
-`FinalPrintBatch.aspx` is confirmed genuinely unmigrated — it's explicitly listed as "pending Phase 3" (Reporting) in `docs/Migration-Plan.md`'s module table — so "Done" redirects to `/Batches/BatchesReceived` instead, matching legacy's own eventual post-print destination (`SV_RedirectAfterPrint`). Building a FinalPrintBatch-equivalent print page was out of scope (needs a dedicated Crystal-Reports-to-PDF migration pass). Documented as an accepted, unchanged deviation: legacy's entire block-assignment journey operates on an in-memory session `DataSet` with zero DB writes until Done is clicked (Cancel discards everything) — the current app's immediate-write-per-action architecture (confirmed consistently across every Add/Edit/Delete Sample/Block/Tissue action fixed this session) makes an identical "nothing persists until Done" semantic structurally impossible without reverting the whole app's architecture. Validated `BatchesReceived.cshtml`'s grid (columns, sorting, Quick-Go direct navigation, pagination) already matches legacy closely — no changes needed there. Cross-journey consistency (Create/Edit/View Submission) confirmed intact — all these pages already share the same underlying `_blocks`/`_submissions` repository calls fixed earlier this session.
-
-**Build:** 0 errors. **Tests:** 191 total, 190 passed, 1 skipped, 0 failed (unchanged).
-
-**Files changed:** [src/Histo.Submissions/Interfaces/IBatchService.cs](../src/Histo.Submissions/Interfaces/IBatchService.cs), [src/Histo.Submissions/Interfaces/IBatchRepository.cs](../src/Histo.Submissions/Interfaces/IBatchRepository.cs), [src/Histo.Submissions/Services/BatchService.cs](../src/Histo.Submissions/Services/BatchService.cs), [src/Histo.Submissions/Repositories/BatchRepository.cs](../src/Histo.Submissions/Repositories/BatchRepository.cs), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml.cs).
-
----
-
-## Prompt 130 — Validate Tissue Details functionality in the Create Submission journey (Wet Tissue) (2026-09-07)
-
-> Requirement: Validate Tissue Details Functionality in the Create Submission Journey - Submission type is Wet Tissue. Background: The issues below have already been addressed for the Edit Submission journey. Please analyse the Create Submission flow, specifically within `SubmissionDetails.cshtml` and the Add Sample workflow, to determine whether the same issues exist there. Issue 1: Tissue Details Data Not Loading. Issue 2: Tissue Details Should Support Edit and Delete. Issue 3: Add Tissue Functionality Not Working. [Full requirement covered data loading, Add/Edit/Delete, validation, persistence, UI rendering, accessibility/GDS compliance, and consistency with Edit Submission and legacy.]
-
-Confirmed the `SubmissionDetails.cshtml` markup is fully shared between the Create and Edit journeys (identical GDS-compliant Tissue Code/No. Pieces/Comment/Actions grid, inline confirmation panel, Add/Edit forms) — no UI gap. Root-caused a real backend bug instead: `AddSubmissionModel.OnPostAsync` (Add Sample) reused one shared `BatchSubmission` row (hardcoded `AnimalID=0` placeholder) for every new animal added to a batch, and never linked it to the real animal. Confirmed via legacy `clsBatchSubmission.vb::NewRecord(dtBatchSubmission, iBatchSubmissionID, iBatchID, iAnimalID)` that the real `AddBatchSubmission` SP genuinely accepts a per-animal `AnimalID` — each Wet Tissue sample needs its own dedicated submission row. Because `SubmissionDetailsModel.LoadAnimalAsync` (the Run #29 Edit-journey fix) resolves `Animal.BatchSubmissionID` by matching `submissions.FirstOrDefault(s => s.AnimalID == AnimalId)`, a freshly-created animal's owning submission never matched (its `AnimalID` was always the 0 placeholder), leaving `BatchSubmissionID` at 0 and silently breaking Tissue Details load/Add/Edit/Delete for every newly-added Wet Tissue sample — pre-existing seeded/production animals worked fine because their submissions already had real `AnimalID` values from historical data. Fixed `SubmissionRepository.AddSubmissionAsync` (was hardcoding `AnimalID=0` regardless of the model) and `AddSubmissionModel.OnPostAsync` (now creates a dedicated new submission linked to the new animal for Wet Tissue batches specifically; cassetted/block batches unaffected since their tissues are Block-owned, not Submission-owned).
-
-**Build:** 0 errors. **Tests:** 183 total, 182 passed, 1 skipped, 0 failed (unchanged from before this fix — no unit-testable pure logic extracted).
-
-**Files changed:** [src/Histo.Submissions/Repositories/SubmissionRepository.cs](../src/Histo.Submissions/Repositories/SubmissionRepository.cs), [src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs).
-
-**Follow-up flagged, not fixed:** the same class of bug likely affects the Copy Batch/Copy Samples Wet Tissue flow (`CopyAnimalAsync` in `CopyBatch.cshtml.cs`) — out of scope for this request.
-
-## Prompt 137 — Implement the BatchBlocks page split (2026-09-07)
-
-> Requirement (verbatim): "go ahead and implment it" — referring to the previously-agreed plan to split the batch-wide grid out of `SubmissionDetailsBlock.cshtml` into a genuinely new dedicated page `Batches/BatchBlocks.cshtml`, mirroring legacy's real page boundary.
-
-Created `Pages/Batches/BatchBlocks.cshtml(.cs)` and stripped the batch-wide branch out of `SubmissionDetailsBlock.cshtml(.cs)`, which now always requires `AnimalId` and redirects to the new page otherwise. Repointed `BatchDetails.cshtml`'s "Assign blocks" button and all `CopyBlocks`/`CopySamples`/`CopySamplesSummary` cancel/done redirects (previously targeting the removed batch-wide `SubmissionDetailsBlock` mode) to `/Batches/BatchBlocks`. A follow-up mid-task tool restriction (file-editing tools briefly disabled) required pausing and asking the user to re-enable them before the implementation could proceed.
-
-**Build:** 0 errors. **Tests:** 190 passed, 1 skipped, 0 failed.
-
-**Files changed:** [src/Histo.Web/Pages/Batches/BatchBlocks.cshtml](../src/Histo.Web/Pages/Batches/BatchBlocks.cshtml) (new), [src/Histo.Web/Pages/Batches/BatchBlocks.cshtml.cs](../src/Histo.Web/Pages/Batches/BatchBlocks.cshtml.cs) (new), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml.cs), [src/Histo.Web/Pages/Batches/BatchDetails.cshtml](../src/Histo.Web/Pages/Batches/BatchDetails.cshtml), [src/Histo.Web/Pages/Blocks/CopyBlocks.cshtml.cs](../src/Histo.Web/Pages/Blocks/CopyBlocks.cshtml.cs), [src/Histo.Web/Pages/Blocks/CopySamples.cshtml.cs](../src/Histo.Web/Pages/Blocks/CopySamples.cshtml.cs), [src/Histo.Web/Pages/Blocks/CopySamplesSummary.cshtml.cs](../src/Histo.Web/Pages/Blocks/CopySamplesSummary.cshtml.cs).
-
-## Prompt 138 — BatchesReceived grid columns + BatchBlocks CRUD action buttons (2026-09-07)
-
-> Requirement: Update `BatchesReceived.cshtml`'s grid to match legacy's displayed columns exactly (Submission Number/Project Code/Pathologist/Species/Submitted Date/All Tissues Assigned), and update `BatchBlocks.cshtml`'s action buttons to Add Sample/Edit Sample/Delete Sample/Copy from Prev. Submission/Cancel/Done, with Edit Sample navigating to `SubmissionDetailsBlock.cshtml`.
-
-Trimmed `BatchesReceived.cshtml`'s grid to legacy's exact 6 columns, removing the extra Received date/Customer ref columns. Rebuilt `BatchBlocks.cshtml(.cs)`'s action row into one legacy-matching button group (Add sample/Edit sample/Delete sample/Copy from a previous submission/Cancel/Done), replacing the previous per-row "Manage sample"/"Delete" links — all driven by the grid's existing row checkboxes, requiring exactly one selected row for Edit/Delete (mirroring the established `OnPostEditBlockSelectAsync` pattern). "Delete sample" now calls `ISubmissionService.DeleteAnimalAsync` (removes the whole sample) instead of a single-block delete, matching legacy's `btnDeleteSample_Click`. Kept "Copy selected blocks" as an already-built extra beyond legacy's 6 buttons. Cancel/back-link retargeted to `/Batches/BatchDetails` (this page's real entry point).
-
-**Build:** 0 errors. **Tests:** 190 passed, 1 skipped, 0 failed.
-
-**Files changed:** [src/Histo.Web/Pages/Batches/BatchesReceived.cshtml](../src/Histo.Web/Pages/Batches/BatchesReceived.cshtml), [src/Histo.Web/Pages/Batches/BatchBlocks.cshtml](../src/Histo.Web/Pages/Batches/BatchBlocks.cshtml), [src/Histo.Web/Pages/Batches/BatchBlocks.cshtml.cs](../src/Histo.Web/Pages/Batches/BatchBlocks.cshtml.cs).
-
-## Prompt 139 — Investigate and fix BatchesReceived stored procedure/search/Species + validate BatchBlocks CRUD (2026-09-07)
-
-> Requirement: (1) Identify the SP used by BatchesReceived to load the grid; (2) determine legacy's default sort order; (3) identify the SP used when searching by Submission Number; (4) verify the new implementation matches legacy for both data loading and search. (Issue 2) Fix the Species column showing the species ID instead of name. (Issue 3) Review and validate all BatchBlocks CRUD operations against legacy and the database.
-
-Grepped the legacy `.aspx.vb` call site directly rather than trusting the repository's own doc comment, and confirmed `BatchesReceived.aspx.vb::InitialiseBatchesGrid` calls SP `GetBatchesToBeBlocked` — not `GetReceivedBatches`, which exists in `clsBatch.vb` but is never called by any legacy page (dead code picked by a naming-convention guess during migration). Fixed `BatchRepository.GetReceivedAsync` accordingly, expected to also resolve the reported Species-as-ID bug (same root cause as the earlier `BatchDetails` Species fix) — not verified live, since the user declined both a read-only sqlcmd query and opening a browser to check. Fixed the default sort (legacy: `"ID DESC"` with no column clicked) and `OnPostGoAsync`/`OnPostSelect` to validate via `GetByIdAsync` + status check (Received or InProgress, via legacy's `GetBatchWithStatus` SP) and redirect to `/Batches/BatchBlocks`, matching legacy's `btnGo_Click`/`grdBatches_SelectedIndexChanged` and the `GoError` pattern already used on `BatchesNotReceived`. The BatchBlocks CRUD review found 2 more real bugs: `LoadGridAsync`/`OnPostDoneAsync` only called `GetAnimalsByBatchAsync` (incomplete for cassetted batches — the same known gotcha already fixed in `SampleSummaryModel`), fixed via a new `GetAllAnimalsAsync()` merge helper; and the main grid `<form method="post">` (plus `SubmissionDetailsBlock`'s sibling per-animal grid form, plus `BatchesReceived`'s row "View" form) had no `asp-*` attribute, so Razor's `FormTagHelper` never renders an antiforgery token — added `asp-page` to all three. Flagged, but deliberately did not mass-fix, that the identical bare-form pattern recurs in 32 files across the app — could not verify live whether it actually causes failures in practice (contradicts Run #74's stated root cause, which may itself have been a different bug in the same run).
-
-**Build:** 0 errors. **Tests:** 190 passed, 1 skipped, 0 failed.
-
-**Files changed:** [src/Histo.Submissions/Repositories/BatchRepository.cs](../src/Histo.Submissions/Repositories/BatchRepository.cs), [src/Histo.Submissions/Interfaces/IBatchRepository.cs](../src/Histo.Submissions/Interfaces/IBatchRepository.cs), [src/Histo.Submissions/Models/SearchModels.cs](../src/Histo.Submissions/Models/SearchModels.cs), [src/Histo.Web/Pages/Batches/BatchesReceived.cshtml.cs](../src/Histo.Web/Pages/Batches/BatchesReceived.cshtml.cs), [src/Histo.Web/Pages/Batches/BatchesReceived.cshtml](../src/Histo.Web/Pages/Batches/BatchesReceived.cshtml), [src/Histo.Web/Pages/Batches/BatchBlocks.cshtml.cs](../src/Histo.Web/Pages/Batches/BatchBlocks.cshtml.cs), [src/Histo.Web/Pages/Batches/BatchBlocks.cshtml](../src/Histo.Web/Pages/Batches/BatchBlocks.cshtml), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml).
-
-## Prompt 140 — Fix Tissue type dropdown not loading in BlockDetails Edit block flow (2026-09-07)
-
-> Requirement: In `BlockDetails.cshtml`'s Edit block flow, the Tissue type dropdown is not loading.
-
-Root-caused via code inspection: `BlockDetailsModel.LoadAnimalAsync` resolves `Animal` via `GetBlockAnimalsByBatchAsync` first (for accurate Sender/Histology ref) — but that SP's result set (`BATCH_BLOCK_ANIMAL`) doesn't return a `BatchSubmissionID` column, so it stays 0. In Edit block mode (the block already exists, so this path is almost always hit) `LoadSupportingDataAsync`'s default (unchecked "Use whole tissue list") tissue-dropdown filter calls `GetTissuesBySubmissionAsync(batchId, 0)`, matching zero rows — the same known gotcha already documented and worked around in `SampleSummaryModel`, just not yet applied to `BlockDetailsModel`. Fixed by patching `Animal.BatchSubmissionID` from the plain `GetAnimalsByBatchAsync` list whenever the block-animal source left it at 0.
-
-**Build:** 0 errors. **Tests:** 190 passed, 1 skipped, 0 failed.
-
-**Files changed:** [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs).
-
-## Prompt 141 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-07)
-
-> Requirement: "can you update the log file and prompts, session as usuasal" — apply the standing session-end documentation convention.
-
-Added Run Log rows #39–#42 (`docs/run-log-v2.md`), Agent Run Timing Table rows #100–#103 (`docs/session-metrics.md`), and this Prompts 137–141 entry (`docs/User-Prompts-Log.md`), covering the BatchBlocks page split, the BatchesReceived/BatchBlocks legacy-parity UI pass, the BatchesReceived stored-procedure/search fix + BatchBlocks CRUD review, and the BlockDetails Tissue type dropdown fix. While updating `run-log-v2.md`, discovered and repaired a table-corruption artefact from an earlier `replace_string_in_file` call in this same task (a truncated `oldString` match had split row #38's text across rows #38 and #42) — reconstructed the original row #38 content precisely using PowerShell to extract the exact raw line text (avoiding the read tool's 2000-character display truncation) before repairing both rows.
-
-**Files changed:** [docs/run-log-v2.md](../docs/run-log-v2.md), [docs/session-metrics.md](../docs/session-metrics.md), [docs/User-Prompts-Log.md](../docs/User-Prompts-Log.md).
-
-## Prompt 142 — Investigate and address SubmissionDetailsBlock/BlockDetails issues: column values, Number of blocks, Histology Reference Type workflow (2026-09-07)
-
-> Requirement: (1) Archive/EO/H&E/IHC Other/Special Stain columns in `SubmissionDetailsBlock.cshtml` not populated with data. (2) "Number of blocks" field missing in `BlockDetails.cshtml`. (3) Investigate and document the "Or pick a histology reference type"/"Get Next Ref" workflow's purpose and legacy alignment.
-
-Issue 1 required correcting an earlier fix in this same session: `BlockDetailsModel`'s `Animal.BatchSubmissionID` patch (added to fix the Tissue type dropdown) was itself wrong, root-caused via `BlockDetails.aspx.vb::LoadLookupTypeList`, which really filters used tissues by BatchID+AnimalID (SP `GetBatchSampleTissues`), not any submission ID — fixed by cross-referencing the animal's own block IDs against `GetTissuesByBatchAsync` instead, removing the now-unneeded patch. Then re-investigated the reported column-population bug: with the user's approval, ran a live read-only sqlcmd query against a real batch/block, plus wrote a throwaway xUnit test calling `BlockTestRepository`/`BlockRepository`/`LookupRepository` directly against LocalDB (bypassing the whole web app and its Entra ID/SAML auth, which blocks casual local browser testing) — this proved the data pipeline (repo → service → page-model LINQ) was 100% correct end to end. The real root cause was CSS/markup, not data: `govuk-frontend.min.css` renders `.govuk-checkboxes__input{opacity:0}` and draws the visible tick entirely via the adjacent `.govuk-checkboxes__label`'s pseudo-elements — the 7 read-only indicator checkboxes (Archive/EO/H&E/H&E-BSE/IHC-Prp/IHC-Other/Special-Stain) had no wrapper/label, so they were invisible regardless of their real checked state. Fixed in `SubmissionDetailsBlock.cshtml` and `BatchBlocks.cshtml` (same copy-pasted bug in both) by adding the proper `govuk-checkboxes__item` + label structure, matching the already-working "Select block" checkbox in the same files.
-
-Issue 2: confirmed via `BlockDetails.aspx.vb::Page_Load` (`txtNoBlocks.Text = "1"` set unconditionally, no `.Visible` toggle anywhere) that legacy always shows "Number of blocks", including for pre-cassetted submissions — `CreateMultiBlocks()` explicitly threads `bIsPreCassetted` through, confirming legacy supports bulk-creating multiple pre-booked blocks at once. The migrated page wrongly hid the field via `!Model.IsPreCassetted`. Fixed to only hide in Edit mode; bulk-creation for pre-cassetted submissions now advances sequentially through `PreBookedBlockRefs` (validated against how many remain) instead of the free-text auto-increment scheme.
-
-Issue 3: re-confirmed the existing Run #28 finding — the "Or pick a histology reference type" dropdown + explicit "Get next ref" button is a verified, correct GDS redesign of legacy's `ddlHistologyType_SelectedIndexChanged` AutoPostBack behaviour (auto-assigns the next unused ref for the chosen type — Neuropath/Abattoir/TB/General pool/Mouse projects/Use PG number — and saves it immediately). No change needed; legacy's extra PG-number reverse-format logic on the "Use PG number" option remains a known, pre-existing, out-of-scope simplification.
-
-**Build:** 0 errors. **Tests:** 190 passed, 1 skipped, 0 failed.
-
-**Files changed:** [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml.cs), [src/Histo.Web/Pages/Blocks/BlockDetails.cshtml](../src/Histo.Web/Pages/Blocks/BlockDetails.cshtml), [src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml](../src/Histo.Web/Pages/Submissions/SubmissionDetailsBlock.cshtml), [src/Histo.Web/Pages/Batches/BatchBlocks.cshtml](../src/Histo.Web/Pages/Batches/BatchBlocks.cshtml).
-
-## Prompt 143 — Fix ViewSubmissions pagination font colour and page slowness (2026-09-07)
-
-> Requirement: "viewsubmission.cshtm pagination font colur is different when compare to other page" / "viewsubmission.cshtm this page is very slow".
-
-Root-caused the colour mismatch: GOV.UK's pagination CSS gives the current-page item a blue background (`.govuk-pagination__item--current{background-color:#1a65a6}`) with white link text via the `:link`/`:visited` pseudo-classes — which only match real `<a>` tags. `ViewSubmissions` uses POST-based pagination (`_PaginationPost.cshtml`, buttons submitting a form, since filter criteria are bound via `[BindProperty]` on POST), so the shared `.app-link-button` class's default blue (`#1d70b8`) rendered the current-page number as blue-on-blue instead of white-on-blue, unlike GET-paginated pages. Fixed with a scoped `.govuk-pagination__item--current .app-link-button{color:#fff}` override in `Styles.css` — a shared stylesheet rule, so it also fixes the same latent bug on any other POST-paginated grid in the app.
-
-Root-caused the slowness: `ViewSubmissionsModel.LoadLookupsAsync` awaited 5 independent lookup calls (Users, Projects, Contacts, Species, Fixations) sequentially, each its own DB round trip, and every POST handler then awaited the search query after that — 6 sequential round trips per request. Fixed by parallelizing with `Task.WhenAll` (lookups run concurrently with each other and with the search query), since none of these calls depend on each other's results.
-
-**Build:** 0 errors. **Tests:** 190 passed, 1 skipped, 0 failed.
-
-**Files changed:** [src/Histo.Web/wwwroot/css/Styles.css](../src/Histo.Web/wwwroot/css/Styles.css), [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs).
-
----
-
-## Prompt 144 — Legacy-to-Razor search screen functional review + search module rationalisation (2026-09-08)
-
-> Requirement: comprehensive analysis of 7 legacy search screens against their Razor/GDS replacements — field-by-field comparison, dropdown population, date loading and validation, grid sorting/pagination/actions, GDS error-summary compliance, accessibility, and any regressions. Plus: assess whether `SearchSample.cshtml` and `SearchSender.cshtml` are still used, compare against `ViewSamples.cshtml`, and remove them (with routes, menu entries, services, ViewModels and tests) if they have no active business use.
-
-**Legacy source not in the repo.** Searched the workspace, the sibling `bse` repo and the whole `source\repos` tree — zero `.aspx` files. Flagged this rather than reviewing against the migration docs alone; the user supplied the path (`Histopathology-2026-07-15\HistopathologySystem.2018`), and the review then read the real legacy markup and code-behind. Four `Explore` subagents ran the screen comparisons in parallel, and the highest-severity findings were re-verified by hand before any edit — one subagent claim about stored-procedure naming was not taken at face value.
-
-**Two mappings in the brief were wrong** and were corrected: `ViewImportedData.aspx` maps to a real `Search/ViewImportedData.cshtml`, not `SearchSubmissions.cshtml`; and `SearchMenu.aspx` / `SearchTest.aspx` are two distinct legacy pages, not a single "Search Outputs Menu".
-
-### Findings and fixes
-
-**H1 — `SearchSubmissions` lookup dropdowns downgraded to free-text.** Legacy `LoadLookupLists()` populated Project, Pathologist, Species, Fixation and Submitted Area from lookup SPs, each with a blank "-- All --" item. The migrated page rendered all five as plain `govuk-input`, so users had to guess exact stored values and any typo silently returned zero rows. Restored as `govuk-select` fed by `ILookupService`, following the `ViewSubmissions` ISS-030 pattern; Submitted area binds to the area **code** (`a.ID`), matching how `EditBatch` resolves `Batch.SubmittedArea`. Also fixed `SubmittedArea` bypassing `NullIfEmpty()` — a blank value was being sent as a real filter.
-
-**H2 — `SearchTest` date filter was decorative.** `StartDate`/`EndDate` were bound and rendered but `GetTestItemRowsAsync(ProjectDescription, SubmissionType)` takes no date parameters. Rather than guess, read the actual stored procedure at `Support\1\GetTestRows.sql`: it declares only `@ProjectContractDesc` and `@BatchType`, so passing dates would throw *"too many arguments specified"*, and `TestItemRow` carries no date to filter client-side. Removed the controls and documented the constraint on `IBatchRepository` — restoring date filtering requires a DB change.
-
-**H3 — no date-range validation anywhere in the module.** Legacy called `IsDateRangeValid` before every search. Restored on `SearchPMDates` and both `SearchSubmissions` ranges, plus the legacy `revSubmissionNumber` regex rule (the migrated `int?` binding accepted `0` and negatives).
-
-**GDS.** Only 3 of 11 search pages had an error summary, and where one existed it rendered `<li>@Model.ErrorMessage</li>` — plain text, so clicking an error could not move focus to the field (checklist item 8 failed). Added shared `_ErrorSummary.cshtml` rendering `<a href="#FieldId">` entries, rolled it out, and added `govuk-form-group--error` / `govuk-error-message` (with visually-hidden "Error:") / `aria-describedby` at field level. Replaced native `<input type="date">` throughout with the GOV.UK three-field date input — new `DateParts` holds parts as strings so invalid input survives the round-trip and is redisplayed with the error, and rejects partial input, non-existent dates (via `DaysInMonth`) and non-4-digit years.
-
-**Parity.** Added sorting and pagination to `SearchSubmissions` (default **ID DESC**, matching legacy `dvBatchesView.Sort`), `SearchPMDates` and `SearchUnUsedHistologyRefs`; CSV export to the 4 pages missing it. Converted `SearchBlockRefs` to a GET search to restore legacy `Request.QueryString` deep-linking — which also **fixed a latent bug found while making the change**: the page already used the GET `_SortableHeader`/`_Pagination` partials against POST-bound criteria, so sorting or paging silently dropped the search terms and rendered an empty grid.
-
-### Rationalisation outcome
-
-`SearchSample` **removed** — it called the same `GetAnimalsBySenderRefAsync` and rendered the same two columns as `SearchSender`, with only two navigation links referencing it, no programmatic redirects and no tests. `SearchSender` **kept**: `CopyBatch.OnPostPick` redirects into its picker mode and reads back `TempData["SenderRefPicker_Selected"]`, so removing it would break the batch-copy flow. `ViewSamples` confirmed correctly located at `/Search/ViewSamples` with no duplicate under `Submissions/` (the traceability-matrix reference to that path is stale). `SearchMenu` gained the missing "View samples" and "View old ICC_Sub data" entries.
-
-### Deliberately not done
-
-The wider error-summary rollout beyond Search (~30 files) was left alone: the app mixes `List<string>`, single-string and dictionary error models, and several summaries carry page-level load/save failures that GDS does not require to link to a field. That needs per-page judgement, not a mechanical sweep.
-
-**Build:** 0 errors. **Tests:** 224 total, 217 passed, 1 skipped, 6 failed — all 6 pre-existing and unrelated (`BatchesReceivedModelTests`, `BookBlockRefModelTests`, `BookHistologyRefModelTests`), confirmed by stashing the working tree and re-running to establish a 199-passed / 6-failed baseline. 18 new tests added.
-
-**Files changed:** [src/Histo.Web/Pages/Search/SearchSubmissions.cshtml](../src/Histo.Web/Pages/Search/SearchSubmissions.cshtml), [src/Histo.Web/Pages/Search/SearchSubmissions.cshtml.cs](../src/Histo.Web/Pages/Search/SearchSubmissions.cshtml.cs), [src/Histo.Web/Pages/Search/SearchPMDates.cshtml](../src/Histo.Web/Pages/Search/SearchPMDates.cshtml), [src/Histo.Web/Pages/Search/SearchPMDates.cshtml.cs](../src/Histo.Web/Pages/Search/SearchPMDates.cshtml.cs), [src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml](../src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml), [src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml.cs](../src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml.cs), [src/Histo.Web/Pages/Search/SearchTest.cshtml](../src/Histo.Web/Pages/Search/SearchTest.cshtml), [src/Histo.Web/Pages/Search/SearchTest.cshtml.cs](../src/Histo.Web/Pages/Search/SearchTest.cshtml.cs), [src/Histo.Web/Pages/Search/SearchUnUsedHistologyRefs.cshtml](../src/Histo.Web/Pages/Search/SearchUnUsedHistologyRefs.cshtml), [src/Histo.Web/Pages/Search/SearchUnUsedHistologyRefs.cshtml.cs](../src/Histo.Web/Pages/Search/SearchUnUsedHistologyRefs.cshtml.cs), [src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml), [src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml.cs](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml.cs), [src/Histo.Web/Pages/Search/ViewSamples.cshtml](../src/Histo.Web/Pages/Search/ViewSamples.cshtml), [src/Histo.Web/Pages/Search/ViewSamples.cshtml.cs](../src/Histo.Web/Pages/Search/ViewSamples.cshtml.cs), [src/Histo.Web/Pages/Search/SearchMenu.cshtml](../src/Histo.Web/Pages/Search/SearchMenu.cshtml), [src/Histo.Web/Pages/Index.cshtml](../src/Histo.Web/Pages/Index.cshtml), [src/Histo.Web/Pages/Shared/_ErrorSummary.cshtml](../src/Histo.Web/Pages/Shared/_ErrorSummary.cshtml), [src/Histo.Web/Pages/Shared/_DateInput.cshtml](../src/Histo.Web/Pages/Shared/_DateInput.cshtml), [src/Histo.Web/DateParts.cs](../src/Histo.Web/DateParts.cs), [src/Histo.Submissions/Interfaces/IBatchRepository.cs](../src/Histo.Submissions/Interfaces/IBatchRepository.cs), [src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml.cs), [tests/Histo.Tests/Unit/SearchValidationTests.cs](../tests/Histo.Tests/Unit/SearchValidationTests.cs). **Deleted:** `src/Histo.Web/Pages/Search/SearchSample.cshtml`, `src/Histo.Web/Pages/Search/SearchSample.cshtml.cs`.
-
----
-
-## Prompt 145 — QualityData Test dropdown/grid showing an extra row vs legacy (2026-09-08)
-
-> QualityData.cshmtl Test dropdonw show additional values Special Stain and grid also showing additional row, but legacy it not showing it, legacy it has 3 rows, new applicaiton 4 rows.
-
-Asked for a specific submission number to confirm live rather than guessing; user supplied submission 29399. Read legacy `clsBatchSummary.vb::CreateTestSummaryData`'s `BLOCK_HISTOLOGY` loop and confirmed via `grep -E "^\s*Case \d"` that only codes 1 (EO), 2 (H&E), 5 (H&E-BSE), 7 (Archive) have an explicit `Case` branch adding a worklist row — codes 3 (Special Stain), 4 (IHC-PrP), 6 (IHC-Other) fall through to `Case Else: 'Do nothing`, because they are gating/indicator flags only; the real per-test rows for those categories live in the separate `BLOCK_ANTIBODIES`/`BLOCK_STAIN` child tables, which get their own unconditional loops. Ran live sqlcmd queries for submission 29399/block 317172: `BLOCK_HISTOLOGY` had 1 row (Code=3), `BLOCK_ANTIBODIES` had 0 rows, `BLOCK_STAIN` had 3 real rows (codes 14/1/18) — confirming legacy math 0+0+3=3 matches the user's report, and the current app's 1+0+3=4 matches the reported bug exactly. Fixed `BlockTestRepository.GetByBatchAsync` to filter the histology result set to `Code IN ("1","2","5","7")` before mapping, matching legacy's `Case Else` exclusion. Same SP (`GetBatchBlocksByID`) on both sides — not a wrong-SP bug, purely a missing code-level filter that the earlier porting phase never replicated.
-
-**Build:** 0 errors (`Histo.Histology` project). No new automated test added — this repository has no existing test harness for `BlockTestRepository` (a Dapper repo with no mockable seam); verified via live sqlcmd data and legacy source comparison instead, consistent with this session's established methodology for data-shape bugs.
-
-**Files changed:** [src/Histo.Histology/Repositories/BlockTestRepository.cs](../src/Histo.Histology/Repositories/BlockTestRepository.cs).
-
----
-
-## Prompt 146 — EditBlockStain "expects parameter '@Code'" SqlException on save (2026-09-08)
-
-> Below issue is getting when i save the BlockTestRepository.cs — `public async Task UpdateAsync(BlockTest test, int userId, CancellationToken ct = default)` — `Microsoft.Data.SqlClient.SqlException: 'Procedure or function 'EditBlockStain' expects parameter '@Code', which was not supplied.'`
-
-Queried `sys.parameters` for `EditBlockStain`, `EditBlockHistology` and `EditBlockAntibodies` in one go (rather than fixing one missing parameter at a time and hitting the next error later) and confirmed all three share an identical 22-parameter signature, including `@Code`, `@EnteredBy` (varchar) and `@PremiumCharge` (varchar) — none of which `UpdateAsync` was sending. Confirmed via `sp_helptext` on `GetBatchBlockHistology` that `EnteredBy`/`PremiumCharge` are real columns on the read side too, but had never been mapped onto the `BlockTest` model. Added both as nullable properties on `BlockTest`, mapped them in `BlockTestRepository.Map()`, and fixed `UpdateAsync` to send `@Code` (`test.Code`), `@EnteredBy` (always the current `userId` — confirmed via `QualityData.aspx.vb` that legacy always overwrites this with the session user on every save, never preserves the prior value) and `@PremiumCharge` (round-tripped unchanged — legacy never edits this field from the QC screen). `EditQualityDataTest.cshtml.cs`'s `updated` object now also sets `PremiumCharge = Test.PremiumCharge` so the round-trip doesn't silently null it out.
-
-**Build:** 0 errors (`Histo.Histology` and `Histo.Web` both verified).
-
-**Files changed:** [src/Histo.Histology/Models/BlockTest.cs](../src/Histo.Histology/Models/BlockTest.cs), [src/Histo.Histology/Repositories/BlockTestRepository.cs](../src/Histo.Histology/Repositories/BlockTestRepository.cs), [src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml.cs](../src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml.cs).
-
----
-
-## Prompt 147 — EditQualityDataTest error summary link not clickable (2026-09-08)
-
-> error summary not implmented in this page EditQualityDataTest.cshtml, user can't clikc on the error summary link
-
-Found this app already has an established shared `_ErrorSummary.cshtml` partial (`IReadOnlyDictionary<string,string>` field-id → message, rendering `<a href="#FieldId">`), previously rolled out to the Search module in an earlier session, that `EditQualityDataTest.cshtml` had never adopted — it instead rendered a plain `<li>@Model.Error</li>` with no `href`, so the link could never move focus to a field. Replaced the single `Error` string with a field-keyed `Errors` dictionary (`QCCode`/`DispatchedDate`/`DispatchedBy`/`DispatchedTo`/`RemedialAction`/`ArchiveLocation`/`ArchivedDate`), switched `OnPostAsync` from "return on the first failing check" to accumulating every validation failure in one pass (GDS best practice — show every problem at once), and added a separate non-linked `ConcurrencyError` for the optimistic-concurrency exception case, matching `EditQCNote`'s existing convention for that same class of non-field error. Added GDS field-level error markup (`govuk-form-group--error`/`govuk-error-message`/`aria-describedby`) to all 7 validated fields.
-
-**Build:** 0 errors. Added 5 new tests in `EditQualityDataTestModelTests.cs`, all passing.
-
-**Files changed:** [src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml.cs](../src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml.cs), [src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml](../src/Histo.Web/Pages/QC/EditQualityDataTest.cshtml), [tests/Histo.Tests/Unit/EditQualityDataTestModelTests.cs](../tests/Histo.Tests/Unit/EditQualityDataTestModelTests.cs).
-
----
-
-## Prompt 148 — Analyse Pick List Maintenance and implement GDS-compliant Add/Edit pages (2026-09-08)
-
-> Requirement: analyse the current implementation of `PickListMaintenance.cshtml` and the related lookup item maintenance functionality. Current behaviour combines Add and Edit on `EditLookupItem.cshtml`; per GDS guidelines these should be separate pages. Review the flow, verify GDS requirements, identify all lookup types and field structures, create separate Add/Edit pages with dynamic form rendering based on lookup configuration, and ensure validation/save/UX consistency across all lookup maintenance pages.
-
-Confirmed `EditLookupItem.cshtml` combined three responsibilities on one page (item list, Add form, Edit form), violating GDS "one thing per page". Enumerated every editable lookup table's real field shape by querying `GetEditableLookupProcs` for all 16 tables and then `sys.parameters` on every resulting Add stored procedure in one batch — confirmed only 2 field-shape variants exist across the 14 non-UserArea tables: "Code-keyed" (12 tables: `@Code`/`@Description`/`@IsActive`) and "Area-scoped/ID-keyed" (Contacts 18, Projects 19: `@Area`/`@Description`/`@IsActive`/`@ID`, no `@Code`) — matching the user's "Lookup Type A"/"Lookup Type B" examples exactly. Split into three pages: new `LookupItems.cshtml(.cs)` (read-only item list, "Show deactivated" filter, "Add item" button, per-row "Change" links), new `AddLookupItem.cshtml(.cs)` (dedicated Add form), and `EditLookupItem.cshtml(.cs)` (stripped of the Add branch and the item list, now Edit-only, with a safe redirect instead of a silently-blank form if the item isn't found). Added `LookupTableSchema` (internal static class in `Pages/Admin/`) with `ShowAreaColumn(tableId)`/`HasCodes(items)` so all three pages derive field shape identically rather than duplicating the logic. Updated `PickListMaintenance.cshtml`'s "Edit items" link and `HelpSectionMap.cs` for the two new routes. No existing test file existed for `EditLookupItemModel` before this change (confirmed via search), so no test breakage risk.
-
-**Build:** 0 errors. **Tests:** 267 passed, 4 pre-existing unrelated `BatchesReceivedModelTests` failures, 1 skipped (12 new tests added across 3 new test files).
-
-**Files changed:** [src/Histo.Web/Pages/Admin/LookupItems.cshtml](../src/Histo.Web/Pages/Admin/LookupItems.cshtml) (new), [src/Histo.Web/Pages/Admin/LookupItems.cshtml.cs](../src/Histo.Web/Pages/Admin/LookupItems.cshtml.cs) (new), [src/Histo.Web/Pages/Admin/AddLookupItem.cshtml](../src/Histo.Web/Pages/Admin/AddLookupItem.cshtml) (new), [src/Histo.Web/Pages/Admin/AddLookupItem.cshtml.cs](../src/Histo.Web/Pages/Admin/AddLookupItem.cshtml.cs) (new), [src/Histo.Web/Pages/Admin/EditLookupItem.cshtml](../src/Histo.Web/Pages/Admin/EditLookupItem.cshtml), [src/Histo.Web/Pages/Admin/EditLookupItem.cshtml.cs](../src/Histo.Web/Pages/Admin/EditLookupItem.cshtml.cs), [src/Histo.Web/Pages/Admin/LookupTableSchema.cs](../src/Histo.Web/Pages/Admin/LookupTableSchema.cs) (new), [src/Histo.Web/Pages/Admin/PickListMaintenance.cshtml](../src/Histo.Web/Pages/Admin/PickListMaintenance.cshtml), [src/Histo.Core/Domain/HelpSectionMap.cs](../src/Histo.Core/Domain/HelpSectionMap.cs).
-
----
-
-## Prompt 149 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-08)
-
-> can you run log v2, session metric and user prompt
-
-Appended 4 new rows to `run-log-v2.md`'s Run Log table (#46–#49), 4 new rows to `session-metrics.md`'s timing table (#107–#110, complexity-based duration estimates), and 4 new prompt entries to this file (Prompts 145–148, plus this one) covering: the QualityData extra-row histology-code filter fix, the `EditBlockHistology`/`Antibodies`/`Stain` missing-parameter fix, the `EditQualityDataTest` clickable error-summary fix, and the Pick List Maintenance Add/Edit GDS page split.
-
-**Files changed:** [docs/run-log-v2.md](../docs/run-log-v2.md), [docs/session-metrics.md](../docs/session-metrics.md), [docs/User-Prompts-Log.md](../docs/User-Prompts-Log.md).
-
----
-
-## Prompt 150 — Lookup item pagination/sorting missing + failed test cases (2026-09-09)
-
-> Lookup item pagination and sorting is missing also it's not error summary is not clickable link / test cases failed now — fix failed test case
-
-Found `LookupItemsModel.OnGetAsync` had regressed to a stub that never populated `Items` (grid silently empty, so sorting/pagination appeared broken). Restored the lookup-data load. Investigated the reported test failures: 4 pre-existing bugs in `BatchesReceivedModelTests.cs` (missing `await` on async handler calls, a stale redirect-target assertion expecting `/Batches/BatchDetails` instead of the now-correct `/Batches/BatchBlocks`) — all fixed. Also fixed `BatchesForEditing`'s default sort (always ascending regardless of `SortDesc`) and `BatchesForArchiving`'s back-link infinite loop with `ArchiveMenu`. Build 0 errors; `dotnet test` 274 passed, 1 skipped.
-
-**Files changed:** [src/Histo.Web/Pages/Admin/LookupItems.cshtml.cs](../src/Histo.Web/Pages/Admin/LookupItems.cshtml.cs), [src/Histo.Web/Pages/Batches/BatchesForEditing.cshtml.cs](../src/Histo.Web/Pages/Batches/BatchesForEditing.cshtml.cs), [src/Histo.Web/Pages/Archive/BatchesForArchiving.cshtml](../src/Histo.Web/Pages/Archive/BatchesForArchiving.cshtml), [tests/Histo.Tests/Unit/BatchesReceivedModelTests.cs](../tests/Histo.Tests/Unit/BatchesReceivedModelTests.cs).
-
----
-
-## Prompt 151 — Full View/Create/Edit Submission Journey and Edit Submission Status Journey review (2026-09-09)
-
-> [Two-part review request covering BatchDetails field bugs, ViewSubmissions status-filter over-return, status label "Not Started"→"Not Received", EditBatch button alignment, filter/context retention, BatchesForEditing sort/fields.]
-
-Found and fixed: `BatchDetails.cshtml.cs` Project/Contact lookups missing `includeInactive: true`; `BatchStatus` "Not started"→"Not received" label correction (verified live against `luStatus`); `EditBatch.cshtml` Samples button moved into the Save/Cancel button-group; added `ISessionService.ReturnPageQuery` + `ParseReturnQuery()` so Cancel/Back/post-save redirects restore full list sort/page context; `BatchesForEditing` default-sort fix and `ReturnPageQuery` capture on select; `EditSubmissionStatus` gained missing Submitted by/area/date fields via a new shared `BatchSummaryDisplayResolver`; `ArchiveBlocks`/`ArchiveTissues` given the same summary-field/sortable-column treatment. Build 0 errors.
-
-**Files changed:** [src/Histo.Web/Pages/BatchSummaryDisplayResolver.cs](../src/Histo.Web/Pages/BatchSummaryDisplayResolver.cs), [src/Histo.Web/Pages/Batches/BatchDetails.cshtml.cs](../src/Histo.Web/Pages/Batches/BatchDetails.cshtml.cs), [src/Histo.Web/Pages/Batches/EditBatch.cshtml.cs](../src/Histo.Web/Pages/Batches/EditBatch.cshtml.cs), [src/Histo.Web/Pages/Batches/BatchesForEditing.cshtml.cs](../src/Histo.Web/Pages/Batches/BatchesForEditing.cshtml.cs), [src/Histo.Web/Pages/QC/EditSubmissionStatus.cshtml.cs](../src/Histo.Web/Pages/QC/EditSubmissionStatus.cshtml.cs), [src/Histo.Web/Pages/Archive/ArchiveBlocks.cshtml.cs](../src/Histo.Web/Pages/Archive/ArchiveBlocks.cshtml.cs), [src/Histo.Web/Pages/Archive/ArchiveTissues.cshtml.cs](../src/Histo.Web/Pages/Archive/ArchiveTissues.cshtml.cs), [src/Histo.Core/Domain/BatchStatus.cs](../src/Histo.Core/Domain/BatchStatus.cs), [src/Histo.Web/Services/ISessionService.cs](../src/Histo.Web/Services/ISessionService.cs).
-
----
-
-## Prompt 152 — ViewSubmissions Status Filter over-returning results, then critical correction (2026-09-09)
-
-> ViewSubmissions.cshtml Status Filter investigation (In Progress/Rejected returning far more rows than legacy) — followed by: "Submitted Area is not available as a search or filtering criterion" in legacy; a Rejected-status record from a different VLA appears under legacy's 2-row result.
-
-Initially hypothesised a missing area-based restriction (the `GetSearchBatchDetails` SP has no area-scoping logic and a `TOP 200` cap) and implemented one. The user then disproved this with a direct legacy observation. Fully reverted: removed `SubmittedArea`/`IsAreaRestricted`/`UserAreas` from `ViewSubmissionsModel` and the criteria/view markup. Cross-checked `docs/migration-run-journal.md` — this exact fact was already established once before (Run #57/ISS-030), confirming the revert was correct and this was a reintroduced regression. Added 2 permanent regression-guard tests. Build 0 errors.
-
-**Files changed:** [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs), [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml), [tests/Histo.Tests/Unit/ViewSubmissionsModelTests.cs](../tests/Histo.Tests/Unit/ViewSubmissionsModelTests.cs).
-
----
-
-## Prompt 153 — AddSubmission legacy analysis, Neuropath/Mouse Bioassay scope reduction, and button reposition (2026-09-09)
-
-> Legacy `AddSubmission.aspx`/`.aspx.vb` deep analysis; consider that user area is going to be removed in Neuropath and Mouse Bioassay — what would you recommend implementing; why does this button need to be here, can you remove and put it in the right place; is it aligned with legacy?
-
-Deep-read legacy `AddSubmission.aspx.vb`; confirmed the sender-ref search link already matches legacy's `lbLookup_Click` flow. Recommended closing D-3/D-4 (mouse-number bulk entry/Excel upload) and a new D-8 (PG-Number/TSE Daybook auto-lookup) in `Parity-Audit-Report.md` as won't-implement, since all three are gated exclusively on the Neuropath/Mouse Bioassay areas being decommissioned. Repositioned the "Check historical data for this sender ref" button out of an illegally-nested `<form>` into the main form (HTML5 `formmethod`/`formaction`), grouped under the sender-ref search link. Confirmed via `docs/TSE-NonTSE-Submission-Workflow-Redesign.md` this is a deliberate, previously-reviewed popup→page modernisation, so it is aligned with legacy in substance.
-
-**Files changed:** [src/Histo.Web/Pages/Submissions/AddSubmission.cshtml](../src/Histo.Web/Pages/Submissions/AddSubmission.cshtml), [docs/Parity-Audit-Report.md](../docs/Parity-Audit-Report.md).
-
----
-
-## Prompt 154 — Replace footer crown with APHA logo (2026-09-10)
-
-> Where there is a crown logo, change it to this: [APHA_Lesser_Arms_Stacked_Black] attached the png for to make the changes. / I have placed in src/Histo.Web/wwwroot/assets/images/APHA_Lesser_Arms_Stacked_Black.png / is it GDS standard to refer .png from image folder / Can you check the height="60" width="60" is good enough as GDS standard / As per WCAG implement the change
-
-Replaced the `govuk-footer__crown` SVG in `_Layout.cshtml` with the supplied PNG (renamed `apha_icon.png`). Clarified that referencing a `.png` from `wwwroot/assets/images/` is standard, but reusing the `govuk-footer__crown` slot itself isn't — per the GOV.UK Design System's June 2025 brand-refresh guidance, that component is reserved for services on the gov.uk domain. Found the initial `60×60` sizing distorted the image's true `1140×1005` aspect ratio and shrank the stacked wordmark ("Animal & Plant Health Agency") below legible size. Fixed by moving the logo into its own `govuk-footer__logo` row above the footer meta content, sized at `120×136` (correct ratio, WCAG 1.4.5-compliant legibility), with a small CSS margin rule added since govuk-frontend has no built-in class for this slot. Build 0 errors.
-
-**Files changed:** [src/Histo.Web/Pages/Shared/_Layout.cshtml](../src/Histo.Web/Pages/Shared/_Layout.cshtml), [src/Histo.Web/wwwroot/css/Styles.css](../src/Histo.Web/wwwroot/css/Styles.css), [src/Histo.Web/wwwroot/assets/images/apha_icon.png](../src/Histo.Web/wwwroot/assets/images/apha_icon.png).
-
----
-
-## Prompt 155 — Print Submission Notes should only be enabled when the submission has comments (2026-09-10)
-
-> In view submission page ViewSubmissions.cshtml, Print Submission Notes will only be enabled if the submission includes comments in the "Submission Comments" section of BatchDetails.cshtml
-
-Found the existing precedent for this exact rule in `PrintSubmissionModel.HasNotes` (mirrors legacy `EnableSubmissionNotes`, checking `Batch.Comments`/`Batch.StatusComments`) and replicated it in `ViewSubmissionsModel`: added `HasNotes`, populated in `OnPostSelectAsync` via `_batches.GetByIdAsync(SelectedBatchId)`, and gated the "Print submission notes" button in the view (disabled with a tooltip when false), matching `PrintSubmission.cshtml`'s existing pattern. Build 0 errors.
-
-**Files changed:** [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml.cs), [src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml](../src/Histo.Web/Pages/Submissions/ViewSubmissions.cshtml).
-
----
-
-## Prompt 156 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-10)
-
-> just add the run log and session metrics at end of the file don't read complete file, it consuming more token, i want to add the details in these file — update run-log-v2.md, session-metrics.md, User-Prompts-Log.md
-
-Appended 7 new rows to `run-log-v2.md`'s Run Log table (#50–#56), 7 new rows to `session-metrics.md`'s timing table (#111–#117), and 6 new prompt entries to this file (Prompts 150–155, plus this one) covering everything since the last docs update: LookupItems regression + test-bug fixes, BatchDetails/ArchiveBlocks/ArchiveTissues/BatchStatus parity fixes, EditBatch/EditSubmissionStatus context-restore, the ViewSubmissions area-restriction revert, the AddSubmission review, the footer APHA logo replacement, and the Print submission notes gating fix.
-
-**Files changed:** [docs/run-log-v2.md](../docs/run-log-v2.md), [docs/session-metrics.md](../docs/session-metrics.md), [docs/User-Prompts-Log.md](../docs/User-Prompts-Log.md).
-
-## Prompt 140 — Histo.WebJobs implementation + Application Insights + config alignment with Histo.Web (2026-09-10)
-
-> Series of requests: "implement webjobs add config setting if it's required"; "which log is suitable for histo.web project"; "wat will happen if logs are not capturing in app insights"; "yes implement app insight logs for webjobs, can i add azurestorageaccountconfig in app setting? so it won't missed to configure"; "why this config needed?" (ConfigureAppConfiguration); "no more environment base configuration then why do we need it"; "Histo.web doesn't have environment specific config, can u aligned with that also the same configuration will be reference ex database connection string which is reference from appsetting from azure devops".
-
-Created `src/Histo.WebJobs` — a triggered WebJob (Microsoft.Azure.WebJobs SDK) replacing the legacy SQL Server Agent annual histology-reset job (`dbo.EditResetHistologyRef`, TimerTrigger `0 0 4 1 1 *`), using Managed Identity for DB access (no secrets in code). Fixed 4 build errors (missing `Microsoft.Azure.WebJobs.Extensions`, missing `OutputType=Exe`, `Microsoft.Data.SqlClient` version conflict, `Logging:LogLevel` not binding — `AddConfiguration` was missing). Added Application Insights logging via `Microsoft.ApplicationInsights.WorkerService` after two failed attempts with the wrong package APIs (`Microsoft.Azure.WebJobs.Logging.ApplicationInsights`, `ILoggingBuilder.AddApplicationInsights`). Re-aligned the WebJobs configuration to match `Histo.Web`'s actual conventions exactly: top-level `APPLICATIONINSIGHTS_CONNECTION_STRING` (same placeholder as Web), Managed-Identity `ConnectionStrings:HistologyDb` matching Web's checked-in format, removed non-functional doc-only config sections, and removed `appsettings.Development.json`/per-environment file loading entirely since Web relies purely on the base `appsettings.json` + Azure DevOps-injected App Service Application Settings.
-
-**Build:** 0 errors, 1 pre-existing non-critical `NU1603` warning.
-
-**Files changed:** [src/Histo.WebJobs/Histo.WebJobs.csproj](../src/Histo.WebJobs/Histo.WebJobs.csproj), [src/Histo.WebJobs/Program.cs](../src/Histo.WebJobs/Program.cs), [src/Histo.WebJobs/HistologyResetJob.cs](../src/Histo.WebJobs/HistologyResetJob.cs), [src/Histo.WebJobs/appsettings.json](../src/Histo.WebJobs/appsettings.json), [HistopathologySystem.slnx](../HistopathologySystem.slnx).
-
----
-
-## Prompt 141 — Header navigation GDS check + Menu toggle behaviour question (2026-09-11)
-
-> "Can you check the navigatin link which is in header is it GDS standard, where it's picked up"; "why _navPartial.cshmt showing in header"; "there is menu link in gov.uk page, when user click on menu link it's open up and shows all the link what's the difference here"
-
-Confirmed `_Layout.cshtml`/`_NavPartial.cshtml` use the official GOV.UK Service Navigation component (`govuk-service-navigation`, `govuk-frontend` 6.4.0), correctly wired via `_ViewStart.cshtml` → `_Layout.cshtml` → `Html.PartialAsync("_NavPartial")`. Flagged one real gap: no `aria-current="page"` on the active nav link (not actioned, awaiting decision). Confirmed the "Menu" toggle is standard, unmodified `govuk-frontend` JS behaviour (collapses on narrow viewports only) — no difference from any other GOV.UK service. No code changes.
-
----
-
-## Prompt 142 — SearchArchiveLocation grid presentation, GDS review of sample data (2026-09-11)
-
-> "search is now working when i select slide archive see the below sample data, if data is comming like below it has to show in grid like below is it GDS standard" [supplied sample data showing Block/Slide archive grouped by Submission Number with tissues listed under one row] ... "Can you implmente GDS's default recommendation is a fully flat table"
-
-Implemented the requested grouped/`rowspan` layout matching the user's sample data for Block and Slide archive (removing the earlier click-to-expand `<details>` widget, flagged as a GDS anti-pattern for primary data). On the explicit follow-up request, reverted both to a fully flat table (every row repeats the shared columns) per GOV.UK's own guidance to avoid merged/`rowspan` cells for screen-reader consistency, matching the already-flat Tissue archive table. Removed the now-unused grouping properties.
-
-**Build:** 0 errors. **Tests:** 281 total, 280 pass, 1 skipped.
-
-**Files changed:** [src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml), [src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml.cs](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml.cs).
-
----
-
-## Prompt 143 — SearchArchiveLocation Tissue code dropdown + field reorder (2026-09-11)
-
-> "can u implment SearchArchiveLocation should be dropdown Tissue code (Tissue archive only)"; "archive location dropdown move to below to sender ref Archive location"
-
-Restored Tissue code as a dropdown fed by the tissue lookup (table 9) — an earlier external edit had reverted it to a plain text input. Moved Archive location to appear directly after Sender ref (before Archive type), per the requested field order.
-
-**Build:** 0 errors.
-
-**Files changed:** [src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml).
-
----
-
-## Prompt 144 — SearchArchiveLocation Slide archive returns no records (2026-09-11)
-
-> "Grid is not loading when Archive type selected as slide archive 'No slide archive records found.'"; "still i could not see records for archite type for Slide and filtered it"; "i have give vlaues in both field, why i'm getting below error message ... Enter either the Sender Ref or the Histology Ref, not both."; "issue still i could not see records for archite type for Slide archive"
-
-Confirmed via a live DB test (`GetAnimalStainArchiveInformation` called directly with real data) that the stored procedures work correctly, ruling out a data/SP problem. Root cause: `SenderRef`/`HistologyRef`/`ArchiveLocation`/`TissueCode`/`BlockRef` were passed straight from the posted form — a blank input or unselected dropdown posts an empty string, not `null`, but every underlying SP treats an unapplied filter as `@Param IS NULL`, so an empty string satisfied neither side and silently filtered out every row. Added a `NullIfEmpty` helper applied to all 5 filter values. A first retest false-negative was traced to a stale `Histo.Web` process serving a pre-fix build. Also relaxed the "not both" validation (see Prompt 145).
-
-**Build:** 0 errors. **Tests:** 281 total, 280 pass, 1 skipped.
-
-**Files changed:** [src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml.cs](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml.cs).
-
----
-
-## Prompt 145 — Relax "not both" validation on SearchArchiveLocation and SearchBlockRefs (2026-09-11)
-
-> "Below issue happend in SearchBlockRefs.cshtml as ... Enter either the Sender Ref or the Histology Ref, not both."
-
-Confirmed via `sp_helptext` that `GetBlocksForHistoRef`/`GetBlocksForSenderRef` (and the Archive Location SPs) all tolerate both Sender ref and Histology ref being supplied — Sender ref takes precedence, Histology ref is simply ignored. Relaxed the strict XOR validation on both `SearchArchiveLocation` and `SearchBlockRefs` to only reject when neither is supplied; `SearchBlockRefs.SearchAsync` now explicitly routes to the Sender-ref-only stored procedure whenever Sender ref is present. Rewrote the `SearchBlockRefs_BothRefsSupplied_AddsErrorAndDoesNotSearch` test to assert the new precedence behaviour.
-
-**Build:** 0 errors. **Tests:** 281 total, 280 pass, 1 skipped.
-
-**Files changed:** [src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml.cs](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml.cs), [src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml.cs](../src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml.cs), [tests/Histo.Tests/Unit/SearchValidationTests.cs](../tests/Histo.Tests/Unit/SearchValidationTests.cs).
-
----
-
-## Prompt 146 — SearchBlockRefs blank-submit validation message missing (2026-09-11)
-
-> "but should validation message is not comming happend in SearchBlockRefs.cshtml as if im'm not given any vlaues in both filed"
-
-Root-caused to `SearchBlockRefs` being a GET-based form: submitting with both fields blank produces the same query-string-less URL as a bare first visit, so the two cases were indistinguishable server-side and the code always chose "show empty form, no error". Added a hidden `Submitted` marker field so a genuine blank Search click now shows the validation message while a first visit stays silent. Added a companion regression test.
-
-**Build:** 0 errors. **Tests:** 282 total, 281 pass, 1 skipped.
-
-**Files changed:** [src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml](../src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml), [src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml.cs](../src/Histo.Web/Pages/Search/SearchBlockRefs.cshtml.cs), [tests/Histo.Tests/Unit/SearchValidationTests.cs](../tests/Histo.Tests/Unit/SearchValidationTests.cs).
-
----
-
-## Prompt 147 — SearchArchiveLocation Slide archive alignment check against legacy `ProcessSelectedArchiveSearch` (2026-09-12)
-
-> Slide archive is not working in the SearchArchiveLocation.cshtml page when the archive type When i looked legacy code base here is button search for the SearchArchiveLocation.aspx.vb, it has ProcessSelectedArchiveSearch() method can you please check is it aligned iwth new implmentation ... Why it was missed in migration ? why this gap ?
-
-Compared the supplied legacy `ProcessSelectedArchiveSearch`/`clsAnimal.GetAnimalSlideArchiveInformation` VB source directly against `BlockRepository.GetSlideArchiveAsync`. Confirmed the migrated method only called `GetAnimalStainArchiveInformation` (Special Stain rows) — a "SIMPLIFIED" shortcut already noted in a code comment from the original migration run, but never reproducing legacy's 3-way merge (`GetAnimalStainArchiveInformation` + `GetAnimalBatches`/per-batch `GetAnimalAntibodiesArchiveInformation` + `GetAnimalHistologyArchiveInformation`, excluding rows already covered). Verified all 3 additional stored procedures exist with the expected parameters via live `sp_helptext` against LocalDB, then rewrote the method to reproduce the full fan-out and sort by `BlockRef`. Explained the root cause of the migration gap: the shortcut was documented in a code comment but never escalated to the Parity Audit Report/Traceability Matrix (which only tracked the page's separate UI-hierarchy simplification), and this SP is a structural outlier — every other archive search page is a clean 1-SP-to-1-page mapping, making the true 3-way merge easy to under-scope.
-
-**Build:** 0 errors. **Tests:** 284 total, 281 pass, 1 skipped.
-
-**Files changed:** [src/Histo.Histology/Repositories/BlockRepository.cs](../src/Histo.Histology/Repositories/BlockRepository.cs), [src/Histo.Histology/Interfaces/IBlockRepository.cs](../src/Histo.Histology/Interfaces/IBlockRepository.cs), [src/Histo.Histology/Models/ArchiveModels.cs](../src/Histo.Histology/Models/ArchiveModels.cs).
-
----
-
-## Prompt 148 — ViewSamples "not both" validation error on entering both Sender ref and Histology ref (2026-09-12)
-
-> I entred Sender ref or Histology ref or both in view sample search should work, but after entering both values it giveing below error messge ... Enter either the Sender Ref or the Histology Ref, not both.
-
-Confirmed via `sp_helptext` that `GetAnimalBatchTissues` (Tissue mode) and `GetAnimalBlockTissues` (Block mode) both tolerate either/both refs being supplied — same class of over-strict UI-invented validation already relaxed on `SearchArchiveLocation`/`SearchBlockRefs`. Relaxed `ViewSamplesModel.Validate()` to only reject when neither ref is supplied, and applied the same `NullIfEmpty` empty-string-vs-NULL fix to `SenderRef`/`HistologyRef`/`TissueCode`/`ProjectDesc`. Added 3 new unit tests.
-
-**Build:** 0 errors.
-
-**Files changed:** [src/Histo.Web/Pages/Search/ViewSamples.cshtml.cs](../src/Histo.Web/Pages/Search/ViewSamples.cshtml.cs), [tests/Histo.Tests/Unit/SearchValidationTests.cs](../tests/Histo.Tests/Unit/SearchValidationTests.cs).
-
----
-
-## Prompt 149 — SearchSubmissions empty results table on initial load; is it GDS standard? (2026-09-12)
-
-> can searchsbumssiion.cshtml SearchSubmissions Search Submissions The results table is not displayed on initial page load. ... It's legacy applicatin behaviour, it's not GDS standing to show the record inital page load withouth any search fitler ?
-
-Confirmed `SearchSubmissionsModel.OnGetAsync` never runs a search on first load (only populates filter dropdowns) — the same deliberate pattern used by every other Search page in the module, and matching legacy `SearchSubmissions.aspx`'s own `Page_Load` (no grid binding until Search is clicked). Confirmed this is also the GDS-recommended search pattern, not a violation — GOV.UK Design System guidance directs services to let the user submit a search rather than pre-rendering a full/default result set. No code changes.
-
----
-
-## Prompt 150 — Button spacing issue across the application, GDS button-group reference sample (2026-09-12)
-
-> Button spacing has issue in all the page for in new application for eampl ViewImportedData.cshtml has below two line ... these buttons already working if you are chaning anything it should not break it ... Here is sample reference from the GDS page, how to fix it ?
-
-Audited every `govuk-button--secondary` occurrence app-wide not already wrapped in `govuk-button-group` and identified 14 genuine bare-adjacent-button cases (vs. pages already correct, and 2 deliberately-skipped cases — `CopySamples.cshtml`'s two independent full-width forms, and `QualityData.cshtml`'s "Apply filters"/"Clear" which already had an ad-hoc margin-based spacing fix inside a constrained grid column). Wrapped each in `<div class="govuk-button-group">`, matching the convention already established in `BlockDetails.cshtml` — no button `type`, `asp-page`, `asp-page-handler`, or form attributes touched, preserving existing functionality exactly as requested.
-
-**Build:** 0 errors. **Tests:** 285 total, 284 pass, 1 skipped (after stopping a stray locked `Histo.Web` process that was blocking the build/test copy step).
-
-**Files changed:** [src/Histo.Web/Pages/Search/ViewImportedData.cshtml](../src/Histo.Web/Pages/Search/ViewImportedData.cshtml), [src/Histo.Web/Pages/Admin/AddUser.cshtml](../src/Histo.Web/Pages/Admin/AddUser.cshtml), [src/Histo.Web/Pages/Admin/EditUser.cshtml](../src/Histo.Web/Pages/Admin/EditUser.cshtml), [src/Histo.Web/Pages/Archive/ArchiveBlocks.cshtml](../src/Histo.Web/Pages/Archive/ArchiveBlocks.cshtml), [src/Histo.Web/Pages/AuditLog/AuditLogByDate.cshtml](../src/Histo.Web/Pages/AuditLog/AuditLogByDate.cshtml), [src/Histo.Web/Pages/AuditLog/AuditLogBySubmission.cshtml](../src/Histo.Web/Pages/AuditLog/AuditLogBySubmission.cshtml), [src/Histo.Web/Pages/AuditLog/AuditLogByUser.cshtml](../src/Histo.Web/Pages/AuditLog/AuditLogByUser.cshtml), [src/Histo.Web/Pages/Blocks/CopyBlocks.cshtml](../src/Histo.Web/Pages/Blocks/CopyBlocks.cshtml), [src/Histo.Web/Pages/Blocks/CopySamplesSummary.cshtml](../src/Histo.Web/Pages/Blocks/CopySamplesSummary.cshtml), [src/Histo.Web/Pages/Bookings/EditHistologyRef.cshtml](../src/Histo.Web/Pages/Bookings/EditHistologyRef.cshtml), [src/Histo.Web/Pages/QC/AddQCNote.cshtml](../src/Histo.Web/Pages/QC/AddQCNote.cshtml), [src/Histo.Web/Pages/QC/EditQCNote.cshtml](../src/Histo.Web/Pages/QC/EditQCNote.cshtml), [src/Histo.Web/Pages/QC/QCNotes.cshtml](../src/Histo.Web/Pages/QC/QCNotes.cshtml), [src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml](../src/Histo.Web/Pages/Search/SearchArchiveLocation.cshtml).
 
 

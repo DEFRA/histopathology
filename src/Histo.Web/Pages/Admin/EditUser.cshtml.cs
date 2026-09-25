@@ -1,6 +1,5 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
-using Histo.Core.Domain;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -128,17 +127,6 @@ public class EditUserModel : HistoPageModel
 
         if (GroupCode <= 0) Errors["GroupCode"] = "Select a user group.";
         if (AreaCode <= 0) Errors["AreaCode"] = "Select a user area.";
-
-        // Skip the whitelist check when the Area is unchanged from what's already stored — this
-        // lets a user already on a since-retired area (Mouse Bioassay/Neuropath) keep being saved
-        // for unrelated edits, without letting anyone be newly assigned to a retired area.
-        if (GroupCode > 0 && AreaCode > 0 && AreaCode != _originalAreaCode)
-        {
-            var groupName = Groups.FirstOrDefault(g => g.ID == GroupCode)?.Name;
-            var areaName = Areas.FirstOrDefault(a => a.ID == AreaCode)?.Name;
-            if (!GroupAreaMappingHelpers.IsAllowedCombination(groupName, areaName))
-                Errors["AreaCode"] = "The selected area is not valid for the selected group.";
-        }
     }
 
     private async Task LoadLookupsAsync()

@@ -22,28 +22,28 @@
 <form method="get">
     <input type="hidden" name="Submitted" value="true" />
     <input type="hidden" name="ReturnPage" value="@Model.ReturnPage" />
-    <div class="govuk-form-group @(Model.Errors.ContainsKey("SenderRef") ? "govuk-form-group--error" : "")">
-        <label class="govuk-label" for="SenderRef">Sender ref</label>
-        @if (Model.Errors.TryGetValue("SenderRef", out var senderErr))
-        {
-            <p id="SenderRef-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @senderErr</p>
-        }
-        <input class="govuk-input govuk-input--width-20 @(Model.Errors.ContainsKey("SenderRef") ? "govuk-input--error" : "")"
-               asp-for="SenderRef"
-               aria-describedby="@(Model.Errors.ContainsKey("SenderRef") ? "SenderRef-error" : null)" />
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="HistologyRef">Histology ref</label>
-        <input class="govuk-input govuk-input--width-20" asp-for="HistologyRef" />
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group @(Model.Errors.ContainsKey("SenderRef") ? "govuk-form-group--error" : "")">
+                <label class="govuk-label" for="SenderRef">Sender ref</label>
+                @if (Model.Errors.TryGetValue("SenderRef", out var senderErr))
+                {
+                    <p id="SenderRef-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @senderErr</p>
+                }
+                <input class="govuk-input govuk-input--width-20 @(Model.Errors.ContainsKey("SenderRef") ? "govuk-input--error" : "")"
+                       asp-for="SenderRef"
+                       aria-describedby="@(Model.Errors.ContainsKey("SenderRef") ? "SenderRef-error" : null)" />
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="HistologyRef">Histology ref</label>
+                <input class="govuk-input govuk-input--width-20" asp-for="HistologyRef" />
+            </div>
+        </div>
     </div>
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
-        @* Legacy lbViewImportedData opened ViewImportedData.aspx?SearchString=<ref> in a popup.
-       The migrated page names that parameter Filter and needs a table chosen there. *@
-        <a asp-page="/Search/ViewImportedData"
-           asp-route-Filter="@(Model.SenderRef ?? Model.HistologyRef)"
-           asp-route-ReturnPage="@Model.ReturnPage"
-           class="govuk-button govuk-button--secondary" data-module="govuk-button">View old ICC_Sub data</a>
     </div>
 </form>
 

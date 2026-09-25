@@ -17,12 +17,7 @@ public interface IBatchRepository
     /// </summary>
     Task<Batch?> GetByIdAsync(int batchId, CancellationToken ct = default);
 
-    /// <summary>
-    /// Returns batches with status Received, ready to be assigned to blocks. Maps to
-    /// <c>GetBatchesToBeBlocked</c> (confirmed from <c>BatchesReceived.aspx.vb::InitialiseBatchesGrid</c>
-    /// — NOT <c>GetReceivedBatches</c>, which exists in <c>clsBatch.vb</c> but is never called by
-    /// any legacy page).
-    /// </summary>
+    /// <summary>Returns all batches in Received status. Maps to <c>GetReceivedBatches</c>.</summary>
     Task<IReadOnlyList<BatchListResult>> GetReceivedAsync(CancellationToken ct = default);
 
     /// <summary>Returns all batches in InProgress status. Maps to <c>GetInProgressBatches</c>.</summary>
@@ -74,8 +69,11 @@ public interface IBatchRepository
     /// </summary>
     Task SetCustomerReceivedDateAsync(int batchId, DateTime? date, byte[] rowStamp, int userId, CancellationToken ct = default);
 
-    /// <summary>Sets IsBlocked/AllTissuesAssigned/Status(InProgress) without changing any other field. Legacy source: <c>BatchBlocks.aspx.vb::btSubmit_Click</c>.</summary>
-    Task CompleteBlockAssignmentAsync(int batchId, bool allTissuesAssigned, int userId, CancellationToken ct = default);
+    /// <summary>
+    /// Updates batch status. Maps to <c>EditBatchStatus</c>.
+    /// Throws <see cref="BatchConcurrencyException"/> on rowstamp mismatch.
+    /// </summary>
+    Task<bool> UpdateStatusAsync(int batchId, string newStatus, int userId, CancellationToken ct = default);
 
     /// <summary>
     /// Persists the ByPassSort flag. Reloads current batch to supply the full EditBatch parameter set.
@@ -97,16 +95,13 @@ public interface IBatchRepository
     Task<IReadOnlyList<BatchSearchResult>> SearchAsync(BatchSearchCriteria criteria, CancellationToken ct = default);
 
     /// <summary>
-    /// Returns a simplified test-item listing for a project and submission type.
+    /// Returns a simplified test-item listing for a project/date range.
     /// Maps to <c>GetTestRows</c>. Legacy source: SearchTest.aspx.vb — <c>clsBatch.GetTestItemRows</c>.
     ///
     /// SIMPLIFIED: the legacy screen additionally builds a histology/antibody/special-stain
     /// checkbox-driven premium-charge cross-tab via <c>CountHistologysTestItems</c>,
     /// <c>CountStainTestItems</c>, and <c>CountAntibodesTestItems</c> — that analytics
     /// engine is not ported. See the search module report for details.
-    ///
-    /// No date range is accepted: <c>GetTestRows</c> declares only <c>@ProjectContractDesc</c>
-    /// and <c>@BatchType</c>.
     /// </summary>
     Task<IReadOnlyList<TestItemRow>> GetTestItemRowsAsync(string? projectDesc, int batchType, CancellationToken ct = default);
 
@@ -221,4 +216,31 @@ public interface IBatchRepository
     /// Legacy source: <c>HistopathologyLib/clsCheckBoxData.vb</c> — table type 4 (BATCH_POSTFIXATION_TABLE).
     /// </summary>
     Task SavePostFixationCodesAsync(int batchId, IReadOnlyList<string> codes, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Marks a batch as having all tissues assigned and transitions status to InProgress.
+    /// Updates the AllTissuesAssigned flag and batch status.
+    /// Legacy source: <c>BatchSummary.aspx.vb::btSubmit_Click</c>.
+    /// </summary>
+    Task CompleteBlockAssignmentAsync(int batchId, bool allTissuesAssigned, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns premium/TC charge test counts aggregated by charge type for a project/date range.
+    /// Legacy source: <c>SearchTest.aspx.vb</c> — premium-charge analytics engine (not fully ported).
+    /// </summary>
+    Task<IReadOnlyList<TestPremiumChargeCount>> GetTestPremiumChargeCountsAsync(
+        string? projectDesc, int batchType,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        DateTime? startDate = null, DateTime? endDate = null,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns premium/TC charge test rows by batch reference for a project/date range.
+    /// Legacy source: <c>SearchTest.aspx.vb</c> — premium-charge analytics engine (not fully ported).
+    /// </summary>
+    Task<IReadOnlyList<TestPremiumChargeBatchRef>> GetTestPremiumChargeBatchesAsync(
+        string? projectDesc, int batchType,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        DateTime? startDate = null, DateTime? endDate = null,
+        CancellationToken ct = default);
 }
