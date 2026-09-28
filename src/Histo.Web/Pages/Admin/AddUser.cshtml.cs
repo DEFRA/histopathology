@@ -59,6 +59,7 @@ public class AddUserModel : HistoPageModel
         await LoadLookupsAsync();
 
         Validate();
+        if (Errors.Count == 0 && await EmailAlreadyExistsAsync(Email.Trim())) Errors["Email"] = "A user with this email already exists.";
         if (Errors.Count > 0) return Page();
 
         // NT login is no longer shown, entered, or derived in the UI — Entra ID email is now
@@ -97,6 +98,13 @@ public class AddUserModel : HistoPageModel
 
         if (GroupCode <= 0) Errors["GroupCode"] = "Select a user group.";
         if (AreaCode <= 0) Errors["AreaCode"] = "Select a user area.";
+    }
+
+    /// <summary>Mirrors the DB's unconditional (not Active-filtered) unique index on Email.</summary>
+    private async Task<bool> EmailAlreadyExistsAsync(string email)
+    {
+        var users = await _users.GetAllUsersAsync();
+        return users.Any(u => string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task LoadLookupsAsync()
