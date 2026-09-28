@@ -319,7 +319,7 @@ stages:
     condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.TST.result, 'Succeeded', 'Skipped'), eq('${{ parameters.deployToPreProd }}', true))
     variables:
     - name: appName
-      value: 'PRE-CDE-Web-App'
+      value: 'PRECDEWEBAW1401'
     - name: tenantId
       value: '770a2450-0227-4c62-90c7-4e38537f1102'
     - name: appId

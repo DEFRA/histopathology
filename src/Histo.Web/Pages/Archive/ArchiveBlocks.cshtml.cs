@@ -70,6 +70,27 @@ public class ArchiveBlocksModel : GridPageModel
     public IReadOnlyList<LookupItem> ArchiveLocations { get; private set; } = [];
     public bool IsViewMode => Session.IsViewSubmissionMode;
 
+    /// <summary>
+    /// Legacy <c>ddlHistologyRefList</c> / <c>ddlBlockRefList</c> — populated from the batch's own
+    /// rows (legacy built them from <c>CreateArchiveBlockSummaryData</c>'s two ref DataTables) and
+    /// applied in memory, matching legacy's <c>DataView.RowFilter</c> rather than re-querying.
+    /// </summary>
+    [BindProperty(SupportsGet = true)] public string? FilterHistologyRef { get; set; }
+    [BindProperty(SupportsGet = true)] public string? FilterBlockRef { get; set; }
+
+    public IReadOnlyList<string> HistologyRefOptions =>
+        [.. Rows.Select(r => r.HistologyRef).Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v!).Distinct().Order()];
+
+    public IReadOnlyList<string> BlockRefOptions =>
+        [.. Rows.Select(r => r.BlockRef).Where(v => !string.IsNullOrWhiteSpace(v)).Distinct().Order()];
+
+    public bool FilterApplied => !string.IsNullOrWhiteSpace(FilterHistologyRef) || !string.IsNullOrWhiteSpace(FilterBlockRef);
+
+    public IReadOnlyList<ArchiveBlockRow> FilteredRows =>
+        [.. Rows.Where(r =>
+            (string.IsNullOrWhiteSpace(FilterHistologyRef) || string.Equals(r.HistologyRef, FilterHistologyRef, StringComparison.OrdinalIgnoreCase))
+         && (string.IsNullOrWhiteSpace(FilterBlockRef) || string.Equals(r.BlockRef, FilterBlockRef, StringComparison.OrdinalIgnoreCase)))];
+
     // Resolved display names for the batch summary header (shared with QualityData).
     public string? ProjectName { get; private set; }
     public string? PathologistName { get; private set; }
@@ -79,23 +100,25 @@ public class ArchiveBlocksModel : GridPageModel
     public string? SubmittedByName { get; private set; }
     public string? SubmittedAreaName { get; private set; }
 
-    public int TotalCount => Rows.Count;
+    public int TotalCount => FilteredRows.Count;
 
     public IReadOnlyList<ArchiveBlockRow> PagedEntries =>
         (SortColumn switch
         {
-            "SenderRef"       => SortDesc ? Rows.OrderByDescending(r => r.SenderRef)       : Rows.OrderBy(r => r.SenderRef),
-            "HistologyRef"    => SortDesc ? Rows.OrderByDescending(r => r.HistologyRef)    : Rows.OrderBy(r => r.HistologyRef),
-            "BlockRef"        => SortDesc ? Rows.OrderByDescending(r => r.BlockRef)        : Rows.OrderBy(r => r.BlockRef),
-            "ArchivedDate"    => SortDesc ? Rows.OrderByDescending(r => r.ArchivedDate)    : Rows.OrderBy(r => r.ArchivedDate),
-            "ArchiveLocation" => SortDesc ? Rows.OrderByDescending(r => r.ArchiveLocationName) : Rows.OrderBy(r => r.ArchiveLocationName),
-            _                 => SortDesc ? Rows.OrderByDescending(r => r.BlockRef)        : Rows.OrderBy(r => r.BlockRef),
+            "SenderRef"       => SortDesc ? FilteredRows.OrderByDescending(r => r.SenderRef)       : FilteredRows.OrderBy(r => r.SenderRef),
+            "HistologyRef"    => SortDesc ? FilteredRows.OrderByDescending(r => r.HistologyRef)    : FilteredRows.OrderBy(r => r.HistologyRef),
+            "BlockRef"        => SortDesc ? FilteredRows.OrderByDescending(r => r.BlockRef)        : FilteredRows.OrderBy(r => r.BlockRef),
+            "ArchivedDate"    => SortDesc ? FilteredRows.OrderByDescending(r => r.ArchivedDate)    : FilteredRows.OrderBy(r => r.ArchivedDate),
+            "ArchiveLocation" => SortDesc ? FilteredRows.OrderByDescending(r => r.ArchiveLocationName) : FilteredRows.OrderBy(r => r.ArchiveLocationName),
+            _                 => SortDesc ? FilteredRows.OrderByDescending(r => r.BlockRef)        : FilteredRows.OrderBy(r => r.BlockRef),
         })
         .Skip((PageNumber - 1) * PageSize)
         .Take(PageSize)
         .ToList();
 
     [BindProperty] public List<int> SelectedIds { get; set; } = [];
+    /// <summary>"All" checkbox — selects every row in <see cref="FilteredRows"/>, not just the current page's.</summary>
+    [BindProperty] public bool SelectAllAcrossPages { get; set; }
     [BindProperty] public string? ArchiveLocationCode { get; set; }
     [BindProperty] public DateTime? ArchivedDate { get; set; }
     [BindProperty] public string? Comment { get; set; }
@@ -124,7 +147,11 @@ public class ArchiveBlocksModel : GridPageModel
         await LoadAsync();
 
         if (IsViewMode) return RedirectToPage(new { batchId = Session.BatchID });
-        if (SelectedIds.Count == 0) { Error = "Select at least one block to update."; return Page(); }
+
+        // "All" only ever reaches the server as a flag — off-page rows' checkboxes never render,
+        // so SelectedIds alone can't carry them across a page boundary.
+        var selectedIds = SelectAllAcrossPages ? FilteredRows.Select(r => r.ID).ToList() : SelectedIds;
+        if (selectedIds.Count == 0) { Error = "Select at least one block to update."; return Page(); }
         if (string.IsNullOrWhiteSpace(ArchiveLocationCode) && ArchivedDate is null && string.IsNullOrWhiteSpace(Comment))
         {
             Error = "Enter an Archive Location, Archived Date, or Comment to apply.";
@@ -147,7 +174,7 @@ public class ArchiveBlocksModel : GridPageModel
         }
 
         var all = await _blocks.GetByBatchAsync(Session.BatchID ?? 0);
-        var selected = all.Where(b => SelectedIds.Contains(b.ID)).ToList();
+        var selected = all.Where(b => selectedIds.Contains(b.ID)).ToList();
         var bulkMode = selected.Count >= 2;
 
         foreach (var block in selected)
@@ -209,7 +236,8 @@ public class ArchiveBlocksModel : GridPageModel
                 SenderRef = animal?.SenderRef ?? string.Empty,
                 HistologyRef = animal?.HistologyRef,
                 BlockRef = b.BlockRef,
-                ArchivedDate = b.ArchivedDate,
+                // A stray DateTime.MinValue (0001-01-01) means "no date" — never a real archive date.
+                ArchivedDate = b.ArchivedDate is null or { Year: 1 } ? null : b.ArchivedDate,
                 ArchiveLocation = b.ArchiveLocation,
                 ArchiveLocationName = locationName ?? b.ArchiveLocation,
                 ArchiveComment = b.ArchiveComment,
