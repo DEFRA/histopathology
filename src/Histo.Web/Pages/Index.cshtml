@@ -19,6 +19,19 @@
         </div>
     }
 
+    @* Customer-only search links — legacy Home.aspx's hlSearchPMDates/hlViewSamples are never
+       hidden by EnableCustomerLinks(), unlike every other search link on that page. *@
+    @if (Model.Session.IsCustomer)
+    {
+        <div class="govuk-grid-column-one-third">
+            <h2 class="govuk-heading-m">Search</h2>
+            <ul class="govuk-list">
+                <li><a class="govuk-link" asp-page="/Search/SearchPMDates" asp-route-ReturnPage="/Index">Search by PM date</a></li>
+                <li><a class="govuk-link" asp-page="/Search/ViewSamples" asp-route-ReturnPage="/Index">View samples</a></li>
+            </ul>
+        </div>
+    }
+
     @* Histopathology User / Maintenance panel *@
     @if (Model.Session.IsHistoUser || Model.Session.IsMaintenance)
     {
