@@ -4,8 +4,10 @@ trigger:
       - develop
 
 schedules:
-  - cron: '0 4 1 1 *'
-    displayName: 'Annual histology reference reset (04:00 UTC, 1 Jan)'
+  # TESTING: running every 15 minutes to verify the reset end-to-end.
+  # Revert to '0 4 1 1 *' (annual, 04:00 UTC 1 Jan) once testing is complete.
+  - cron: '*/15 * * * *'
+    displayName: 'Histology reference reset (TESTING - every 15 min)'
     branches:
       include:
         - develop
