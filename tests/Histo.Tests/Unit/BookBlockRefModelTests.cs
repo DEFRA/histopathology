@@ -1,5 +1,7 @@
 using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
+using Histo.Submissions.Interfaces;
+using Histo.Submissions.Models;
 using Histo.Web.Pages.Bookings;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -10,77 +12,85 @@ using Moq;
 
 namespace Histo.Tests.Unit;
 
-/// <summary>
-/// Unit tests for <see cref="BookBlockRefModel"/>.
-///
-/// NOTE: <c>OnPostAsync</c> is a documented placeholder in the production code
-/// ("Booking logic delegates to BlockService update — placeholder until full
-/// workflow confirmed.") — it ignores the posted <c>blockId</c> entirely and never
-/// calls any block-booking repository method. The tests below assert the current
-/// (incomplete) behaviour; see the accompanying bug report.
-/// </summary>
+/// <summary>Unit tests for <see cref="BookBlockRefModel"/> — pre-books block placeholders for a Sender Ref range.</summary>
 public class BookBlockRefModelTests
 {
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<IBlockService> _blocks = new();
-    private readonly Mock<IHistologyRefService> _refs = new();
-
-    public BookBlockRefModelTests()
-    {
-        _session.SetupProperty(s => s.AnimalID);
-    }
+    private readonly Mock<ISubmissionService> _submissions = new();
 
     private BookBlockRefModel CreateSut() =>
-        new(_session.Object, _blocks.Object, _refs.Object)
+        new(_session.Object, _blocks.Object, _submissions.Object)
         {
             PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
         };
 
     [Fact]
-    public async Task OnGetAsync_NoAnimalIdInSession_DoesNotLoadPreBookedBlocks()
-    {
-        _session.Object.AnimalID = null;
-        var sut = CreateSut();
-
-        await sut.OnGetAsync();
-
-        Assert.Empty(sut.PreBookedBlocks);
-        _blocks.Verify(b => b.GetPreBookedByAnimalAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task OnGetAsync_AnimalIdInSession_LoadsPreBookedBlocks()
-    {
-        _session.Object.AnimalID = 42;
-        _blocks.Setup(b => b.GetPreBookedByAnimalAsync(42, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 1, BlockRef = "01" }]);
-        var sut = CreateSut();
-
-        await sut.OnGetAsync();
-
-        Assert.Single(sut.PreBookedBlocks);
-    }
-
-    [Fact]
-    public async Task OnPostAsync_ZeroBlockId_DoesNotProceedToBookingMenu()
+    public async Task OnPostAsync_MissingSenderRefFrom_ReturnsError()
     {
         var sut = CreateSut();
+        sut.SenderRefFrom = "";
+        sut.BlockRefFrom = "01";
 
-        var result = await sut.OnPostAsync(blockId: 0);
+        await sut.OnPostAsync();
 
-        Assert.IsType<PageResult>(result);
-    }
-
-    [Fact]
-    public async Task OnPostAsync_AlwaysRedirectsToBookingMenu_RegardlessOfBlockId()
-    {
-        // BUG: OnPostAsync never actually books the block — it ignores blockId entirely.
-        var sut = CreateSut();
-
-        var result = await sut.OnPostAsync(blockId: 12345);
-
-        var redirect = Assert.IsType<RedirectToPageResult>(result);
-        Assert.Equal("/Bookings/BookingMenu", redirect.PageName);
+        Assert.Equal("Enter a Sender Ref from.", sut.Error);
         _blocks.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task OnPostAsync_InvalidBlockRefFrom_ReturnsError()
+    {
+        var sut = CreateSut();
+        sut.SenderRefFrom = "S1";
+        sut.BlockRefFrom = "not-a-number";
+
+        await sut.OnPostAsync();
+
+        Assert.Equal("The requested block ref range cannot be created.", sut.Error);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_PlainSenderRef_BooksBlocksForFirstRefOnly()
+    {
+        var sut = CreateSut();
+        sut.SenderRefFrom = "PLAINREF";
+        sut.BlockRefFrom = "01";
+        sut.BlockRefTo = "02";
+
+        _submissions.Setup(s => s.GetAnimalBySenderAsync("PLAINREF", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<SenderSearchResult>)[new SenderSearchResult { ID = 7 }]);
+        _blocks.Setup(b => b.GetPreBookedByAnimalAsync(7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[]);
+        _blocks.Setup(b => b.CreatePreBookedBlockAsync(7, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        await sut.OnPostAsync();
+
+        Assert.Null(sut.Error);
+        _blocks.Verify(b => b.CreatePreBookedBlockAsync(7, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        Assert.Contains(sut.ResultMessages, m => m.Contains("2 blocks booked, 0 blocks not booked"));
+    }
+
+    [Fact]
+    public async Task OnPostAsync_NoExistingAnimal_CreatesOne()
+    {
+        var sut = CreateSut();
+        sut.SenderRefFrom = "NEWREF";
+        sut.BlockRefFrom = "01";
+
+        _submissions.Setup(s => s.GetAnimalBySenderAsync("NEWREF", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<SenderSearchResult>)[]);
+        _submissions.Setup(s => s.AddAnimalAsync(0, "NEWREF", It.IsAny<int>(), null, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(9);
+        _blocks.Setup(b => b.GetPreBookedByAnimalAsync(9, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[]);
+        _blocks.Setup(b => b.CreatePreBookedBlockAsync(9, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        await sut.OnPostAsync();
+
+        Assert.Null(sut.Error);
+        _blocks.Verify(b => b.CreatePreBookedBlockAsync(9, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 }

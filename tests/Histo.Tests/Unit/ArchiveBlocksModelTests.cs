@@ -1,5 +1,9 @@
 using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
+using Histo.Submissions.Interfaces;
+using Histo.Submissions.Models;
+using Histo.Administration.Interfaces;
+using Histo.Administration.Models;
 using Histo.Web.Pages.Archive;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Http;
@@ -16,14 +20,24 @@ public class ArchiveBlocksModelTests
 {
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<IBlockService> _blocks = new();
+    private readonly Mock<IBatchService> _batches = new();
+    private readonly Mock<ISubmissionService> _submissions = new();
+    private readonly Mock<ILookupService> _lookups = new();
+    private readonly Mock<IUserService> _users = new();
 
     public ArchiveBlocksModelTests()
     {
         _session.SetupProperty(s => s.BatchID);
+        _lookups.Setup(l => l.GetLookupDataAsync(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[]);
+        _lookups.Setup(l => l.GetSpeciesLookupAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[]);
+        _lookups.Setup(l => l.GetUserAreasAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[]);
+        _users.Setup(u => u.GetAllUsersAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<User>)[]);
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
     }
 
     private ArchiveBlocksModel CreateSut() =>
-        new(_session.Object, _blocks.Object)
+        new(_session.Object, _blocks.Object, _batches.Object, _submissions.Object, _lookups.Object, _users.Object)
         {
             PageContext = new PageContext
             {
@@ -33,14 +47,14 @@ public class ArchiveBlocksModelTests
         };
 
     [Fact]
-    public async Task OnGetAsync_NoBatchIdInSession_LeavesBlocksEmpty()
+    public async Task OnGetAsync_NoBatchIdInSession_LeavesRowsEmpty()
     {
         _session.Object.BatchID = null;
         var sut = CreateSut();
 
         await sut.OnGetAsync();
 
-        Assert.Empty(sut.Blocks);
+        Assert.Empty(sut.Rows);
         _blocks.Verify(b => b.GetByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -139,7 +153,7 @@ public class ArchiveBlocksModelTests
     }
 
     [Fact]
-    public async Task OnGetAsync_BatchIdInSession_LoadsBlocks()
+    public async Task OnGetAsync_BatchIdInSession_LoadsRows()
     {
         _session.Object.BatchID = 5;
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
@@ -148,7 +162,7 @@ public class ArchiveBlocksModelTests
 
         await sut.OnGetAsync();
 
-        Assert.Single(sut.Blocks);
+        Assert.Single(sut.Rows);
     }
 
     [Fact]
