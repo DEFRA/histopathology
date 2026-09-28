@@ -117,6 +117,8 @@ public class ArchiveBlocksModel : GridPageModel
         .ToList();
 
     [BindProperty] public List<int> SelectedIds { get; set; } = [];
+    /// <summary>"All" checkbox — selects every row in <see cref="FilteredRows"/>, not just the current page's.</summary>
+    [BindProperty] public bool SelectAllAcrossPages { get; set; }
     [BindProperty] public string? ArchiveLocationCode { get; set; }
     [BindProperty] public DateTime? ArchivedDate { get; set; }
     [BindProperty] public string? Comment { get; set; }
@@ -145,7 +147,11 @@ public class ArchiveBlocksModel : GridPageModel
         await LoadAsync();
 
         if (IsViewMode) return RedirectToPage(new { batchId = Session.BatchID });
-        if (SelectedIds.Count == 0) { Error = "Select at least one block to update."; return Page(); }
+
+        // "All" only ever reaches the server as a flag — off-page rows' checkboxes never render,
+        // so SelectedIds alone can't carry them across a page boundary.
+        var selectedIds = SelectAllAcrossPages ? FilteredRows.Select(r => r.ID).ToList() : SelectedIds;
+        if (selectedIds.Count == 0) { Error = "Select at least one block to update."; return Page(); }
         if (string.IsNullOrWhiteSpace(ArchiveLocationCode) && ArchivedDate is null && string.IsNullOrWhiteSpace(Comment))
         {
             Error = "Enter an Archive Location, Archived Date, or Comment to apply.";
@@ -168,7 +174,7 @@ public class ArchiveBlocksModel : GridPageModel
         }
 
         var all = await _blocks.GetByBatchAsync(Session.BatchID ?? 0);
-        var selected = all.Where(b => SelectedIds.Contains(b.ID)).ToList();
+        var selected = all.Where(b => selectedIds.Contains(b.ID)).ToList();
         var bulkMode = selected.Count >= 2;
 
         foreach (var block in selected)
@@ -230,7 +236,8 @@ public class ArchiveBlocksModel : GridPageModel
                 SenderRef = animal?.SenderRef ?? string.Empty,
                 HistologyRef = animal?.HistologyRef,
                 BlockRef = b.BlockRef,
-                ArchivedDate = b.ArchivedDate,
+                // A stray DateTime.MinValue (0001-01-01) means "no date" — never a real archive date.
+                ArchivedDate = b.ArchivedDate is null or { Year: 1 } ? null : b.ArchivedDate,
                 ArchiveLocation = b.ArchiveLocation,
                 ArchiveLocationName = locationName ?? b.ArchiveLocation,
                 ArchiveComment = b.ArchiveComment,
