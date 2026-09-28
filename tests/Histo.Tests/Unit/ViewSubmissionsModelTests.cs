@@ -1,7 +1,7 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
-using Histo.Infrastructure;
-using Histo.Reporting.Services;
+using Histo.Histology.Interfaces;
+using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.Submissions;
@@ -27,8 +27,9 @@ public class ViewSubmissionsModelTests
     private readonly Mock<IBatchService> _batches = new();
     private readonly Mock<IUserService> _users = new();
     private readonly Mock<ILookupService> _lookups = new();
-    // Concrete sealed type — not exercised by these tests, so a real instance with a stub connection factory suffices.
-    private readonly SubmissionNotesDataSetBuilder _notes = new(Mock.Of<IDbConnectionFactory>());
+    private readonly Mock<IBlockService> _blocks = new();
+    private readonly Mock<ISubmissionService> _submissions = new();
+    private readonly Mock<IBlockTestService> _tests = new();
 
     public ViewSubmissionsModelTests()
     {
@@ -38,10 +39,14 @@ public class ViewSubmissionsModelTests
         _lookups.Setup(l => l.GetSpeciesLookupAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[]);
         _batches.Setup(b => b.SearchAsync(It.IsAny<BatchSearchCriteria>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BatchSearchResult>)[]);
+        _batches.Setup(b => b.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        _blocks.Setup(b => b.GetByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _tests.Setup(t => t.GetByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[]);
     }
 
     private ViewSubmissionsModel CreateSut() =>
-        new(_session.Object, _batches.Object, _users.Object, _lookups.Object, _notes)
+        new(_session.Object, _batches.Object, _users.Object, _lookups.Object, _blocks.Object, _submissions.Object, _tests.Object)
         {
             PageContext = new PageContext
             {
@@ -63,6 +68,30 @@ public class ViewSubmissionsModelTests
 
         _batches.Verify(b => b.SearchAsync(
             It.Is<BatchSearchCriteria>(c => c.SubmittedArea == null), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostSelectAsync_BlockCommentOnly_NoHeaderComment_EnablesPrintSubmissionNotes()
+    {
+        _blocks.Setup(b => b.GetByBatchAsync(7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 1, Comment = "Block note" }]);
+        var sut = CreateSut();
+        sut.SelectedBatchId = 7;
+
+        await sut.OnPostSelectAsync();
+
+        Assert.True(sut.HasNotes);
+    }
+
+    [Fact]
+    public async Task OnPostSelectAsync_NoCommentsAnywhere_PrintSubmissionNotesStaysDisabled()
+    {
+        var sut = CreateSut();
+        sut.SelectedBatchId = 7;
+
+        await sut.OnPostSelectAsync();
+
+        Assert.False(sut.HasNotes);
     }
 
     [Fact]

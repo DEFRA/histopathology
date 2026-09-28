@@ -105,6 +105,18 @@ public interface ISessionService
     string? SampleDetailReturnPage { get; set; }
 
     /// <summary>
+    /// The page path <c>EditBatch.cshtml</c>'s Save/Cancel should return to, when set by a caller
+    /// other than its usual entry point (<c>BatchesForEditing</c>). Currently written by
+    /// <c>EditSubmissionStatus.cshtml</c>'s "Continue to edit submission" button, so the user comes
+    /// back to Edit Submission Status rather than the batch list. Kept separate from
+    /// <see cref="ReturnPage"/> because EditSubmissionStatus already uses that slot for its OWN
+    /// back link (to wherever IT was entered from) — overwriting it here would break that link
+    /// on the very page the user returns to. Falls back to <see cref="ReturnPage"/>'s own
+    /// BatchesForEditing default when unset.
+    /// </summary>
+    string? EditBatchReturnPage { get; set; }
+
+    /// <summary>
     /// True when the user is in the read-only "View Submission" journey (legacy
     /// <c>SessionVars.SV_ViewSubmission</c>). Gates Add/Edit/Copy/Delete sample on
     /// <c>BatchBlockSummary</c>/<c>BatchDetails</c>.

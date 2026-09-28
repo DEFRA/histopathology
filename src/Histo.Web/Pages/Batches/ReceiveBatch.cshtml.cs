@@ -213,6 +213,7 @@ public class ReceiveBatchModel : HistoPageModel
     public IActionResult OnPostEditSubmission()
     {
         Session.ReturnPage = "/Batches/ReceiveBatch";
+        Session.EditBatchReturnPage = null; // this entry point owns EditBatch's return target, not any stale Edit Submission Status detour
         return RedirectToPage("/Batches/EditBatch");
     }
 

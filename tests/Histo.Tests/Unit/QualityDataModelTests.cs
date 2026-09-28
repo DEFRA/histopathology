@@ -2,6 +2,7 @@ using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
 using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
+using Histo.QualityControl.Interfaces;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.QC;
@@ -21,6 +22,7 @@ public class QualityDataModelTests
     private readonly Mock<IBatchService> _batches = new();
     private readonly Mock<ILookupService> _lookups = new();
     private readonly Mock<IUserService> _users = new();
+    private readonly Mock<IQCNoteService> _qc = new();
 
     public QualityDataModelTests()
     {
@@ -34,7 +36,7 @@ public class QualityDataModelTests
     }
 
     private QualityDataModel CreateSut() =>
-        new(_session.Object, _tests.Object, _batches.Object, _lookups.Object, _users.Object)
+        new(_session.Object, _tests.Object, _batches.Object, _lookups.Object, _users.Object, _qc.Object)
         {
             PageContext = new PageContext
             {
@@ -115,5 +117,176 @@ public class QualityDataModelTests
 
         Assert.Single(sut.Tests);
         Assert.Equal(1, sut.Tests[0].ID);
+    }
+
+    // ── OnPostUpdateAsync — legacy multi-select bulk-save ────────────────────────────────────
+
+    private static BlockTest MakeTest(int id, string? result = null, bool dispatched = false) => new()
+    {
+        ID = id,
+        BlockID = 1,
+        TestType = "Histology",
+        Code = "1",
+        HistologyRef = "24/001",
+        BlockRef = "01",
+        Result = result,
+        Dispatched = dispatched,
+        DispatchedDate = dispatched ? new DateTime(2026, 5, 1) : null,
+        RowStamp = [1, 2, 3],
+    };
+
+    [Fact]
+    public async Task OnPostUpdateAsync_NoRowsSelected_SetsErrorAndDoesNotSave()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var sut = CreateSut();
+        sut.Result = Histo.Histology.Models.BlockTestResult.Passed;
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Equal("Select at least one test to update.", sut.Error);
+        _tests.Verify(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_NoFieldsEntered_SetsErrorAndDoesNotSave()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var sut = CreateSut();
+        sut.SelectedIds = [1];
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Equal("Enter at least one field to apply to the selected tests.", sut.Error);
+        _tests.Verify(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_AppliesOneFieldToEveryCheckedRow_LeavingOthersUnchanged()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1), MakeTest(2), MakeTest(3)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var saved = new List<BlockTest>();
+        _tests.Setup(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<BlockTest, int, CancellationToken>((bt, _, _) => saved.Add(bt))
+            .Returns(Task.CompletedTask);
+        var sut = CreateSut();
+        sut.SelectedIds = [1, 3]; // row 2 left unselected
+        sut.Result = Histo.Histology.Models.BlockTestResult.Passed;
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Null(sut.Error);
+        Assert.Equal(2, saved.Count);
+        Assert.All(saved, bt => Assert.Equal(Histo.Histology.Models.BlockTestResult.Passed, bt.Result));
+        _tests.Verify(t => t.UpdateAsync(It.Is<BlockTest>(bt => bt.ID == 2), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_BlankFields_PreserveEachRowsExistingValue()
+    {
+        var existing = MakeTest(1, result: Histo.Histology.Models.BlockTestResult.Failed);
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[existing]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        BlockTest? saved = null;
+        _tests.Setup(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<BlockTest, int, CancellationToken>((bt, _, _) => saved = bt)
+            .Returns(Task.CompletedTask);
+        var sut = CreateSut();
+        sut.SelectedIds = [1];
+        sut.StainRef = "S1"; // only this field entered
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.NotNull(saved);
+        Assert.Equal("S1", saved!.StainRef);
+        Assert.Equal(Histo.Histology.Models.BlockTestResult.Failed, saved.Result); // untouched
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_ResultSetToFailedWithoutQcCode_SetsError()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var sut = CreateSut();
+        sut.SelectedIds = [1];
+        sut.Result = Histo.Histology.Models.BlockTestResult.Failed;
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Equal("Enter a QC code when setting the result to Failed.", sut.Error);
+        _tests.Verify(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_DispatchedYesWithoutRequiredFields_SetsError()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var sut = CreateSut();
+        sut.SelectedIds = [1];
+        sut.Dispatched = true;
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Equal("Enter a dispatched date.", sut.Error);
+        _tests.Verify(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_ConcurrencyExceptionOnOneRow_ReportsCountAndSavesTheRest()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1), MakeTest(2)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        _tests.Setup(t => t.UpdateAsync(It.Is<BlockTest>(bt => bt.ID == 1), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new BlockTestConcurrencyException());
+        _tests.Setup(t => t.UpdateAsync(It.Is<BlockTest>(bt => bt.ID == 2), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        var sut = CreateSut();
+        sut.SelectedIds = [1, 2];
+        sut.StainRef = "S1";
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Contains("1 test(s)", sut.Error);
+        Assert.Null(sut.SuccessMessage);
+        _tests.Verify(t => t.UpdateAsync(It.Is<BlockTest>(bt => bt.ID == 2), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_SelectAllAcrossPages_AppliesToEveryFilteredRow()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1), MakeTest(2), MakeTest(3)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var saved = new List<int>();
+        _tests.Setup(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<BlockTest, int, CancellationToken>((bt, _, _) => saved.Add(bt.ID))
+            .Returns(Task.CompletedTask);
+        var sut = CreateSut();
+        sut.SelectAllAcrossPages = true;
+        sut.StainRef = "S1";
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Equal([1, 2, 3], saved.Order());
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_AllTestsDispatched_CompletesBatch()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1, dispatched: true)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var sut = CreateSut();
+        sut.SelectedIds = [1];
+        sut.StainRef = "S1";
+
+        await sut.OnPostUpdateAsync();
+
+        _batches.Verify(b => b.SetCompletedAsync(42, new DateTime(2026, 5, 1), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 }

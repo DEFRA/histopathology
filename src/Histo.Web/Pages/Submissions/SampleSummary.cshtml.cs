@@ -247,12 +247,19 @@ public class SampleSummaryModel : HistoPageModel
     /// "submission created" business gate, restoring the legacy rule that a submission must have
     /// at least one sample before it is considered finished.
     ///
-    /// Uses <see cref="IBatchService.CompleteBlockAssignmentAsync"/> — the same call
-    /// <c>BatchBlocks.cshtml.cs::OnPostDoneAsync</c> uses for the verified legacy source
-    /// (<c>BatchBlocks.aspx.vb::btSubmit_Click</c>: sets IsBlocked=True, status In progress,
-    /// and AllTissuesAssigned) — NOT <c>UpdateStatusAsync</c>/<c>EditBatchStatus</c>, which
-    /// doesn't appear anywhere in the legacy source and whose backing procedure never sets
-    /// IsBlocked/AllTissuesAssigned at all.
+    /// <summary>
+    /// Legacy source: <c>BatchSummary.aspx.vb::btSubmit_Click</c> and its cassetted counterpart —
+    /// neither changes <c>BatchStatus</c> at "Finish". Every submission type stays Submitted
+    /// ("Not started") until Histopathology explicitly receives it via <c>ReceiveBatch</c>; the
+    /// block-based journey only advances to In progress later, via <c>BatchBlocks.cshtml.cs</c>'s
+    /// own "Done" button (<see cref="IBatchService.CompleteBlockAssignmentAsync"/>), once the
+    /// user has actually started assigning blocks — not at submission-creation time.
+    ///
+    /// A previous version of this handler called <c>CompleteBlockAssignmentAsync</c> here for every
+    /// non-Wet-Tissue type, which set the batch In progress immediately on Finish — before it had
+    /// even been received. That skipped "Received" entirely and is why non-Wet-Tissue submissions
+    /// (Pre-Cassetted, Stained/Unstained Section, Wax Block) appeared to jump straight past the
+    /// awaiting-receipt list. Removed; status is no longer touched here for any submission type.
     ///
     /// <c>FinalPrintBatch.aspx</c> itself remains unmigrated (blocked on the Phase 2 Reporting
     /// work — see <c>docs/Parity-Audit-Report.md</c>), so on success this mirrors the same
@@ -275,16 +282,6 @@ public class SampleSummaryModel : HistoPageModel
             return RedirectToPage(new { batchId });
         }
 
-        // Wet Tissue has no Block table rows at submission time — blocks are only created later,
-        // once Histopathology receives the sample. Legacy's BatchSummary.aspx.vb::btSubmit_Click
-        // (the Wet Tissue journey) only inserted the samples and left the batch's status as
-        // Submitted ("Not received"); only the block-based journey (BatchBlocks.aspx.vb, reached
-        // via BatchBlockSummary.aspx for Wax Block/Pre-Cassetted/Stained-Section submissions)
-        // advances status to In Progress at this step. Finishing a Wet Tissue submission must not
-        // jump it straight to In Progress before Histopathology has even received it.
-        var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId.Value);
-        var isWetTissue = ValidationHelpers.IsWetTissueDescription(await ResolveSubmittedAsDescriptionAsync(submittedAsCode));
-
         // When the user reached this page from Edit Submission/Submission Details, the logical
         // completion target is the originating submission page rather than the final print screen.
         if (!string.IsNullOrWhiteSpace(Session.SampleSummaryReturnPage))
@@ -294,13 +291,6 @@ public class SampleSummaryModel : HistoPageModel
         // with the follow-up return target kept as the awaiting-receipt list.
         Session.ReturnPage = "/Batches/BatchesNotReceived";
 
-        if (isWetTissue)
-            return RedirectToPage("/Batches/PrintSubmission");
-
-        var blocks = await _blocks.GetByBatchAsync(batchId.Value);
-        var allTissuesAssigned = animals.All(a => blocks.Any(b => b.AnimalID == a.ID));
-
-        await _batches.CompleteBlockAssignmentAsync(batchId.Value, allTissuesAssigned, Session.UserID);
         return RedirectToPage("/Batches/PrintSubmission");
     }
 

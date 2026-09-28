@@ -1,5 +1,6 @@
 using Histo.Administration.Interfaces;
 using Histo.Core.Domain;
+using Histo.Histology.Interfaces;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -13,13 +14,15 @@ public class AddSubmissionModel : HistoPageModel
     private readonly ISubmissionService _submissions;
     private readonly IBatchService _batches;
     private readonly ILookupService _lookups;
+    private readonly IBlockService _blocks;
 
-    public AddSubmissionModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups)
+    public AddSubmissionModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups, IBlockService blocks)
         : base(session)
     {
         _submissions = submissions;
         _batches = batches;
         _lookups = lookups;
+        _blocks = blocks;
     }
 
     /// <summary>Batch ID from the URL (route/query). Falls back to <see cref="ISessionService.BatchID"/>.</summary>
@@ -45,6 +48,31 @@ public class AddSubmissionModel : HistoPageModel
         ? string.IsNullOrWhiteSpace(Session.ReturnPage) ? "/Batches/BatchesNotReceived" : Session.ReturnPage
         : ReturnPage;
 
+    /// <summary>
+    /// True when reached from the "Assign Tissues to Blocks" journey (<c>BatchBlocks.cshtml</c>'s
+    /// "Add sample" button), as opposed to Create/Edit Submission. Matches the same
+    /// substring-on-ReturnPage convention already used by
+    /// <see cref="Histo.Web.Pages.Submissions.SubmissionDetailsBlockModel.IsAssignTissueMode"/>.
+    ///
+    /// Legacy had two distinct pages here: <c>AddSubmission.aspx</c> (Create/Edit Submission — types
+    /// a brand-new Sender Ref) and <c>AddSample.aspx</c> (Assign Tissues to Blocks — associates an
+    /// *existing* sample, found via search, with the current batch; confirmed via
+    /// docs/Functionality-Traceability-Matrix.md and this session's own prior finding that
+    /// AddSample.aspx "is not a separate sample-creation workflow — it's the landing page for
+    /// adding an existing animal to the current batch"). Both were consolidated onto this one page
+    /// with a single free-text field, which incorrectly let the Assign Tissues journey type a new
+    /// Sender Ref instead of picking one of the batch's own not-yet-blocked samples.
+    /// </summary>
+    public bool IsAssignTissueMode =>
+        (ReturnPage ?? string.Empty).Contains("/Batches/BatchBlocks", StringComparison.OrdinalIgnoreCase)
+        || (Session.SampleDetailReturnPage ?? string.Empty).Contains("/Batches/BatchBlocks", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Samples already in this batch that don't yet have a block — the only valid choices in
+    /// <see cref="IsAssignTissueMode"/>, populated in <see cref="OnGetAsync"/>.
+    /// </summary>
+    public IReadOnlyList<Animal> AvailableAnimals { get; private set; } = [];
+
     public string? ModelError { get; private set; }
 
     public async Task OnGetAsync(string? senderRef, int? sourceAnimalId)
@@ -67,6 +95,9 @@ public class AddSubmissionModel : HistoPageModel
             SenderRef = chosenRef;
         else if (!string.IsNullOrWhiteSpace(senderRef))
             SenderRef = senderRef;
+
+        if (IsAssignTissueMode && BatchId is > 0)
+            AvailableAnimals = await GetUnblockedAnimalsAsync(BatchId.Value);
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -75,6 +106,22 @@ public class AddSubmissionModel : HistoPageModel
 
         var batchId = BatchId ?? Session.BatchID;
         if (batchId is null or <= 0) return RedirectToPage("/Index");
+
+        if (IsAssignTissueMode)
+        {
+            // No new Animal is created here — the user is picking one of the batch's own samples
+            // that still needs blocks assigned, mirroring legacy AddSample.aspx.
+            var available = await GetUnblockedAnimalsAsync(batchId.Value);
+            AvailableAnimals = available;
+            var chosen = available.FirstOrDefault(a => string.Equals(a.SenderRef, SenderRef, StringComparison.OrdinalIgnoreCase));
+            if (chosen is null)
+            {
+                ModelError = "Select a sample from the list.";
+                return Page();
+            }
+
+            return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = chosen.ID });
+        }
 
         var submissionId = BatchSubmissionId ?? Session.BatchSubmissionID;
         if (submissionId is null or <= 0)
@@ -173,5 +220,13 @@ public class AddSubmissionModel : HistoPageModel
         var items = await _lookups.GetLookupDataAsync(11); // LOOKUP_SUBMITTEDAS
         var match = items.FirstOrDefault(i => i.Code == submittedAsCode);
         return ValidationHelpers.IsWetTissueDescription(match?.Name);
+    }
+
+    /// <summary>Samples in the batch that have no block yet — the pickable set for <see cref="IsAssignTissueMode"/>.</summary>
+    private async Task<IReadOnlyList<Animal>> GetUnblockedAnimalsAsync(int batchId)
+    {
+        var animals = await _submissions.GetAnimalsByBatchAsync(batchId);
+        var blockedAnimalIds = (await _blocks.GetByBatchAsync(batchId)).Select(b => b.AnimalID).ToHashSet();
+        return animals.Where(a => !blockedAnimalIds.Contains(a.ID)).ToList();
     }
 }

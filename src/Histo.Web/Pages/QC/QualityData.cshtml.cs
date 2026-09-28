@@ -1,6 +1,8 @@
 using Histo.Administration.Interfaces;
+using Histo.Administration.Models;
 using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
+using Histo.QualityControl.Interfaces;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -12,11 +14,14 @@ namespace Histo.Web.Pages.QC;
 /// Quality-control / dispatch worklist for the current batch — replaces
 /// <c>QualityData.aspx</c>. Lists every histology, antibodies and special-stain
 /// test on the batch's blocks so results, QC data, dispatch and archive
-/// information can be recorded per test via <see cref="EditQualityDataTestModel"/>.
+/// information can be recorded per test.
 ///
-/// SIMPLIFIED: the legacy page edits several selected tests at once in a single
-/// save. This page edits one test at a time instead. See
-/// <see cref="Histo.Histology.Models.BlockTest"/> for further scope notes.
+/// <see cref="OnPostUpdateAsync"/> reproduces legacy's multi-select bulk-save: check one or more
+/// rows, fill in only the fields you want to change, and they're applied to every checked row —
+/// fields left blank keep each row's own existing value. Mirrors the same pattern already used by
+/// <see cref="Histo.Web.Pages.Archive.ArchiveBlocksModel"/>. Editing one test at a time is still
+/// available via <see cref="EditQualityDataTestModel"/> for deep-linking, but is no longer required
+/// for routine updates.
 /// </summary>
 public class QualityDataModel : GridPageModel
 {
@@ -24,25 +29,32 @@ public class QualityDataModel : GridPageModel
     private readonly IBatchService _batches;
     private readonly ILookupService _lookups;
     private readonly IUserService _users;
+    private readonly IQCNoteService _qc;
 
     private const int LookupAntibodiesTse    = 4;
     private const int LookupAntibodiesNonTse = 5;
     private const int LookupSpecialStain     = 6;
     private const int LookupHistologyTse     = 7;
     private const int LookupHistologyNonTse  = 8;
+    private const int LookupQcCode           = 14;
+    private const int LookupRemedialAction   = 15;
+    private const int LookupArchiveLocation  = 16;
+    private const int LookupPremiumCharges   = 17;
 
     public QualityDataModel(
         ISessionService session,
         IBlockTestService tests,
         IBatchService batches,
         ILookupService lookups,
-        IUserService users)
+        IUserService users,
+        IQCNoteService qc)
         : base(session)
     {
         _tests   = tests;
         _batches = batches;
         _lookups = lookups;
         _users   = users;
+        _qc      = qc;
     }
 
     public IReadOnlyList<BlockTest> Tests { get; private set; } = [];
@@ -72,6 +84,41 @@ public class QualityDataModel : GridPageModel
 
     public IReadOnlyList<string> HistologyRefs { get; private set; } = [];
     public IReadOnlyList<string> TestNames { get; private set; } = [];
+
+    // ── Inline bulk edit — legacy QualityData.aspx multi-select batch-save ──────────────────
+
+    [BindProperty] public List<int> SelectedIds { get; set; } = [];
+
+    /// <summary>"Select all" only ever reaches the server as a flag for rows on other pages,
+    /// whose checkboxes never render — mirrors <c>ArchiveBlocksModel.SelectAllAcrossPages</c>.</summary>
+    [BindProperty] public bool SelectAllAcrossPages { get; set; }
+
+    /// <summary>"" = leave unchanged, "0" = explicitly clear to Not tested, "1"/"2" = Passed/Failed.</summary>
+    [BindProperty] public string? Result { get; set; }
+    [BindProperty] public string? QCCode { get; set; }
+    [BindProperty] public bool? QCNote { get; set; }
+    [BindProperty] public string? StainRef { get; set; }
+    [BindProperty] public bool? Dispatched { get; set; }
+    [BindProperty] public DateTime? DispatchedDate { get; set; }
+    [BindProperty] public string? DispatchedBy { get; set; }
+    [BindProperty] public string? DispatchedTo { get; set; }
+    [BindProperty] public string? RemedialAction { get; set; }
+    [BindProperty] public string? ArchiveLocationCode { get; set; }
+    [BindProperty] public DateTime? ArchivedDate { get; set; }
+    [BindProperty] public string? ArchiveComment { get; set; }
+    [BindProperty] public int? NumberOfSlides { get; set; }
+    [BindProperty] public string? Comment { get; set; }
+    [BindProperty] public bool ApplyCharges { get; set; }
+    [BindProperty] public List<string> SelectedCharges { get; set; } = [];
+
+    public string? Error { get; private set; }
+    public string? SuccessMessage { get; private set; }
+
+    public IReadOnlyList<LookupItem> QCCodes { get; private set; } = [];
+    public IReadOnlyList<LookupItem> RemedialActions { get; private set; } = [];
+    public IReadOnlyList<LookupItem> ArchiveLocations { get; private set; } = [];
+    public IReadOnlyList<LookupItem> PremiumCharges { get; private set; } = [];
+    public IReadOnlyList<Administration.Models.User> Users { get; private set; } = [];
 
     // Resolved code→name map keyed as "TestType|Code"
     private IReadOnlyDictionary<string, string> _testNameMap = new Dictionary<string, string>();
@@ -129,13 +176,183 @@ public class QualityDataModel : GridPageModel
             filtered = filtered.Where(t => string.Equals(GetTestName(t), FilterTest, StringComparison.OrdinalIgnoreCase));
         Tests = filtered.ToList();
 
+        await LoadEditLookupsAsync();
         PopulateGridViewData(Tests.Count);
         return Page();
     }
 
-    public IActionResult OnPostEdit(int testId)
+    /// <summary>
+    /// Bulk-applies the fields the user filled in to every checked row, leaving blank fields
+    /// unchanged on each row — legacy <c>QualityData.aspx.vb</c>'s multi-select batch-save.
+    /// </summary>
+    public async Task<IActionResult> OnPostUpdateAsync()
     {
-        return RedirectToPage("/QC/EditQualityDataTest", new { testId });
+        ViewData["Title"] = "Quality data";
+        ViewData["PageTitle"] = "Quality data";
+        if (!Session.BatchID.HasValue) return RedirectToPage("/Index");
+        var batchId = Session.BatchID.Value;
+
+        var all = await _tests.GetByBatchAsync(batchId);
+        var selectedIds = SelectAllAcrossPages ? all.Select(t => t.ID).ToList() : SelectedIds;
+        if (selectedIds.Count == 0)
+        {
+            Error = "Select at least one test to update.";
+            await ReloadGridAsync(batchId);
+            return Page();
+        }
+
+        var anyFieldEntered = !string.IsNullOrWhiteSpace(Result) || !string.IsNullOrWhiteSpace(QCCode)
+            || QCNote.HasValue || !string.IsNullOrWhiteSpace(StainRef) || Dispatched.HasValue
+            || DispatchedDate is not null || !string.IsNullOrWhiteSpace(DispatchedBy) || !string.IsNullOrWhiteSpace(DispatchedTo)
+            || !string.IsNullOrWhiteSpace(RemedialAction) || !string.IsNullOrWhiteSpace(ArchiveLocationCode) || ArchivedDate is not null
+            || !string.IsNullOrWhiteSpace(ArchiveComment) || NumberOfSlides is not null || !string.IsNullOrWhiteSpace(Comment)
+            || ApplyCharges;
+        if (!anyFieldEntered)
+        {
+            Error = "Enter at least one field to apply to the selected tests.";
+            await ReloadGridAsync(batchId);
+            return Page();
+        }
+
+        // Cross-field checks only apply when the relevant value is actually being changed by this
+        // save — unlike EditQualityDataTest's single-row form, a bulk update may legitimately touch
+        // only one or two fields, so fields left blank ("unchanged") are never validated.
+        if (Dispatched == true)
+        {
+            if (DispatchedDate is null) Error = "Enter a dispatched date.";
+            else if (string.IsNullOrWhiteSpace(DispatchedBy)) Error = "Select who dispatched the test.";
+            else if (string.IsNullOrWhiteSpace(DispatchedTo)) Error = "Enter who the test was dispatched to.";
+        }
+        if (Error is null && Result == Histo.Histology.Models.BlockTestResult.Failed && string.IsNullOrWhiteSpace(QCCode))
+            Error = "Enter a QC code when setting the result to Failed.";
+        if (Error is null && !string.IsNullOrWhiteSpace(ArchiveLocationCode) && ArchivedDate is null)
+            Error = "Enter an archive date when an archive location is selected.";
+        if (Error is null && ArchivedDate is not null && string.IsNullOrWhiteSpace(ArchiveLocationCode))
+            Error = "Select an archive location when an archive date is entered.";
+
+        if (Error is not null)
+        {
+            await ReloadGridAsync(batchId);
+            return Page();
+        }
+
+        var selected = all.Where(t => selectedIds.Contains(t.ID)).ToList();
+        var concurrencyCount = 0;
+
+        foreach (var test in selected)
+        {
+            var applyQcNote = QCNote ?? test.QCNote;
+            var qcNoteRef = test.QCNoteRef;
+            if (applyQcNote && qcNoteRef is null or 0)
+            {
+                var newId = await _qc.AddAsync(batchId, Session.UserID);
+                if (newId > 0) qcNoteRef = newId;
+            }
+            else if (!applyQcNote)
+            {
+                qcNoteRef = null;
+            }
+
+            var newArchiveLocation = !string.IsNullOrWhiteSpace(ArchiveLocationCode) ? ArchiveLocationCode : test.ArchiveLocation;
+            var newArchivedDate = ArchivedDate ?? test.ArchivedDate;
+
+            var updated = new BlockTest
+            {
+                ID = test.ID,
+                BlockID = test.BlockID,
+                BlockRef = test.BlockRef,
+                HistologyRef = test.HistologyRef,
+                TestType = test.TestType,
+                Code = test.Code,
+                TestDetails = test.TestDetails,
+                Result = Result switch { null or "" => test.Result, "0" => null, _ => Result },
+                QCCode = !string.IsNullOrWhiteSpace(QCCode) ? QCCode : test.QCCode,
+                QCNote = applyQcNote,
+                QCNoteRef = qcNoteRef,
+                StainRef = !string.IsNullOrWhiteSpace(StainRef) ? StainRef : test.StainRef,
+                Dispatched = Dispatched ?? test.Dispatched,
+                DispatchedDate = DispatchedDate ?? test.DispatchedDate,
+                DispatchedBy = !string.IsNullOrWhiteSpace(DispatchedBy) ? DispatchedBy : test.DispatchedBy,
+                PremiumCharge = test.PremiumCharge, // pass-through, not edited here
+                DispatchedTo = !string.IsNullOrWhiteSpace(DispatchedTo) ? DispatchedTo : test.DispatchedTo,
+                Comment = !string.IsNullOrWhiteSpace(Comment) ? Comment : test.Comment,
+                RemedialAction = !string.IsNullOrWhiteSpace(RemedialAction) ? RemedialAction : test.RemedialAction,
+                ArchiveLocation = newArchiveLocation,
+                ArchivedDate = newArchivedDate,
+                ArchiveComment = !string.IsNullOrWhiteSpace(ArchiveComment) ? ArchiveComment : test.ArchiveComment,
+                NumberOfSlides = NumberOfSlides ?? test.NumberOfSlides,
+                OnHold = test.OnHold,
+                Archived = !string.IsNullOrWhiteSpace(newArchiveLocation) && newArchivedDate is not null,
+                RowStamp = test.RowStamp,
+            };
+
+            try
+            {
+                await _tests.UpdateAsync(updated, Session.UserID);
+                if (ApplyCharges)
+                    await _tests.SaveTCCodesAsync(batchId, test.ID, test.TestType, test.TCCodes, SelectedCharges, Session.UserID);
+            }
+            catch (BlockTestConcurrencyException)
+            {
+                concurrencyCount++;
+            }
+        }
+
+        await CompleteBatchIfAllTestsDispatchedAsync(batchId);
+
+        Error = concurrencyCount > 0
+            ? $"{concurrencyCount} test(s) were modified by another user and were not updated. Please reload and try again."
+            : null;
+        SuccessMessage = concurrencyCount == 0 ? $"Updated {selected.Count} test(s)." : null;
+
+        await ReloadGridAsync(batchId);
+        return Page();
+    }
+
+    /// <summary>
+    /// Reproduces legacy <c>QualityData.aspx.vb::UpdateSessionWithQualityData</c>: once every test
+    /// on the batch has been dispatched, the batch is marked Completed and stamped with the latest
+    /// dispatch date.
+    /// </summary>
+    private async Task CompleteBatchIfAllTestsDispatchedAsync(int batchId)
+    {
+        var tests = await _tests.GetByBatchAsync(batchId);
+        if (tests.Count == 0) return;
+        if (!tests.All(t => t.Dispatched && t.DispatchedDate is not null)) return;
+
+        var latestDispatch = tests.Max(t => t.DispatchedDate!.Value);
+        await _batches.SetCompletedAsync(batchId, latestDispatch, Session.UserID);
+    }
+
+    /// <summary>Re-runs the same load/filter/lookup logic as <see cref="OnGetAsync"/> after a POST, so the redisplayed grid reflects the just-applied changes.</summary>
+    private async Task ReloadGridAsync(int batchId)
+    {
+        var allTests = await _tests.GetByBatchAsync(batchId);
+        BatchSummary = await _batches.GetByIdAsync(batchId);
+        if (BatchSummary is not null) await ResolveBatchSummaryAsync(BatchSummary);
+        await ResolveTestNamesAsync(BatchSummary?.BatchType ?? Histo.Submissions.Models.BatchTypeConstants.Tse);
+
+        HistologyRefs = allTests.Select(t => t.HistologyRef).Where(r => !string.IsNullOrEmpty(r))
+            .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(r => r).ToList()!;
+        TestNames = allTests.Select(GetTestName).Where(n => !string.IsNullOrEmpty(n))
+            .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n).ToList()!;
+
+        var filtered = allTests.AsEnumerable();
+        if (!string.IsNullOrEmpty(FilterHistologyRef)) filtered = filtered.Where(t => t.HistologyRef == FilterHistologyRef);
+        if (!string.IsNullOrEmpty(FilterTest)) filtered = filtered.Where(t => string.Equals(GetTestName(t), FilterTest, StringComparison.OrdinalIgnoreCase));
+        Tests = filtered.ToList();
+
+        await LoadEditLookupsAsync();
+        PopulateGridViewData(Tests.Count);
+    }
+
+    private async Task LoadEditLookupsAsync()
+    {
+        QCCodes          = await _lookups.GetLookupDataAsync(LookupQcCode);
+        RemedialActions  = await _lookups.GetLookupDataAsync(LookupRemedialAction);
+        ArchiveLocations = await _lookups.GetLookupDataAsync(LookupArchiveLocation);
+        PremiumCharges   = await _lookups.GetLookupDataAsync(LookupPremiumCharges);
+        Users            = await _users.GetAllUsersAsync();
     }
 
     private async Task ResolveTestNamesAsync(int batchType)
