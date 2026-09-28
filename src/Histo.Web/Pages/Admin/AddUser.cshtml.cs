@@ -63,10 +63,12 @@ public class AddUserModel : HistoPageModel
 
         // NT login is no longer shown, entered, or derived in the UI — Entra ID email is now
         // the sole identity key (see HistopathologyClaimsTransformation). The legacy NtLogin
-        // column is left blank for new users rather than mapped from any other field.
+        // column is left NULL for new users rather than mapped from any other field — must be
+        // a true NULL, not "", since IX_User_NTLogin is a filtered unique index (WHERE NTLogin
+        // IS NOT NULL) that still enforces uniqueness across empty-string values.
         var user = new User
         {
-            NtLogin   = string.Empty,
+            NtLogin   = null,
             Name      = Name.Trim(),
             Email     = Email.Trim(),
             GroupCode = GroupCode,

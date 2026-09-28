@@ -27,9 +27,6 @@
 
 <form method="post" asp-antiforgery="true">
     <input type="hidden" asp-for="ReturnUrl" />
-    @* NT login is legacy/unused post-Entra ID (email is now the identity key) — kept as a
-       hidden field so the existing value round-trips unchanged on save rather than being lost. *@
-    <input type="hidden" asp-for="NtLogin" />
     <div class="govuk-form-group @(Model.Errors.ContainsKey("Name") ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="Name">Name</label>
         @if (Model.Errors.TryGetValue("Name", out var nameError))

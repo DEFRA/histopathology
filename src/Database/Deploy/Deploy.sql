@@ -33,4 +33,14 @@ PRINT '--- Deactivating Mouse Bioassay / Neuropath user areas ---';
 :r ../Migrations/V20260917_01_Deactivate_MouseBioassay_Neuropath_UserAreas.sql
 GO
 
+-- Step 4: Fix pre-existing blank-string NTLogin rows that collide under IX_User_NTLogin
+PRINT '--- Fixing empty-string NTLogin rows to NULL ---';
+:r ../Migrations/V20260928_01_Fix_Empty_String_NTLogin_To_Null.sql
+GO
+
+-- Step 5: NTLogin is no longer an identity key (Email is) — drop the unique constraint
+PRINT '--- Making IX_User_NTLogin non-unique ---';
+:r ../Migrations/V20260928_02_Make_NTLogin_Index_NonUnique.sql
+GO
+
 PRINT '=== Database deployment completed ===';
