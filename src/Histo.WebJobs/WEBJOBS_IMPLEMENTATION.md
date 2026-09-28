@@ -1,5 +1,12 @@
 # Histo.WebJobs Implementation Summary
 
+> **⚠️ Superseded:** `Histo.WebJobs` was converted from an Azure WebJobs SDK `[TimerTrigger]` host to a
+> classic **Triggered WebJob** (plain console app + `settings.job` CRON schedule file, scheduled by
+> Kudu's built-in scheduler). It no longer references `Microsoft.Azure.WebJobs*` packages, does not
+> use a `JobHost`, and does **not** require an `AzureWebJobsStorage` connection string / Storage
+> Account. Sections below describing `[FunctionName]`/`[TimerTrigger]`, `AzureWebJobsStorage`, and
+> `UseDevelopmentStorage=true` are obsolete.
+
 **Date:** 2026-09-10  
 **Project:** Histo.WebJobs (Azure WebJobs for scheduled tasks)
 

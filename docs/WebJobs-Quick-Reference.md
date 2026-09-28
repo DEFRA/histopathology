@@ -1,5 +1,12 @@
 # WebJobs Configuration Quick Reference
 
+> **⚠️ Superseded:** `Histo.WebJobs` was converted from an Azure WebJobs SDK `[TimerTrigger]` host to a
+> classic **Triggered WebJob** (plain console app + `settings.job` CRON schedule file, scheduled by
+> Kudu's built-in scheduler). It no longer references `Microsoft.Azure.WebJobs*` packages and does
+> **not** require an `AzureWebJobsStorage` connection string / Storage Account. The
+> `AzureWebJobsStorage` settings and `webjobs-storage-connection-string` Key Vault secret referenced
+> below are obsolete and should be ignored/removed from deployment configuration.
+
 **Document Type:** Quick Reference  
 **Date:** 2026-09-10  
 **Project:** Histo.Web (Histology Reset WebJob)

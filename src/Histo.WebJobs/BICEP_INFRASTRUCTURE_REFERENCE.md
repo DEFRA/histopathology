@@ -78,14 +78,16 @@ resource sqlFirewallAllowAzureServices 'Microsoft.Sql/servers/firewallRules@2023
 //    TrustServerCertificate=False;
 //    Connection Timeout=30;
 //
-// 2. webjobs-storage-connection-string
-//    Value: Azure Storage connection string (DefaultEndpointsProtocol=https;...)
-//
-// 3. saml2-tenant-id (for Entra ID authentication)
+// 2. saml2-tenant-id (for Entra ID authentication)
 //    Value: {tenant-guid}
 //
-// 4. appinsights-connection-string (optional)
+// 3. appinsights-connection-string (optional)
 //    Value: Application Insights connection string
+//
+// NOTE: A separate Azure Storage account / AzureWebJobsStorage connection string is NOT
+// required. Histo.WebJobs is a classic Triggered WebJob (plain console app + settings.job
+// schedule file), scheduled by Kudu's built-in scheduler rather than the Azure WebJobs SDK's
+// [TimerTrigger], so it does not need Storage-backed distributed locking.
 //
 // Example PowerShell commands:
 // 
@@ -93,11 +95,6 @@ resource sqlFirewallAllowAzureServices 'Microsoft.Sql/servers/firewallRules@2023
 //     --vault-name {vault-name} \
 //     --name histologydb-connection-string \
 //     --value "Server=tcp:{sql}.database.windows.net,1433;Initial Catalog=Histology;Authentication=Active Directory Default;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
-//
-//   az keyvault secret set \
-//     --vault-name {vault-name} \
-//     --name webjobs-storage-connection-string \
-//     --value "{storage-connection-string}"
 //
 // ================================================================================
 
@@ -121,10 +118,6 @@ output sqlFirewallRuleId string = sqlFirewallAllowAzureServices.id
 //   {
 //     name: 'ConnectionStrings__HistologyDb'
 //     value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/histologydb-connection-string/)'
-//   }
-//   {
-//     name: 'AzureWebJobsStorage'
-//     value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/webjobs-storage-connection-string/)'
 //   }
 //   {
 //     name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'

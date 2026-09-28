@@ -1,5 +1,10 @@
 # ✅ WebJobs Implementation Complete
 
+> **⚠️ Superseded:** `Histo.WebJobs` was converted from an Azure WebJobs SDK `[TimerTrigger]` host to a
+> classic **Triggered WebJob** (plain console app + `settings.job` CRON schedule file, scheduled by
+> Kudu's built-in scheduler). It no longer requires an `AzureWebJobsStorage` connection string /
+> Storage Account.
+
 ## Summary
 
 Your **Histo.WebJobs** project has been successfully created and is **building without errors**. This WebJob replaces the legacy SQL Server Agent job and executes annually on January 1st at 04:00 UTC to reset histology reference numbers.

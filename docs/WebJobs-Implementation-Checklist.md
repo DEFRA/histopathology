@@ -1,5 +1,12 @@
 # WebJobs Implementation — Final Checklist
 
+> **⚠️ Superseded:** `Histo.WebJobs` was converted from an Azure WebJobs SDK `[TimerTrigger]` host to a
+> classic **Triggered WebJob** (plain console app + `settings.job` CRON schedule file, scheduled by
+> Kudu's built-in scheduler). It no longer references `Microsoft.Azure.WebJobs*` packages and does
+> **not** require an `AzureWebJobsStorage` connection string / Storage Account. References to
+> `AzureWebJobsStorage` and the `webjobs-storage-connection-string` Key Vault secret below are
+> obsolete and should be ignored/removed from deployment configuration.
+
 **Date:** 2026-09-10  
 **Status:** ✅ COMPLETE — Project structure created and building successfully  
 **Build Result:** ✅ SUCCESS  
