@@ -68,3 +68,5 @@ ELSE
 		[Animal].[HistologyRef] = @HistologyRef AND (@BlockRef = [BatchBlock].[BlockRef] OR @BlockRef  IS NULL)
 		AND (@ArchiveLocation = [BatchBlock].[ArchiveLocation] OR @ArchiveLocation IS NULL)
 GO
+PRINT '--- dbo.GetAnimalBlockArchiveInformation: (re)created ---';
+GO

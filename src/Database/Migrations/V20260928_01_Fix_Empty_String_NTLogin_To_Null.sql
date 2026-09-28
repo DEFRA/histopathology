@@ -7,7 +7,10 @@ SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 GO
 
+PRINT '--- V20260928_01: fixing empty-string NTLogin rows to NULL ---';
 UPDATE dbo.[User]
 SET NTLogin = NULL
 WHERE NTLogin = '';
+GO
+PRINT '--- V20260928_01: completed ---';
 GO
