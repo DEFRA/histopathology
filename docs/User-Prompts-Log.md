@@ -1952,4 +1952,101 @@ User suspected the earlier `BatchBlockSummary` → `SampleSummary` rename had ca
 
 **Files changed:** [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs).
 
+---
+
+## Prompt 137 — SearchTest "Analyse results"/"Analyse submissions" — fix as per legacy, avoid writing new script (2026-09-25)
+
+> why @file:BatchRepository.cs has script, is same thing used in legacy, its not best approach right, can you go throgh legacy and fix as per legacy on this searchtest functinaligy SearchTest.aspx -> analysis results button and analysis submission button logic here so that we can avoid wrignting new script
+
+Rejected an earlier invented raw-SQL implementation. Read `SearchTest.aspx.vb`/`clsBatch.vb` directly and confirmed via live `sp_helptext` that 6 real SPs (`GetTestHistologyCounts`/`Antibodies`/`Stains` + `*Batch` variants) already exist and are what legacy actually calls — an earlier session's memory note wrongly declared them nonexistent (it had checked the VB wrapper method names, not the real `FillDataTable` call site). Rewrote `BatchRepository`'s premium-charge methods to call these real SPs directly, looping once per active premium charge exactly as legacy's `ProcessHistologyData`/`ProcessAntibodiesData`/`ProcessStainData` do. Also fixed a consequential Description-vs-Code keying/summing bug this exposed in `SearchTest.cshtml.cs`. Build 0 errors; SearchTest tests 3/3 pass.
+
+---
+
+## Prompt 138 — Analysis report still returns "No test items found" (2026-09-25)
+
+> still analysis report return No test items found matching the search criteria.
+
+Wrote a temporary throwaway integration test calling the real repository method against LocalDB directly, which reproduced a real `SqlException: Incorrect syntax near '1'`. Root cause: `GetActivePremiumChargeDescriptionsAsync` called `QueryAsync<string>` against `GetluPremiumCharges`'s 4-column result set — Dapper silently bound the FIRST column (`ID`, e.g. `"1"`) instead of `Description` (`"TC 1401"`), and that numeric string then broke the SP's own dynamic-SQL column alias. Fixed by reading the row as `dynamic` and selecting `Description` explicitly; re-ran the same integration test and confirmed 254 real rows returned, then deleted the test. Build 0 errors; tests pass.
+
+---
+
+## Prompt 139 — Histology checkbox un-select should cascade too (2026-09-25)
+
+> Issue is that if we unslecet the IHC-PrP or Special Stain, all the selected item should be un selected but it's not happening : specifically "IHC-PrP → antibodies, Special Stain → Special stain" — this is client-side auto-selection based on `Histo.Submissions.Models.HistologyCode`'s own documented rule.
+
+The existing checkbox auto-select JS only handled the checked→check-all direction (a known gap flagged in an earlier session but not yet fixed). Fixed to mirror legacy's `chkblHistology_SelectedIndexChanged` in both directions — unchecking now un-checks the dependent Special Stain/Antibodies column too. Build 0 errors; SearchTest tests 3/3 pass.
+
+---
+
+## Prompt 140 — Export to Excel not working + reposition above results (2026-09-28)
+
+> in searchTest.csthml — Export Outputs to Excel and Export Submissions to Excel are not currently working... The Export to Excel button should be repositioned... place it above the search results section, alongside the Analyse Submissions functionality.
+
+Investigated via live browser/Playwright and found the real cause: both export buttons (and, discovered along the way, the pre-existing "Analyse submissions" button too) used `asp-page-handler`/`formaction="?handler=X"` inside a `method="get"` form — per the HTML spec, GET form submission discards any query string already on the action URL and replaces it entirely with the serialized form fields, silently dropping `handler=X` and always falling back to the default handler. Confirmed live: clicking "Analyse submissions" produced a URL with no `handler` param at all. Fixed by switching to named-button `<button name="handler" value="X">` submits (GET-safe) and moved both Export buttons into the top button group. Also fixed a real 500 in the Submissions export caused by exceeding Excel's 32,767-character cell limit on a comma-joined batch-ID list. Build 0 errors; verified end-to-end via a real running instance + Playwright.
+
+---
+
+## Prompt 141 — Export buttons should only appear after their analysis has run (2026-09-28)
+
+> so the button movement and button will not be shown until user hit the "Analyse submissions", "Analyse Results" shown based result set
+
+Wrapped both Export buttons in `@if` conditions gated on `Searched`/`SubmissionsSearched` plus non-empty results, so each only appears after its corresponding analysis has actually produced rows. Verified live: on first page load neither export button shows; after "Analyse results" only "Export outputs to excel" appears; after "Analyse submissions" only "Export submissions to excel" appears.
+
+---
+
+## Prompt 142 — "Other" checkbox missing from Antibodies/Special Stain (2026-09-28)
+
+> can you check Other check box is missing in Antibodies and Special Stain, it's there in legacy
+
+Confirmed via legacy `LoadCheckBoxLists()`: an "Other" `ListItem` (Value="Other") is appended to `chkblAntibodies`/`chkblSpecialStain` manually after data-binding, not part of the lookup table itself — missing from the migrated page entirely. Fixed by appending it in `LoadLookupsAsync`. Verified live via browser: "Other" now appears as the last item in both columns.
+
+---
+
+## Prompt 143 — ArchiveBlocks: "Go to page" missing + need "select all" for bulk update (2026-09-28)
+
+> In ArchiveBlocks.cshtml or ArchiveBlocks.cshtml go to page implmentation is mssing and user should able to select all to update details at one streatch. Can you check and fix it
+
+Added an "All" checkbox (`SelectAllAcrossPages`, selects every filtered row server-side — not just the current page's DOM checkboxes) and a "Go to page" number-input control matching `QualityData.cshtml`'s existing pattern. Also fixed a related bug found while implementing this: the "Update selected" POST form had no hidden `PageNumber`/`SortColumn`/`SortDesc` fields, so submitting silently reset the grid to page 1. Build 0 errors; ArchiveBlocks tests 11/11 pass.
+
+---
+
+## Prompt 144 — Apply the same change to ArchiveTissues.cshtml (2026-09-28)
+
+> this change should be there for Archivetissue.cshtml as well.
+
+Ported the "All"-select-across-pages checkbox, "Go to page" control, and the page/sort-preserving hidden fields to `ArchiveTissues.cshtml`/`.cshtml.cs`, mirroring `ArchiveBlocks` exactly (this page had neither the select-all/go-to-page feature nor any row-checkbox prefill JS at all before). Build 0 errors; Archive tests 16/16 pass.
+
+---
+
+## Prompt 145 — Banner position on ArchiveTissues + remove redundant Done button on ArchiveBlocks (2026-09-28)
+
+> banner should be shown top of the page in archive tissue. If the done button only navigate to previewous page, then remove from archiveblock.cshtml
+
+Moved `ArchiveTissues.cshtml`'s success banner to the top of the page (was rendered after the batch summary), matching `ArchiveBlocks.cshtml`'s existing layout. Confirmed the "Done" button on `ArchiveBlocks.cshtml` targeted `@Model.BackLinkPage` — identical to the "Back" link already at the top of the page — and removed it as a redundant duplicate. Build 0 errors; Archive tests 16/16 pass.
+
+---
+
+## Prompt 146 — Archive Location/Date auto-population rules for single vs. multi-select (2026-09-28)
+
+> Archive Location and Archive Date Auto-Population: (1) selecting a single archived tissue should auto-populate its Archive Location/Date; (2) selecting multiple records or Select All should NOT auto-populate; (3) apply the same logic to ArchiveBlock.cshtml.
+
+Confirmed this behaviour was already implemented on both pages from the preceding fixes, then hardened it: bound row checkboxes to `Model.SelectedIds` (previously not bound at all) and ran the field-prefill script once on page load, so a validation-error postback correctly retains its visual checkbox state and the Location/Date/Comment fields reflect it immediately, not only after the user's next click. Build 0 errors; Archive tests 16/16 pass.
+
+---
+
+## Prompt 147 — Don't show "01/01/0001" for an empty archive date (2026-09-28)
+
+> If date is empty then don't show this 01/01/0001 in ArchiveTissues.cshtml ArchiveBlocks.cshtml
+
+Checked the live LocalDB data directly (column types, actual stored values) and found no genuine `0001-01-01` sentinel in the database — nulls are stored as real `NULL`. As a defensive fix against this ever surfacing (e.g. from a `Convert.ToDateTime` edge case or bad data in another environment), normalized `DateTime.MinValue` to `null` at the point `ArchivedDate` is mapped into both Archive page models' row types, so the table cell, the JS `data-archived-date` prefill, and sorting are all automatically correct from one change rather than patched per display site. Build 0 errors; Archive tests 16/16 pass.
+
+---
+
+## Prompt 148 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-28)
+
+> can you update run log and session metrix and user prompt
+
+Appended Run Log entry #94 (`run-log-v2.md`), Session Metrics row #156 (`session-metrics.md`), and Prompts 137–148 (this file) covering the SearchTest legacy-SP rebuild, the Dapper column-binding "No test items found" fix, the checkbox un-check cascade fix, both Export-to-Excel fixes (GET-form handler routing + Excel cell-overflow), the restored "Other" checkbox, and the ArchiveBlocks/ArchiveTissues select-all/go-to-page/banner/date-display parity work.
+
+
 

@@ -97,6 +97,8 @@ public class ArchiveTissuesModel : GridPageModel
         .ToList();
 
     [BindProperty] public List<int> SelectedIds { get; set; } = [];
+    /// <summary>"All" checkbox — selects every row in <see cref="Rows"/>, not just the current page's.</summary>
+    [BindProperty] public bool SelectAllAcrossPages { get; set; }
     [BindProperty] public string? ArchiveLocationCode { get; set; }
     [BindProperty] public DateTime? ArchivedDate { get; set; }
     [BindProperty] public string? Comment { get; set; }
@@ -125,7 +127,11 @@ public class ArchiveTissuesModel : GridPageModel
         await LoadAsync();
 
         if (IsViewMode) return RedirectToPage(new { batchId = Session.BatchID });
-        if (SelectedIds.Count == 0) { Error = "Select at least one tissue to update."; return Page(); }
+
+        // "All" only ever reaches the server as a flag — off-page rows' checkboxes never render,
+        // so SelectedIds alone can't carry them across a page boundary.
+        var selectedIds = SelectAllAcrossPages ? Rows.Select(r => r.ID).ToList() : SelectedIds;
+        if (selectedIds.Count == 0) { Error = "Select at least one tissue to update."; return Page(); }
         if (string.IsNullOrWhiteSpace(ArchiveLocationCode) && ArchivedDate is null && string.IsNullOrWhiteSpace(Comment))
         {
             Error = "Enter an Archive Location, Archived Date, or Comment to apply.";
@@ -148,7 +154,7 @@ public class ArchiveTissuesModel : GridPageModel
         }
 
         var all = await _submissions.GetBatchSubmissionTissuesAsync(Session.BatchID ?? 0);
-        var selected = all.Where(t => SelectedIds.Contains(t.ID)).ToList();
+        var selected = all.Where(t => selectedIds.Contains(t.ID)).ToList();
         var bulkMode = selected.Count >= 2;
 
         foreach (var tissue in selected)
@@ -215,7 +221,8 @@ public class ArchiveTissuesModel : GridPageModel
                 SenderRef = animal?.SenderRef ?? string.Empty,
                 HistologyRef = animal?.HistologyRef,
                 TissueDescription = tissueDesc ?? t.TissueCode,
-                ArchivedDate = t.ArchivedDate,
+                // A stray DateTime.MinValue (0001-01-01) means "no date" — never a real archive date.
+                ArchivedDate = t.ArchivedDate is null or { Year: 1 } ? null : t.ArchivedDate,
                 ArchiveLocation = t.ArchiveLocation,
                 ArchiveLocationName = locationName ?? t.ArchiveLocation,
                 ArchiveComment = t.ArchiveComment,

@@ -24,4 +24,7 @@ public static class AppClaimTypes
 
     /// <summary>Integer area code from <c>tblUser.UserArea</c>.</summary>
     public const string UserAreaId = Base + "user-area-id";
+
+    /// <summary>Every app-issued claim type, used to clear stale claims before re-issuing them.</summary>
+    public static readonly string[] All = [GroupName, UserDbId, GroupId, UserArea, UserAreaId];
 }
