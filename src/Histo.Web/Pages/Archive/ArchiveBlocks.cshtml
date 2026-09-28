@@ -9,6 +9,13 @@
     <a asp-page="@Model.BackLinkPage" asp-route-batchId="@Model.BatchId" class="govuk-back-link">Back</a>
 }
 
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="govuk-panel govuk-panel--confirmation govuk-!-margin-bottom-6">
+        <p class="govuk-panel__body">@Model.SuccessMessage</p>
+    </div>
+}
+
 @if (Model.Batch is not null)
 {
     <dl class="govuk-summary-list govuk-!-margin-bottom-6">
@@ -64,13 +71,6 @@
                 <ul class="govuk-list govuk-error-summary__list"><li><a href="#ArchiveLocationCode">@Model.Error</a></li></ul>
             </div>
         </div>
-    </div>
-}
-
-@if (!string.IsNullOrEmpty(Model.SuccessMessage))
-{
-    <div class="govuk-panel govuk-panel--confirmation govuk-!-margin-bottom-6">
-        <p class="govuk-panel__body">@Model.SuccessMessage</p>
     </div>
 }
 
@@ -141,7 +141,9 @@
                     <td class="govuk-table__cell">
                         <div class="govuk-checkboxes govuk-checkboxes--small">
                             <div class="govuk-checkboxes__item">
-                                <input class="govuk-checkboxes__input" type="checkbox" id="select-@r.ID" name="SelectedIds" value="@r.ID" @(Model.IsViewMode ? "disabled" : "") />
+                                <input class="govuk-checkboxes__input" type="checkbox" id="select-@r.ID" name="SelectedIds" value="@r.ID"
+                                       data-archive-location="@r.ArchiveLocation" data-archived-date="@r.ArchivedDate?.ToString("yyyy-MM-dd")" data-comment="@r.ArchiveComment"
+                                       @(Model.IsViewMode ? "disabled" : "") />
                                 <label class="govuk-label govuk-checkboxes__label" for="select-@r.ID"><span class="govuk-visually-hidden">Select block @r.BlockRef</span></label>
                             </div>
                         </div>
@@ -192,3 +194,33 @@
         <a asp-page="@Model.BackLinkPage" asp-route-batchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
     </div>
 </form>
+
+@section Scripts {
+    <script>
+        // Selecting exactly one block pre-fills its existing archive details for editing;
+        // selecting zero or multiple clears the fields back to bulk mode's blank-is-unchanged default.
+        (function () {
+            var checkboxes = document.querySelectorAll('input[name="SelectedIds"]');
+            var locationSelect = document.getElementById('ArchiveLocationCode');
+            var dateInput = document.getElementById('ArchivedDate');
+            var commentInput = document.getElementById('Comment');
+            if (!checkboxes.length || !locationSelect || !dateInput || !commentInput) return;
+
+            function applySelection() {
+                var checked = Array.from(checkboxes).filter(function (cb) { return cb.checked; });
+                if (checked.length === 1) {
+                    var cb = checked[0];
+                    locationSelect.value = cb.dataset.archiveLocation || '';
+                    dateInput.value = cb.dataset.archivedDate || '';
+                    commentInput.value = cb.dataset.comment || '';
+                } else {
+                    locationSelect.value = '';
+                    dateInput.value = '';
+                    commentInput.value = '';
+                }
+            }
+
+            checkboxes.forEach(function (cb) { cb.addEventListener('change', applySelection); });
+        })();
+    </script>
+}
