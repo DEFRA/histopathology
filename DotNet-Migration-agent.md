@@ -1,4 +1,4 @@
-# Sabari .NET Migration Agent — Prompt Log
+# .NET Migration Agent — Prompt Log
 
 This file captures migration-related prompts/requests for tracking purposes, per user preference.
 
