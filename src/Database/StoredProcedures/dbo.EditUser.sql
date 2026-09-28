@@ -1,5 +1,5 @@
 /****** Object:  StoredProcedure [dbo].[EditUser] ******/
-/****** ONE-TIME DEPLOYMENT SCRIPT — Safe to re-run via pipeline ******/
+/****** ONE-TIME DEPLOYMENT SCRIPT ï¿½ Safe to re-run via pipeline ******/
 
 SET ANSI_NULLS ON
 GO
@@ -103,4 +103,6 @@ AS
     END ELSE BEGIN
         RETURN @ErrorCode
     END
+GO
+PRINT '--- dbo.EditUser: (re)created ---';
 GO
