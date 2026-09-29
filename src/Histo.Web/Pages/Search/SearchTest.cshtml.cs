@@ -135,7 +135,7 @@ public class SearchTestModel : HistoPageModel
             return (IReadOnlyList<object?>)cells;
         });
 
-        return ExcelExportHelper.BuildXlsx("search-test-outputs.xlsx", headers, rows);
+        return ExcelExportHelper.BuildXlsx("Quality Totals.xlsx", headers, rows);
     }
 
     /// <summary>Replaces the legacy <c>hlbBatchExcel</c> ("Export Submissions to Excel") link.</summary>
@@ -146,14 +146,16 @@ public class SearchTestModel : HistoPageModel
             ProjectDescription, SubmissionType, SelectedHistology, SelectedAntibodies, SelectedSpecialStain, StartDate, EndDate);
         BuildSubmissionGroups(raw);
 
+        // One row per (premium charge, submission) — a single comma-joined cell can exceed
+        // Excel's 32,767-character-per-cell limit once a premium charge has many submissions.
         return ExcelExportHelper.BuildXlsx(
-            "search-test-submissions.xlsx",
-            ["Premium charge", "Submission numbers"],
-            SubmissionGroups.Select(g => (IReadOnlyList<object?>)new object?[]
+            "Quality Submissions.xlsx",
+            ["Premium charge", "Submission number"],
+            SubmissionGroups.SelectMany(g => g.BatchIds.Select(id => (IReadOnlyList<object?>)new object?[]
             {
                 g.PremiumDescription,
-                string.Join(", ", g.BatchIds),
-            }));
+                id,
+            })));
     }
 
     private void SetTitles()
@@ -173,18 +175,26 @@ public class SearchTestModel : HistoPageModel
             : histology.Where(h => h.Code != "6").ToList();
 
         var antibodyTableId = SubmissionType == BatchTypeConstants.NonTse ? LookupNonTseAntibodies : LookupTseAntibodies;
-        AntibodyTests = await _lookups.GetLookupDataAsync(antibodyTableId);
+        // Legacy LoadCheckBoxLists() appends a manual "Other" ListItem (Value="Other") after
+        // DataBind — it isn't part of the lookup table itself.
+        AntibodyTests = (await _lookups.GetLookupDataAsync(antibodyTableId))
+            .Append(new LookupItem { Name = "Other", Code = "Other" })
+            .ToList();
 
-        SpecialStainTests = await _lookups.GetLookupDataAsync(LookupSpecialStain);
+        SpecialStainTests = (await _lookups.GetLookupDataAsync(LookupSpecialStain))
+            .Append(new LookupItem { Name = "Other", Code = "Other" })
+            .ToList();
         PremiumCharges = await _lookups.GetPremiumChargesAsync();
     }
 
     private void BuildCrossTab(IReadOnlyList<TestPremiumChargeCount> raw)
     {
+        // Legacy keys the cross-tab by luPremiumCharges.Description (e.g. "TC 1401"), not .Code —
+        // GetTestHistologyCounts/GetTestAntibodiesCounts/GetTestStainsCounts filter/name their
+        // output column by @TestCode = Description (confirmed via sp_helptext).
         var codes = PremiumCharges
-            .Select(p => p.Code)
+            .Select(p => p.Name)
             .Where(c => !string.IsNullOrEmpty(c))
-            .Select(c => c!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(c => c, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -197,8 +207,10 @@ public class SearchTestModel : HistoPageModel
             var counts = codes.ToDictionary(c => c, _ => 0, StringComparer.OrdinalIgnoreCase);
             foreach (var r in g)
             {
+                // A (project, premium code) pair can be contributed by more than one test type
+                // (Histology/Antibodies/Stain) — sum rather than overwrite.
                 if (r.PremiumCode is not null && counts.ContainsKey(r.PremiumCode))
-                    counts[r.PremiumCode] = r.Count;
+                    counts[r.PremiumCode] += r.Count;
             }
 
             foreach (var kv in counts) columnTotals[kv.Key] += kv.Value;
@@ -217,17 +229,13 @@ public class SearchTestModel : HistoPageModel
 
     private void BuildSubmissionGroups(IReadOnlyList<TestPremiumChargeBatchRef> raw)
     {
-        var descByCode = PremiumCharges
-            .Where(p => !string.IsNullOrEmpty(p.Code))
-            .ToDictionary(p => p.Code!, p => p.Name, StringComparer.OrdinalIgnoreCase);
-
         SubmissionGroups = raw
             .GroupBy(r => r.PremiumCode ?? "", StringComparer.OrdinalIgnoreCase)
             .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
             .Select(g => new PremiumSubmissionGroup
             {
                 PremiumCode = g.Key,
-                PremiumDescription = descByCode.TryGetValue(g.Key, out var d) ? d : g.Key,
+                PremiumDescription = g.Key,
                 BatchIds = g.Select(r => r.BatchID).Distinct().OrderBy(id => id).ToList(),
             })
             .ToList();

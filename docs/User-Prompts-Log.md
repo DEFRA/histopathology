@@ -1848,6 +1848,87 @@ Root-caused: `Submissions/SubmissionDetailsBlock.cshtml(.cs)` is shared by both 
 
 Appended Run Log entry #92 (`run-log-v2.md`), Session Metrics row #154 (`session-metrics.md`), and Prompts 125–126 (this file) covering the Assign Tissue to BatchBlocks journey-scoped PM Date/Histology Ref fix.
 
+---
+
+## Prompt 127 — EditUser ANSI_NULLS/QUOTED_IDENTIFIER SqlException + Application Insights logging gap (2026-09-24)
+
+> UPDATE failed because the following SET options have incorrect settings: 'ANSI_NULLS, QUOTED_IDENTIFIER' ... also it's very hard to find this exception in Application Insights, also some error is not properly captured — why is the exception not coming through in `UserService.UpdateUserAsync`'s catch block?
+
+Diagnosed two issues. (1) Traced the SET-options error to the `UpdateUser` call path (`UserRepository.UpdateUserAsync` → SP `EditUser`), triggered by a new filtered/unique index added to `dbo.[User]` requiring correct SET options on any calling procedure — asked for the migration script and `EditUser`/`GetUserByEmail` SP source to confirm. (2) Corrected an earlier (wrong) claim about `IAppLogger.LogError`'s argument order — the codebase's custom interface signature is `(message, exception, args)`, not `ILogger`'s `(exception, message, args)`; confirmed via reading `AppLogger.cs`/`IAppLogger.cs` directly.
+
+---
+
+## Prompt 128 — Provided V20260914 migration script + confirmed EditUser fix (2026-09-24)
+
+> here is the V20260914_01_User_Email_NotNull_NTLogin_Nullable.sql file which may [have] some issue after execution of this script we couldn't update the user from application, it was working before adding this
+
+Confirmed the migration script itself is correct (explicitly sets `ANSI_NULLS ON`/`QUOTED_IDENTIFIER ON` before creating a filtered unique index on `NTLogin`). Root cause is that `EditUser`/`AddUser` predate this repo's stored-procedure source control and were almost certainly compiled with the wrong SET options years ago — harmless until this migration added the filtered index. Added `V20260924_01_Fix_EditUser_AddUser_AnsiNulls_QuotedIdentifier.sql` (recompiles both procs in place via `OBJECT_DEFINITION`, no need to know their source), wired into `Deploy.sql`.
+
+---
+
+## Prompt 129 — How to see the exception in Application Insights after the AppLogger fix (2026-09-24)
+
+> after this fix how can i see error message in application insights logs? `_logger.LogError("Failed to update user {UserId}.", ex, user.UserID);`
+
+Fixed a bug in my own first-pass `AppLogger.TrackException` call — it was passing the raw unformatted message template (`{UserId}` literal) instead of the substituted value. Added a small placeholder-substitution helper so the `exceptions` table's `message` custom property now shows the real value. Provided a KQL query example (`exceptions | where customDimensions.message has "..."`) and explained the `operation_Id` correlation caveat vs. exceptions tracked through the global exception handler's `TelemetryHelper`.
+
+---
+
+## Prompt 130 — Search Archive Location 4-part fix (2026-09-24/25)
+
+> Please investigate and fix: (1) Slide Archive Search missing columns; (2) Block Archive "Archive" field should be a dropdown, not free text; (3) Block Archive Excel export missing Archive Comment; (4) Slide Archive Excel export missing No Pieces/Description.
+
+Added `NoPieces`/`ArchiveComment` to `SlideArchiveInfo`/`BlockArchiveInfo` (Dapper auto-maps if the underlying SPs return them, unverified live). Changed Block Archive's "Archive location" field from free text to the same dropdown Tissue/Slide modes already use. Renamed the "Slide" export/grid column to "Description" (matching the model's actual property/doc comment) and added the missing "No pieces"/"Archive comment" columns to both the on-screen tables and Excel exports. Build 0 errors; archive-related tests 19/19 pass.
+
+---
+
+## Prompt 131 — Remove Group/Area validation added during Mouse Bioassay/Neuropath removal (2026-09-25)
+
+> why i'm getting below error message, there [is no] restriction assigning user group and area, it can [be] any area that could be assigned, it has like legacy no restriction on this: "The selected area is not valid for the selected group."
+
+Removed the `GroupAreaMappingHelpers.IsAllowedCombination` check from `AddUser`/`EditUser`'s `Validate()` methods per explicit confirmation that legacy has no cross-field restriction between Group and Area — restoring "any Group with any Area" behaviour. Deleted the now-fully-unused `GroupAreaMappingHelpers` class. Build 0 errors; full test suite 295 passed, 1 pre-existing skip.
+
+---
+
+## Prompt 132 — Session.UserID showing a hardcoded, nonexistent ID + FK_AuditLog_User violation (2026-09-25)
+
+> Getting below exception when i edit the user also noticed that Session.UserID show 234, actual user id is 2002, where this session is captured: Microsoft.Data.SqlClient.SqlException: 'The INSERT statement conflicted with the FOREIGN KEY constraint "FK_AuditLog_User"...'
+
+Root-caused to `Program.cs`'s `DevAuthBypass` middleware hardcoding every claim (including `UserDbId`) to a literal test value — used as the audit-log `@UserID` FK, which fails whenever that literal ID has no matching `dbo.[User]` row. Made the impersonated identity configurable via a new `DevAuthBypassNTLogin` setting, resolved through the same `IUserService.ResolveUserAsync` production auth uses, so `Session.UserID` always references a real, FK-safe row. Build 0 errors.
+
+---
+
+## Prompt 133 — ViewSamples reciprocal Sender/Histology ref not shown in its own input box (2026-09-25)
+
+> In viewsample.cshtml If a Sender Ref has been entered, then it should also display the Histology Ref in the HistologyRef input box, the reverse should also happen — but it's not working in [the] label[s].
+
+Populated `SenderRef`/`HistologyRef` directly from the resolved search result (previously only shown in a separate text label) so the actual input boxes display the counterpart ref. On a follow-up request, restored the original `OtherFieldLabel` text display alongside the now-populated input boxes, matching legacy exactly.
+
+---
+
+## Prompt 134 — ViewSamples Histology ref input still not populating (2026-09-25)
+
+> still viewsample.cshtml is not showing value Histology ref input field when enter values Sender ref field
+
+Root-caused to an ASP.NET Core Razor Pages gotcha: the `<input asp-for="HistologyRef">` tag helper renders the stale `ModelState` entry (bound from the empty query string) in preference to the model property's current, correctly-resolved value. Fixed by calling `ModelState.Remove(nameof(SenderRef))`/`ModelState.Remove(nameof(HistologyRef))` after resolving the counterpart ref. Build 0 errors; ViewSamples tests 3/3 pass.
+
+---
+
+## Prompt 135 — ViewSubmissions Species filter not working + button-group wrapping (2026-09-25)
+
+> In viewsumbssion.cshtml Filtering issue: Search functions for Species not working, and [please] bring [the] button to [the] same line — seems like Date Returned shows [on the] next line.
+
+Root-caused the Species filter to the same "dropdown posts display name, SP filters by ID" bug class already fixed on `SearchSubmissions` in an earlier session — `ViewSubmissions.cshtml` never received that fix. Applied the identical `@s.ID`-bound dropdown fix. Investigated the button-group wrapping and confirmed no structural markup bug — GOV.UK's `govuk-button-group` is intentionally `flex-wrap`; asked the user whether to override GDS's default responsive behaviour, and left it as-is per their choice. Build 0 errors; ViewSubmissions tests 3/3 pass.
+
+---
+
+## Prompt 136 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-25)
+
+> update run log, session metric and user prompt
+
+Appended Run Log entry #93 (`run-log-v2.md`), Session Metrics row #155 (`session-metrics.md`), and Prompts 127–136 (this file) covering the 9-part multi-bug-fix session: EditUser/AddUser ANSI_NULLS fix, Application Insights exception visibility fix, Search Archive Location 4-part fix, Group/Area whitelist removal, DevAuthBypass hardcoded-user fix, ViewSamples reciprocal-ref/ModelState fix, and ViewSubmissions Species filter fix.
+
+---
 
 ## Prompt 113 — Run the journal updater for this session (2026-09-02)
 
@@ -1870,5 +1951,102 @@ User suspected the earlier `BatchBlockSummary` → `SampleSummary` rename had ca
 **Build:** 0 errors, 3 pre-existing warnings. **Tests:** 145 passed, 1 skipped, 0 failed.
 
 **Files changed:** [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs).
+
+---
+
+## Prompt 137 — SearchTest "Analyse results"/"Analyse submissions" — fix as per legacy, avoid writing new script (2026-09-25)
+
+> why @file:BatchRepository.cs has script, is same thing used in legacy, its not best approach right, can you go throgh legacy and fix as per legacy on this searchtest functinaligy SearchTest.aspx -> analysis results button and analysis submission button logic here so that we can avoid wrignting new script
+
+Rejected an earlier invented raw-SQL implementation. Read `SearchTest.aspx.vb`/`clsBatch.vb` directly and confirmed via live `sp_helptext` that 6 real SPs (`GetTestHistologyCounts`/`Antibodies`/`Stains` + `*Batch` variants) already exist and are what legacy actually calls — an earlier session's memory note wrongly declared them nonexistent (it had checked the VB wrapper method names, not the real `FillDataTable` call site). Rewrote `BatchRepository`'s premium-charge methods to call these real SPs directly, looping once per active premium charge exactly as legacy's `ProcessHistologyData`/`ProcessAntibodiesData`/`ProcessStainData` do. Also fixed a consequential Description-vs-Code keying/summing bug this exposed in `SearchTest.cshtml.cs`. Build 0 errors; SearchTest tests 3/3 pass.
+
+---
+
+## Prompt 138 — Analysis report still returns "No test items found" (2026-09-25)
+
+> still analysis report return No test items found matching the search criteria.
+
+Wrote a temporary throwaway integration test calling the real repository method against LocalDB directly, which reproduced a real `SqlException: Incorrect syntax near '1'`. Root cause: `GetActivePremiumChargeDescriptionsAsync` called `QueryAsync<string>` against `GetluPremiumCharges`'s 4-column result set — Dapper silently bound the FIRST column (`ID`, e.g. `"1"`) instead of `Description` (`"TC 1401"`), and that numeric string then broke the SP's own dynamic-SQL column alias. Fixed by reading the row as `dynamic` and selecting `Description` explicitly; re-ran the same integration test and confirmed 254 real rows returned, then deleted the test. Build 0 errors; tests pass.
+
+---
+
+## Prompt 139 — Histology checkbox un-select should cascade too (2026-09-25)
+
+> Issue is that if we unslecet the IHC-PrP or Special Stain, all the selected item should be un selected but it's not happening : specifically "IHC-PrP → antibodies, Special Stain → Special stain" — this is client-side auto-selection based on `Histo.Submissions.Models.HistologyCode`'s own documented rule.
+
+The existing checkbox auto-select JS only handled the checked→check-all direction (a known gap flagged in an earlier session but not yet fixed). Fixed to mirror legacy's `chkblHistology_SelectedIndexChanged` in both directions — unchecking now un-checks the dependent Special Stain/Antibodies column too. Build 0 errors; SearchTest tests 3/3 pass.
+
+---
+
+## Prompt 140 — Export to Excel not working + reposition above results (2026-09-28)
+
+> in searchTest.csthml — Export Outputs to Excel and Export Submissions to Excel are not currently working... The Export to Excel button should be repositioned... place it above the search results section, alongside the Analyse Submissions functionality.
+
+Investigated via live browser/Playwright and found the real cause: both export buttons (and, discovered along the way, the pre-existing "Analyse submissions" button too) used `asp-page-handler`/`formaction="?handler=X"` inside a `method="get"` form — per the HTML spec, GET form submission discards any query string already on the action URL and replaces it entirely with the serialized form fields, silently dropping `handler=X` and always falling back to the default handler. Confirmed live: clicking "Analyse submissions" produced a URL with no `handler` param at all. Fixed by switching to named-button `<button name="handler" value="X">` submits (GET-safe) and moved both Export buttons into the top button group. Also fixed a real 500 in the Submissions export caused by exceeding Excel's 32,767-character cell limit on a comma-joined batch-ID list. Build 0 errors; verified end-to-end via a real running instance + Playwright.
+
+---
+
+## Prompt 141 — Export buttons should only appear after their analysis has run (2026-09-28)
+
+> so the button movement and button will not be shown until user hit the "Analyse submissions", "Analyse Results" shown based result set
+
+Wrapped both Export buttons in `@if` conditions gated on `Searched`/`SubmissionsSearched` plus non-empty results, so each only appears after its corresponding analysis has actually produced rows. Verified live: on first page load neither export button shows; after "Analyse results" only "Export outputs to excel" appears; after "Analyse submissions" only "Export submissions to excel" appears.
+
+---
+
+## Prompt 142 — "Other" checkbox missing from Antibodies/Special Stain (2026-09-28)
+
+> can you check Other check box is missing in Antibodies and Special Stain, it's there in legacy
+
+Confirmed via legacy `LoadCheckBoxLists()`: an "Other" `ListItem` (Value="Other") is appended to `chkblAntibodies`/`chkblSpecialStain` manually after data-binding, not part of the lookup table itself — missing from the migrated page entirely. Fixed by appending it in `LoadLookupsAsync`. Verified live via browser: "Other" now appears as the last item in both columns.
+
+---
+
+## Prompt 143 — ArchiveBlocks: "Go to page" missing + need "select all" for bulk update (2026-09-28)
+
+> In ArchiveBlocks.cshtml or ArchiveBlocks.cshtml go to page implmentation is mssing and user should able to select all to update details at one streatch. Can you check and fix it
+
+Added an "All" checkbox (`SelectAllAcrossPages`, selects every filtered row server-side — not just the current page's DOM checkboxes) and a "Go to page" number-input control matching `QualityData.cshtml`'s existing pattern. Also fixed a related bug found while implementing this: the "Update selected" POST form had no hidden `PageNumber`/`SortColumn`/`SortDesc` fields, so submitting silently reset the grid to page 1. Build 0 errors; ArchiveBlocks tests 11/11 pass.
+
+---
+
+## Prompt 144 — Apply the same change to ArchiveTissues.cshtml (2026-09-28)
+
+> this change should be there for Archivetissue.cshtml as well.
+
+Ported the "All"-select-across-pages checkbox, "Go to page" control, and the page/sort-preserving hidden fields to `ArchiveTissues.cshtml`/`.cshtml.cs`, mirroring `ArchiveBlocks` exactly (this page had neither the select-all/go-to-page feature nor any row-checkbox prefill JS at all before). Build 0 errors; Archive tests 16/16 pass.
+
+---
+
+## Prompt 145 — Banner position on ArchiveTissues + remove redundant Done button on ArchiveBlocks (2026-09-28)
+
+> banner should be shown top of the page in archive tissue. If the done button only navigate to previewous page, then remove from archiveblock.cshtml
+
+Moved `ArchiveTissues.cshtml`'s success banner to the top of the page (was rendered after the batch summary), matching `ArchiveBlocks.cshtml`'s existing layout. Confirmed the "Done" button on `ArchiveBlocks.cshtml` targeted `@Model.BackLinkPage` — identical to the "Back" link already at the top of the page — and removed it as a redundant duplicate. Build 0 errors; Archive tests 16/16 pass.
+
+---
+
+## Prompt 146 — Archive Location/Date auto-population rules for single vs. multi-select (2026-09-28)
+
+> Archive Location and Archive Date Auto-Population: (1) selecting a single archived tissue should auto-populate its Archive Location/Date; (2) selecting multiple records or Select All should NOT auto-populate; (3) apply the same logic to ArchiveBlock.cshtml.
+
+Confirmed this behaviour was already implemented on both pages from the preceding fixes, then hardened it: bound row checkboxes to `Model.SelectedIds` (previously not bound at all) and ran the field-prefill script once on page load, so a validation-error postback correctly retains its visual checkbox state and the Location/Date/Comment fields reflect it immediately, not only after the user's next click. Build 0 errors; Archive tests 16/16 pass.
+
+---
+
+## Prompt 147 — Don't show "01/01/0001" for an empty archive date (2026-09-28)
+
+> If date is empty then don't show this 01/01/0001 in ArchiveTissues.cshtml ArchiveBlocks.cshtml
+
+Checked the live LocalDB data directly (column types, actual stored values) and found no genuine `0001-01-01` sentinel in the database — nulls are stored as real `NULL`. As a defensive fix against this ever surfacing (e.g. from a `Convert.ToDateTime` edge case or bad data in another environment), normalized `DateTime.MinValue` to `null` at the point `ArchivedDate` is mapped into both Archive page models' row types, so the table cell, the JS `data-archived-date` prefill, and sorting are all automatically correct from one change rather than patched per display site. Build 0 errors; Archive tests 16/16 pass.
+
+---
+
+## Prompt 148 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-28)
+
+> can you update run log and session metrix and user prompt
+
+Appended Run Log entry #94 (`run-log-v2.md`), Session Metrics row #156 (`session-metrics.md`), and Prompts 137–148 (this file) covering the SearchTest legacy-SP rebuild, the Dapper column-binding "No test items found" fix, the checkbox un-check cascade fix, both Export-to-Excel fixes (GET-form handler routing + Excel cell-overflow), the restored "Other" checkbox, and the ArchiveBlocks/ArchiveTissues select-all/go-to-page/banner/date-display parity work.
+
 
 

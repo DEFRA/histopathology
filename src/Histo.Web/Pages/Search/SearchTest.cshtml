@@ -63,7 +63,7 @@
                         var item = Model.HistologyTests[i];
                         <div class="govuk-checkboxes__item">
                             <input class="govuk-checkboxes__input" type="checkbox" id="histology-@i" name="SelectedHistology" value="@item.Code"
-                                   checked="@(Model.SelectedHistology.Contains(item.Code ?? string.Empty))" />
+                                   checked="@(!string.IsNullOrEmpty(item.Code) && Model.SelectedHistology.Contains(item.Code))" />
                             <label class="govuk-label govuk-checkboxes__label" for="histology-@i">@item.Name</label>
                         </div>
                     }
@@ -79,7 +79,7 @@
                         var item = Model.AntibodyTests[i];
                         <div class="govuk-checkboxes__item">
                             <input class="govuk-checkboxes__input" type="checkbox" id="antibodies-@i" name="SelectedAntibodies" value="@item.Code"
-                                   checked="@(Model.SelectedAntibodies.Contains(item.Code ?? string.Empty))" />
+                                   checked="@(!string.IsNullOrEmpty(item.Code) && Model.SelectedAntibodies.Contains(item.Code))" />
                             <label class="govuk-label govuk-checkboxes__label" for="antibodies-@i">@item.Name</label>
                         </div>
                     }
@@ -95,7 +95,7 @@
                         var item = Model.SpecialStainTests[i];
                         <div class="govuk-checkboxes__item">
                             <input class="govuk-checkboxes__input" type="checkbox" id="specialstain-@i" name="SelectedSpecialStain" value="@item.Code"
-                                   checked="@(Model.SelectedSpecialStain.Contains(item.Code ?? string.Empty))" />
+                                   checked="@(!string.IsNullOrEmpty(item.Code) && Model.SelectedSpecialStain.Contains(item.Code))" />
                             <label class="govuk-label govuk-checkboxes__label" for="specialstain-@i">@item.Name</label>
                         </div>
                     }
@@ -104,12 +104,48 @@
         </div>
     </div>
 
+    @* Named-button "handler" values, not asp-page-handler/formaction — for method="get" forms the
+       browser discards any query string already on the action/formaction URL and replaces it
+       with the serialized form fields, so formaction="?handler=X" is silently dropped and every
+       button below would otherwise just re-run the default Analyse results search instead. *@
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Analyse results</button>
-        <button type="submit" asp-page-handler="AnalyseSubmissions" class="govuk-button govuk-button--secondary" data-module="govuk-button">Analyse submissions</button>
-        <a asp-page="/Search/SearchMenu" class="govuk-button govuk-button--secondary" data-module="govuk-button">Outputs menu</a>
+        <button type="submit" name="handler" value="AnalyseSubmissions" class="govuk-button govuk-button--secondary" data-module="govuk-button">Analyse submissions</button>
+        @if (Model.Searched && Model.CrossTabRows.Any())
+        {
+            <button type="submit" name="handler" value="ExportOutputsExcel" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export outputs to excel</button>
+        }
+        @if (Model.SubmissionsSearched && Model.SubmissionGroups.Any())
+        {
+            <button type="submit" name="handler" value="ExportSubmissionsExcel" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export submissions to excel</button>
+        }
     </div>
 </form>
+
+@section Scripts {
+    <script>
+        // Checking/unchecking Special Stain/IHC-PrP/IHC-Other in Histology mirrors that state onto
+        // every item in the corresponding Special Stain/Antibodies column in BOTH directions — these
+        // Histology flags require at least one matching stain/antibody to be chosen (see
+        // Histo.Submissions.Models.HistologyCode), and legacy's chkblHistology_SelectedIndexChanged
+        // sets li.Selected = the triggering checkbox's own state, not just true on check.
+        (function () {
+            var SPECIAL_STAIN_CODE = '@HistologyCode.SpecialStain';
+            var ANTIBODY_TRIGGER_CODES = ['@HistologyCode.IhcPrp', '@HistologyCode.IhcOther'];
+
+            function setAll(name, checked) {
+                document.querySelectorAll('input[name="' + name + '"]').forEach(function (cb) { cb.checked = checked; });
+            }
+
+            document.querySelectorAll('input[name="SelectedHistology"]').forEach(function (cb) {
+                cb.addEventListener('change', function () {
+                    if (cb.value === SPECIAL_STAIN_CODE) setAll('SelectedSpecialStain', cb.checked);
+                    else if (ANTIBODY_TRIGGER_CODES.indexOf(cb.value) !== -1) setAll('SelectedAntibodies', cb.checked);
+                });
+            });
+        })();
+    </script>
+}
 
 @if (Model.Searched)
 {
@@ -151,17 +187,6 @@
                 </tr>
             </tfoot>
         </table>
-
-        <form method="get">
-            <input type="hidden" name="ProjectDescription" value="@Model.ProjectDescription" />
-            <input type="hidden" name="SubmissionType" value="@Model.SubmissionType" />
-            <input type="hidden" name="StartDate" value="@Model.StartDate?.ToString("yyyy-MM-dd")" />
-            <input type="hidden" name="EndDate" value="@Model.EndDate?.ToString("yyyy-MM-dd")" />
-            @foreach (var c in Model.SelectedHistology) { <input type="hidden" name="SelectedHistology" value="@c" /> }
-            @foreach (var c in Model.SelectedAntibodies) { <input type="hidden" name="SelectedAntibodies" value="@c" /> }
-            @foreach (var c in Model.SelectedSpecialStain) { <input type="hidden" name="SelectedSpecialStain" value="@c" /> }
-            <button type="submit" formaction="?handler=ExportOutputsExcel" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export outputs to excel</button>
-        </form>
     }
     else
     {
@@ -196,17 +221,6 @@
                 }
             </tbody>
         </table>
-
-        <form method="get">
-            <input type="hidden" name="ProjectDescription" value="@Model.ProjectDescription" />
-            <input type="hidden" name="SubmissionType" value="@Model.SubmissionType" />
-            <input type="hidden" name="StartDate" value="@Model.StartDate?.ToString("yyyy-MM-dd")" />
-            <input type="hidden" name="EndDate" value="@Model.EndDate?.ToString("yyyy-MM-dd")" />
-            @foreach (var c in Model.SelectedHistology) { <input type="hidden" name="SelectedHistology" value="@c" /> }
-            @foreach (var c in Model.SelectedAntibodies) { <input type="hidden" name="SelectedAntibodies" value="@c" /> }
-            @foreach (var c in Model.SelectedSpecialStain) { <input type="hidden" name="SelectedSpecialStain" value="@c" /> }
-            <button type="submit" formaction="?handler=ExportSubmissionsExcel" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export submissions to excel</button>
-        </form>
     }
     else
     {

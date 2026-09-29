@@ -7,12 +7,20 @@ GO
 
 BEGIN TRANSACTION;
 
+PRINT '--- V20260914_01: deduplicating Email values ---';
 -- Duplicate emails can exist where the same person has two User rows: an older
 -- NTLogin using the legacy single-character-prefix convention (e.g. x0391401)
 -- and a newer one using the current multi-character prefix convention
--- (e.g. ns000060). For each such duplicate pair, deactivate the legacy row and
--- rename its email so it no longer collides with the active row's email,
--- before the NOT NULL/UNIQUE constraints below are enforced.
+-- (e.g. ns000060). For each such duplicate group, keep exactly one row (preferring a
+-- non-legacy-looking NTLogin, tie-broken by highest ID) untouched/active, and deactivate +
+-- uniquely rename every other row in the group — including when EVERY row in the group
+-- happens to match the legacy NTLogin pattern (e.g. two single-letter-prefix logins sharing
+-- one email), which the previous pattern-only classification silently mishandled: it renamed
+-- every "legacy-looking" row to the SAME literal suffix, recreating the exact duplicate the
+-- rename was meant to remove and causing the unique-index check below to roll back the
+-- entire migration (confirmed live: Pre-Prod failed with "Duplicate emails exist - cannot
+-- create unique index on Email" for exactly this shape of data). The per-row ID suffix
+-- guarantees uniqueness regardless of how many rows in a group look legacy.
 ;WITH DuplicateEmails AS (
     SELECT Email
     FROM dbo.[User]
@@ -20,23 +28,32 @@ BEGIN TRANSACTION;
     GROUP BY Email
     HAVING COUNT(*) > 1
 ),
-LegacyRows AS (
-    SELECT u.ID, u.Email, u.NTLogin
+Ranked AS (
+    SELECT
+        u.ID,
+        u.Email,
+        u.NTLogin,
+        ROW_NUMBER() OVER (
+            PARTITION BY u.Email
+            ORDER BY
+                CASE WHEN u.NTLogin LIKE '[a-zA-Z][0-9]%' AND u.NTLogin NOT LIKE '[a-zA-Z][a-zA-Z]%' THEN 1 ELSE 0 END,
+                u.ID DESC
+        ) AS RowNum
     FROM dbo.[User] u
     INNER JOIN DuplicateEmails d ON d.Email = u.Email
-    WHERE u.NTLogin LIKE '[a-zA-Z][0-9]%'
-      AND u.NTLogin NOT LIKE '[a-zA-Z][a-zA-Z]%'
 )
 UPDATE u
 SET u.Active = 0,
-    u.Email = CONCAT(l.Email, '__LEGACY')
+    u.Email = CONCAT(r.Email, '__LEGACY_', r.ID)
 FROM dbo.[User] u
-INNER JOIN LegacyRows l ON l.ID = u.ID;
+INNER JOIN Ranked r ON r.ID = u.ID
+WHERE r.RowNum > 1;
 
 UPDATE dbo.[User]
 SET Email = CONCAT('old_email_legacy', ID, '@apha.gov.uk')
 WHERE Email IS NULL;
 
+PRINT '--- V20260914_01: enforcing Email NOT NULL ---';
 IF EXISTS (
     SELECT 1
     FROM dbo.[User]
@@ -51,6 +68,7 @@ END;
 ALTER TABLE dbo.[User]
 ALTER COLUMN Email VARCHAR(60) NOT NULL;
 
+PRINT '--- V20260914_01: creating unique index IX_User_Email ---';
 -- Email is now the primary per-request user-resolution lookup (GetUserByEmail, called on
 -- every authenticated request) — index it. Unique because that lookup expects one row.
 IF EXISTS (
@@ -67,23 +85,16 @@ END;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_User_Email' AND object_id = OBJECT_ID('dbo.[User]'))
     CREATE UNIQUE NONCLUSTERED INDEX IX_User_Email ON dbo.[User] (Email);
 
+PRINT '--- V20260914_01: making NTLogin nullable and IX_User_NTLogin non-unique ---';
 -- IX_User_NTLogin depends on NTLogin (Msg 5074) — must be dropped before ALTER COLUMN
--- and recreated after. Recreated as a filtered unique index when it was unique, since a
--- plain unique index tolerates only one NULL row and NTLogin can now be NULL for
--- multiple Entra ID-only users. If it backs a UNIQUE constraint (Msg 3723), DROP INDEX
--- is rejected — the constraint itself has to be dropped instead.
-DECLARE @isUnique bit = NULL, @isConstraint bit = 0;
-
+-- and recreated after. Always recreated NON-UNIQUE: NTLogin is legacy/unused post-Entra ID
+-- (Email is the identity key now — see IX_User_Email above), so uniqueness is no longer
+-- enforced regardless of whether the existing index was unique. If it backs a UNIQUE
+-- constraint (Msg 3723), DROP INDEX is rejected — the constraint itself has to be dropped.
 IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_User_NTLogin' AND object_id = OBJECT_ID('dbo.[User]'))
 BEGIN
-    SELECT @isUnique = is_unique FROM sys.indexes
-    WHERE name = 'IX_User_NTLogin' AND object_id = OBJECT_ID('dbo.[User]');
-
     IF EXISTS (SELECT 1 FROM sys.key_constraints WHERE name = 'IX_User_NTLogin' AND parent_object_id = OBJECT_ID('dbo.[User]'))
-    BEGIN
-        SET @isConstraint = 1;
         ALTER TABLE dbo.[User] DROP CONSTRAINT IX_User_NTLogin;
-    END
     ELSE
         DROP INDEX IX_User_NTLogin ON dbo.[User];
 END;
@@ -91,11 +102,7 @@ END;
 ALTER TABLE dbo.[User]
 ALTER COLUMN NTLogin VARCHAR(25) NULL;
 
--- Recreated as a filtered unique INDEX (not a constraint) even if it was originally a
--- constraint — unique constraints can't have a WHERE filter, which is required here.
-IF @isUnique = 1
-    CREATE UNIQUE NONCLUSTERED INDEX IX_User_NTLogin ON dbo.[User] (NTLogin) WHERE NTLogin IS NOT NULL;
-ELSE IF @isUnique = 0
-    CREATE NONCLUSTERED INDEX IX_User_NTLogin ON dbo.[User] (NTLogin);
+CREATE NONCLUSTERED INDEX IX_User_NTLogin ON dbo.[User] (NTLogin);
 
 COMMIT TRANSACTION;
+PRINT '--- V20260914_01: completed ---';
