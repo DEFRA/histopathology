@@ -99,18 +99,19 @@ public class SearchPMDatesModel : GridPageModel
         var results = await _submissions.GetByPmDateRangeAsync(from, to);
         return ExcelExportHelper.BuildXlsx(
             "search-pm-dates.xlsx",
-            ["Sub. number", "Sender ref", "PM date", "Date submitted", "Date received / rejected",
-             "Time received / rejected", "Date completed", "Customer received date"],
+            ["ID", "SenderRef", "HistologyRef", "PM Date", "Batch Date", "Date Received", "Customer Received Date",
+              "Completed Date", "Time Received"],
             results.Select(r => (IReadOnlyList<object?>)new object?[]
             {
                 r.ID,
                 r.SenderRef,
+                r.HistologyRef,
                 r.PMDate,
                 r.BatchDate,
                 r.DateReceived,
-                r.TimeReceived,
+                r.CustomerReceivedDate,
                 r.CompletedDate,
-                r.CustomerReceivedDate
+                r.TimeReceived
             }));
     }
 

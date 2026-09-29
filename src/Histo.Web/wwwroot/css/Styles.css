@@ -168,9 +168,10 @@
 
 /* User Maintenance table columns were sized purely by the longest value on the current page, so
  * paging/sorting to a row with a much longer/shorter name or email visibly widened or shrank the
- * whole table. Fixing the layout with explicit column widths keeps it stable across pages; long
- * values are clipped with an ellipsis (the existing title="" attribute still exposes the full
- * text on hover/focus). */
+ * whole table. Fixed explicit column widths keep the layout stable across pages. Long values WRAP
+ * onto multiple lines rather than being clipped with an ellipsis — truncating a user's actual
+ * name/email and relying on a title="" tooltip to reveal the rest fails WCAG 1.4.13 (Content on
+ * Hover or Focus: not touch/keyboard/screen-reader accessible) and isn't a pattern GDS tables use. */
 #user-maintenance-table {
     table-layout: fixed;
     width: 100%;
@@ -178,9 +179,8 @@
 
 #user-maintenance-table th,
 #user-maintenance-table td {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 #user-maintenance-table th:nth-child(1),

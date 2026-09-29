@@ -83,8 +83,6 @@ public sealed class UserService : IUserService
     {
         try
         {
-            // v To-Be Removed
-            _logger.LogInfo("AI_TEST_CREATE_USER");
             await _users.CreateUserAsync(user, ct);
             return true;
         }

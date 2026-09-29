@@ -22,7 +22,10 @@ public sealed class UserRepository : IUserRepository
     public async Task<User?> GetUserByNtLoginAsync(string ntLogin, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var result = await conn.QuerySingleOrDefaultAsync<dynamic>(
+        // NTLogin is no longer unique at the DB level (Email is the identity key now) —
+        // QueryFirstOrDefaultAsync rather than QuerySingleOrDefaultAsync, so a duplicate
+        // NTLogin never throws here, it just picks one match.
+        var result = await conn.QueryFirstOrDefaultAsync<dynamic>(
             "GetUserByNTLogin",
             new { NTLogin = ntLogin },
             commandType: System.Data.CommandType.StoredProcedure);

@@ -1,6 +1,5 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
-using Histo.Core.Domain;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -60,14 +59,17 @@ public class AddUserModel : HistoPageModel
         await LoadLookupsAsync();
 
         Validate();
+        if (Errors.Count == 0 && await EmailAlreadyExistsAsync(Email.Trim())) Errors["Email"] = "A user with this email already exists.";
         if (Errors.Count > 0) return Page();
 
         // NT login is no longer shown, entered, or derived in the UI — Entra ID email is now
         // the sole identity key (see HistopathologyClaimsTransformation). The legacy NtLogin
-        // column is left blank for new users rather than mapped from any other field.
+        // column is left NULL for new users rather than mapped from any other field — must be
+        // a true NULL, not "", since IX_User_NTLogin is a filtered unique index (WHERE NTLogin
+        // IS NOT NULL) that still enforces uniqueness across empty-string values.
         var user = new User
         {
-            NtLogin   = string.Empty,
+            NtLogin   = null,
             Name      = Name.Trim(),
             Email     = Email.Trim(),
             GroupCode = GroupCode,
@@ -96,14 +98,13 @@ public class AddUserModel : HistoPageModel
 
         if (GroupCode <= 0) Errors["GroupCode"] = "Select a user group.";
         if (AreaCode <= 0) Errors["AreaCode"] = "Select a user area.";
+    }
 
-        if (GroupCode > 0 && AreaCode > 0)
-        {
-            var groupName = Groups.FirstOrDefault(g => g.ID == GroupCode)?.Name;
-            var areaName = Areas.FirstOrDefault(a => a.ID == AreaCode)?.Name;
-            if (!GroupAreaMappingHelpers.IsAllowedCombination(groupName, areaName))
-                Errors["AreaCode"] = "The selected area is not valid for the selected group.";
-        }
+    /// <summary>Mirrors the DB's unconditional (not Active-filtered) unique index on Email.</summary>
+    private async Task<bool> EmailAlreadyExistsAsync(string email)
+    {
+        var users = await _users.GetAllUsersAsync();
+        return users.Any(u => string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task LoadLookupsAsync()

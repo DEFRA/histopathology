@@ -124,11 +124,30 @@ public class ViewSamplesModel : GridPageModel
 
         Searched = true;
         Results = await SearchAsync();
-        OtherFieldLabel = !string.IsNullOrWhiteSpace(SenderRef)
-            ? $"Histology Ref: {Results.FirstOrDefault()?.HistologyRef}"
-            : !string.IsNullOrWhiteSpace(HistologyRef)
-                ? $"Sender Ref: {Results.FirstOrDefault()?.SenderRef}"
+
+        // Legacy source: ViewSamples.aspx.vb::FillviewGrid — fills in whichever ref was NOT
+        // entered by the user, resolved from the matched sample, directly into that field's own
+        // input box (not just a separate label) so both refs are visible/editable afterwards.
+        var resolvedHistologyRef = string.IsNullOrWhiteSpace(SenderRef) ? null : Results.FirstOrDefault()?.HistologyRef;
+        var resolvedSenderRef = string.IsNullOrWhiteSpace(HistologyRef) ? null : Results.FirstOrDefault()?.SenderRef;
+
+        if (string.IsNullOrWhiteSpace(SenderRef))
+            SenderRef = Results.FirstOrDefault()?.SenderRef;
+        if (string.IsNullOrWhiteSpace(HistologyRef))
+            HistologyRef = Results.FirstOrDefault()?.HistologyRef;
+
+        // The <input asp-for="..."> tag helper renders whatever was model-bound from the query
+        // string (ModelState) in preference to the property's current value — without this, the
+        // resolved ref set above is computed correctly but the input box still shows blank.
+        ModelState.Remove(nameof(SenderRef));
+        ModelState.Remove(nameof(HistologyRef));
+
+        OtherFieldLabel = resolvedHistologyRef is not null
+            ? $"Histology Ref: {resolvedHistologyRef}"
+            : resolvedSenderRef is not null
+                ? $"Sender Ref: {resolvedSenderRef}"
                 : null;
+
         PopulateGridViewData(Results.Count);
     }
 
