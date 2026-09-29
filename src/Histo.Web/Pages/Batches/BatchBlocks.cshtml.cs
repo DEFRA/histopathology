@@ -259,7 +259,9 @@ public class BatchBlocksModel : HistoPageModel
         {
             HistologyOptions = await _lookups.GetHistologyTypesAsync();
 
-            var allTests = await _blockTests.GetByBatchAsync(BatchId ?? 0);
+            // GetByBatchAsync excludes Special Stain/IHC-PrP/IHC-Other (worklist-only exclusion) —
+            // these grid checkboxes need every code, so they must use GetAllSelectionsByBatchAsync.
+            var allTests = await _blockTests.GetAllSelectionsByBatchAsync(BatchId ?? 0);
             var histologyByBlock = new Dictionary<int, IReadOnlyList<string>>();
             foreach (var block in Blocks)
                 histologyByBlock[block.ID] = allTests.Where(t => t.BlockID == block.ID && t.TestType == BlockTestType.Histology).Select(t => t.Code).ToList();

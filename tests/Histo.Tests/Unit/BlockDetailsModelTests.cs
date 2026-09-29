@@ -43,7 +43,7 @@ public class BlockDetailsModelTests
         _batches.Setup(b => b.GetSubmittedAsCodeAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((string?)null);
         _batches.Setup(b => b.GetBatchTestSelectionsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Histo.Submissions.Models.BatchTestSelections());
-        _blockTests.Setup(t => t.GetByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[]);
+        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[]);
         _lookups.Setup(l => l.GetHistologyTypesAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[]);
         _lookups.Setup(l => l.GetLookupDataAsync(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[]);
     }
@@ -87,6 +87,35 @@ public class BlockDetailsModelTests
 
         Assert.Contains(sut.TissueOptions, o => o.Code == "AGAR");
         Assert.DoesNotContain(sut.TissueOptions, o => o.Code == "OTHER");
+    }
+
+    [Fact]
+    public async Task ExistingHistologyCodes_IncludesSpecialStainIhcPrpAndIhcOther()
+    {
+        // Regression: GetByBatchAsync excludes Histology codes 3/4/6 (QC-worklist-only gating
+        // flags there) — the Tests checkbox pre-population on Edit block must read from
+        // GetAllSelectionsByBatchAsync, or a block that already has Special Stain/IHC-Prp/
+        // IHC-Other selected would show them unchecked when reopened, risking a duplicate
+        // insert next time "Done" is saved (SaveTestSelectionsAsync would never see the existing row).
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+        ]);
+        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[
+            new BlockTest { ID = 1, BlockID = 319181, TestType = BlockTestType.Histology, Code = HistologyCode.SpecialStain },
+            new BlockTest { ID = 2, BlockID = 319181, TestType = BlockTestType.Histology, Code = HistologyCode.IhcOther },
+        ]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+
+        await sut.OnGetAsync();
+
+        Assert.Contains(HistologyCode.SpecialStain, sut.ExistingHistologyCodes);
+        Assert.Contains(HistologyCode.IhcOther, sut.ExistingHistologyCodes);
     }
 
     [Fact]

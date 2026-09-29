@@ -114,7 +114,6 @@
                     <th scope="col" class="govuk-table__header">IHC Other</th>
                 }
                 <th scope="col" class="govuk-table__header">Special stain</th>
-                <th scope="col" class="govuk-table__header">Status</th>
             </tr>
         </thead>
         <tbody class="govuk-table__body">
@@ -216,12 +215,11 @@
                             </div>
                         </div>
                     </td>
-                    <td class="govuk-table__cell">@b.Status</td>
                 </tr>
             }
             @if (!Model.Blocks.Any())
             {
-                <tr class="govuk-table__row"><td colspan="@(Model.IsTse ? 12 : 11)" class="govuk-table__cell">No blocks found for this batch.</td></tr>
+                <tr class="govuk-table__row"><td colspan="@(Model.IsTse ? 11 : 10)" class="govuk-table__cell">No blocks found for this batch.</td></tr>
             }
         </tbody>
     </table>

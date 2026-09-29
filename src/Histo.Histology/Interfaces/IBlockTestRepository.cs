@@ -13,10 +13,18 @@ namespace Histo.Histology.Interfaces;
 public interface IBlockTestRepository
 {
     /// <summary>
-    /// Returns every histology, antibodies and special-stain test for a batch's blocks.
-    /// Maps to <c>GetTestsByBatchID</c>.
+    /// Returns every histology, antibodies and special-stain test for a batch's blocks — for the
+    /// QC/dispatch worklist only. Excludes Histology codes 3 (Special Stain)/4 (IHC-PrP)/6 (IHC-Other),
+    /// which are gating flags double-counting the dedicated Antibodies/Stain rows. Maps to <c>GetTestsByBatchID</c>.
     /// </summary>
     Task<IReadOnlyList<BlockTest>> GetByBatchAsync(int batchId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns every histology, antibodies and special-stain test for a batch's blocks, WITHOUT the
+    /// worklist's Histology code exclusion — use this (not <see cref="GetByBatchAsync"/>) whenever
+    /// the question is "was test type X selected for this block" rather than "the QC worklist rows".
+    /// </summary>
+    Task<IReadOnlyList<BlockTest>> GetAllSelectionsByBatchAsync(int batchId, CancellationToken ct = default);
 
     /// <summary>Updates a single test record's result, QC, dispatch and archive fields.
     /// Maps to <c>EditBlockHistology</c>, <c>EditBlockAntibodies</c> or

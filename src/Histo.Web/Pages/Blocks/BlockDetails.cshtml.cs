@@ -611,7 +611,9 @@ public class BlockDetailsModel : HistoPageModel
             }
         }
 
-        var allTests = await _blockTests.GetByBatchAsync(BatchId ?? 0);
+        // GetByBatchAsync excludes Special Stain/IHC-PrP/IHC-Other (worklist-only exclusion) — the
+        // Tests checkbox pre-population needs every code, so it must use GetAllSelectionsByBatchAsync.
+        var allTests = await _blockTests.GetAllSelectionsByBatchAsync(BatchId ?? 0);
         ExistingHistologyCodes = allTests.Where(t => t.BlockID == Block.ID && t.TestType == BlockTestType.Histology).Select(t => t.Code).ToList();
         ExistingAntibodyCodes = allTests.Where(t => t.BlockID == Block.ID && t.TestType == BlockTestType.Antibodies).Select(t => t.Code).ToList();
         ExistingStainCodes = allTests.Where(t => t.BlockID == Block.ID && t.TestType == BlockTestType.Stain).Select(t => t.Code).ToList();

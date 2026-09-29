@@ -73,6 +73,31 @@ public class SubmissionDetailsBlockModelTests
     }
 
     [Fact]
+    public async Task HistologyCodesByBlockId_IncludesSpecialStainIhcPrpAndIhcOther()
+    {
+        // Regression: GetByBatchAsync excludes Histology codes 3/4/6 (they're QC-worklist-only
+        // gating flags there) — the grid checkboxes for Special Stain/IHC-Prp/IHC-Other must read
+        // from GetAllSelectionsByBatchAsync instead, or those 3 columns could never show checked.
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 100, BatchID = 5, AnimalID = 1, BlockRef = "01" }]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[
+            new BlockTest { ID = 1, BlockID = 100, TestType = BlockTestType.Histology, Code = HistologyCode.SpecialStain },
+            new BlockTest { ID = 2, BlockID = 100, TestType = BlockTestType.Histology, Code = HistologyCode.IhcPrp },
+            new BlockTest { ID = 3, BlockID = 100, TestType = BlockTestType.Histology, Code = HistologyCode.IhcOther },
+        ]);
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+
+        await sut.OnGetAsync();
+
+        var codes = sut.HistologyCodesByBlockId.GetValueOrDefault(100, []);
+        Assert.Contains(HistologyCode.SpecialStain, codes);
+        Assert.Contains(HistologyCode.IhcPrp, codes);
+        Assert.Contains(HistologyCode.IhcOther, codes);
+    }
+
+    [Fact]
     public async Task CreateEditSubmissionJourney_AlreadyAssignedRef_StaysLocked()
     {
         var animal = new Animal { ID = 1, SenderRef = "S1", HistoRefSet = true, HistologyRef = "26/40001", PMDateSet = true, PMDate = "01/01/2026" };
