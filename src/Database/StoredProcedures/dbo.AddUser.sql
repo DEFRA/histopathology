@@ -1,5 +1,5 @@
 /****** Object:  StoredProcedure [dbo].[AddUser] ******/
-/****** ONE-TIME DEPLOYMENT SCRIPT — Safe to re-run via pipeline ******/
+/****** ONE-TIME DEPLOYMENT SCRIPT ï¿½ Safe to re-run via pipeline ******/
 
 SET ANSI_NULLS ON
 GO
@@ -23,4 +23,6 @@ AS
         		([NTLogin], [Name], [Email], [UserGroup], [UserArea],  [Active])
 	VALUES
 		(@NTLogin, @Name, @Email, @UserGroup, @UserArea, @Active)
+GO
+PRINT '--- dbo.AddUser: (re)created ---';
 GO

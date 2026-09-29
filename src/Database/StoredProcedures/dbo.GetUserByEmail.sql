@@ -34,3 +34,5 @@ BEGIN
 		 [User].[Email] = @email;
 END
 GO
+PRINT '--- dbo.GetUserByEmail: (re)created ---';
+GO

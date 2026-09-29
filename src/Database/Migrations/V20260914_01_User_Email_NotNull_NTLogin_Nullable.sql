@@ -7,6 +7,7 @@ GO
 
 BEGIN TRANSACTION;
 
+PRINT '--- V20260914_01: deduplicating Email values ---';
 -- Duplicate emails can exist where the same person has two User rows: an older
 -- NTLogin using the legacy single-character-prefix convention (e.g. x0391401)
 -- and a newer one using the current multi-character prefix convention
@@ -52,6 +53,7 @@ UPDATE dbo.[User]
 SET Email = CONCAT('old_email_legacy', ID, '@apha.gov.uk')
 WHERE Email IS NULL;
 
+PRINT '--- V20260914_01: enforcing Email NOT NULL ---';
 IF EXISTS (
     SELECT 1
     FROM dbo.[User]
@@ -66,6 +68,7 @@ END;
 ALTER TABLE dbo.[User]
 ALTER COLUMN Email VARCHAR(60) NOT NULL;
 
+PRINT '--- V20260914_01: creating unique index IX_User_Email ---';
 -- Email is now the primary per-request user-resolution lookup (GetUserByEmail, called on
 -- every authenticated request) — index it. Unique because that lookup expects one row.
 IF EXISTS (
@@ -82,23 +85,16 @@ END;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_User_Email' AND object_id = OBJECT_ID('dbo.[User]'))
     CREATE UNIQUE NONCLUSTERED INDEX IX_User_Email ON dbo.[User] (Email);
 
+PRINT '--- V20260914_01: making NTLogin nullable and IX_User_NTLogin non-unique ---';
 -- IX_User_NTLogin depends on NTLogin (Msg 5074) — must be dropped before ALTER COLUMN
--- and recreated after. Recreated as a filtered unique index when it was unique, since a
--- plain unique index tolerates only one NULL row and NTLogin can now be NULL for
--- multiple Entra ID-only users. If it backs a UNIQUE constraint (Msg 3723), DROP INDEX
--- is rejected — the constraint itself has to be dropped instead.
-DECLARE @isUnique bit = NULL, @isConstraint bit = 0;
-
+-- and recreated after. Always recreated NON-UNIQUE: NTLogin is legacy/unused post-Entra ID
+-- (Email is the identity key now — see IX_User_Email above), so uniqueness is no longer
+-- enforced regardless of whether the existing index was unique. If it backs a UNIQUE
+-- constraint (Msg 3723), DROP INDEX is rejected — the constraint itself has to be dropped.
 IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_User_NTLogin' AND object_id = OBJECT_ID('dbo.[User]'))
 BEGIN
-    SELECT @isUnique = is_unique FROM sys.indexes
-    WHERE name = 'IX_User_NTLogin' AND object_id = OBJECT_ID('dbo.[User]');
-
     IF EXISTS (SELECT 1 FROM sys.key_constraints WHERE name = 'IX_User_NTLogin' AND parent_object_id = OBJECT_ID('dbo.[User]'))
-    BEGIN
-        SET @isConstraint = 1;
         ALTER TABLE dbo.[User] DROP CONSTRAINT IX_User_NTLogin;
-    END
     ELSE
         DROP INDEX IX_User_NTLogin ON dbo.[User];
 END;
@@ -106,11 +102,7 @@ END;
 ALTER TABLE dbo.[User]
 ALTER COLUMN NTLogin VARCHAR(25) NULL;
 
--- Recreated as a filtered unique INDEX (not a constraint) even if it was originally a
--- constraint — unique constraints can't have a WHERE filter, which is required here.
-IF @isUnique = 1
-    CREATE UNIQUE NONCLUSTERED INDEX IX_User_NTLogin ON dbo.[User] (NTLogin) WHERE NTLogin IS NOT NULL;
-ELSE IF @isUnique = 0
-    CREATE NONCLUSTERED INDEX IX_User_NTLogin ON dbo.[User] (NTLogin);
+CREATE NONCLUSTERED INDEX IX_User_NTLogin ON dbo.[User] (NTLogin);
 
 COMMIT TRANSACTION;
+PRINT '--- V20260914_01: completed ---';
