@@ -76,6 +76,7 @@ variables:
 stages:
   - stage: Build
     displayName: Build and Test
+    condition: ne(variables['Build.Reason'], 'Schedule')
     jobs:
       - job: build
         pool:
