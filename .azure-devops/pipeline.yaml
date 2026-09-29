@@ -172,7 +172,7 @@ stages:
   - stage: DEV
     displayName: DEV
     dependsOn: Build
-    condition: and(succeeded(), eq('${{ parameters.deployToDev }}', true))
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.deployToDev }}', true))
     variables:
     - name: appName
       value: 'DEVCDEWEBAW1401'
@@ -252,7 +252,7 @@ stages:
     dependsOn:
       - DEV
       - Build
-    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.DEV.result, 'Succeeded', 'Skipped'), eq('${{ parameters.deployToTest }}', true))
+    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.DEV.result, 'Succeeded', 'Skipped'), ne(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.deployToTest }}', true))
     variables:
     - name: appName
       value: 'TSTCDEWEBAW1401'
@@ -331,7 +331,7 @@ stages:
     dependsOn:
       - TST
       - Build
-    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.TST.result, 'Succeeded', 'Skipped'), eq('${{ parameters.deployToPreProd }}', true))
+    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.TST.result, 'Succeeded', 'Skipped'), ne(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.deployToPreProd }}', true))
     variables:
     - name: appName
       value: 'PRE-CDE-Web-App'
