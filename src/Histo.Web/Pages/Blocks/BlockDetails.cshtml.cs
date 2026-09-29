@@ -223,6 +223,21 @@ public class BlockDetailsModel : HistoPageModel
         return Page();
     }
 
+    /// <summary>
+    /// Legacy: btnCancel_Click — for a block still in the add flow (never reached "Done"), Back
+    /// discards it entirely rather than leaving an empty provisional row behind. Safe to attempt
+    /// even if the user did add tissues/tests before backing out: DeleteBlockAsync's own
+    /// FK-guarded delete just fails silently in that case, leaving the block (and what was added
+    /// to it) intact rather than losing data the user may already consider saved.
+    /// </summary>
+    public async Task<IActionResult> OnPostCancelAsync()
+    {
+        if (IsAddFlow && BlockId is > 0)
+            await _blocks.DeleteBlockAsync(BlockId.Value, Session.UserID);
+
+        return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId = BatchId, animalId = AnimalId });
+    }
+
     /// <summary>Saves the block (ref/customer ref/repeat/comment) and its test selections together — replaces the former separate Save block/Save tests actions.</summary>
     public async Task<IActionResult> OnPostDoneAsync()
     {
@@ -526,12 +541,17 @@ public class BlockDetailsModel : HistoPageModel
                 .GroupBy(t => t.OwnerID)
                 .ToDictionary(g => g.Key, g => g.Select(t => t.TissueCode).ToList());
 
-            // Same fallback chain as SampleSummary/CopyBatch: BatchSubmissionID → the batch's first
-            // submission → the unkeyed (0) group. Not every SP returns BatchSubmissionID, so keying
-            // on it alone silently matched nothing and fell through to the whole tissue list.
-            var submId = Animal.BatchSubmissionID > 0 && submissionIds.Contains(Animal.BatchSubmissionID)
-                ? Animal.BatchSubmissionID
-                : firstSubmId;
+            // Same fallback chain as SampleSummary/CopyBatch: this animal's own BatchSubmission row
+            // → BatchSubmissionID → the batch's first submission → the unkeyed (0) group.
+            // Neither GetBatchAnimal nor GetBatchBlocksByID's animal result-set ever returns
+            // BatchSubmissionID (verified against the actual SP output), so Animal.BatchSubmissionID
+            // is always 0 here — relying on it alone silently matched nothing and fell through to
+            // firstSubmId, which is wrong for every animal except the batch's very first submission
+            // (reproduced live: batch 33425/animal 103547 is submission order 2, so its real tissue
+            // list at submission 69945 was skipped entirely in favour of submission 69944's empty one).
+            var ownSubmissionId = submissions.FirstOrDefault(s => s.AnimalID == Animal.ID)?.ID;
+            var submId = ownSubmissionId
+                ?? (Animal.BatchSubmissionID > 0 && submissionIds.Contains(Animal.BatchSubmissionID) ? Animal.BatchSubmissionID : firstSubmId);
             var sampleCodes = (bySubmission.TryGetValue(submId, out var codes) ? codes
                     : bySubmission.TryGetValue(0, out var unkeyed) ? unkeyed
                     : [])

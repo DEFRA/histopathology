@@ -1,4 +1,5 @@
 using Histo.Administration.Interfaces;
+using Histo.Administration.Models;
 using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
@@ -35,7 +36,6 @@ public class AddSubmissionModelTests
         _session.SetupProperty(s => s.BatchSubmissionID);
         _session.SetupProperty(s => s.SampleDetailReturnPage);
         _session.Setup(s => s.UserID).Returns(7);
-        _session.Setup(s => s.UserArea).Returns(string.Empty);
         _batches.Setup(b => b.GetSubmittedAsCodeAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((string?)null);
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
@@ -61,6 +61,17 @@ public class AddSubmissionModelTests
     public void IsAssignTissueMode_ForCreateEditSubmission_IsFalse()
     {
         var sut = CreateSut(returnPage: null);
+        Assert.False(sut.IsAssignTissueMode);
+    }
+
+    [Fact]
+    public void IsAssignTissueMode_ForSampleSummaryOrigin_IsAlwaysFalse()
+    {
+        // Regression guard: SampleSummary's own "Add sample" must ALWAYS be free text, never a
+        // dropdown, regardless of how many existing samples the batch has — only BatchBlocks'
+        // "Add sample" (reached via BatchesReceived) is a picker. A prior iteration added a
+        // lenient SampleSummary-origin picker mode; it was reverted per explicit user correction.
+        var sut = CreateSut(returnPage: "/Submissions/SampleSummary?batchId=5");
         Assert.False(sut.IsAssignTissueMode);
     }
 
@@ -108,6 +119,28 @@ public class AddSubmissionModelTests
         Assert.Equal("/Submissions/SubmissionDetailsBlock", redirect.PageName);
         Assert.Equal(2, redirect.RouteValues!["animalId"]);
         _submissions.Verify(s => s.AddAnimalAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_AssignTissueMode_RedirectsToSubmissionDetailsBlock_EvenIfSubmittedAsCodeLooksLikeWetTissue()
+    {
+        // Regression: BatchBlocks' "Add sample" must always continue into the block-assignment
+        // detail page, decided purely by ORIGIN — it must never re-derive Wet-Tissue-ness from the
+        // "Submitted As" lookup for this branch (that previously misrouted BatchBlocks-origin
+        // samples to SubmissionDetails).
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
+        _batches.Setup(b => b.GetSubmittedAsCodeAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync("WT");
+        _lookups.Setup(l => l.GetLookupDataAsync(11, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { Code = "WT", Name = "Wet Tissue" }]);
+        var sut = CreateSut(returnPage: "/Batches/BatchBlocks?batchId=5");
+        sut.SenderRef = "S2";
+
+        var result = await sut.OnPostAsync();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Submissions/SubmissionDetailsBlock", redirect.PageName);
     }
 
     [Fact]

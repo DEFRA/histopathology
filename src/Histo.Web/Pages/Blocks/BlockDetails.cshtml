@@ -6,7 +6,22 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" class="govuk-back-link">Back</a>
+    @if (Model.IsAddFlow)
+    {
+        @* Legacy: btnCancel_Click discards a newly-provisioned block entirely rather than leaving
+           an empty row behind — the plain Back link had no way to do this, so Back silently left
+           an orphan block whenever the user left without adding anything. *@
+        <form method="post" asp-page-handler="Cancel" asp-antiforgery="true" style="display:inline">
+            <input type="hidden" asp-for="BatchId" />
+            <input type="hidden" asp-for="AnimalId" />
+            <input type="hidden" asp-for="BlockId" />
+            <button type="submit" class="govuk-back-link" style="background:none;border:none;padding:0;cursor:pointer;">Back</button>
+        </form>
+    }
+    else
+    {
+        <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" class="govuk-back-link">Back</a>
+    }
 
 }
 

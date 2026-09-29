@@ -32,6 +32,7 @@ public class SampleSummaryModelTests
         _session.SetupProperty(s => s.BatchID);
         _session.SetupProperty(s => s.AnimalID);
         _session.SetupProperty(s => s.BatchSubmissionID);
+        _session.SetupProperty(s => s.SampleDetailReturnPage);
         _session.Setup(s => s.IsHistoUser).Returns(true);
         _session.Setup(s => s.UserID).Returns(99);
 
@@ -141,18 +142,22 @@ public class SampleSummaryModelTests
     }
 
     [Fact]
-    public async Task OnPostSelect_UsesSampleSummaryReturnPageAsDetailReturnTarget()
+    public async Task OnPostSelect_AlwaysSetsSampleDetailReturnPageToSampleSummary()
     {
+        // Regression guard: Back/Save from SubmissionDetails(Block) must return to SampleSummary
+        // itself — not to Session.SampleSummaryReturnPage (wherever SampleSummary itself was
+        // reached from), which previously caused Back to skip past SampleSummary entirely
+        // whenever that session value held a stale value from an earlier, unrelated visit.
         _session.Setup(s => s.SampleSummaryReturnPage).Returns("/Batches/EditBatch");
-        _batches.Setup(b => b.GetSubmittedAsCodeAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync("4");
+        _batches.Setup(b => b.GetSubmittedAsCodeAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync("5");
         var sut = CreateSut();
         sut.BatchId = 1;
 
         var result = await sut.OnPostSelect(5);
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
-        Assert.Equal("/Submissions/SubmissionDetails", redirect.PageName);
-        Assert.Equal("/Batches/EditBatch", _session.Object.SampleDetailReturnPage);
+        Assert.Equal("/Submissions/SubmissionDetailsBlock", redirect.PageName);
+        Assert.Equal("/Submissions/SampleSummary?batchId=1", _session.Object.SampleDetailReturnPage);
     }
 
     [Fact]

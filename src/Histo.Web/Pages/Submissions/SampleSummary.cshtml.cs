@@ -200,11 +200,12 @@ public class SampleSummaryModel : HistoPageModel
         var batchId = BatchId ?? Session.BatchID;
         if (batchId is null or <= 0) return RedirectToPage("/Index");
 
-        // Preserve the user's originating submission page as the landing point when the user hits
-        // Back/Save from the detail screen, rather than forcing a fixed jump back to the sample list.
-        Session.SampleDetailReturnPage = string.IsNullOrWhiteSpace(Session.SampleSummaryReturnPage)
-            ? $"/Submissions/SampleSummary?batchId={batchId.Value}"
-            : Session.SampleSummaryReturnPage;
+        // Back/Save from the detail screen must return here (SampleSummary), the page the user
+        // actually clicked the sample from — not further back to wherever SampleSummary itself
+        // was reached from. Previously fell through to Session.SampleSummaryReturnPage, which
+        // skipped SampleSummary entirely whenever it held a stale value from an earlier,
+        // unrelated BatchDetails/EditBatch visit.
+        Session.SampleDetailReturnPage = $"/Submissions/SampleSummary?batchId={batchId.Value}";
 
         // Re-resolve submission type server-side on POST.
         // Do not trust the hidden field from the view for routing decisions.

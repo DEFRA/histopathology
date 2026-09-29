@@ -53,6 +53,8 @@ public class AddSubmissionModel : HistoPageModel
     /// "Add sample" button), as opposed to Create/Edit Submission. Matches the same
     /// substring-on-ReturnPage convention already used by
     /// <see cref="Histo.Web.Pages.Submissions.SubmissionDetailsBlockModel.IsAssignTissueMode"/>.
+    /// No user-area restriction. Strict: always requires picking an existing sample, since
+    /// BatchBlocks is only ever reached once a Received/InProgress batch's samples already exist.
     ///
     /// Legacy had two distinct pages here: <c>AddSubmission.aspx</c> (Create/Edit Submission — types
     /// a brand-new Sender Ref) and <c>AddSample.aspx</c> (Assign Tissues to Blocks — associates an
@@ -62,13 +64,18 @@ public class AddSubmissionModel : HistoPageModel
     /// adding an existing animal to the current batch"). Both were consolidated onto this one page
     /// with a single free-text field, which incorrectly let the Assign Tissues journey type a new
     /// Sender Ref instead of picking one of the batch's own not-yet-blocked samples.
+    ///
+    /// Excludes "Copy sample" (<see cref="SourceAnimalId"/> set) — that flow always creates a
+    /// genuinely new Animal with copied tissues, never picks an existing one, regardless of how
+    /// stale <see cref="ISessionService.SampleDetailReturnPage"/> might be at that point.
     /// </summary>
     public bool IsAssignTissueMode =>
-        (ReturnPage ?? string.Empty).Contains("/Batches/BatchBlocks", StringComparison.OrdinalIgnoreCase)
-        || (Session.SampleDetailReturnPage ?? string.Empty).Contains("/Batches/BatchBlocks", StringComparison.OrdinalIgnoreCase);
+        (SourceAnimalId is null or <= 0)
+        && ((ReturnPage ?? string.Empty).Contains("/Batches/BatchBlocks", StringComparison.OrdinalIgnoreCase)
+            || (Session.SampleDetailReturnPage ?? string.Empty).Contains("/Batches/BatchBlocks", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
-    /// Samples already in this batch that don't yet have a block — the only valid choices in
+    /// Samples already in this batch that don't yet have a block — the only valid choices when
     /// <see cref="IsAssignTissueMode"/>, populated in <see cref="OnGetAsync"/>.
     /// </summary>
     public IReadOnlyList<Animal> AvailableAnimals { get; private set; } = [];
@@ -109,10 +116,11 @@ public class AddSubmissionModel : HistoPageModel
 
         if (IsAssignTissueMode)
         {
-            // No new Animal is created here — the user is picking one of the batch's own samples
-            // that still needs blocks assigned, mirroring legacy AddSample.aspx.
             var available = await GetUnblockedAnimalsAsync(batchId.Value);
             AvailableAnimals = available;
+
+            // No new Animal is created here — the user is picking one of the batch's own
+            // samples that still needs blocks assigned, mirroring legacy AddSample.aspx.
             var chosen = available.FirstOrDefault(a => string.Equals(a.SenderRef, SenderRef, StringComparison.OrdinalIgnoreCase));
             if (chosen is null)
             {
