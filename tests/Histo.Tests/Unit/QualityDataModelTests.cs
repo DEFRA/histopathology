@@ -150,17 +150,35 @@ public class QualityDataModelTests
     }
 
     [Fact]
-    public async Task OnPostUpdateAsync_NoFieldsEntered_SetsErrorAndDoesNotSave()
+    public async Task OnPostUpdateAsync_MultiSelectWithNoFieldsEntered_SetsErrorAndDoesNotSave()
     {
-        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1)]);
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1), MakeTest(2)]);
         _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
         var sut = CreateSut();
-        sut.SelectedIds = [1];
+        sut.SelectedIds = [1, 2];
 
         await sut.OnPostUpdateAsync();
 
         Assert.Equal("Enter at least one field to apply to the selected tests.", sut.Error);
         _tests.Verify(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_OnHoldRow_IsNeverUpdated()
+    {
+        var onHold = new BlockTest { ID = 2, BlockID = 1, TestType = "Histology", Code = "1", HistologyRef = "24/001", BlockRef = "02", OnHold = true, RowStamp = [1] };
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1), onHold]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var sut = CreateSut();
+        sut.SelectAllAcrossPages = true;
+        sut.StainRef = "S1";
+        sut.NumberOfSlides = 1;
+
+        await sut.OnPostUpdateAsync();
+
+        _tests.Verify(t => t.UpdateAsync(It.Is<BlockTest>(bt => bt.ID == 2), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _tests.Verify(t => t.UpdateAsync(It.Is<BlockTest>(bt => bt.ID == 1), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -178,7 +196,6 @@ public class QualityDataModelTests
         sut.Result = Histo.Histology.Models.BlockTestResult.Passed;
 
         await sut.OnPostUpdateAsync();
-
         Assert.Null(sut.Error);
         Assert.Equal(2, saved.Count);
         Assert.All(saved, bt => Assert.Equal(Histo.Histology.Models.BlockTestResult.Passed, bt.Result));
@@ -186,7 +203,29 @@ public class QualityDataModelTests
     }
 
     [Fact]
-    public async Task OnPostUpdateAsync_BlankFields_PreserveEachRowsExistingValue()
+    public async Task OnPostUpdateAsync_MultiSelect_BlankFieldsPreserveEachRowsExistingValue()
+    {
+        var existing = MakeTest(1, result: Histo.Histology.Models.BlockTestResult.Failed);
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[existing, MakeTest(2, result: Histo.Histology.Models.BlockTestResult.Failed)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var saved = new List<BlockTest>();
+        _tests.Setup(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<BlockTest, int, CancellationToken>((bt, _, _) => saved.Add(bt))
+            .Returns(Task.CompletedTask);
+        var sut = CreateSut();
+        sut.SelectedIds = [1, 2];
+        sut.StainRef = "S1"; // only this field entered
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Equal(2, saved.Count);
+        Assert.All(saved, bt => Assert.Equal("S1", bt.StainRef));
+        Assert.All(saved, bt => Assert.Equal(Histo.Histology.Models.BlockTestResult.Failed, bt.Result)); // untouched
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_SingleSelect_WritesEveryFieldAsShown_ClearingBlanks()
     {
         var existing = MakeTest(1, result: Histo.Histology.Models.BlockTestResult.Failed);
         _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[existing]);
@@ -197,13 +236,30 @@ public class QualityDataModelTests
             .Returns(Task.CompletedTask);
         var sut = CreateSut();
         sut.SelectedIds = [1];
-        sut.StainRef = "S1"; // only this field entered
+        sut.StainRef = "S1";
+        sut.NumberOfSlides = 1;
+        // Result left blank — a single-row save clears it rather than preserving "Failed".
 
         await sut.OnPostUpdateAsync();
 
         Assert.NotNull(saved);
         Assert.Equal("S1", saved!.StainRef);
-        Assert.Equal(Histo.Histology.Models.BlockTestResult.Failed, saved.Result); // untouched
+        Assert.Null(saved.Result);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_SingleSelect_WithoutNumberOfSlides_SetsError()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var sut = CreateSut();
+        sut.SelectedIds = [1];
+        sut.StainRef = "S1";
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Equal("Enter the number of blocks/slides.", sut.Error);
+        _tests.Verify(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -217,8 +273,7 @@ public class QualityDataModelTests
 
         await sut.OnPostUpdateAsync();
 
-        Assert.Equal("Enter a QC code when setting the result to Failed.", sut.Error);
-        _tests.Verify(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal("Enter a QC code when setting the result to Failed.", sut.Error);        _tests.Verify(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -284,6 +339,7 @@ public class QualityDataModelTests
         var sut = CreateSut();
         sut.SelectedIds = [1];
         sut.StainRef = "S1";
+        sut.NumberOfSlides = 1;
 
         await sut.OnPostUpdateAsync();
 

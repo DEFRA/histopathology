@@ -16,12 +16,12 @@ namespace Histo.Web.Pages.QC;
 /// test on the batch's blocks so results, QC data, dispatch and archive
 /// information can be recorded per test.
 ///
-/// <see cref="OnPostUpdateAsync"/> reproduces legacy's multi-select bulk-save: check one or more
-/// rows, fill in only the fields you want to change, and they're applied to every checked row —
-/// fields left blank keep each row's own existing value. Mirrors the same pattern already used by
-/// <see cref="Histo.Web.Pages.Archive.ArchiveBlocksModel"/>. Editing one test at a time is still
-/// available via <see cref="EditQualityDataTestModel"/> for deep-linking, but is no longer required
-/// for routine updates.
+    /// <see cref="OnPostUpdateAsync"/> reproduces legacy <c>btnEdit_Click</c>'s two save modes:
+/// selecting exactly one row writes every field as shown (the row's existing values are
+/// pre-filled client-side, so clearing a field clears it); selecting two or more rows applies only
+/// the fields that were filled in, leaving each row's other values untouched. Editing one test at a
+/// time is still available via <see cref="EditQualityDataTestModel"/> for deep-linking, but is no
+/// longer required for routine updates.
 /// </summary>
 public class QualityDataModel : GridPageModel
 {
@@ -93,12 +93,12 @@ public class QualityDataModel : GridPageModel
     /// whose checkboxes never render — mirrors <c>ArchiveBlocksModel.SelectAllAcrossPages</c>.</summary>
     [BindProperty] public bool SelectAllAcrossPages { get; set; }
 
-    /// <summary>"" = leave unchanged, "0" = explicitly clear to Not tested, "1"/"2" = Passed/Failed.</summary>
+    /// <summary>"" = Not tested (single row) / leave unchanged (multi-row), "1"/"2" = Passed/Failed.</summary>
     [BindProperty] public string? Result { get; set; }
     [BindProperty] public string? QCCode { get; set; }
-    [BindProperty] public bool? QCNote { get; set; }
+    [BindProperty] public bool QCNote { get; set; }
     [BindProperty] public string? StainRef { get; set; }
-    [BindProperty] public bool? Dispatched { get; set; }
+    [BindProperty] public bool Dispatched { get; set; }
     [BindProperty] public DateTime? DispatchedDate { get; set; }
     [BindProperty] public string? DispatchedBy { get; set; }
     [BindProperty] public string? DispatchedTo { get; set; }
@@ -108,7 +108,6 @@ public class QualityDataModel : GridPageModel
     [BindProperty] public string? ArchiveComment { get; set; }
     [BindProperty] public int? NumberOfSlides { get; set; }
     [BindProperty] public string? Comment { get; set; }
-    [BindProperty] public bool ApplyCharges { get; set; }
     [BindProperty] public List<string> SelectedCharges { get; set; } = [];
 
     public string? Error { get; private set; }
@@ -169,12 +168,7 @@ public class QualityDataModel : GridPageModel
             .OrderBy(n => n)
             .ToList()!;
 
-        var filtered = allTests.AsEnumerable();
-        if (!string.IsNullOrEmpty(FilterHistologyRef))
-            filtered = filtered.Where(t => t.HistologyRef == FilterHistologyRef);
-        if (!string.IsNullOrEmpty(FilterTest))
-            filtered = filtered.Where(t => string.Equals(GetTestName(t), FilterTest, StringComparison.OrdinalIgnoreCase));
-        Tests = filtered.ToList();
+        Tests = ApplyCurrentFilter(allTests).ToList();
 
         await LoadEditLookupsAsync();
         PopulateGridViewData(Tests.Count);
@@ -182,8 +176,9 @@ public class QualityDataModel : GridPageModel
     }
 
     /// <summary>
-    /// Bulk-applies the fields the user filled in to every checked row, leaving blank fields
-    /// unchanged on each row — legacy <c>QualityData.aspx.vb</c>'s multi-select batch-save.
+    /// Saves the entered quality data onto every checked row — legacy
+    /// <c>QualityData.aspx.vb::btnEdit_Click</c>. One row checked writes every field as shown
+    /// (blank clears); two or more rows checked applies only the fields that were filled in.
     /// </summary>
     public async Task<IActionResult> OnPostUpdateAsync()
     {
@@ -193,7 +188,13 @@ public class QualityDataModel : GridPageModel
         var batchId = Session.BatchID.Value;
 
         var all = await _tests.GetByBatchAsync(batchId);
-        var selectedIds = SelectAllAcrossPages ? all.Select(t => t.ID).ToList() : SelectedIds;
+
+        // Legacy never lets an on-hold or unreferenced test be ticked, so "All" must skip them too.
+        var selectable = all.Where(t => !t.OnHold && !string.IsNullOrWhiteSpace(t.HistologyRef)).ToList();
+        var selectedIds = SelectAllAcrossPages
+            ? ApplyCurrentFilter(selectable).Select(t => t.ID).ToList()
+            : selectable.Where(t => SelectedIds.Contains(t.ID)).Select(t => t.ID).ToList();
+
         if (selectedIds.Count == 0)
         {
             Error = "Select at least one test to update.";
@@ -201,35 +202,28 @@ public class QualityDataModel : GridPageModel
             return Page();
         }
 
-        var anyFieldEntered = !string.IsNullOrWhiteSpace(Result) || !string.IsNullOrWhiteSpace(QCCode)
-            || QCNote.HasValue || !string.IsNullOrWhiteSpace(StainRef) || Dispatched.HasValue
-            || DispatchedDate is not null || !string.IsNullOrWhiteSpace(DispatchedBy) || !string.IsNullOrWhiteSpace(DispatchedTo)
-            || !string.IsNullOrWhiteSpace(RemedialAction) || !string.IsNullOrWhiteSpace(ArchiveLocationCode) || ArchivedDate is not null
-            || !string.IsNullOrWhiteSpace(ArchiveComment) || NumberOfSlides is not null || !string.IsNullOrWhiteSpace(Comment)
-            || ApplyCharges;
-        if (!anyFieldEntered)
+        // Legacy's two save modes: a single selection is a straight write of the form as shown
+        // (the row's values were pre-filled on selection), so "blank" legitimately means "clear".
+        // With two or more rows, blank means "leave each row's own value alone".
+        var isSingle = selectedIds.Count == 1;
+
+        if (!isSingle)
         {
-            Error = "Enter at least one field to apply to the selected tests.";
-            await ReloadGridAsync(batchId);
-            return Page();
+            var anyFieldEntered = !string.IsNullOrWhiteSpace(Result) || !string.IsNullOrWhiteSpace(QCCode)
+                || QCNote || !string.IsNullOrWhiteSpace(StainRef) || Dispatched
+                || DispatchedDate is not null || !string.IsNullOrWhiteSpace(DispatchedBy) || !string.IsNullOrWhiteSpace(DispatchedTo)
+                || !string.IsNullOrWhiteSpace(RemedialAction) || !string.IsNullOrWhiteSpace(ArchiveLocationCode) || ArchivedDate is not null
+                || !string.IsNullOrWhiteSpace(ArchiveComment) || NumberOfSlides is not null || !string.IsNullOrWhiteSpace(Comment)
+                || SelectedCharges.Count > 0;
+            if (!anyFieldEntered)
+            {
+                Error = "Enter at least one field to apply to the selected tests.";
+                await ReloadGridAsync(batchId);
+                return Page();
+            }
         }
 
-        // Cross-field checks only apply when the relevant value is actually being changed by this
-        // save — unlike EditQualityDataTest's single-row form, a bulk update may legitimately touch
-        // only one or two fields, so fields left blank ("unchanged") are never validated.
-        if (Dispatched == true)
-        {
-            if (DispatchedDate is null) Error = "Enter a dispatched date.";
-            else if (string.IsNullOrWhiteSpace(DispatchedBy)) Error = "Select who dispatched the test.";
-            else if (string.IsNullOrWhiteSpace(DispatchedTo)) Error = "Enter who the test was dispatched to.";
-        }
-        if (Error is null && Result == Histo.Histology.Models.BlockTestResult.Failed && string.IsNullOrWhiteSpace(QCCode))
-            Error = "Enter a QC code when setting the result to Failed.";
-        if (Error is null && !string.IsNullOrWhiteSpace(ArchiveLocationCode) && ArchivedDate is null)
-            Error = "Enter an archive date when an archive location is selected.";
-        if (Error is null && ArchivedDate is not null && string.IsNullOrWhiteSpace(ArchiveLocationCode))
-            Error = "Select an archive location when an archive date is entered.";
-
+        Error = ValidateEntry(isSingle);
         if (Error is not null)
         {
             await ReloadGridAsync(batchId);
@@ -241,7 +235,7 @@ public class QualityDataModel : GridPageModel
 
         foreach (var test in selected)
         {
-            var applyQcNote = QCNote ?? test.QCNote;
+            var applyQcNote = isSingle ? QCNote : QCNote || test.QCNote;
             var qcNoteRef = test.QCNoteRef;
             if (applyQcNote && qcNoteRef is null or 0)
             {
@@ -253,8 +247,8 @@ public class QualityDataModel : GridPageModel
                 qcNoteRef = null;
             }
 
-            var newArchiveLocation = !string.IsNullOrWhiteSpace(ArchiveLocationCode) ? ArchiveLocationCode : test.ArchiveLocation;
-            var newArchivedDate = ArchivedDate ?? test.ArchivedDate;
+            var newArchiveLocation = Pick(isSingle, ArchiveLocationCode, test.ArchiveLocation);
+            var newArchivedDate = isSingle ? ArchivedDate : ArchivedDate ?? test.ArchivedDate;
 
             var updated = new BlockTest
             {
@@ -265,22 +259,24 @@ public class QualityDataModel : GridPageModel
                 TestType = test.TestType,
                 Code = test.Code,
                 TestDetails = test.TestDetails,
-                Result = Result switch { null or "" => test.Result, "0" => null, _ => Result },
-                QCCode = !string.IsNullOrWhiteSpace(QCCode) ? QCCode : test.QCCode,
+                Result = isSingle
+                    ? (string.IsNullOrWhiteSpace(Result) || Result == "0" ? null : Result)
+                    : Result switch { null or "" => test.Result, "0" => null, _ => Result },
+                QCCode = Pick(isSingle, QCCode, test.QCCode),
                 QCNote = applyQcNote,
                 QCNoteRef = qcNoteRef,
-                StainRef = !string.IsNullOrWhiteSpace(StainRef) ? StainRef : test.StainRef,
-                Dispatched = Dispatched ?? test.Dispatched,
-                DispatchedDate = DispatchedDate ?? test.DispatchedDate,
-                DispatchedBy = !string.IsNullOrWhiteSpace(DispatchedBy) ? DispatchedBy : test.DispatchedBy,
+                StainRef = Pick(isSingle, StainRef, test.StainRef),
+                Dispatched = isSingle ? Dispatched : Dispatched || test.Dispatched,
+                DispatchedDate = isSingle ? DispatchedDate : DispatchedDate ?? test.DispatchedDate,
+                DispatchedBy = Pick(isSingle, DispatchedBy, test.DispatchedBy),
                 PremiumCharge = test.PremiumCharge, // pass-through, not edited here
-                DispatchedTo = !string.IsNullOrWhiteSpace(DispatchedTo) ? DispatchedTo : test.DispatchedTo,
-                Comment = !string.IsNullOrWhiteSpace(Comment) ? Comment : test.Comment,
-                RemedialAction = !string.IsNullOrWhiteSpace(RemedialAction) ? RemedialAction : test.RemedialAction,
+                DispatchedTo = Pick(isSingle, DispatchedTo, test.DispatchedTo),
+                Comment = Pick(isSingle, Comment, test.Comment),
+                RemedialAction = Pick(isSingle, RemedialAction, test.RemedialAction),
                 ArchiveLocation = newArchiveLocation,
                 ArchivedDate = newArchivedDate,
-                ArchiveComment = !string.IsNullOrWhiteSpace(ArchiveComment) ? ArchiveComment : test.ArchiveComment,
-                NumberOfSlides = NumberOfSlides ?? test.NumberOfSlides,
+                ArchiveComment = Pick(isSingle, ArchiveComment, test.ArchiveComment),
+                NumberOfSlides = isSingle ? NumberOfSlides : NumberOfSlides ?? test.NumberOfSlides,
                 OnHold = test.OnHold,
                 Archived = !string.IsNullOrWhiteSpace(newArchiveLocation) && newArchivedDate is not null,
                 RowStamp = test.RowStamp,
@@ -289,7 +285,10 @@ public class QualityDataModel : GridPageModel
             try
             {
                 await _tests.UpdateAsync(updated, Session.UserID);
-                if (ApplyCharges)
+
+                // Legacy only rewrites the charge set when the user ticked at least one box during a
+                // multi-row save; a single-row save always writes it, so unticking all clears them.
+                if (isSingle || SelectedCharges.Count > 0)
                     await _tests.SaveTCCodesAsync(batchId, test.ID, test.TestType, test.TCCodes, SelectedCharges, Session.UserID);
             }
             catch (BlockTestConcurrencyException)
@@ -307,6 +306,51 @@ public class QualityDataModel : GridPageModel
 
         await ReloadGridAsync(batchId);
         return Page();
+    }
+
+    /// <summary>Single-row saves write blanks through as clears; multi-row saves treat blank as "unchanged".</summary>
+    private static string? Pick(bool isSingle, string? entered, string? existing) =>
+        isSingle
+            ? (string.IsNullOrWhiteSpace(entered) ? null : entered)
+            : (!string.IsNullOrWhiteSpace(entered) ? entered : existing);
+
+    /// <summary>
+    /// Cross-field checks mirroring legacy's conditionally-enabled validators. In multi-row mode
+    /// only the fields the user actually filled in are validated, since blanks mean "unchanged".
+    /// </summary>
+    private string? ValidateEntry(bool isSingle)
+    {
+        if (Dispatched)
+        {
+            if (DispatchedDate is null) return "Enter a dispatched date.";
+            if (string.IsNullOrWhiteSpace(DispatchedBy)) return "Select who dispatched the test.";
+            if (string.IsNullOrWhiteSpace(DispatchedTo)) return "Enter who the test was dispatched to.";
+        }
+
+        if (Result == BlockTestResult.Failed)
+        {
+            if (string.IsNullOrWhiteSpace(QCCode)) return "Enter a QC code when setting the result to Failed.";
+            if (string.IsNullOrWhiteSpace(RemedialAction)) return "Select a remedial action when setting the result to Failed.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(ArchiveLocationCode) && ArchivedDate is null)
+            return "Enter an archive date when an archive location is selected.";
+        if (ArchivedDate is not null && string.IsNullOrWhiteSpace(ArchiveLocationCode))
+            return "Select an archive location when an archive date is entered.";
+
+        if (NumberOfSlides is <= 0) return "Number of blocks/slides must be greater than zero.";
+        if (isSingle && NumberOfSlides is null) return "Enter the number of blocks/slides.";
+
+        return null;
+    }
+
+    private IEnumerable<BlockTest> ApplyCurrentFilter(IEnumerable<BlockTest> tests)
+    {
+        if (!string.IsNullOrEmpty(FilterHistologyRef))
+            tests = tests.Where(t => t.HistologyRef == FilterHistologyRef);
+        if (!string.IsNullOrEmpty(FilterTest))
+            tests = tests.Where(t => string.Equals(GetTestName(t), FilterTest, StringComparison.OrdinalIgnoreCase));
+        return tests;
     }
 
     /// <summary>
@@ -337,10 +381,7 @@ public class QualityDataModel : GridPageModel
         TestNames = allTests.Select(GetTestName).Where(n => !string.IsNullOrEmpty(n))
             .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n).ToList()!;
 
-        var filtered = allTests.AsEnumerable();
-        if (!string.IsNullOrEmpty(FilterHistologyRef)) filtered = filtered.Where(t => t.HistologyRef == FilterHistologyRef);
-        if (!string.IsNullOrEmpty(FilterTest)) filtered = filtered.Where(t => string.Equals(GetTestName(t), FilterTest, StringComparison.OrdinalIgnoreCase));
-        Tests = filtered.ToList();
+        Tests = ApplyCurrentFilter(allTests).ToList();
 
         await LoadEditLookupsAsync();
         PopulateGridViewData(Tests.Count);

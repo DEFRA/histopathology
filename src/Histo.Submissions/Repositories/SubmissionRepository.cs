@@ -115,7 +115,10 @@ public sealed class SubmissionRepository : ISubmissionRepository
         for (var i = 0; i < blockAnimalResultSetIndex; i++)
             await multi.ReadAsync<dynamic>();
         var rows = await multi.ReadAsync<Animal>();
-        return rows.ToList();
+        // BATCH_BLOCK_ANIMAL is block-grained — an animal with several blocks is returned once per
+        // block. Every caller treats this as an animal list (and several key dictionaries by ID),
+        // so collapse to one row per animal here.
+        return rows.GroupBy(a => a.ID).Select(g => g.First()).ToList();
     }
 
     /// <inheritdoc/>
