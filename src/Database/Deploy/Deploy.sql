@@ -16,6 +16,7 @@
 PRINT '--- Deploying stored procedures ---';
 :r ../StoredProcedures/dbo.GetUserByEmail.sql
 GO
+:r ../StoredProcedures/dbo.EditResetHistologyRef.sql
 :r ../StoredProcedures/dbo.AddUser.sql
 GO
 :r ../StoredProcedures/dbo.EditUser.sql
