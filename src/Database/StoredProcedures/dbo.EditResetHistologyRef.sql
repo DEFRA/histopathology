@@ -19,6 +19,10 @@
 -- for verification purposes. Once verified, replace the body below with the
 -- real production reset rule (e.g. each type's own starting number) and
 -- revert the pipeline schedule back to the annual CRON (0 4 1 1 *).
+--
+-- DIAGNOSTICS: prints and selects the full dbo.HistologyRef contents both
+-- before and after the UPDATE, so a pipeline/sqlcmd run's output log shows
+-- the exact before/after values for every type in a single execution.
 -- ============================================================================
 CREATE OR ALTER PROCEDURE dbo.EditResetHistologyRef
 AS
@@ -28,7 +32,15 @@ BEGIN
 	DECLARE @MinutesSinceMidnight INT = DATEDIFF(MINUTE, CAST(GETUTCDATE() AS DATE), GETUTCDATE());
 	DECLARE @TestValue VARCHAR(5) = RIGHT('0000' + CAST(@MinutesSinceMidnight AS VARCHAR(5)), 5);
 
+	PRINT '--- BEFORE reset (dbo.HistologyRef) ---';
+	SELECT [Type], [NextHistologyRef], [RowStamp]
+	FROM dbo.[HistologyRef];
+
 	UPDATE dbo.[HistologyRef]
 	SET NextHistologyRef = @TestValue;
+
+	PRINT '--- AFTER reset (dbo.HistologyRef) --- new value: ' + @TestValue;
+	SELECT [Type], [NextHistologyRef], [RowStamp]
+	FROM dbo.[HistologyRef];
 END
 GO
