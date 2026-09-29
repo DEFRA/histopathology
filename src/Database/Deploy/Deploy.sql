@@ -23,6 +23,14 @@ GO
 GO
 :r ../StoredProcedures/dbo.GetAnimalBlockArchiveInformation.sql
 GO
+:r ../StoredProcedures/GettlkpSpecies.sql
+GO
+:r ../StoredProcedures/AddtlkpSpecies.sql
+GO
+:r ../StoredProcedures/EdittlkpSpecies.sql
+GO
+:r ../StoredProcedures/DeletetlkpSpecies.sql
+GO
 
 -- Step 2: Deployment script to used to alter/create tables, columns etc
 PRINT '--- Create or Alter Table, Column  ---';
@@ -37,6 +45,11 @@ GO
 -- Step 4: Fix pre-existing blank-string NTLogin rows that collide under IX_User_NTLogin
 PRINT '--- Fixing empty-string NTLogin rows to NULL ---';
 :r ../Migrations/V20260928_01_Fix_Empty_String_NTLogin_To_Null.sql
+GO
+
+-- Step 5: Make tlkpSpecies editable via the picklist admin screen
+PRINT '--- Applying picklist Species changes ---';
+:r ../Migrations/picklist-species-changes.sql
 GO
 
 PRINT '=== Database deployment completed ===';
