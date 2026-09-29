@@ -184,7 +184,7 @@ else
                         <tr class="govuk-table__row">
                             <td class="govuk-table__cell">@(Model.EditTissueOptions.FirstOrDefault(o => o.Code == t.TissueCode)?.Name ?? t.TissueCode)</td>
                             <td class="govuk-table__cell">@t.NoPieces</td>
-                            <td class="govuk-table__cell">@t.Comment</td>
+                            <td class="govuk-table__cell app-table-comment-cell">@t.Comment</td>
                             <td class="govuk-table__cell">
                                 <div class="govuk-button-group govuk-!-margin-bottom-0">
                                     <a asp-page="/Blocks/BlockDetails" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-BlockId="@Model.BlockId"

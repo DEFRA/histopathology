@@ -159,7 +159,20 @@ else
                         }
                         <th scope="col" class="govuk-table__header">Special stain</th>
                     }
-                    <th scope="col" class="govuk-table__header">Select</th>
+                    <th scope="col" class="govuk-table__header">
+                        Select
+                        @if (!Model.IsViewMode && Model.Blocks.Any())
+                        {
+                            <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-top-1">
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input" type="checkbox" id="select-all-blocks" />
+                                    <label class="govuk-label govuk-checkboxes__label" for="select-all-blocks">
+                                        <span class="govuk-visually-hidden">Select all blocks (for Delete block)</span>
+                                    </label>
+                                </div>
+                            </div>
+                        }
+                    </th>
                 </tr>
             </thead>
             <tbody class="govuk-table__body">
@@ -288,4 +301,19 @@ else
                class="govuk-button govuk-button--secondary" data-module="govuk-button">Block ref search</a>
         </div>
     </form>
+}
+
+@section Scripts {
+    <script>
+        // Legacy: cbSelectAll (SubmissionDetailsBlock.aspx) — ticks every block row so "Delete
+        // block" can remove them all in one go, instead of checking each one individually.
+        (function () {
+            var selectAll = document.getElementById('select-all-blocks');
+            var checkboxes = document.querySelectorAll('input[name="blockIds"]');
+            if (!selectAll || !checkboxes.length) return;
+            selectAll.addEventListener('change', function () {
+                checkboxes.forEach(function (cb) { cb.checked = selectAll.checked; });
+            });
+        })();
+    </script>
 }

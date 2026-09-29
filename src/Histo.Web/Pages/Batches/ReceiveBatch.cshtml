@@ -210,7 +210,9 @@ else
                             <div class="govuk-checkboxes__item">
                                 <input class="govuk-checkboxes__input" type="checkbox" id="@checkboxId" name="SelectedPostFixationCodes"
                                        value="@p.Code" checked="@Model.SelectedPostFixationCodes.Contains(p.Code ?? string.Empty)" />
-                                <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@p.Name</label>
+                                @* Falls back to the raw code when the pick-list's Description is blank, so the
+                                   checkbox is never rendered with no visible text at all. *@
+                                <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@(string.IsNullOrWhiteSpace(p.Name) ? p.Code : p.Name)</label>
                             </div>
                         }
                         <div class="govuk-checkboxes__item">
