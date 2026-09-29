@@ -21,8 +21,15 @@
 -- revert the pipeline schedule back to the annual CRON (0 4 1 1 *).
 --
 -- DIAGNOSTICS: prints and selects the full dbo.HistologyRef contents both
--- before and after the UPDATE, so a pipeline/sqlcmd run's output log shows
+-- before and after the reset, so a pipeline/sqlcmd run's output log shows
 -- the exact before/after values for every type in a single execution.
+--
+-- IMPLEMENTATION: rather than issuing a raw UPDATE against dbo.HistologyRef,
+-- this procedure calls the existing dbo.EditHistologyRef SP once per row,
+-- passing that row's current RowStamp for optimistic concurrency - the same
+-- update path the application itself uses (Histo.Histology.Repositories.
+-- HistologyRepository.UpdateCounterAsync -> dbo.EditHistologyRef), so the
+-- reset behaves identically to a normal application-driven counter update.
 -- ============================================================================
 CREATE OR ALTER PROCEDURE dbo.EditResetHistologyRef
 AS
@@ -36,8 +43,28 @@ BEGIN
 	SELECT [Type], [NextHistologyRef], [RowStamp]
 	FROM dbo.[HistologyRef];
 
-	UPDATE dbo.[HistologyRef]
-	SET NextHistologyRef = @TestValue;
+	DECLARE @Type INT;
+	DECLARE @RowStamp BINARY(8);
+
+	DECLARE HistologyRefCursor CURSOR LOCAL FAST_FORWARD FOR
+		SELECT [Type], [RowStamp]
+		FROM dbo.[HistologyRef];
+
+	OPEN HistologyRefCursor;
+	FETCH NEXT FROM HistologyRefCursor INTO @Type, @RowStamp;
+
+	WHILE @@FETCH_STATUS = 0
+	BEGIN
+		EXEC dbo.EditHistologyRef
+			@Type = @Type,
+			@NextHistologyRef = @TestValue,
+			@RowStamp = @RowStamp;
+
+		FETCH NEXT FROM HistologyRefCursor INTO @Type, @RowStamp;
+	END
+
+	CLOSE HistologyRefCursor;
+	DEALLOCATE HistologyRefCursor;
 
 	PRINT '--- AFTER reset (dbo.HistologyRef) --- new value: ' + @TestValue;
 	SELECT [Type], [NextHistologyRef], [RowStamp]
