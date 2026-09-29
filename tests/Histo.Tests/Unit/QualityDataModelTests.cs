@@ -258,7 +258,7 @@ public class QualityDataModelTests
 
         await sut.OnPostUpdateAsync();
 
-        Assert.Equal("Enter the number of blocks/slides.", sut.Error);
+        Assert.Equal("Enter the number of blocks/slides.", sut.Errors["NumberOfSlides"]);
         _tests.Verify(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -273,7 +273,8 @@ public class QualityDataModelTests
 
         await sut.OnPostUpdateAsync();
 
-        Assert.Equal("Enter a QC code when setting the result to Failed.", sut.Error);        _tests.Verify(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal("Enter a QC code when setting the result to Failed.", sut.Errors["QCCode"]);
+        _tests.Verify(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -287,7 +288,7 @@ public class QualityDataModelTests
 
         await sut.OnPostUpdateAsync();
 
-        Assert.Equal("Enter a dispatched date.", sut.Error);
+        Assert.Equal("Enter a dispatched date.", sut.Errors["DispatchedDate"]);
         _tests.Verify(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 

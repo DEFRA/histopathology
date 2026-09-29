@@ -63,8 +63,10 @@ public sealed class HistologyBookingResult
 /// <summary>
 /// Histology ref range-type codes.
 /// Legacy source: HistopathologySystem/Common.vb — <c>Enum HistologyRefType</c>.
-/// The "use pg number" option (legacy value 6) is deliberately excluded — BookHistologyRef.aspx
-/// removes it from its type dropdown via <c>RemovePGNumberOption</c>.
+/// <see cref="UsePgNumber"/> (legacy value 6, "use pg number") is excluded from
+/// BookHistologyRef.aspx's own type dropdown (<c>RemovePGNumberOption</c>) — it has no counter
+/// row of its own — but IS a real, selectable option on SubmissionDetailsBlock's "or Pick a
+/// histology reference type" dropdown.
 /// </summary>
 public static class HistologyRefTypeCode
 {
@@ -73,4 +75,5 @@ public static class HistologyRefTypeCode
     public const int TBDiagnostic = 3;
     public const int GeneralPool = 4;
     public const int MouseProjects = 5;
+    public const int UsePgNumber = 6;
 }

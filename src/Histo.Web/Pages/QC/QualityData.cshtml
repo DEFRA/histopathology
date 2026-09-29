@@ -18,6 +18,7 @@
         </div>
     </div>
 }
+<partial name="_ErrorSummary" model="Model.Errors" />
 @if (Model.SuccessMessage is not null)
 {
     <div class="govuk-panel govuk-panel--confirmation govuk-!-margin-bottom-6">
@@ -137,7 +138,7 @@
 
         <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-bottom-2">
             <div class="govuk-checkboxes__item">
-                <input class="govuk-checkboxes__input" type="checkbox" id="SelectAllAcrossPages" name="SelectAllAcrossPages" value="true" />
+                <input class="govuk-checkboxes__input" type="checkbox" id="SelectAllAcrossPages" name="SelectAllAcrossPages" value="true" @(Model.SelectAllAcrossPages ? "checked" : "") />
                 <label class="govuk-label govuk-checkboxes__label" for="SelectAllAcrossPages">All — select every test matching the current filter, including tests on other pages</label>
             </div>
         </div>
@@ -172,6 +173,7 @@
                             <div class="govuk-checkboxes govuk-checkboxes--small">
                                 <div class="govuk-checkboxes__item">
                                     <input class="govuk-checkboxes__input" type="checkbox" id="select-@t.ID" name="SelectedIds" value="@t.ID"
+                                           @(Model.SelectedIds.Contains(t.ID) ? "checked" : "")
                                            @(locked ? "disabled" : "")
                                            title="@(noHistologyRef ? "Unable to enter quality information as the Histology Ref has not been entered for the sample." : null)"
                                            data-result="@t.Result"
@@ -252,58 +254,83 @@
                     <label class="govuk-label" for="Result">Test Result</label>
                     <select class="govuk-select govuk-!-width-two-thirds" id="Result" name="Result">
                         <option value=""></option>
-                        <option value="@Histo.Histology.Models.BlockTestResult.Passed">Passed</option>
-                        <option value="@Histo.Histology.Models.BlockTestResult.Failed">Failed</option>
+                        <option value="@Histo.Histology.Models.BlockTestResult.Passed" selected="@(Model.Result == Histo.Histology.Models.BlockTestResult.Passed)">Passed</option>
+                        <option value="@Histo.Histology.Models.BlockTestResult.Failed" selected="@(Model.Result == Histo.Histology.Models.BlockTestResult.Failed)">Failed</option>
                     </select>
                 </div>
                 <div class="govuk-form-group">
                     <label class="govuk-label" for="StainRef">Stain Ref</label>
-                    <input class="govuk-input govuk-!-width-two-thirds" id="StainRef" name="StainRef" maxlength="20" />
+                    <input class="govuk-input govuk-!-width-two-thirds" id="StainRef" name="StainRef" maxlength="20" value="@Model.StainRef" />
                 </div>
                 <div class="govuk-form-group">
                     <div class="govuk-checkboxes govuk-checkboxes--small">
                         <div class="govuk-checkboxes__item">
-                            <input class="govuk-checkboxes__input" type="checkbox" id="Dispatched" name="Dispatched" value="true" />
+                            <input class="govuk-checkboxes__input" type="checkbox" id="Dispatched" name="Dispatched" value="true" @(Model.Dispatched ? "checked" : "") />
                             <label class="govuk-label govuk-checkboxes__label" for="Dispatched">Dispatched?</label>
                         </div>
                     </div>
                 </div>
-                <div class="govuk-form-group">
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("DispatchedTo") ? "govuk-form-group--error" : "")">
                     <label class="govuk-label" for="DispatchedTo">Dispatched To</label>
-                    <input class="govuk-input govuk-!-width-two-thirds" id="DispatchedTo" name="DispatchedTo" maxlength="30" />
+                    @if (Model.Errors.TryGetValue("DispatchedTo", out var dispatchedToErr))
+                    {
+                        <p id="DispatchedTo-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @dispatchedToErr</p>
+                    }
+                    <input class="govuk-input govuk-!-width-two-thirds @(Model.Errors.ContainsKey("DispatchedTo") ? "govuk-input--error" : "")" id="DispatchedTo" name="DispatchedTo" maxlength="30" value="@Model.DispatchedTo"
+                           aria-describedby="@(Model.Errors.ContainsKey("DispatchedTo") ? "DispatchedTo-error" : null)" />
                 </div>
-                <div class="govuk-form-group">
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("DispatchedDate") ? "govuk-form-group--error" : "")">
                     <label class="govuk-label" for="DispatchedDate">Dispatched Date</label>
-                    <input class="govuk-input govuk-input--width-10" id="DispatchedDate" name="DispatchedDate" type="date" />
+                    @if (Model.Errors.TryGetValue("DispatchedDate", out var dispatchedDateErr))
+                    {
+                        <p id="DispatchedDate-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @dispatchedDateErr</p>
+                    }
+                    <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("DispatchedDate") ? "govuk-input--error" : "")" id="DispatchedDate" name="DispatchedDate" type="date" value="@Model.DispatchedDate?.ToString("yyyy-MM-dd")"
+                           aria-describedby="@(Model.Errors.ContainsKey("DispatchedDate") ? "DispatchedDate-error" : null)" />
                 </div>
-                <div class="govuk-form-group">
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("DispatchedBy") ? "govuk-form-group--error" : "")">
                     <label class="govuk-label" for="DispatchedBy">Dispatched By</label>
-                    <select class="govuk-select govuk-!-width-two-thirds" id="DispatchedBy" name="DispatchedBy">
+                    @if (Model.Errors.TryGetValue("DispatchedBy", out var dispatchedByErr))
+                    {
+                        <p id="DispatchedBy-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @dispatchedByErr</p>
+                    }
+                    <select class="govuk-select govuk-!-width-two-thirds @(Model.Errors.ContainsKey("DispatchedBy") ? "govuk-select--error" : "")" id="DispatchedBy" name="DispatchedBy"
+                            aria-describedby="@(Model.Errors.ContainsKey("DispatchedBy") ? "DispatchedBy-error" : null)">
                         <option value=""></option>
                         @foreach (var u in Model.Users)
                         {
-                            <option value="@u.UserID">@u.Name</option>
+                            <option value="@u.UserID" selected="@(Model.DispatchedBy == u.UserID.ToString())">@u.Name</option>
                         }
                     </select>
                 </div>
                 <div class="govuk-form-group">
                     <label class="govuk-label" for="NumberOfSlides">Number of Blocks\Slides</label>
-                    <input class="govuk-input govuk-input--width-4" id="NumberOfSlides" name="NumberOfSlides" type="number" min="1" max="9999" />
+                    <input class="govuk-input govuk-input--width-4 @(Model.Errors.ContainsKey("NumberOfSlides") ? "govuk-input--error" : "")" id="NumberOfSlides" name="NumberOfSlides" type="number" min="1" max="9999" value="@Model.NumberOfSlides"
+                           aria-describedby="@(Model.Errors.ContainsKey("NumberOfSlides") ? "NumberOfSlides-error" : null)" />
+                    @if (Model.Errors.TryGetValue("NumberOfSlides", out var slidesErr))
+                    {
+                        <p id="NumberOfSlides-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @slidesErr</p>
+                    }
                 </div>
-                <div class="govuk-form-group">
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("QCCode") ? "govuk-form-group--error" : "")">
                     <label class="govuk-label" for="QCCode">QC Code</label>
-                    <select class="govuk-select govuk-!-width-two-thirds" id="QCCode" name="QCCode">
+                    @if (Model.Errors.TryGetValue("QCCode", out var qcCodeErr))
+                    {
+                        <p id="QCCode-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @qcCodeErr</p>
+                    }
+                    <select class="govuk-select govuk-!-width-two-thirds @(Model.Errors.ContainsKey("QCCode") ? "govuk-select--error" : "")" id="QCCode" name="QCCode"
+                            aria-describedby="@(Model.Errors.ContainsKey("QCCode") ? "QCCode-error" : null)">
                         <option value=""></option>
                         @foreach (var c in Model.QCCodes)
                         {
-                            <option value="@c.Code">@c.Name</option>
+                            <option value="@c.Code" selected="@(Model.QCCode == c.Code)">@c.Name</option>
                         }
                     </select>
                 </div>
                 <div class="govuk-form-group">
                     <div class="govuk-checkboxes govuk-checkboxes--small">
                         <div class="govuk-checkboxes__item">
-                            <input class="govuk-checkboxes__input" type="checkbox" id="QCNote" name="QCNote" value="true" />
+                            <input class="govuk-checkboxes__input" type="checkbox" id="QCNote" name="QCNote" value="true" @(Model.QCNote ? "checked" : "") />
                             <label class="govuk-label govuk-checkboxes__label" for="QCNote">QC Note</label>
                         </div>
                     </div>
@@ -317,33 +344,48 @@
                 </div>
             </div>
             <div class="govuk-grid-column-one-half">
-                <div class="govuk-form-group">
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("RemedialAction") ? "govuk-form-group--error" : "")">
                     <label class="govuk-label" for="RemedialAction">Remedial Action</label>
-                    <select class="govuk-select govuk-!-width-two-thirds" id="RemedialAction" name="RemedialAction">
+                    @if (Model.Errors.TryGetValue("RemedialAction", out var remedialErr))
+                    {
+                        <p id="RemedialAction-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @remedialErr</p>
+                    }
+                    <select class="govuk-select govuk-!-width-two-thirds @(Model.Errors.ContainsKey("RemedialAction") ? "govuk-select--error" : "")" id="RemedialAction" name="RemedialAction"
+                            aria-describedby="@(Model.Errors.ContainsKey("RemedialAction") ? "RemedialAction-error" : null)">
                         <option value=""></option>
                         @foreach (var r in Model.RemedialActions)
                         {
-                            <option value="@r.Code">@r.Name</option>
+                            <option value="@r.Code" selected="@(Model.RemedialAction == r.Code)">@r.Name</option>
                         }
                     </select>
                 </div>
-                <div class="govuk-form-group">
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("ArchiveLocationCode") ? "govuk-form-group--error" : "")">
                     <label class="govuk-label" for="ArchiveLocationCode">Archive Location</label>
-                    <select class="govuk-select govuk-!-width-two-thirds" id="ArchiveLocationCode" name="ArchiveLocationCode">
+                    @if (Model.Errors.TryGetValue("ArchiveLocationCode", out var archiveLocationErr))
+                    {
+                        <p id="ArchiveLocationCode-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @archiveLocationErr</p>
+                    }
+                    <select class="govuk-select govuk-!-width-two-thirds @(Model.Errors.ContainsKey("ArchiveLocationCode") ? "govuk-select--error" : "")" id="ArchiveLocationCode" name="ArchiveLocationCode"
+                            aria-describedby="@(Model.Errors.ContainsKey("ArchiveLocationCode") ? "ArchiveLocationCode-error" : null)">
                         <option value=""></option>
                         @foreach (var l in Model.ArchiveLocations)
                         {
-                            <option value="@l.Code">@l.Name</option>
+                            <option value="@l.Code" selected="@(Model.ArchiveLocationCode == l.Code)">@l.Name</option>
                         }
                     </select>
                 </div>
-                <div class="govuk-form-group">
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("ArchivedDate") ? "govuk-form-group--error" : "")">
                     <label class="govuk-label" for="ArchivedDate">Archive Date</label>
-                    <input class="govuk-input govuk-input--width-10" id="ArchivedDate" name="ArchivedDate" type="date" />
+                    @if (Model.Errors.TryGetValue("ArchivedDate", out var archivedDateErr))
+                    {
+                        <p id="ArchivedDate-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @archivedDateErr</p>
+                    }
+                    <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("ArchivedDate") ? "govuk-input--error" : "")" id="ArchivedDate" name="ArchivedDate" type="date" value="@Model.ArchivedDate?.ToString("yyyy-MM-dd")"
+                           aria-describedby="@(Model.Errors.ContainsKey("ArchivedDate") ? "ArchivedDate-error" : null)" />
                 </div>
                 <div class="govuk-form-group">
                     <label class="govuk-label" for="ArchiveComment">Archive Comment</label>
-                    <textarea class="govuk-textarea govuk-!-width-two-thirds" id="ArchiveComment" name="ArchiveComment" rows="3" maxlength="200"></textarea>
+                    <textarea class="govuk-textarea govuk-!-width-two-thirds" id="ArchiveComment" name="ArchiveComment" rows="3" maxlength="200">@Model.ArchiveComment</textarea>
                 </div>
                 <div class="govuk-form-group">
                     <fieldset class="govuk-fieldset">
@@ -352,7 +394,7 @@
                             @foreach (var charge in Model.PremiumCharges)
                             {
                                 <div class="govuk-checkboxes__item">
-                                    <input class="govuk-checkboxes__input" type="checkbox" id="charge-@charge.Code" name="SelectedCharges" value="@charge.Code" />
+                                    <input class="govuk-checkboxes__input" type="checkbox" id="charge-@charge.Code" name="SelectedCharges" value="@charge.Code" @(Model.SelectedCharges.Contains(charge.Code!) ? "checked" : "") />
                                     <label class="govuk-label govuk-checkboxes__label" for="charge-@charge.Code">@charge.Name</label>
                                 </div>
                             }
@@ -364,7 +406,7 @@
 
         <div class="govuk-form-group">
             <label class="govuk-label" for="Comment">Comments:</label>
-            <textarea class="govuk-textarea" id="Comment" name="Comment" rows="4" maxlength="2000"></textarea>
+            <textarea class="govuk-textarea" id="Comment" name="Comment" rows="4" maxlength="2000">@Model.Comment</textarea>
         </div>
 
         <hr class="govuk-section-break govuk-section-break--visible govuk-!-margin-bottom-4" />
@@ -444,7 +486,11 @@ else
                 });
             }
 
-            applySelection();
+            // Deliberately NOT called on page load: after a validation-failure postback (e.g.
+            // "QC Code is mandatory"), the server already re-renders every field/checkbox with
+            // exactly what was submitted — running this here would immediately blank them again
+            // for any reload with 0 or 2+ rows checked. Only real checkbox interactions should
+            // trigger the single-row-populate/clear behaviour.
         })();
     </script>
 }

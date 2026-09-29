@@ -107,4 +107,13 @@ public interface ILookupRepository
 
     /// <summary>Returns all active premium/TC charge codes from <c>GetluPremiumCharges</c>.</summary>
     Task<IReadOnlyList<LookupItem>> GetPremiumChargesAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the Histology Ref Type pick list (Neuropath/Abattoir Survey/TB Diag/General Pool/
+    /// Mouse Projects/use pg number) from the real database-driven <c>GetluHistologyRefType</c> SP
+    /// (table <c>luHistologyRefType</c>, Code/Description columns) — legacy source:
+    /// <c>LookupData.vb::GetHistologyRefLookupData</c>, consumed by
+    /// <c>SubmissionDetailsBlock.aspx.vb::LoadLookupLists</c>'s <c>ddlHistologyType</c>.
+    /// </summary>
+    Task<IReadOnlyList<LookupItem>> GetHistologyRefTypesAsync(CancellationToken ct = default);
 }

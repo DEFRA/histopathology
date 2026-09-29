@@ -110,8 +110,12 @@ public class QualityDataModel : GridPageModel
     [BindProperty] public string? Comment { get; set; }
     [BindProperty] public List<string> SelectedCharges { get; set; } = [];
 
+    /// <summary>Not tied to a single field (e.g. "select at least one test"), shown separately from <see cref="Errors"/>.</summary>
     public string? Error { get; private set; }
     public string? SuccessMessage { get; private set; }
+
+    /// <summary>Field id → message, rendered via the shared clickable _ErrorSummary partial.</summary>
+    public Dictionary<string, string> Errors { get; } = new();
 
     public IReadOnlyList<LookupItem> QCCodes { get; private set; } = [];
     public IReadOnlyList<LookupItem> RemedialActions { get; private set; } = [];
@@ -223,8 +227,8 @@ public class QualityDataModel : GridPageModel
             }
         }
 
-        Error = ValidateEntry(isSingle);
-        if (Error is not null)
+        ValidateEntry(isSingle);
+        if (Errors.Count > 0)
         {
             await ReloadGridAsync(batchId);
             return Page();
@@ -317,31 +321,31 @@ public class QualityDataModel : GridPageModel
     /// <summary>
     /// Cross-field checks mirroring legacy's conditionally-enabled validators. In multi-row mode
     /// only the fields the user actually filled in are validated, since blanks mean "unchanged".
+    /// Accumulates every failing field into <see cref="Errors"/> rather than stopping at the
+    /// first one, so the error summary can link to (and the user can fix) all of them at once.
     /// </summary>
-    private string? ValidateEntry(bool isSingle)
+    private void ValidateEntry(bool isSingle)
     {
         if (Dispatched)
         {
-            if (DispatchedDate is null) return "Enter a dispatched date.";
-            if (string.IsNullOrWhiteSpace(DispatchedBy)) return "Select who dispatched the test.";
-            if (string.IsNullOrWhiteSpace(DispatchedTo)) return "Enter who the test was dispatched to.";
+            if (DispatchedDate is null) Errors["DispatchedDate"] = "Enter a dispatched date.";
+            if (string.IsNullOrWhiteSpace(DispatchedBy)) Errors["DispatchedBy"] = "Select who dispatched the test.";
+            if (string.IsNullOrWhiteSpace(DispatchedTo)) Errors["DispatchedTo"] = "Enter who the test was dispatched to.";
         }
 
         if (Result == BlockTestResult.Failed)
         {
-            if (string.IsNullOrWhiteSpace(QCCode)) return "Enter a QC code when setting the result to Failed.";
-            if (string.IsNullOrWhiteSpace(RemedialAction)) return "Select a remedial action when setting the result to Failed.";
+            if (string.IsNullOrWhiteSpace(QCCode)) Errors["QCCode"] = "Enter a QC code when setting the result to Failed.";
+            if (string.IsNullOrWhiteSpace(RemedialAction)) Errors["RemedialAction"] = "Select a remedial action when setting the result to Failed.";
         }
 
         if (!string.IsNullOrWhiteSpace(ArchiveLocationCode) && ArchivedDate is null)
-            return "Enter an archive date when an archive location is selected.";
+            Errors["ArchivedDate"] = "Enter an archive date when an archive location is selected.";
         if (ArchivedDate is not null && string.IsNullOrWhiteSpace(ArchiveLocationCode))
-            return "Select an archive location when an archive date is entered.";
+            Errors["ArchiveLocationCode"] = "Select an archive location when an archive date is entered.";
 
-        if (NumberOfSlides is <= 0) return "Number of blocks/slides must be greater than zero.";
-        if (isSingle && NumberOfSlides is null) return "Enter the number of blocks/slides.";
-
-        return null;
+        if (NumberOfSlides is <= 0) Errors["NumberOfSlides"] = "Number of blocks/slides must be greater than zero.";
+        if (isSingle && NumberOfSlides is null) Errors["NumberOfSlides"] = "Enter the number of blocks/slides.";
     }
 
     private IEnumerable<BlockTest> ApplyCurrentFilter(IEnumerable<BlockTest> tests)

@@ -33,6 +33,7 @@ public class AddSubmissionModelTests
     {
         _session.SetupProperty(s => s.BatchID);
         _session.SetupProperty(s => s.BatchSubmissionID);
+        _session.SetupProperty(s => s.SampleDetailReturnPage);
         _session.Setup(s => s.UserID).Returns(7);
         _session.Setup(s => s.UserArea).Returns(string.Empty);
         _batches.Setup(b => b.GetSubmittedAsCodeAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((string?)null);
@@ -107,6 +108,22 @@ public class AddSubmissionModelTests
         Assert.Equal("/Submissions/SubmissionDetailsBlock", redirect.PageName);
         Assert.Equal(2, redirect.RouteValues!["animalId"]);
         _submissions.Verify(s => s.AddAnimalAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_AssignTissueMode_SetsSampleDetailReturnPageToBatchBlocks()
+    {
+        // SubmissionDetailsBlock's own Back link reads this — without it, Back would fall through
+        // to the wrong default (SampleSummary) instead of returning to BatchBlocks.
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
+        var sut = CreateSut(returnPage: "/Batches/BatchBlocks?batchId=5");
+        sut.SenderRef = "S2";
+
+        await sut.OnPostAsync();
+
+        Assert.Equal("/Batches/BatchBlocks?batchId=5", sut.Session.SampleDetailReturnPage);
     }
 
     [Fact]

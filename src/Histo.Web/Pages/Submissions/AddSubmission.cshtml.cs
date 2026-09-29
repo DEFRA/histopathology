@@ -120,6 +120,7 @@ public class AddSubmissionModel : HistoPageModel
                 return Page();
             }
 
+            Session.SampleDetailReturnPage = BackLinkPage;
             return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = chosen.ID });
         }
 
@@ -200,12 +201,14 @@ public class AddSubmissionModel : HistoPageModel
                 return RedirectToPage("/Submissions/SampleSummary", new { batchId });
             }
 
+            Session.SampleDetailReturnPage = BackLinkPage;
             return RedirectToPage("/Submissions/SubmissionDetails", new { batchId, animalId = newAnimalId });
         }
 
         if (SourceAnimalId is > 0)
             return RedirectToPage("/Submissions/SampleSummary", new { batchId });
 
+        Session.SampleDetailReturnPage = BackLinkPage;
         return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = newAnimalId });
     }
 
