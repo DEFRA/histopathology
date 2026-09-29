@@ -518,16 +518,38 @@ public class BlockDetailsModel : HistoPageModel
             // recorded against this SAMPLE, i.e. the ones waiting to be assigned to its blocks.
             // Legacy source: BlockDetails.aspx.vb::LoadLookupTypeList ->
             // clsTissue.GetBatchAnimalTissues(BatchID, AnimalID) -> SP GetBatchSampleTissues.
-            // Filtering by the animal's own BLOCK tissues instead is circular — a block with
-            // nothing assigned yet contributes no codes, so the list came back empty exactly when
-            // it was needed.
-            var sampleCodes = (await _submissions.GetTissuesBySubmissionAsync(BatchId ?? 0, Animal.BatchSubmissionID))
-                .Select(t => t.TissueCode)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            TissueOptions = fullTissueList.Where(o => o.Code is not null && sampleCodes.Contains(o.Code)).ToList();
+            var submissions = await _submissions.GetSubmissionsByBatchAsync(BatchId ?? 0);
+            var submissionIds = submissions.Select(s => s.ID).ToHashSet();
+            var firstSubmId = submissions.Count > 0 ? submissions[0].ID : 0;
 
-            // A sample with no recorded tissues would otherwise offer nothing to pick from.
-            if (TissueOptions.Count == 0) TissueOptions = fullTissueList;
+            var bySubmission = (await _submissions.GetBatchSubmissionTissuesAsync(BatchId ?? 0))
+                .GroupBy(t => t.OwnerID)
+                .ToDictionary(g => g.Key, g => g.Select(t => t.TissueCode).ToList());
+
+            // Same fallback chain as SampleSummary/CopyBatch: BatchSubmissionID → the batch's first
+            // submission → the unkeyed (0) group. Not every SP returns BatchSubmissionID, so keying
+            // on it alone silently matched nothing and fell through to the whole tissue list.
+            var submId = Animal.BatchSubmissionID > 0 && submissionIds.Contains(Animal.BatchSubmissionID)
+                ? Animal.BatchSubmissionID
+                : firstSubmId;
+            var sampleCodes = (bySubmission.TryGetValue(submId, out var codes) ? codes
+                    : bySubmission.TryGetValue(0, out var unkeyed) ? unkeyed
+                    : [])
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            // Anything already assigned to this sample's blocks must stay selectable even if it
+            // isn't (or is no longer) on the submission's own tissue list — otherwise a tissue
+            // visible in the table above can't be picked again for another block.
+            var animalBlockIds = (await _blocks.GetByBatchAsync(BatchId ?? 0))
+                .Where(b => b.AnimalID == Animal.ID)
+                .Select(b => b.ID)
+                .ToHashSet();
+            foreach (var t in await _submissions.GetTissuesByBatchAsync(BatchId ?? 0))
+            {
+                if (animalBlockIds.Contains(t.OwnerID)) sampleCodes.Add(t.TissueCode);
+            }
+
+            TissueOptions = fullTissueList.Where(o => o.Code is not null && sampleCodes.Contains(o.Code)).ToList();
         }
 
         // Loaded for the initial provisioning request (BlockId not yet assigned) and for every
