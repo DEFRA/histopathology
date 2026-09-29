@@ -1,73 +1,128 @@
+/****** Object:  StoredProcedure [dbo].[EditResetHistologyRef] ******/
+/****** ONE-TIME DEPLOYMENT SCRIPT — Safe to re-run via pipeline ******/
 -- ============================================================================
 -- dbo.EditResetHistologyRef
 -- ============================================================================
--- Resets each histology reference counter (dbo.HistologyRef.NextHistologyRef,
--- confirmed varchar(5) per the real dbo.EditHistologyRef definition) to a
--- clock-derived value, so scheduled runs can be verified end-to-end without
--- waiting for the annual 1-January reset.
+-- Real production reset logic (captured from SSMS, script date 29/09/2026
+-- 14:35:32). Resets each histology reference counter
+-- (dbo.HistologyRef.NextHistologyRef) to its fixed per-type starting value,
+-- but ONLY once per calendar year - guarded by comparing GETDATE() against
+-- the most recent HistRefResetLog entry
+-- (DATEDIFF(Year, @LastUpdate, @CurrentDate) > 0).
 --
--- TESTING value: minutes-since-midnight (UTC), zero-padded to 5 digits
--- (e.g. '00555' = 09:15 UTC). Fits varchar(5) (range 00000-01439) and visibly
--- changes every minute, so a 15-minute schedule is easy to verify.
+-- Before resetting, current values are snapshotted into HistologyRefBackup,
+-- then each type is updated in its own statement inside an explicit
+-- transaction, with a rowcount check + ROLLBACK after every statement. On
+-- success, a new HistRefResetLog row is inserted recording @CurrentDate as
+-- the reset date (this becomes @LastUpdate on the next run).
 --
--- NOTE: RowStamp is a SQL Server `timestamp`/rowversion column, auto-updated
--- by the engine on any row change - it is never set explicitly, matching
--- dbo.EditHistologyRef's own usage (RowStamp only ever appears in a WHERE
--- clause there, never in a SET clause).
---
--- TESTING NOTE: currently scheduled every 15 minutes (see .azure-devops/pipeline.yaml)
--- for verification purposes. Once verified, replace the body below with the
--- real production reset rule (e.g. each type's own starting number) and
--- revert the pipeline schedule back to the annual CRON (0 4 1 1 *).
---
--- DIAGNOSTICS: prints and selects the full dbo.HistologyRef contents both
--- before and after the reset, so a pipeline/sqlcmd run's output log shows
--- the exact before/after values for every type in a single execution.
---
--- IMPLEMENTATION: rather than issuing a raw UPDATE against dbo.HistologyRef,
--- this procedure calls the existing dbo.EditHistologyRef SP once per row,
--- passing that row's current RowStamp for optimistic concurrency - the same
--- update path the application itself uses (Histo.Histology.Repositories.
--- HistologyRepository.UpdateCounterAsync -> dbo.EditHistologyRef), so the
--- reset behaves identically to a normal application-driven counter update.
+-- IMPORTANT: because of the year-gate, calling this procedure on a schedule
+-- (e.g. every 15 minutes) is a deliberate no-op on every run except the
+-- first run after the calendar year rolls over - this is expected
+-- production behaviour, not a bug. To test locally without waiting for
+-- 1 January, temporarily back-date the most recent HistRefResetLog row (or
+-- insert a dummy earlier-year row) so the year-gate evaluates true, then
+-- restore/re-seed HistRefResetLog afterwards.
 -- ============================================================================
-CREATE OR ALTER PROCEDURE dbo.EditResetHistologyRef
-AS
-BEGIN
-	SET NOCOUNT ON;
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
 
-	DECLARE @MinutesSinceMidnight INT = DATEDIFF(MINUTE, CAST(GETUTCDATE() AS DATE), GETUTCDATE());
-	DECLARE @TestValue VARCHAR(5) = RIGHT('0000' + CAST(@MinutesSinceMidnight AS VARCHAR(5)), 5);
+IF OBJECT_ID('[dbo].[EditResetHistologyRef]', 'P') IS NOT NULL
+	DROP PROCEDURE [dbo].[EditResetHistologyRef];
+GO
 
-	PRINT '--- BEFORE reset (dbo.HistologyRef) ---';
-	SELECT [Type], [NextHistologyRef], [RowStamp]
-	FROM dbo.[HistologyRef];
+CREATE PROCEDURE [dbo].[EditResetHistologyRef] AS
 
-	DECLARE @Type INT;
-	DECLARE @RowStamp BINARY(8);
+DECLARE
+	@LastUpdate datetime,
+	@CurrentDate datetime,
+	@ErrorCode int,
+	@Rowcount int
 
-	DECLARE HistologyRefCursor CURSOR LOCAL FAST_FORWARD FOR
-		SELECT [Type], [RowStamp]
-		FROM dbo.[HistologyRef];
 
-	OPEN HistologyRefCursor;
-	FETCH NEXT FROM HistologyRefCursor INTO @Type, @RowStamp;
+	SET @CurrentDate = GETDATE()
 
-	WHILE @@FETCH_STATUS = 0
-	BEGIN
-		EXEC dbo.EditHistologyRef
-			@Type = @Type,
-			@NextHistologyRef = @TestValue,
-			@RowStamp = @RowStamp;
+	SELECT @LastUpdate = (SELECT TOP 1  HistRefResetDate FROM HistRefResetLog ORDER BY ResetID DESC)
 
-		FETCH NEXT FROM HistologyRefCursor INTO @Type, @RowStamp;
+
+	IF  DATEDIFF(Year,@LastUpdate,@CurrentDate)>0 BEGIN
+
+		UPDATE HistologyRefBackup SET
+			HistologyRefBackup.NextHistologyRef = HistologyRef.NextHistologyRef
+		FROM
+			HistologyRef
+		WHERE
+			HistologyRefBackup.Type = HistologyRef.Type
+
+		BEGIN TRANSACTION
+
+		UPDATE HistologyRef SET NextHistologyRef = 10000 WHERE Type = 1
+
+		SET @RowCount = @@ROWCOUNT
+		IF @RowCount <> 1 BEGIN
+			ROLLBACK TRANSACTION
+			RETURN 1
+		END
+
+		UPDATE HistologyRef SET NextHistologyRef = 20000 WHERE Type = 2
+
+		SET @RowCount = @@ROWCOUNT
+		IF @RowCount <> 1 BEGIN
+			ROLLBACK TRANSACTION
+			RETURN 1
+		END
+
+		UPDATE HistologyRef SET NextHistologyRef = 30000 WHERE Type = 3
+
+		SET @RowCount = @@ROWCOUNT
+		IF @RowCount <> 1 BEGIN
+			ROLLBACK TRANSACTION
+			RETURN 1
+		END
+
+		UPDATE HistologyRef SET NextHistologyRef = 40000 WHERE Type = 4
+
+		SET @RowCount = @@ROWCOUNT
+		IF @RowCount <> 1 BEGIN
+			ROLLBACK TRANSACTION
+			RETURN 1
+		END
+
+		UPDATE HistologyRef SET NextHistologyRef = 60000 WHERE Type = 5
+
+		SET @RowCount = @@ROWCOUNT
+		IF @RowCount <> 1 BEGIN
+			ROLLBACK TRANSACTION
+			RETURN 1
+		END
+
+		INSERT INTO HistRefResetLog
+			(
+				HistRefResetDate
+			)
+		VALUES
+			(
+				 @CurrentDate
+			)
+
+		SET @RowCount = @@ROWCOUNT
+		IF @RowCount <> 1 BEGIN
+			ROLLBACK TRANSACTION
+			RETURN 1
+		END
+
+		SET @ErrorCode = @@ERROR
+
+		IF @ErrorCode <> 0 BEGIN
+			ROLLBACK TRANSACTION
+			RETURN 1
+		END
+
+		COMMIT TRANSACTION
+
+		RETURN 0
+
 	END
-
-	CLOSE HistologyRefCursor;
-	DEALLOCATE HistologyRefCursor;
-
-	PRINT '--- AFTER reset (dbo.HistologyRef) --- new value: ' + @TestValue;
-	SELECT [Type], [NextHistologyRef], [RowStamp]
-	FROM dbo.[HistologyRef];
-END
 GO
