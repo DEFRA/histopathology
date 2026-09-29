@@ -230,25 +230,12 @@ public class BlockDetailsModel : HistoPageModel
         if (redirect is not null) return redirect;
         if (Animal is null) return RedirectToPage("/Submissions/SampleSummary", new { batchId = BatchId });
 
-        // Locked fields can't be changed by a crafted POST — silently keep the existing value
-        // rather than trusting the submitted one, mirroring the readonly inputs in the view.
-        if (HistologyRefLocked) EditHistologyRef = Animal.HistologyRef;
-        if (PMDateLocked) EditPMDate = Animal.PMDate;
+        // Legacy txtHistologyRef/PM date are display-only here (Enabled = False) — they're set via
+        // the sample screens. Never trust a posted value, and never write them back from this page.
+        EditHistologyRef = Animal.HistologyRef;
+        EditPMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
 
-        // Validate Histology Reference before proceeding
-        var histoRefError = await ValidateHistologyRefAsync(EditHistologyRef);
-        if (histoRefError is not null)
-        {
-            ErrorMessage = histoRefError;
-            var attemptedHistoRef = EditHistologyRef;
-            var attemptedPmDate = EditPMDate;
-            if (!await LoadEditModeDataAsync()) return Page();
-            EditHistologyRef = attemptedHistoRef;
-            EditPMDate = attemptedPmDate;
-            return Page();
-        }
-
-        // Validate test selections up front too, so nothing is saved at all if either half is invalid.
+        // Validate test selections up front, so nothing is saved at all if they're invalid.
         var testsError = ValidateTestSelections(SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes);
         if (testsError is not null)
         {
@@ -261,67 +248,25 @@ public class BlockDetailsModel : HistoPageModel
             return Page();
         }
 
-        // Save Histology Reference and PM Date to Animal record if they've changed
-        if (Animal is not null && (Animal.HistologyRef != EditHistologyRef || Animal.PMDate != EditPMDate))
-        {
-            var updatedAnimal = new Animal
-            {
-                ID = Animal.ID,
-                BatchSubmissionID = Animal.BatchSubmissionID,
-                SenderRef = Animal.SenderRef,
-                NextBlockRef = Animal.NextBlockRef,
-                HistoRefSet = !string.IsNullOrWhiteSpace(EditHistologyRef),
-                HistologyRef = EditHistologyRef,
-                OnHold = Animal.OnHold,
-                PMDate = DateFormatHelpers.ToLegacyDate(EditPMDate),
-                PMDateSet = !string.IsNullOrWhiteSpace(EditPMDate),
-                IsPGNumber = Animal.IsPGNumber,
-                BookedHistologyRef = Animal.BookedHistologyRef,
-                RowStamp = Animal.RowStamp,
-            };
-            await _submissions.UpdateAnimalAsync(updatedAnimal, Session.UserID);
-            Animal = updatedAnimal; // Update the local reference
-        }
-
         await LoadSupportingDataAsync();
         var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
 
-        // Reached via a genuine Edit link (not the auto-provisioned add-flow) — plain update, no bulk-duplicate.
-        if (!IsAddFlow)
-        {
-            var existing = allBlocks.FirstOrDefault(b => b.ID == BlockId);
-            if (existing is null || string.IsNullOrWhiteSpace(NewBlockRef))
-                return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
-
-            if (!CanUseAdditionalRequest) NewRepeatBlock = false;
-
-            var updated = new Block
-            {
-                ID = existing.ID,
-                BatchID = existing.BatchID,
-                AnimalID = existing.AnimalID,
-                BlockRef = NewBlockRef,
-                CustomerRef = NewCustomerRef,
-                Comment = NewComment,
-                RepeatBlock = NewRepeatBlock,
-                Status = existing.Status,
-                Order = existing.Order,
-                RowStamp = existing.RowStamp,
-            };
-            await _blocks.UpdateBlockAsync(updated, Session.UserID);
-            await _blockTests.SaveTestSelectionsAsync(
-                BatchId ?? 0, existing.ID, SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes, Session.UserID);
-            return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
-        }
-
-        // Add flow — legacy: UpdateBlockDetails() + CreateMultiBlocks(). Block #1 already exists
-        // (auto-created on first load so tissues/tests could be assigned immediately); Save updates
-        // that record, then optionally creates NewNumberOfBlocks-1 more sibling blocks.
+        // Legacy btnDone_Click: UpdateBlockDetails() then CreateMultiBlocks(), for a freshly added
+        // block and an existing one being edited alike — "Number of blocks" applies to both. In the
+        // add flow block #1 already exists (auto-created on first load so tissues/tests could be
+        // assigned immediately), so this updates that record then creates count-1 more siblings.
         var current = allBlocks.FirstOrDefault(b => b.ID == BlockId);
-        if (current is null || string.IsNullOrWhiteSpace(NewBlockRef)) return Page();
+        if (current is null || string.IsNullOrWhiteSpace(NewBlockRef))
+            return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
 
+        var count = Math.Max(1, NewNumberOfBlocks);
+        var refChanged = !string.Equals(NewBlockRef, current.BlockRef, StringComparison.OrdinalIgnoreCase);
+
+        // Legacy only re-checks the pre-booked list when the ref actually changes (ValidateRequiredData's
+        // "If Not sOriginalBlockRef = txtBlockReference.Text()" guard) — an unchanged ref is already
+        // allocated to this block and so no longer appears among the free pre-booked refs.
         var preBookedIndex = -1;
-        if (IsPreCassetted)
+        if (IsPreCassetted && (count > 1 || refChanged))
         {
             var preBookedRefs = PreBookedBlockRefs.Select(b => b.BlockRef).ToList();
             preBookedIndex = preBookedRefs.FindIndex(r => r == NewBlockRef);
@@ -330,7 +275,7 @@ public class BlockDetailsModel : HistoPageModel
                 ErrorMessage = "Select one of the pre-booked block references for this pre-cassetted submission.";
                 return Page();
             }
-            if (preBookedIndex + NewNumberOfBlocks > preBookedRefs.Count)
+            if (preBookedIndex + count > preBookedRefs.Count)
             {
                 ErrorMessage = $"Only {preBookedRefs.Count - preBookedIndex} pre-booked block reference(s) are available from this starting point.";
                 return Page();
@@ -366,7 +311,6 @@ public class BlockDetailsModel : HistoPageModel
         await _blockTests.SaveTestSelectionsAsync(
             BatchId ?? 0, current.ID, SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes, Session.UserID);
 
-        var count = Math.Max(1, NewNumberOfBlocks);
         if (count > 1)
         {
             var existingOrders = allBlocks.Select(b => b.Order).ToList();
@@ -375,6 +319,10 @@ public class BlockDetailsModel : HistoPageModel
             var preBookedRefsForCreate = IsPreCassetted ? PreBookedBlockRefs.Select(b => b.BlockRef).ToList() : null;
             var blockRef = NewBlockRef;
 
+            // Legacy CreateMultiBlocks duplicates the source block's tissues and tests into every
+            // sibling — the "blocks containing the same tissues and tests" the field describes.
+            var sourceTissues = await _submissions.GetTissuesByBlockAsync(BatchId ?? 0, current.ID);
+
             for (var i = 1; i < count; i++)
             {
                 // Pre-cassetted blocks must use the next pre-booked ref, not the free-text auto-increment scheme.
@@ -382,9 +330,27 @@ public class BlockDetailsModel : HistoPageModel
                     ? preBookedRefsForCreate![preBookedIndex + i]
                     : BlockHelpers.ComputeNextBlockRef(existingRefs);
 
-                await _blocks.AddBlockAsync(
+                var siblingId = await _blocks.AddBlockAsync(
                     BatchId ?? 0, Animal.ID, blockRef, existingOrders, Session.UserID,
-                    customerRef: null, comment: null, repeatBlock: false);
+                    customerRef: NewCustomerRef, comment: NewComment, repeatBlock: NewRepeatBlock);
+
+                if (siblingId > 0)
+                {
+                    foreach (var t in sourceTissues)
+                    {
+                        await _submissions.AddTissueAsync(new Tissue
+                        {
+                            OwnerID = siblingId,
+                            Owner = TissueOwner.Block,
+                            TissueCode = t.TissueCode,
+                            NoPieces = t.NoPieces,
+                            Comment = t.Comment,
+                        }, Session.UserID);
+                    }
+
+                    await _blockTests.SaveTestSelectionsAsync(
+                        BatchId ?? 0, siblingId, SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes, Session.UserID);
+                }
 
                 existingRefs.Add(blockRef);
                 existingOrders.Add(BlockHelpers.ComputeNextOrder(existingOrders));
@@ -548,19 +514,20 @@ public class BlockDetailsModel : HistoPageModel
         }
         else
         {
-            // Legacy: LoadLookupTypeList default (chkUseWholeTissueList unchecked) — only tissue
-            // types already used across this animal's OWN blocks. Legacy source:
-            // BlockDetails.aspx.vb::LoadLookupTypeList -> clsTissue.GetBatchAnimalTissues(BatchID,
-            // AnimalID) -> SP GetBatchSampleTissues. Block-owned tissues have no BatchSubmissionID
-            // of their own, so this cross-references this animal's block IDs against the batch's
-            // block tissues rather than filtering by submission (which was the earlier, wrong fix).
-            var animalBlockIds = (await _blocks.GetByBatchAsync(BatchId ?? 0))
-                .Where(b => b.AnimalID == Animal.ID)
-                .Select(b => b.ID)
-                .ToHashSet();
-            var allBlockTissues = await _submissions.GetTissuesByBatchAsync(BatchId ?? 0);
-            var usedCodes = allBlockTissues.Where(t => animalBlockIds.Contains(t.OwnerID)).Select(t => t.TissueCode).ToHashSet();
-            TissueOptions = fullTissueList.Where(o => o.Code is not null && usedCodes.Contains(o.Code)).ToList();
+            // Legacy: LoadLookupTypeList default (chkUseWholeTissueList unchecked) — the tissue types
+            // recorded against this SAMPLE, i.e. the ones waiting to be assigned to its blocks.
+            // Legacy source: BlockDetails.aspx.vb::LoadLookupTypeList ->
+            // clsTissue.GetBatchAnimalTissues(BatchID, AnimalID) -> SP GetBatchSampleTissues.
+            // Filtering by the animal's own BLOCK tissues instead is circular — a block with
+            // nothing assigned yet contributes no codes, so the list came back empty exactly when
+            // it was needed.
+            var sampleCodes = (await _submissions.GetTissuesBySubmissionAsync(BatchId ?? 0, Animal.BatchSubmissionID))
+                .Select(t => t.TissueCode)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            TissueOptions = fullTissueList.Where(o => o.Code is not null && sampleCodes.Contains(o.Code)).ToList();
+
+            // A sample with no recorded tissues would otherwise offer nothing to pick from.
+            if (TissueOptions.Count == 0) TissueOptions = fullTissueList;
         }
 
         // Loaded for the initial provisioning request (BlockId not yet assigned) and for every
@@ -654,10 +621,16 @@ public class BlockDetailsModel : HistoPageModel
         Session.AnimalID = AnimalId;
         var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(batchId.Value);
         Animal = blockAnimals.FirstOrDefault(a => a.ID == AnimalId);
+        var plainAnimals = await _submissions.GetAnimalsByBatchAsync(batchId.Value);
         if (Animal is null)
         {
-            var animals = await _submissions.GetAnimalsByBatchAsync(batchId.Value);
-            Animal = animals.FirstOrDefault(a => a.ID == AnimalId);
+            Animal = plainAnimals.FirstOrDefault(a => a.ID == AnimalId);
+        }
+        else if (Animal.BatchSubmissionID <= 0)
+        {
+            // BATCH_BLOCK_ANIMAL doesn't return BatchSubmissionID, so patch it from the plain
+            // animal list — the sample's tissue list is keyed on it.
+            Animal.BatchSubmissionID = plainAnimals.FirstOrDefault(a => a.ID == AnimalId)?.BatchSubmissionID ?? 0;
         }
 
         return null;
