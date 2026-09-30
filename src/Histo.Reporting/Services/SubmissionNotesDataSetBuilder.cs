@@ -197,6 +197,31 @@ public sealed class SubmissionNotesDataSetBuilder
         return ds;
     }
 
+    /// <summary>
+    /// Lightweight existence check equivalent to legacy <c>EnableSubmissionNotes</c> — true when
+    /// the submission has any recorded comment, whether at header (Batch.Comments/StatusComments)
+    /// level or on any individual tissue/block/antibody/histology/stain row. Callers that only
+    /// checked Batch.Comments/StatusComments missed notes recorded solely at tissue/block/test
+    /// level, leaving the "Print submission notes" button disabled even though the report has
+    /// content.
+    /// </summary>
+    public async Task<bool> HasAnyNotesAsync(int batchId, CancellationToken ct = default)
+    {
+        var ds = await BuildAsync(batchId, ct);
+
+        var header = ds.Tables["Submission"];
+        if (header is { Rows.Count: > 0 })
+        {
+            var row = header.Rows[0];
+            if (!string.IsNullOrWhiteSpace(row["SubmissionComments"] as string) ||
+                !string.IsNullOrWhiteSpace(row["SubmissionStatusComment"] as string))
+                return true;
+        }
+
+        return new[] { "SubmissionTissues", "SubmissionBlocks", "BlockAntibodies", "BlockHistology", "BlockSpecialStain" }
+            .Any(name => ds.Tables[name] is { Rows.Count: > 0 });
+    }
+
     private static string Str(IDictionary<string, object> row, string key)
     {
         if (!row.TryGetValue(key, out var val) || val is null || val is DBNull)

@@ -28,15 +28,32 @@
     <input type="hidden" asp-for="ReturnPage" />
     <input type="hidden" id="icc-filter" name="Filter" value="" />
     <div class="govuk-form-group">
-        <label class="govuk-label" for="SenderRef">Sender reference</label>
-        <div class="govuk-hint">Enter the reference for the sample you are submitting tissue for, then click Add sample. It is recommended that the sender reference does not exceed 10 characters.</div>
-        <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" required />
+        <label class="govuk-label" for="SenderRef">@(Model.IsAssignTissueMode ? "Sample associated" : "Sender reference")</label>
+        @if (Model.IsAssignTissueMode)
+        {
+            <div class="govuk-hint">Select the sample you want to assign tissues/blocks to.</div>
+            <select class="govuk-select" asp-for="SenderRef" required>
+                <option value="">-- Select a sample --</option>
+                @foreach (var animal in Model.AvailableAnimals)
+                {
+                    <option value="@animal.SenderRef" selected="@(Model.SenderRef == animal.SenderRef)">@animal.SenderRef</option>
+                }
+            </select>
+        }
+        else
+        {
+            <div class="govuk-hint">Enter the reference for the sample you are submitting tissue for, then click Add sample. It is recommended that the sender reference does not exceed 10 characters.</div>
+            <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" required />
+        }
     </div>
-    <p class="govuk-body">
-        <a asp-page="/Search/SearchSender" asp-route-returnPage="/Submissions/AddSubmission" asp-route-SenderRef="@Model.SenderRef" class="govuk-link">
-            Search for a previously used sender reference
-        </a>
-    </p>
+    @if (!Model.IsAssignTissueMode)
+    {
+        <p class="govuk-body">
+            <a asp-page="/Search/SearchSender" asp-route-returnPage="/Submissions/AddSubmission" asp-route-SenderRef="@Model.SenderRef" class="govuk-link">
+                Search for a previously used sender reference
+            </a>
+        </p>
+    }
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Add sample</button>
         <a href="@Model.BackLinkPage" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>

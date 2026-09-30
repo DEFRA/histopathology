@@ -256,6 +256,7 @@ public class SearchSubmissionsModel : HistoPageModel
         {
             Session.BatchID    = SelectedBatchId;
             Session.ReturnPage = "/Search/SearchSubmissions";  // GAP-3: context-aware back link on BatchDetails
+            Session.EditBatchReturnPage = null; // this entry point owns EditBatch's return target, not any stale Edit Submission Status detour
             Session.IsViewSubmissionMode = true;
         }
 

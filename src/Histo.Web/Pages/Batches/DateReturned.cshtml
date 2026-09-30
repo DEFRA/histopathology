@@ -6,7 +6,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Batches/BatchDetails" class="govuk-back-link">Back</a>
+    <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
 }
 
 @if (Model.Error is not null && Model.Batch is null)
@@ -19,7 +19,7 @@
             @Model.Error
         </strong>
     </div>
-    <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to submission</a>
+    <a href="@Model.BackLinkPage" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to submission</a>
 }
 else if (Model.Batch is not null)
 {
@@ -65,8 +65,24 @@ else if (Model.Batch is not null)
             <dt class="govuk-summary-list__key">Date completed</dt>
             <dd class="govuk-summary-list__value">@Model.Batch.CompletedDate?.ToShortDateString()</dd>
         </div>
+        @if (Model.ReadOnly)
+        {
+            @* Reached from the read-only BatchDetails view — display only, no save action. *@
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">Date returned to customer</dt>
+                <dd class="govuk-summary-list__value">
+                    @(Model.CustomerReceivedDate.HasValue ? Model.CustomerReceivedDate.Value.ToShortDateString() : "Not yet recorded")
+                </dd>
+            </div>
+        }
     </dl>
 
+    @if (Model.ReadOnly)
+    {
+        <a href="@Model.BackLinkPage" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to submission details</a>
+    }
+    else
+    {
     <form method="post">
         <div class="govuk-form-group @(Model.Error != null ? "govuk-form-group--error" : "")">
             <label class="govuk-label govuk-label--s" for="customer-received-date">
@@ -92,7 +108,7 @@ else if (Model.Batch is not null)
 
         <div class="govuk-button-group">
             <button type="submit" class="govuk-button" data-module="govuk-button">Save date returned</button>
-            <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
         </div>
     </form>
+    }
 }

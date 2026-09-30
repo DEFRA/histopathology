@@ -23,7 +23,6 @@ public class BatchesForArchivingModel : GridPageModel
             "ProjectDescription" => SortDesc ? Batches.OrderByDescending(b => b.ProjectDescription) : Batches.OrderBy(b => b.ProjectDescription),
             "ContactDescription" => SortDesc ? Batches.OrderByDescending(b => b.ContactDescription) : Batches.OrderBy(b => b.ContactDescription),
             "Species"            => SortDesc ? Batches.OrderByDescending(b => b.Species)            : Batches.OrderBy(b => b.Species),
-            "OtherSubmittedBy"   => SortDesc ? Batches.OrderByDescending(b => b.OtherSubmittedBy)   : Batches.OrderBy(b => b.OtherSubmittedBy),
             "CompletedDate"      => SortDesc ? Batches.OrderByDescending(b => b.CompletedDate)      : Batches.OrderBy(b => b.CompletedDate),
             "ID"                 => SortDesc ? Batches.OrderByDescending(b => b.ID)                  : Batches.OrderBy(b => b.ID),
             // No column clicked yet — legacy default: dvBatchesView.Sort = "ID DESC".

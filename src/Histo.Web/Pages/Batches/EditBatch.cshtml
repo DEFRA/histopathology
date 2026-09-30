@@ -76,7 +76,7 @@
         <div class="govuk-grid-column-two-thirds">
             @* External submitter *@
             <div class="govuk-form-group">
-                <label class="govuk-label" for="OtherSubmittedBy">Submitted by (external)</label>
+                <label class="govuk-label" for="OtherSubmittedBy">Submitted by</label>
                 <select class="govuk-select app-select-stack" asp-for="OtherSubmittedBy">
                     <option value="">-- None --</option>
                     @foreach (var u in Model.AllUsers)
@@ -94,7 +94,7 @@
         </div>
         <div class="govuk-grid-column-one-third">
             <div class="govuk-form-group">
-                <label class="govuk-label" for="OtherSubmittedAreaDisplay">Submitted area (external)</label>
+                <label class="govuk-label" for="OtherSubmittedAreaDisplay">Submitted area</label>
                 <select class="govuk-select" id="OtherSubmittedAreaDisplay" disabled>
                     <option value="">-- None --</option>
                     @foreach (var a in Model.UserAreas)

@@ -119,6 +119,20 @@
     text-decoration: none;
 }
 
+/* Resets native <button> chrome so a Back link that must POST (discard/cancel) instead of
+ * navigate via <a href> renders identically to govuk-back-link's <a> variant. Restates
+ * padding-left explicitly rather than relying on cascade order against govuk-frontend.min.css. */
+.app-back-link-button {
+    appearance: none;
+    background: none;
+    border: 0;
+    margin: 0;
+    padding: 0 0 0 14px;
+    font: inherit;
+    cursor: pointer;
+    color: #0b0c0c;
+}
+
 /* Aligns a <select> with its "Manage …" pick-list button on the same row (e.g. Project/
  * Contract code, Pathologist, Submitted by (external) on EditBatch/BatchDetails) instead of
  * the button stacking below on its own line. Wraps on narrow screens rather than overflowing. */
@@ -147,6 +161,14 @@
  * of letting it overflow past the page width — govuk-table has no built-in responsive behaviour. */
 .app-table-responsive {
     overflow-x: auto;
+}
+
+/* A long, unbroken Comment paragraph (SubmissionDetails/BlockDetails tissue tables) otherwise grows
+ * the column with no limit, squeezing the adjacent Actions column until its Edit/Delete
+ * govuk-button-group runs out of room and wraps the buttons onto separate lines. */
+.app-table-comment-cell {
+    max-width: 320px;
+    word-break: break-word;
 }
 
 /* Uniform-width submission status tag (SearchSubmissions/ViewSubmissions/BatchesForEditing grids)

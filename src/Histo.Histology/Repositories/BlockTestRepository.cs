@@ -30,7 +30,19 @@ public sealed class BlockTestRepository : IBlockTestRepository
     public BlockTestRepository(IDbConnectionFactory db) => _db = db;
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<BlockTest>> GetByBatchAsync(int batchId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<BlockTest>> GetByBatchAsync(int batchId, CancellationToken ct = default) =>
+        await FetchAsync(batchId, filterToWorklistCodes: true, ct);
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BlockTest>> GetAllSelectionsByBatchAsync(int batchId, CancellationToken ct = default) =>
+        await FetchAsync(batchId, filterToWorklistCodes: false, ct);
+
+    /// <summary>
+    /// Shared reader behind <see cref="GetByBatchAsync"/> and <see cref="GetAllSelectionsByBatchAsync"/>.
+    /// <paramref name="filterToWorklistCodes"/> selects which of those two contracts to honour —
+    /// see the histology-codes comment below for why they must differ.
+    /// </summary>
+    private async Task<IReadOnlyList<BlockTest>> FetchAsync(int batchId, bool filterToWorklistCodes, CancellationToken ct)
     {
         using var conn = _db.CreateConnection();
         using var multi = await conn.QueryMultipleAsync(
@@ -159,17 +171,25 @@ public sealed class BlockTestRepository : IBlockTestRepository
         // worklist row from this table. Including 3/4/6 here double-counts a test already
         // represented by its own Antibodies/Stain row (confirmed live: batch 29399/block 317172
         // had a BLOCK_HISTOLOGY Code=3 row plus 3 real BLOCK_STAIN rows — legacy shows 3 rows,
-        // not 4).
-        var histologyWorklistCodes = new HashSet<string> { "1", "2", "5", "7" };
-        var histologyFiltered = histology.Where(row => histologyWorklistCodes.Contains(Str((IDictionary<string, object>)row, "Code") ?? string.Empty));
+        // not 4). This filter is ONLY correct for the QC/dispatch worklist's own purpose
+        // (GetByBatchAsync) — callers that need to know whether Special Stain/IHC-PrP/IHC-Other
+        // was SELECTED for a block (the grid indicator columns on SubmissionDetailsBlock/
+        // BatchBlocks, the Tests checkbox pre-population on BlockDetails, and this repository's
+        // own SaveTestSelectionsAsync diffing) must see every code, or those 3 gating codes can
+        // never show as checked, and SaveTestSelectionsAsync would re-INSERT a duplicate row for
+        // them on every save since it would never find the existing one to skip re-adding it.
+        var histologyRows = filterToWorklistCodes
+            ? histology.Where(row => HistologyWorklistCodes.Contains(Str((IDictionary<string, object>)row, "Code") ?? string.Empty))
+            : histology;
 
-        foreach (var row in histologyFiltered) results.Add(Map(row, BlockTestType.Histology));
-        foreach (var row in antibodies)         results.Add(Map(row, BlockTestType.Antibodies));
-        foreach (var row in stains)              results.Add(Map(row, BlockTestType.Stain));
-
+        foreach (var row in histologyRows) results.Add(Map(row, BlockTestType.Histology));
+        foreach (var row in antibodies)     results.Add(Map(row, BlockTestType.Antibodies));
+        foreach (var row in stains)         results.Add(Map(row, BlockTestType.Stain));
 
         return results;
     }
+
+    private static readonly HashSet<string> HistologyWorklistCodes = ["1", "2", "5", "7"];
 
     /// <inheritdoc/>
     public async Task UpdateAsync(BlockTest test, int userId, CancellationToken ct = default)
@@ -253,7 +273,7 @@ public sealed class BlockTestRepository : IBlockTestRepository
         IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
         int userId, CancellationToken ct = default)
     {
-        var current = (await GetByBatchAsync(batchId, ct)).Where(t => t.BlockID == blockId).ToList();
+        var current = (await GetAllSelectionsByBatchAsync(batchId, ct)).Where(t => t.BlockID == blockId).ToList();
 
         using var conn = _db.CreateConnection();
         await ApplyBlockTestDeltaAsync(conn, batchId, blockId, userId,

@@ -191,6 +191,20 @@ public sealed class LookupService : ILookupService
         }
     }
 
+    /// <summary>Returns the database-driven Histology Ref Type pick list from <c>GetluHistologyRefType</c>.</summary>
+    public async Task<IReadOnlyList<LookupItem>> GetHistologyRefTypesAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _lookups.GetHistologyRefTypesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get histology ref types.", ex);
+            return [];
+        }
+    }
+
     /// <summary>
     /// Creates a new pick-list row in the table identified by <paramref name="tableId"/>.
     /// Replaces the legacy <c>LookupData.SaveLookupData</c> insert path

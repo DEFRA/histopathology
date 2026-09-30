@@ -40,13 +40,15 @@
 
 <form method="post" id="audit-log-form">
     <div class="govuk-grid-row">
-        <div class="govuk-grid-column-one-half">
+        <div class="govuk-grid-column-full">
             <div class="govuk-form-group @(Model.Errors.Any(e => e.Contains("start")) ? "govuk-form-group--error" : "")">
                 <label class="govuk-label" for="StartDate">From</label>
                 <input class="govuk-input govuk-input--width-10" type="date" asp-for="StartDate" />
             </div>
         </div>
-        <div class="govuk-grid-column-one-half">
+    </div>
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-full">
             <div class="govuk-form-group @(Model.Errors.Any(e => e.Contains("end")) ? "govuk-form-group--error" : "")">
                 <label class="govuk-label" for="EndDate">To</label>
                 <input class="govuk-input govuk-input--width-10" type="date" asp-for="EndDate" />

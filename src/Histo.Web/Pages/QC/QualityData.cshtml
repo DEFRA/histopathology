@@ -9,6 +9,23 @@
     <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
 }
 
+@if (Model.Error is not null)
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body"><ul class="govuk-list govuk-error-summary__list"><li>@Model.Error</li></ul></div>
+        </div>
+    </div>
+}
+<partial name="_ErrorSummary" model="Model.Errors" />
+@if (Model.SuccessMessage is not null)
+{
+    <div class="govuk-panel govuk-panel--confirmation govuk-!-margin-bottom-6">
+        <p class="govuk-panel__body">@Model.SuccessMessage</p>
+    </div>
+}
+
 @* Batch summary — mirrors legacy Batch.ascx header *@
 <dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-4">
     <div class="govuk-summary-list__row">
@@ -57,7 +74,7 @@
     <div class="govuk-grid-row">
         <div class="govuk-grid-column-one-quarter">
             <div class="govuk-form-group govuk-!-margin-bottom-0">
-                <label class="govuk-label" for="FilterHistologyRef">Histology ref</label>
+                <label class="govuk-label" for="FilterHistologyRef">Histology Ref</label>
                 <select class="govuk-select govuk-!-width-full" id="FilterHistologyRef" name="FilterHistologyRef">
                     <option value="">All</option>
                     @foreach (var r in Model.HistologyRefs)
@@ -95,7 +112,7 @@
         </div>
         <div class="govuk-grid-column-one-quarter" style="padding-top: 2rem;">
             <div class="govuk-button-group">
-                <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Apply filters</button>
+                <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Go</button>
                 @if (!string.IsNullOrEmpty(Model.FilterHistologyRef) || !string.IsNullOrEmpty(Model.FilterTest))
                 {
                     <a asp-page="/QC/QualityData" class="govuk-link">Clear</a>
@@ -107,90 +124,391 @@
 
 @if (Model.Tests.Any())
 {
-    <p class="govuk-hint">To raise a QC note against a test, click <strong>Edit</strong> on that row and tick "Raise a QC note".</p>
-    <table class="govuk-table">
-        <thead class="govuk-table__head">
-            <tr class="govuk-table__row">
-                @{ ViewData["Label"] = "Histology ref"; ViewData["Column"] = "HistologyRef"; }
-                <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Block ref"; ViewData["Column"] = "BlockRef"; }
-                <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Test"; ViewData["Column"] = "Test"; }
-                <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Result"; ViewData["Column"] = "Result"; }
-                <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Dispatched"; ViewData["Column"] = "Dispatched"; }
-                <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "Archived"; ViewData["Column"] = "Archived"; }
-                <partial name="_SortableHeader" />
-                @{ ViewData["Label"] = "On hold"; ViewData["Column"] = "OnHold"; }
-                <partial name="_SortableHeader" />
-                <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
-            </tr>
-        </thead>
-        <tbody class="govuk-table__body">
-            @foreach (var t in Model.PagedEntries)
-            {
-                <tr class="govuk-table__row">
-                    <td class="govuk-table__cell">@t.HistologyRef</td>
-                    <td class="govuk-table__cell">@t.BlockRef</td>
-                    <td class="govuk-table__cell">@Model.GetTestName(t)</td>
-                    <td class="govuk-table__cell">
-                        @if (t.Dispatched)
-                        {
-                            <strong class="govuk-tag govuk-tag--blue">Dispatched</strong>
-                        }
-                        else if (t.Result == Histo.Histology.Models.BlockTestResult.Passed)
-                        {
-                            <strong class="govuk-tag govuk-tag--green">Passed</strong>
-                        }
-                        else if (t.Result == Histo.Histology.Models.BlockTestResult.Failed)
-                        {
-                            <strong class="govuk-tag govuk-tag--red">Failed</strong>
-                        }
-                        else
-                        {
-                            <strong class="govuk-tag govuk-tag--yellow">Not tested</strong>
-                        }
-                    </td>
-                    <td class="govuk-table__cell">@(t.Dispatched ? "Yes" : "No")</td>
-                    <td class="govuk-table__cell">@(t.Archived ? "Yes" : "No")</td>
-                    <td class="govuk-table__cell">@(t.OnHold ? "Yes" : "No")</td>
-                    <td class="govuk-table__cell">
-                        @if (t.OnHold)
-                        {
-                            <strong class="govuk-tag govuk-tag--grey">On hold</strong>
-                        }
-                        else
-                        {
-                            <form method="post">
-                                <input type="hidden" name="testId" value="@t.ID" />
-                                <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-page-handler="Edit">Edit</button>
-                            </form>
-                        }
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-    <partial name="_Pagination" />
-    @if (Model.TotalPages > 1)
-    {
-        <form method="get" class="govuk-!-margin-top-4">
-            <input type="hidden" name="FilterHistologyRef" value="@Model.FilterHistologyRef" />
-            <input type="hidden" name="FilterTest" value="@Model.FilterTest" />
-            <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
-            <input type="hidden" name="SortDesc" value="@Model.SortDesc" />
-            <label class="govuk-label" for="GoToPage">Go to page (1 to @Model.TotalPages)</label>
-            <div class="app-field-with-button">
-                <input class="govuk-input govuk-input--width-3" id="GoToPage" name="PageNumber" type="number" min="1" max="@Model.TotalPages" value="@Model.PageNumber" />
-                <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Go</button>
+    <p class="govuk-hint">
+        Tick a single test to load its existing quality data for editing — saving then writes back
+        exactly what is shown, so clearing a field clears it. Tick two or more tests (or "All") to
+        apply only the fields you fill in; fields left blank keep each test's own existing value.
+    </p>
+    <form method="post" asp-page-handler="Update">
+        <input type="hidden" name="FilterHistologyRef" value="@Model.FilterHistologyRef" />
+        <input type="hidden" name="FilterTest" value="@Model.FilterTest" />
+        <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
+        <input type="hidden" name="SortDesc" value="@Model.SortDesc" />
+        <input type="hidden" name="PageNumber" value="@Model.PageNumber" />
+
+        <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-bottom-2">
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" type="checkbox" id="SelectAllAcrossPages" name="SelectAllAcrossPages" value="true" @(Model.SelectAllAcrossPages ? "checked" : "") />
+                <label class="govuk-label govuk-checkboxes__label" for="SelectAllAcrossPages">All — select every test matching the current filter, including tests on other pages</label>
             </div>
-        </form>
-    }
+        </div>
+
+        <table class="govuk-table">
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header govuk-visually-hidden">Select</th>
+                    @{ ViewData["Label"] = "Histology Ref"; ViewData["Column"] = "HistologyRef"; }
+                    <partial name="_SortableHeader" />
+                    @{ ViewData["Label"] = "Block Ref"; ViewData["Column"] = "BlockRef"; }
+                    <partial name="_SortableHeader" />
+                    @{ ViewData["Label"] = "Test"; ViewData["Column"] = "Test"; }
+                    <partial name="_SortableHeader" />
+                    @{ ViewData["Label"] = "Result"; ViewData["Column"] = "Result"; }
+                    <partial name="_SortableHeader" />
+                    @{ ViewData["Label"] = "Dispatched"; ViewData["Column"] = "Dispatched"; }
+                    <partial name="_SortableHeader" />
+                    @{ ViewData["Label"] = "Archived"; ViewData["Column"] = "Archived"; }
+                    <partial name="_SortableHeader" />
+                    @{ ViewData["Label"] = "On Hold"; ViewData["Column"] = "OnHold"; }
+                    <partial name="_SortableHeader" />
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @foreach (var t in Model.PagedEntries)
+                {
+                    var noHistologyRef = string.IsNullOrWhiteSpace(t.HistologyRef);
+                    var locked = t.OnHold || noHistologyRef;
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">
+                            <div class="govuk-checkboxes govuk-checkboxes--small">
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input" type="checkbox" id="select-@t.ID" name="SelectedIds" value="@t.ID"
+                                           @(Model.SelectedIds.Contains(t.ID) ? "checked" : "")
+                                           @(locked ? "disabled" : "")
+                                           title="@(noHistologyRef ? "Unable to enter quality information as the Histology Ref has not been entered for the sample." : null)"
+                                           data-result="@t.Result"
+                                           data-qccode="@t.QCCode"
+                                           data-qcnote="@(t.QCNote ? "1" : "")"
+                                           data-qcnoteref="@(t.QCNoteRef > 0 ? t.QCNoteRef.ToString() : "")"
+                                           data-stainref="@t.StainRef"
+                                           data-dispatched="@(t.Dispatched ? "1" : "")"
+                                           data-dispatcheddate="@t.DispatchedDate?.ToString("yyyy-MM-dd")"
+                                           data-dispatchedby="@t.DispatchedBy"
+                                           data-dispatchedto="@t.DispatchedTo"
+                                           data-remedialaction="@t.RemedialAction"
+                                           data-archivelocation="@t.ArchiveLocation"
+                                           data-archiveddate="@t.ArchivedDate?.ToString("yyyy-MM-dd")"
+                                           data-archivecomment="@t.ArchiveComment"
+                                           data-numberofslides="@t.NumberOfSlides"
+                                           data-comment="@t.Comment"
+                                           data-charges="@string.Join(",", t.TCCodes.Select(c => c.Code))" />
+                                    <label class="govuk-label govuk-checkboxes__label" for="select-@t.ID"><span class="govuk-visually-hidden">Select test @t.ID</span></label>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="govuk-table__cell">@t.HistologyRef</td>
+                        <td class="govuk-table__cell">@t.BlockRef</td>
+                        <td class="govuk-table__cell">@Model.GetTestName(t)</td>
+                        <td class="govuk-table__cell">
+                            @* Result reflects the test's actual outcome regardless of dispatch status —
+                               "Dispatched" is its own column below and must not replace the result. *@
+                            @if (t.Result == Histo.Histology.Models.BlockTestResult.Passed)
+                            {
+                                <strong class="govuk-tag govuk-tag--green">Passed</strong>
+                            }
+                            else if (t.Result == Histo.Histology.Models.BlockTestResult.Failed)
+                            {
+                                <strong class="govuk-tag govuk-tag--red">Failed</strong>
+                            }
+                            else
+                            {
+                                <strong class="govuk-tag govuk-tag--yellow">Not tested</strong>
+                            }
+                        </td>
+                        <td class="govuk-table__cell">@(t.Dispatched ? "Yes" : "No")</td>
+                        <td class="govuk-table__cell">@(t.Archived ? "Yes" : "No")</td>
+                        <td class="govuk-table__cell">
+                            @if (t.OnHold)
+                            {
+                                <strong class="govuk-tag govuk-tag--grey">On hold</strong>
+                            }
+                            else
+                            {
+                                @("No")
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <partial name="_Pagination" />
+        @if (Model.TotalPages > 1)
+        {
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="GoToPage">Go To Page (1 to @Model.TotalPages)</label>
+                <div class="app-field-with-button">
+                    <input class="govuk-input govuk-input--width-3" id="GoToPage" name="PageNumber" type="number" min="1" max="@Model.TotalPages" value="@Model.PageNumber" form="go-to-page-form" />
+                    <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" form="go-to-page-form">Go to Page</button>
+                </div>
+            </div>
+        }
+
+        <hr class="govuk-section-break govuk-section-break--visible govuk-!-margin-top-6" />
+
+        @* Field order and labelling follow legacy QualityData.aspx: test result / stain / dispatch /
+           slides / QC on the left, remedial action / archive / charges on the right, with Comments
+           spanning the full width directly above the Update Selected button. *@
+        <div class="govuk-grid-row govuk-!-margin-top-4">
+            <div class="govuk-grid-column-one-half">
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="Result">Test Result</label>
+                    <select class="govuk-select govuk-!-width-two-thirds" id="Result" name="Result">
+                        <option value=""></option>
+                        <option value="@Histo.Histology.Models.BlockTestResult.Passed" selected="@(Model.Result == Histo.Histology.Models.BlockTestResult.Passed)">Passed</option>
+                        <option value="@Histo.Histology.Models.BlockTestResult.Failed" selected="@(Model.Result == Histo.Histology.Models.BlockTestResult.Failed)">Failed</option>
+                    </select>
+                </div>
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="StainRef">Stain Ref</label>
+                    <input class="govuk-input govuk-!-width-two-thirds" id="StainRef" name="StainRef" maxlength="20" value="@Model.StainRef" />
+                </div>
+                <div class="govuk-form-group">
+                    <div class="govuk-checkboxes govuk-checkboxes--small">
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" type="checkbox" id="Dispatched" name="Dispatched" value="true" @(Model.Dispatched ? "checked" : "") />
+                            <label class="govuk-label govuk-checkboxes__label" for="Dispatched">Dispatched?</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("DispatchedTo") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="DispatchedTo">Dispatched To</label>
+                    @if (Model.Errors.TryGetValue("DispatchedTo", out var dispatchedToErr))
+                    {
+                        <p id="DispatchedTo-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @dispatchedToErr</p>
+                    }
+                    <input class="govuk-input govuk-!-width-two-thirds @(Model.Errors.ContainsKey("DispatchedTo") ? "govuk-input--error" : "")" id="DispatchedTo" name="DispatchedTo" maxlength="30" value="@Model.DispatchedTo"
+                           aria-describedby="@(Model.Errors.ContainsKey("DispatchedTo") ? "DispatchedTo-error" : null)" />
+                </div>
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("DispatchedDate") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="DispatchedDate">Dispatched Date</label>
+                    @if (Model.Errors.TryGetValue("DispatchedDate", out var dispatchedDateErr))
+                    {
+                        <p id="DispatchedDate-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @dispatchedDateErr</p>
+                    }
+                    <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("DispatchedDate") ? "govuk-input--error" : "")" id="DispatchedDate" name="DispatchedDate" type="date" value="@Model.DispatchedDate?.ToString("yyyy-MM-dd")"
+                           aria-describedby="@(Model.Errors.ContainsKey("DispatchedDate") ? "DispatchedDate-error" : null)" />
+                </div>
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("DispatchedBy") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="DispatchedBy">Dispatched By</label>
+                    @if (Model.Errors.TryGetValue("DispatchedBy", out var dispatchedByErr))
+                    {
+                        <p id="DispatchedBy-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @dispatchedByErr</p>
+                    }
+                    <select class="govuk-select govuk-!-width-two-thirds @(Model.Errors.ContainsKey("DispatchedBy") ? "govuk-select--error" : "")" id="DispatchedBy" name="DispatchedBy"
+                            aria-describedby="@(Model.Errors.ContainsKey("DispatchedBy") ? "DispatchedBy-error" : null)">
+                        <option value=""></option>
+                        @foreach (var u in Model.Users)
+                        {
+                            <option value="@u.UserID" selected="@(Model.DispatchedBy == u.UserID.ToString())">@u.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="NumberOfSlides">Number of Blocks\Slides</label>
+                    <input class="govuk-input govuk-input--width-4 @(Model.Errors.ContainsKey("NumberOfSlides") ? "govuk-input--error" : "")" id="NumberOfSlides" name="NumberOfSlides" type="number" min="1" max="9999" value="@Model.NumberOfSlides"
+                           aria-describedby="@(Model.Errors.ContainsKey("NumberOfSlides") ? "NumberOfSlides-error" : null)" />
+                    @if (Model.Errors.TryGetValue("NumberOfSlides", out var slidesErr))
+                    {
+                        <p id="NumberOfSlides-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @slidesErr</p>
+                    }
+                </div>
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("QCCode") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="QCCode">QC Code</label>
+                    @if (Model.Errors.TryGetValue("QCCode", out var qcCodeErr))
+                    {
+                        <p id="QCCode-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @qcCodeErr</p>
+                    }
+                    <select class="govuk-select govuk-!-width-two-thirds @(Model.Errors.ContainsKey("QCCode") ? "govuk-select--error" : "")" id="QCCode" name="QCCode"
+                            aria-describedby="@(Model.Errors.ContainsKey("QCCode") ? "QCCode-error" : null)">
+                        <option value=""></option>
+                        @foreach (var c in Model.QCCodes)
+                        {
+                            <option value="@c.Code" selected="@(Model.QCCode == c.Code)">@c.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="govuk-form-group">
+                    <div class="govuk-checkboxes govuk-checkboxes--small">
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" type="checkbox" id="QCNote" name="QCNote" value="true" @(Model.QCNote ? "checked" : "") />
+                            <label class="govuk-label govuk-checkboxes__label" for="QCNote">QC Note</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="QCNoteRef">QC Note Ref</label>
+                    @* Read-only in legacy too — the reference is allocated by the system when a QC
+                       note is first raised for the test, never typed in. *@
+                    <input class="govuk-input govuk-input--width-10" id="QCNoteRef" type="text" readonly aria-describedby="QCNoteRef-hint" />
+                    <div id="QCNoteRef-hint" class="govuk-hint govuk-!-font-size-16">Allocated automatically when a QC note is raised.</div>
+                </div>
+            </div>
+            <div class="govuk-grid-column-one-half">
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("RemedialAction") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="RemedialAction">Remedial Action</label>
+                    @if (Model.Errors.TryGetValue("RemedialAction", out var remedialErr))
+                    {
+                        <p id="RemedialAction-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @remedialErr</p>
+                    }
+                    <select class="govuk-select govuk-!-width-two-thirds @(Model.Errors.ContainsKey("RemedialAction") ? "govuk-select--error" : "")" id="RemedialAction" name="RemedialAction"
+                            aria-describedby="@(Model.Errors.ContainsKey("RemedialAction") ? "RemedialAction-error" : null)">
+                        <option value=""></option>
+                        @foreach (var r in Model.RemedialActions)
+                        {
+                            <option value="@r.Code" selected="@(Model.RemedialAction == r.Code)">@r.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("ArchiveLocationCode") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="ArchiveLocationCode">Archive Location</label>
+                    @if (Model.Errors.TryGetValue("ArchiveLocationCode", out var archiveLocationErr))
+                    {
+                        <p id="ArchiveLocationCode-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @archiveLocationErr</p>
+                    }
+                    <select class="govuk-select govuk-!-width-two-thirds @(Model.Errors.ContainsKey("ArchiveLocationCode") ? "govuk-select--error" : "")" id="ArchiveLocationCode" name="ArchiveLocationCode"
+                            aria-describedby="@(Model.Errors.ContainsKey("ArchiveLocationCode") ? "ArchiveLocationCode-error" : null)">
+                        <option value=""></option>
+                        @foreach (var l in Model.ArchiveLocations)
+                        {
+                            <option value="@l.Code" selected="@(Model.ArchiveLocationCode == l.Code)">@l.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="govuk-form-group @(Model.Errors.ContainsKey("ArchivedDate") ? "govuk-form-group--error" : "")">
+                    <label class="govuk-label" for="ArchivedDate">Archive Date</label>
+                    @if (Model.Errors.TryGetValue("ArchivedDate", out var archivedDateErr))
+                    {
+                        <p id="ArchivedDate-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @archivedDateErr</p>
+                    }
+                    <input class="govuk-input govuk-input--width-10 @(Model.Errors.ContainsKey("ArchivedDate") ? "govuk-input--error" : "")" id="ArchivedDate" name="ArchivedDate" type="date" value="@Model.ArchivedDate?.ToString("yyyy-MM-dd")"
+                           aria-describedby="@(Model.Errors.ContainsKey("ArchivedDate") ? "ArchivedDate-error" : null)" />
+                </div>
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="ArchiveComment">Archive Comment</label>
+                    <textarea class="govuk-textarea govuk-!-width-two-thirds" id="ArchiveComment" name="ArchiveComment" rows="3" maxlength="200">@Model.ArchiveComment</textarea>
+                </div>
+                <div class="govuk-form-group">
+                    <fieldset class="govuk-fieldset">
+                        <legend class="govuk-fieldset__legend">Charges</legend>
+                        <div class="govuk-checkboxes govuk-checkboxes--small">
+                            @foreach (var charge in Model.PremiumCharges)
+                            {
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input" type="checkbox" id="charge-@charge.Code" name="SelectedCharges" value="@charge.Code" @(Model.SelectedCharges.Contains(charge.Code!) ? "checked" : "") />
+                                    <label class="govuk-label govuk-checkboxes__label" for="charge-@charge.Code">@charge.Name</label>
+                                </div>
+                            }
+                        </div>
+                    </fieldset>
+                </div>
+            </div>
+        </div>
+
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="Comment">Comments:</label>
+            <textarea class="govuk-textarea" id="Comment" name="Comment" rows="4" maxlength="2000">@Model.Comment</textarea>
+        </div>
+
+        <hr class="govuk-section-break govuk-section-break--visible govuk-!-margin-bottom-4" />
+
+        <button type="submit" class="govuk-button" data-module="govuk-button">Update Selected</button>
+    </form>
 }
 else
 {
     <p class="govuk-body">No tests found for this batch.</p>
+}
+
+@* Separate GET form for "Go to page"/sorting-adjacent nav — a plain number input associated
+   with the POST update form above via the "form" attribute would submit it as part of the
+   bulk-edit save, not a navigation. *@
+<form id="go-to-page-form" method="get" class="govuk-visually-hidden">
+    <input type="hidden" name="FilterHistologyRef" value="@Model.FilterHistologyRef" />
+    <input type="hidden" name="FilterTest" value="@Model.FilterTest" />
+    <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
+    <input type="hidden" name="SortDesc" value="@Model.SortDesc" />
+</form>
+
+@section Scripts {
+    <script>
+        // Legacy QualityData.aspx behaviour: ticking exactly one test loads that test's saved
+        // quality data into the edit fields (grdQuality_SelectedIndexChanged / Check_Clicked),
+        // while ticking none or several resets them to blanks (InitialiseControls). "All" mirrors
+        // its state onto every selectable row checkbox, and unticking any row clears "All".
+        (function () {
+            var selectAll = document.getElementById('SelectAllAcrossPages');
+            var rows = Array.prototype.slice.call(document.querySelectorAll('input[name="SelectedIds"]'));
+            if (!rows.length) return;
+
+            var textFields = {
+                Result: 'result', QCCode: 'qccode', StainRef: 'stainref', DispatchedDate: 'dispatcheddate',
+                DispatchedBy: 'dispatchedby', DispatchedTo: 'dispatchedto', RemedialAction: 'remedialaction',
+                ArchiveLocationCode: 'archivelocation', ArchivedDate: 'archiveddate',
+                ArchiveComment: 'archivecomment', NumberOfSlides: 'numberofslides', Comment: 'comment',
+                QCNoteRef: 'qcnoteref'
+            };
+            var dispatched = document.getElementById('Dispatched');
+            var qcNote = document.getElementById('QCNote');
+            var charges = Array.prototype.slice.call(document.querySelectorAll('input[name="SelectedCharges"]'));
+
+            function setFields(source) {
+                Object.keys(textFields).forEach(function (id) {
+                    var el = document.getElementById(id);
+                    if (el) el.value = source ? (source.dataset[textFields[id]] || '') : '';
+                });
+                if (!source) {
+                    var slides = document.getElementById('NumberOfSlides');
+                    if (slides) slides.value = '1'; // legacy InitialiseControls default
+                }
+                if (dispatched) dispatched.checked = !!(source && source.dataset.dispatched);
+                if (qcNote) qcNote.checked = !!(source && source.dataset.qcnote);
+
+                var selectedCharges = source ? (source.dataset.charges || '').split(',').filter(Boolean) : [];
+                charges.forEach(function (cb) { cb.checked = selectedCharges.indexOf(cb.value) !== -1; });
+            }
+
+            function applySelection() {
+                var checked = rows.filter(function (cb) { return cb.checked; });
+                setFields(checked.length === 1 && (!selectAll || !selectAll.checked) ? checked[0] : null);
+            }
+
+            rows.forEach(function (cb) {
+                cb.addEventListener('change', function () {
+                    if (!cb.checked && selectAll) selectAll.checked = false;
+                    applySelection();
+                });
+            });
+
+            if (selectAll) {
+                selectAll.addEventListener('change', function () {
+                    rows.forEach(function (cb) { if (!cb.disabled) cb.checked = selectAll.checked; });
+                    applySelection();
+                });
+            }
+
+            // Deliberately NOT called on page load: after a validation-failure postback (e.g.
+            // "QC Code is mandatory"), the server already re-renders every field/checkbox with
+            // exactly what was submitted — running this here would immediately blank them again
+            // for any reload with 0 or 2+ rows checked. Only real checkbox interactions should
+            // trigger the single-row-populate/clear behaviour.
+
+            // Ticking "Dispatched?" defaults Dispatched By/Date to the logged-in user/today (who is
+            // actually recording the dispatch), and Dispatched To to who submitted the batch.
+            if (dispatched) {
+                var currentUserId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Session.UserID.ToString()));
+                var submittedByName = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SubmittedByName ?? string.Empty));
+                var today = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(DateTime.Today.ToString("yyyy-MM-dd")));
+                dispatched.addEventListener('change', function () {
+                    if (!dispatched.checked) return;
+                    var to = document.getElementById('DispatchedTo');
+                    var date = document.getElementById('DispatchedDate');
+                    var by = document.getElementById('DispatchedBy');
+                    if (to) to.value = submittedByName;
+                    if (date) date.value = today;
+                    if (by) by.value = currentUserId;
+                });
+            }
+        })();
+    </script>
 }
 

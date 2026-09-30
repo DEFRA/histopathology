@@ -10,7 +10,7 @@
     @* GAP-3: context-aware back link — ReturnPage is set by the list page before navigating here. *@
     @if (Model.IsCreateMode)
     {
-        <a asp-page="/Batches/Cassetted" class="govuk-back-link">Back</a>
+        <a asp-page="/Batches/Cassetted" asp-route-restore="true" class="govuk-back-link">Back</a>
     }
     else
     {
@@ -102,21 +102,19 @@
                 </div>
             </div>
             <div class="govuk-grid-column-one-third">
-                @* Submitted Area — required, legacy ddlUserArea rfvSubmittedArea *@
-                <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_OtherSubmittedArea") ? "govuk-form-group--error" : "")">
-                    <label class="govuk-label" for="Create_OtherSubmittedArea">Submitted area</label>
-                    @if (Model.Errors.TryGetValue("Create_OtherSubmittedArea", out var subAreaErr))
-                    {
-                        <p id="Create_OtherSubmittedArea-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @subAreaErr</p>
-                    }
-                    <select class="govuk-select @(Model.Errors.ContainsKey("Create_OtherSubmittedArea") ? "govuk-select--error" : "")"
-                            asp-for="Create_OtherSubmittedArea" id="Create_OtherSubmittedArea">
-                        <option value="">-- Select --</option>
+                @* Submitted Area — legacy ddlUserArea is only ever enabled for Histopath-area users
+                   (BatchDetails.aspx.vb's enable/disable block); everyone else gets it auto-set from
+                   their own session area and locked, matching EditBatch's disabled treatment. *@
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="Create_OtherSubmittedAreaDisplay">Submitted area</label>
+                    <select class="govuk-select" id="Create_OtherSubmittedAreaDisplay" disabled>
+                        <option value="">-- None --</option>
                         @foreach (var a in Model.Create_UserAreas)
                         {
-                            @if (Model.Create_OtherSubmittedArea == a.ID.ToString()) { <option value="@a.ID" selected>@a.Name</option> } else { <option value="@a.ID">@a.Name</option> }
+                            <option value="@a.ID" selected="@(Model.Create_OtherSubmittedArea == a.ID.ToString())">@a.Name</option>
                         }
                     </select>
+                    <input type="hidden" asp-for="Create_OtherSubmittedArea" />
                 </div>
             </div>
         </div>
@@ -334,7 +332,6 @@
 
         <div class="govuk-button-group">
             <button type="submit" class="govuk-button" data-module="govuk-button">Create submission</button>
-            <a asp-page="/Batches/Cassetted" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back</a>
             <a asp-page="/Index" class="govuk-link"
                onclick="return confirm('Are you sure you want to cancel? Any information you have entered will be lost.');">Cancel</a>
         </div>
@@ -578,10 +575,12 @@
         </a>
 
 
-        @* Date returned � Completed status only. *@
+        @* Date returned — Completed status only. Read-only here: this page already shows the
+           Customer received date above; only ViewSubmissions' own "Date returned" button offers
+           editing it. *@
         @if (Model.CanDateReturned)
         {
-            <a asp-page="/Batches/DateReturned" class="govuk-button govuk-button--secondary" data-module="govuk-button">Date returned</a>
+            <a asp-page="/Batches/DateReturned" asp-route-readOnly="true" class="govuk-button govuk-button--secondary" data-module="govuk-button">Date returned</a>
         }
 
         <a href="@Model.BackLinkPage" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
