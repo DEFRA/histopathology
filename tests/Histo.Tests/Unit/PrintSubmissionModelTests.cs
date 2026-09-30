@@ -29,7 +29,7 @@ public class PrintSubmissionModelTests
         _session.Object.BatchID = 42;
         _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 42 });
         _blocks.Setup(b => b.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
-        _submissions.Setup(s => s.GetTissuesByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[]);
     }
 
@@ -60,9 +60,9 @@ public class PrintSubmissionModelTests
     }
 
     [Fact]
-    public async Task OnGetAsync_TissueCommentOnly_HasNotesTrue()
+    public async Task OnGetAsync_SubmissionOwnedTissueCommentOnly_HasNotesTrue()
     {
-        _submissions.Setup(s => s.GetTissuesByBatchAsync(42, It.IsAny<CancellationToken>()))
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(42, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Tissue>)[new Tissue { ID = 1, ArchiveComment = "Archived tissue note" }]);
         var sut = CreateSut();
 

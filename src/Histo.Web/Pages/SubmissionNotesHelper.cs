@@ -15,12 +15,14 @@ namespace Histo.Web.Pages;
 /// same "invented stored procedure" defect class already found and fixed for tissue loading
 /// elsewhere (see <c>docs/run-log-v2.md</c> — <c>GetTissuesByBlockID</c>/<c>GetTissuesBySubmissionID</c>).
 /// This instead composes <see cref="IBatchService.GetByIdAsync"/>, <see cref="IBlockService.GetByBatchAsync"/>,
-/// <see cref="Histo.Submissions.Interfaces.ISubmissionService.GetTissuesByBatchAsync"/> and
-/// <see cref="Histo.Histology.Interfaces.IBlockTestService.GetByBatchAsync"/> — four methods
-/// already proven working elsewhere in this app — covering the same scope as the original
-/// 6-table DataSet (header comments, block comments, tissue comments, and antibody/histology/
-/// stain per-test comments, all via <see cref="Histo.Histology.Models.BlockTest"/>'s shared
-/// Comment/ArchiveComment fields).
+/// <see cref="Histo.Submissions.Interfaces.ISubmissionService.GetBatchSubmissionTissuesAsync"/> and
+/// <see cref="Histo.Histology.Interfaces.IBlockTestService.GetByBatchAsync"/> — methods already
+/// proven working elsewhere in this app — deliberately matching the EXACT scope of legacy's real
+/// <c>GetAllBatchComments</c> (confirmed live via <c>sp_helptext</c>): header comments, block
+/// HEADER comments only (not per-tissue-within-a-block comments — legacy's own
+/// <c>GetBatchBlockComments</c> never covered that), submission-owned (Wet Tissue) tissue
+/// comments, and antibody/histology/stain per-test comments (via
+/// <see cref="Histo.Histology.Models.BlockTest"/>'s shared Comment/ArchiveComment fields).
 /// </summary>
 public static class SubmissionNotesHelper
 {
@@ -37,12 +39,16 @@ public static class SubmissionNotesHelper
             return true;
 
         var blocksTask = blocks.GetByBatchAsync(batchId, ct);
-        var tissuesTask = submissions.GetTissuesByBatchAsync(batchId, ct);
+        // Submission-owned (Wet Tissue) tissue comments only — legacy's GetAllBatchComments has no
+        // SP for per-tissue comments WITHIN a block (GetBatchBlockComments only covers the block's
+        // own header Comment/ArchiveComment), so block-owned tissue comments are deliberately not
+        // checked here, matching legacy's real behaviour exactly.
+        var submissionTissuesTask = submissions.GetBatchSubmissionTissuesAsync(batchId, ct);
         var testsTask = tests.GetByBatchAsync(batchId, ct);
-        await Task.WhenAll(blocksTask, tissuesTask, testsTask);
+        await Task.WhenAll(blocksTask, submissionTissuesTask, testsTask);
 
         return blocksTask.Result.Any(HasComment)
-            || tissuesTask.Result.Any(HasComment)
+            || submissionTissuesTask.Result.Any(HasComment)
             || testsTask.Result.Any(HasComment);
     }
 
