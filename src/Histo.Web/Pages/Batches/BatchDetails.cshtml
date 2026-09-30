@@ -575,10 +575,12 @@
         </a>
 
 
-        @* Date returned � Completed status only. *@
+        @* Date returned — Completed status only. Read-only here: this page already shows the
+           Customer received date above; only ViewSubmissions' own "Date returned" button offers
+           editing it. *@
         @if (Model.CanDateReturned)
         {
-            <a asp-page="/Batches/DateReturned" class="govuk-button govuk-button--secondary" data-module="govuk-button">Date returned</a>
+            <a asp-page="/Batches/DateReturned" asp-route-readOnly="true" class="govuk-button govuk-button--secondary" data-module="govuk-button">Date returned</a>
         }
 
         <a href="@Model.BackLinkPage" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>

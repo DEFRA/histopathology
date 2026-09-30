@@ -44,13 +44,25 @@ public class DateReturnedModel : HistoPageModel
     public string? Error { get; private set; }
 
     /// <summary>
-    /// Back-link target — honours <see cref="ISessionService.ReturnPage"/> (set by whichever page
-    /// this journey actually started from, e.g. ViewSubmissions), matching every other page reached
-    /// via BatchDetails (QualityData, ReceiveBatch, PrintSubmission, EditSubmissionStatus, …).
+    /// Back-link target. In <see cref="ReadOnly"/> mode this always returns to BatchDetails, since
+    /// that's the only page that link can come from — honouring <see cref="ISessionService.ReturnPage"/>
+    /// here would skip back past it to whatever brought the user into BatchDetails in the first
+    /// place. Otherwise honours <c>ReturnPage</c> (set by whichever page this editable journey
+    /// actually started from, e.g. ViewSubmissions), matching every other page reached via
+    /// BatchDetails (QualityData, ReceiveBatch, PrintSubmission, EditSubmissionStatus, …).
     /// </summary>
-    public string BackLinkPage => string.IsNullOrWhiteSpace(Session.ReturnPage)
+    public string BackLinkPage => ReadOnly || string.IsNullOrWhiteSpace(Session.ReturnPage)
         ? "/Batches/BatchDetails"
         : Session.ReturnPage;
+
+    /// <summary>
+    /// True when reached from the read-only BatchDetails view (its own "Date returned" button),
+    /// which already shows this same date on its own summary — that journey just displays it,
+    /// it doesn't offer to change it. False when reached from ViewSubmissions' "Date returned"
+    /// button, which is the one place this value can actually be recorded/edited.
+    /// </summary>
+    [BindProperty(SupportsGet = true)]
+    public bool ReadOnly { get; set; }
 
     /// <summary>Resolved project/contract code description — see BatchDetailsModel.ProjectName for details.</summary>
     public string? ProjectName { get; private set; }
@@ -93,6 +105,11 @@ public class DateReturnedModel : HistoPageModel
     {
         ViewData["Title"] = "Date returned";
         ViewData["PageTitle"] = "Date returned";
+
+        // Defensive — the read-only view never renders this form, so this only guards against a
+        // direct/replayed POST while in that mode.
+        if (ReadOnly)
+            return RedirectToPage(BackLinkPage);
 
         Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0);
         if (Batch?.RowStamp is null)
