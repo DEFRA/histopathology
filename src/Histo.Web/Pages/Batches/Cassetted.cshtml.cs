@@ -28,16 +28,21 @@ public class CassettedModel : HistoPageModel
     public IReadOnlyList<LookupItem> SubmittedAsOptions { get; private set; } = [];
     public IDictionary<string, string> Errors { get; private set; } = new Dictionary<string, string>();
 
-    public async Task OnGetAsync()
+    public async Task OnGetAsync(bool restore = false)
     {
         ViewData["Title"]     = "Submission type";
         ViewData["PageTitle"] = "Submission type";
         await LoadLookupsAsync();
 
-        // Every fresh visit starts with nothing selected — do not restore a previous choice from
-        // TempData here, since it can leak from an abandoned/completed earlier submission attempt
-        // and wrongly pre-select a submission type (e.g. always showing "Pre Cassetted Tissue").
-        BatchType = Session.BatchType;
+        // Every fresh visit starts with TSE selected (the property's own default) — Session.BatchType
+        // itself must never be read here, since it can leak from an unrelated existing batch opened
+        // via BatchDetails/EditBatch/ReceiveBatch and wrongly pre-select Non-TSE for a brand-new
+        // submission. restore=true (Back link from BatchDetails, mid-journey) is the one exception —
+        // it reads the journey-exclusive CassettedBatchTypeDraft instead, never the shared field.
+        if (restore && Session.CassettedBatchTypeDraft.HasValue)
+            BatchType = Session.CassettedBatchTypeDraft.Value;
+        else
+            Session.CassettedBatchTypeDraft = null;
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -60,6 +65,7 @@ public class CassettedModel : HistoPageModel
 
         // Store type selection in session — BatchDetails create mode reads these.
         Session.BatchType = BatchType;
+        Session.CassettedBatchTypeDraft = BatchType; // journey-exclusive copy, restored only by OnGetAsync(restore: true)
         Session.BatchID   = null; // clear any previous batch
 
         // Clear a stale "reached via View/Search Submissions" flag from an earlier, unrelated visit

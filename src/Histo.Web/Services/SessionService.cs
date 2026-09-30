@@ -30,6 +30,7 @@ public sealed class SessionService : ISessionService
     private const string KeyAnimalID  = "AnimalID";
     private const string KeyBlockID   = "BlockID";
     private const string KeyBatchType  = "BatchType";
+    private const string KeyCassettedBatchTypeDraft = "CassettedBatchTypeDraft";
     private const string KeyReturnPage = "ReturnPage";
     private const string KeyReturnPageQuery = "ReturnPageQuery";
     private const string KeySampleSummaryReturnPage = "SampleSummaryReturnPage";
@@ -85,6 +86,12 @@ public sealed class SessionService : ISessionService
     {
         get => GetInt(KeyBatchType);
         set => _session.Set(KeyBatchType, BitConverter.GetBytes(value));
+    }
+
+    public int? CassettedBatchTypeDraft
+    {
+        get => GetNullableInt(KeyCassettedBatchTypeDraft);
+        set => SetNullableInt(KeyCassettedBatchTypeDraft, value);
     }
 
     public string ReturnPage

@@ -37,6 +37,14 @@ public interface ISessionService
     /// </summary>
     int BatchType { get; set; }
 
+    /// <summary>
+    /// In-progress-only copy of the Cassetted TSE/Non-TSE choice, owned exclusively by the
+    /// Create Submission journey (unlike <see cref="BatchType"/>, never overwritten by opening an
+    /// unrelated existing batch). Restored only when Back from <c>BatchDetails</c> returns to
+    /// <c>Cassetted</c> mid-journey; a genuinely fresh visit ignores it and defaults to TSE.
+    /// </summary>
+    int? CassettedBatchTypeDraft { get; set; }
+
     // ── Role helpers ─────────────────────────────────────────────────────────
 
     bool IsCustomer { get; }
