@@ -43,6 +43,15 @@ public class DateReturnedModel : HistoPageModel
     public Batch? Batch { get; private set; }
     public string? Error { get; private set; }
 
+    /// <summary>
+    /// Back-link target — honours <see cref="ISessionService.ReturnPage"/> (set by whichever page
+    /// this journey actually started from, e.g. ViewSubmissions), matching every other page reached
+    /// via BatchDetails (QualityData, ReceiveBatch, PrintSubmission, EditSubmissionStatus, …).
+    /// </summary>
+    public string BackLinkPage => string.IsNullOrWhiteSpace(Session.ReturnPage)
+        ? "/Batches/BatchDetails"
+        : Session.ReturnPage;
+
     /// <summary>Resolved project/contract code description — see BatchDetailsModel.ProjectName for details.</summary>
     public string? ProjectName { get; private set; }
 

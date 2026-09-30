@@ -6,7 +6,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Batches/BatchDetails" class="govuk-back-link">Back</a>
+    <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
 }
 
 @if (Model.Error is not null && Model.Batch is null)
@@ -19,7 +19,7 @@
             @Model.Error
         </strong>
     </div>
-    <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to submission</a>
+    <a href="@Model.BackLinkPage" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to submission</a>
 }
 else if (Model.Batch is not null)
 {
@@ -92,7 +92,6 @@ else if (Model.Batch is not null)
 
         <div class="govuk-button-group">
             <button type="submit" class="govuk-button" data-module="govuk-button">Save date returned</button>
-            <a asp-page="/Batches/BatchDetails" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
         </div>
     </form>
 }
