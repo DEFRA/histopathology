@@ -47,14 +47,14 @@ public class BatchesForEditingModelTests
     }
 
     [Fact]
-    public void OnPostSelect_SetsSessionStateAndRedirectsToEditBatch()
+    public void OnPostSelect_SetsSessionStateAndRedirectsToEditSubmissionStatus()
     {
         var sut = CreateSut();
 
         var result = sut.OnPostSelect(42);
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
-        Assert.Equal("/Batches/EditBatch", redirect.PageName);
+        Assert.Equal("/Batches/EditSubmissionStatus", redirect.PageName);
         Assert.Equal(42, _session.Object.BatchID);
         Assert.Equal("/Batches/BatchesForEditing", _session.Object.ReturnPage);
         Assert.False(_session.Object.IsViewSubmissionMode);
@@ -98,7 +98,7 @@ public class BatchesForEditingModelTests
         var result = await sut.OnPostGoAsync();
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
-        Assert.Equal("/Batches/EditBatch", redirect.PageName);
+        Assert.Equal("/Batches/EditSubmissionStatus", redirect.PageName);
         Assert.Equal(99, _session.Object.BatchID);
     }
 }

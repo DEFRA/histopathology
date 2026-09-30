@@ -51,7 +51,7 @@ public class AuditLogBySubmissionModelTests
 
         sut.OnGet();
 
-        Assert.Equal(0, sut.SubmissionID);
+        Assert.Null(sut.SubmissionID);
     }
 
     [Fact]

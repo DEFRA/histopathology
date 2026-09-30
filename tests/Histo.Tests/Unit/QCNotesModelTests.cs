@@ -2,6 +2,7 @@ using Histo.QualityControl.Interfaces;
 using Histo.QualityControl.Models;
 using Histo.Web.Pages.QC;
 using Histo.Web.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -24,7 +25,11 @@ public class QCNotesModelTests
     private QCNotesModel CreateSut() =>
         new(_session.Object, _qc.Object)
         {
-            PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
+            PageContext = new PageContext
+            {
+                HttpContext = new DefaultHttpContext(),
+                ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()),
+            },
         };
 
     [Fact]
@@ -78,12 +83,12 @@ public class QCNotesModelTests
     }
 
     [Fact]
-    public void OnPostGoAsync_QuickGoRefSet_RedirectsToEditQCNote()
+    public async Task OnPostGoAsync_QuickGoRefSet_RedirectsToEditQCNote()
     {
         var sut = CreateSut();
         sut.QuickGoRef = 9;
 
-        var result = sut.OnPostGoAsync();
+        var result = await sut.OnPostGoAsync();
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
         Assert.Equal("/QC/EditQCNote", redirect.PageName);
@@ -91,14 +96,15 @@ public class QCNotesModelTests
     }
 
     [Fact]
-    public void OnPostGoAsync_NoQuickGoRef_RedirectsToSelf()
+    public async Task OnPostGoAsync_NoQuickGoRef_ReturnsPageWithError()
     {
+        _qc.Setup(q => q.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<QCNote>)[]);
         var sut = CreateSut();
         sut.QuickGoRef = null;
 
-        var result = sut.OnPostGoAsync();
+        var result = await sut.OnPostGoAsync();
 
-        var redirect = Assert.IsType<RedirectToPageResult>(result);
-        Assert.Null(redirect.PageName);
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("Enter a QC number", sut.Errors["QuickGoRef"]);
     }
 }

@@ -93,6 +93,10 @@ public class SampleSummaryModelTests
     public async Task OnPostSelect_WetTissue_RoutesToSubmissionDetails()
     {
         _batches.Setup(b => b.GetSubmittedAsCodeAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync("4");
+        // Routing now resolves the code to its LOOKUP_SUBMITTEDAS description (legacy compares
+        // the description text, not the code) — override the constructor's empty-list default.
+        _lookups.Setup(l => l.GetLookupDataAsync(11, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 4, Code = "4", Name = "Wet Tissue" }]);
         var sut = CreateSut();
         sut.BatchId = 1;
 
