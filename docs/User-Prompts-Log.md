@@ -2156,6 +2156,73 @@ Applied all four: `BatchDetails` Submitted-area locked to match `EditBatch`'s di
 
 ## Prompt 159 — Update run log, session metrics, user prompt log (2026-09-30)
 
+---
+
+## Prompt 160 — BatchDetails.cshtml duplicate Back button question (2026-09-30)
+
+> In BatchDetails.cshtml below code also has backbutton top it has link, why duplicatin navigation ?
+> ```cshtml
+> <div class="govuk-button-group">
+>     <button type="submit" class="govuk-button" data-module="govuk-button">Create submission</button>
+>     <a asp-page="/Batches/Cassetted" asp-route-restore="true" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back</a>
+>     <a asp-page="/Index" class="govuk-link" onclick="return confirm('Are you sure you want to cancel? Any information you have entered will be lost.');">Cancel</a>
+> </div>
+> ```
+
+---
+
+## Prompt 161 — Three-task batch: QualityData dispatch auto-fill, BatchesForArchiving Customer Ref, DateReturned display values (2026-09-30)
+
+> 1. **QualityData.cshtml** — When the user selects the **Dispatched** checkbox: Automatically set **Dispatched To** = logged-in user. Automatically set **Dispatch Date** = today's date. Automatically set **Dispatched By** = logged-in user.
+> 2. **BatchesForArchiving.cshtml** — Remove the **Customer Ref** field/column.
+> 3. **DateReturned.cshtml** — Display the correct values for: **Project / Contract Code**, **Pathologist**
+
+---
+
+## Prompt 162 — Correct Dispatched To source (2026-09-30)
+
+> small correctin  Dispatched To submitted by user's name
+
+---
+
+## Prompt 163 — BatchesForArchiving Actions column button spacing (2026-09-30)
+
+> BatchesForArchiving.cshtml action column shows button it's doesn't have space between button can ou fix it
+
+---
+
+## Prompt 164 — DateReturned back/cancel navigation target + redundant Cancel button (2026-09-30)
+
+> ViewSubmissions.csthml  show datereturn, it goes to DateReturned.cshtml when user click back/cancel it should come back to ViewSubmissions.csthml 
+> What cancel is doing here ? if its just navigation remove that button
+
+---
+
+## Prompt 165 — DateReturned should be read-only when reached from BatchDetails (2026-09-30)
+
+> Why BatchDetails.cshtml has Datereturn button, if its for view only then dateretrun page should not show save date details, its should view only page from this journey. other journey its should allow to edit i menat if user comes from Datareturn button click from view submsiion.cshtml
+
+---
+
+## Prompt 166 — DateReturned read-only mode: spacing and wrong Back target (2026-09-30)
+
+> In DateReturned.cshtml below field shows additional space on top of below row
+> Date returned to customer	30/09/2026
+>
+> Back to submission and Back link taking to Viewsubssion, but actually user has reached this from batchdetails.cshtm page  DateReturned.cshtml  read only mode
+
+---
+
+## Prompt 167 — Fix the 11 unit test failures (2026-09-30)
+
+> Can you fix the Unit test  11 test failuer
+
+---
+
+## Prompt 168 — Update run log, session metrics, and user prompt log (2026-09-30)
+
+> update the run log and session metric and user prompt
+
 > update run log, session metric, and user prompt
 
 Appended Run Log entry #95 (`run-log-v2.md`), Session Metrics row #157 (`session-metrics.md`), and Prompts 149–159 (this file) covering the Assign-Tissue dropdown scoping saga, the two navigation-regression fixes, the BlockDetails tissue-filter and empty-block-on-cancel fixes, the grid-checkbox/duplicate-row root cause and fix, the removed Status column, and the four small UI fixes from 2026-09-29/30.
