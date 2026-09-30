@@ -34,7 +34,6 @@ public class BatchDetailsModel : HistoPageModel
     private const int LookupProjects    = 19;
     private const int LookupFixation    = 10;
     private const int LookupSubmittedAs      = 11;
-    private const int LookupUserArea          = 13;
     private const int LookupTseAntibodies     = 4;
     private const int LookupNonTseAntibodies  = 5;
     private const int LookupSpecialStain      = 6;
@@ -73,6 +72,14 @@ public class BatchDetailsModel : HistoPageModel
     [BindProperty] public int?    Create_OtherSubmittedBy    { get; set; }
     [BindProperty] public string? Create_OtherSubmittedArea  { get; set; }
     [BindProperty] public string? Create_Comments            { get; set; }
+
+    /// <summary>
+    /// Legacy source: <c>BatchDetails.aspx.vb::EnableDisableControls</c> — <c>ddlUserArea</c> is
+    /// only ever enabled when the current user's own area is Histopath; every other area gets it
+    /// auto-set from their own session area and locked. Applies identically to both the "new
+    /// batch" and "editing batch" branches of that method.
+    /// </summary>
+    public bool CanEditSubmittedArea => Session.UserArea == "Histopath";
 
     // ── Test type selections (checkbox groups) ──
     [BindProperty] public List<string> Create_SelectedHistologyCodes { get; set; } = [];
@@ -590,7 +597,16 @@ public class BatchDetailsModel : HistoPageModel
         var contactsTask  = _lookups.GetContactsByAreaAsync(Session.UserAreaID.ToString());
         var speciesTask   = _lookups.GetSpeciesLookupAsync();
         var fixationTask  = _lookups.GetLookupDataAsync(LookupFixation);
-        var areaTask      = _lookups.GetLookupDataAsync(LookupUserArea);
+        // GetluUserArea returns BOTH a meaningless row-sequence "ID" column and the real area
+        // code in "Code" — GetLookupDataAsync(13) maps the former (MapDescriptionIsActive reads
+        // "ID"), silently mismatching Session.UserAreaID/Batch.OtherSubmittedArea, which are the
+        // real Code values. GetUserAreasAsync maps "Code" correctly (MapCodeDescription) — same
+        // method already used for view-mode name resolution and by EditBatchModel.
+        // Active areas only (default) — Mouse Bioassay/Neuropath have been retired and must not be
+        // offered as a choice going forward; historical batches already submitted under them still
+        // resolve to a name in the read-only ViewSubmissions/view-mode summary, which fetches
+        // includeInactive: true separately.
+        var areaTask      = _lookups.GetUserAreasAsync();
         var usersTask     = _users.GetAllUsersAsync();
         var antibodyId    = Session.BatchType == BatchTypeConstants.NonTse ? LookupNonTseAntibodies : LookupTseAntibodies;
         var histologyTask = _lookups.GetHistologyTypesAsync();

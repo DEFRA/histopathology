@@ -94,15 +94,28 @@
         </div>
         <div class="govuk-grid-column-one-third">
             <div class="govuk-form-group">
-                <label class="govuk-label" for="OtherSubmittedAreaDisplay">Submitted area</label>
-                <select class="govuk-select" id="OtherSubmittedAreaDisplay" disabled>
-                    <option value="">-- None --</option>
-                    @foreach (var a in Model.UserAreas)
-                    {
-                        <option value="@a.ID" selected="@(Model.OtherSubmittedArea == a.ID.ToString())">@a.Name</option>
-                    }
-                </select>
-                <input type="hidden" asp-for="OtherSubmittedArea" />
+                <label class="govuk-label" for="OtherSubmittedArea">Submitted area</label>
+                @if (Model.CanEditSubmittedArea)
+                {
+                    <select class="govuk-select" asp-for="OtherSubmittedArea" id="OtherSubmittedArea">
+                        <option value="">-- None --</option>
+                        @foreach (var a in Model.UserAreas)
+                        {
+                            <option value="@a.ID" selected="@(Model.OtherSubmittedArea == a.ID.ToString())">@a.Name</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <select class="govuk-select" id="OtherSubmittedAreaDisplay" disabled>
+                        <option value="">-- None --</option>
+                        @foreach (var a in Model.UserAreas)
+                        {
+                            <option value="@a.ID" selected="@(Model.OtherSubmittedArea == a.ID.ToString())">@a.Name</option>
+                        }
+                    </select>
+                    <input type="hidden" asp-for="OtherSubmittedArea" />
+                }
             </div>
         </div>
     </div>
