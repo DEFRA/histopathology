@@ -491,6 +491,23 @@ else
             // exactly what was submitted — running this here would immediately blank them again
             // for any reload with 0 or 2+ rows checked. Only real checkbox interactions should
             // trigger the single-row-populate/clear behaviour.
+
+            // Ticking "Dispatched?" defaults Dispatched By/Date to the logged-in user/today (who is
+            // actually recording the dispatch), and Dispatched To to who submitted the batch.
+            if (dispatched) {
+                var currentUserId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Session.UserID.ToString()));
+                var submittedByName = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SubmittedByName ?? string.Empty));
+                var today = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(DateTime.Today.ToString("yyyy-MM-dd")));
+                dispatched.addEventListener('change', function () {
+                    if (!dispatched.checked) return;
+                    var to = document.getElementById('DispatchedTo');
+                    var date = document.getElementById('DispatchedDate');
+                    var by = document.getElementById('DispatchedBy');
+                    if (to) to.value = submittedByName;
+                    if (date) date.value = today;
+                    if (by) by.value = currentUserId;
+                });
+            }
         })();
     </script>
 }

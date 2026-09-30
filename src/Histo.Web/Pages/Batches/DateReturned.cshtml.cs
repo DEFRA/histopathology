@@ -127,8 +127,11 @@ public class DateReturnedModel : HistoPageModel
     {
         if (Batch is null) return;
 
-        var projectsTask = _lookups.GetLookupDataAsync(LookupProjects);
-        var contactsTask = _lookups.GetLookupDataAsync(LookupContacts);
+        // includeInactive: true — this page only shows Completed batches, so the saved
+        // Project/Pathologist code is often older and may since have been deactivated; without
+        // this the raw code is shown instead of its name (same fix as BatchDetailsModel).
+        var projectsTask = _lookups.GetLookupDataAsync(LookupProjects, includeInactive: true);
+        var contactsTask = _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true);
         await Task.WhenAll(projectsTask, contactsTask);
 
         ProjectName     = ResolveName(Batch.ProjectContractCode, projectsTask.Result);
