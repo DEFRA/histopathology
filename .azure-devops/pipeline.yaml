@@ -508,7 +508,7 @@ stages:
     jobs:
       - job: reset_dev
         displayName: 'Reset histology reference (DEV)'
-        condition: eq('${{ parameters.resetHistologyRefDev }}', true)
+        condition: or(eq(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.resetHistologyRefDev }}', true))
         pool:
           name: 'DEFRA-COMMON-UBUNTU-SSV3'
         variables:
@@ -537,7 +537,7 @@ stages:
 
       - job: reset_tst
         displayName: 'Reset histology reference (TST)'
-        condition: eq('${{ parameters.resetHistologyRefTest }}', true)
+        condition: or(eq(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.resetHistologyRefTest }}', true))
         pool:
           name: 'DEFRA-COMMON-UBUNTU-SSV3'
         variables:
@@ -566,7 +566,7 @@ stages:
 
       - job: reset_preprod
         displayName: 'Reset histology reference (Pre-Prod)'
-        condition: eq('${{ parameters.resetHistologyRefPreProd }}', true)
+        condition: or(eq(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.resetHistologyRefPreProd }}', true))
         pool:
           name: 'DEFRA-COMMON-UBUNTU-SSV5'
         variables:
