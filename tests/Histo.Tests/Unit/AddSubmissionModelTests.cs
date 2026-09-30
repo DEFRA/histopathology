@@ -1,5 +1,7 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
+using Histo.Histology.Interfaces;
+using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.Submissions;
@@ -27,6 +29,7 @@ public class AddSubmissionModelTests
     private readonly Mock<ISubmissionService> _submissions = new();
     private readonly Mock<IBatchService> _batches = new();
     private readonly Mock<ILookupService> _lookups = new();
+    private readonly Mock<IBlockService> _blocks = new();
 
     public AddSubmissionModelTests()
     {
@@ -35,12 +38,13 @@ public class AddSubmissionModelTests
         _session.SetupProperty(s => s.SampleDetailReturnPage);
         _session.Setup(s => s.UserID).Returns(7);
         _batches.Setup(b => b.GetSubmittedAsCodeAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((string?)null);
+        _batches.Setup(b => b.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
     }
 
     private AddSubmissionModel CreateSut(string? returnPage = null) =>
-        new(_session.Object, _submissions.Object, _batches.Object, _lookups.Object)
+        new(_session.Object, _submissions.Object, _batches.Object, _lookups.Object, _blocks.Object)
         {
             PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
             TempData = new TempDataDictionary(new Microsoft.AspNetCore.Http.DefaultHttpContext(), Mock.Of<ITempDataProvider>()),
@@ -201,5 +205,49 @@ public class AddSubmissionModelTests
         _submissions.Verify(s => s.AddAnimalAsync(99, "NewRef", 7, (string?)null, false, It.IsAny<CancellationToken>()), Times.Once);
         var redirect = Assert.IsType<RedirectToPageResult>(result);
         Assert.Equal("/Submissions/SubmissionDetailsBlock", redirect.PageName);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_PreCassetted_SenderHasPreBookedBlock_ReusesPreBookedAnimal()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _batches.Setup(b => b.GetByIdAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 5, IsPreCassetted = true });
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        _submissions.Setup(s => s.GetAnimalBySenderAsync("PreBookedRef", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<SenderSearchResult>)[new SenderSearchResult { ID = 77, SenderRef = "PreBookedRef" }]);
+        _blocks.Setup(b => b.GetPreBookedByAnimalAsync(77, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 1, AnimalID = 77, BlockRef = "01" }]);
+        _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(200);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SenderRef = "PreBookedRef";
+
+        var result = await sut.OnPostAsync();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Submissions/SubmissionDetailsBlock", redirect.PageName);
+        Assert.Equal(77, redirect.RouteValues!["animalId"]);
+        _submissions.Verify(s => s.AddAnimalAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_PreCassetted_SenderHasNoPreBookedBlock_SetsModelErrorAndDoesNotCreateAnimal()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _batches.Setup(b => b.GetByIdAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 5, IsPreCassetted = true });
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        _submissions.Setup(s => s.GetAnimalBySenderAsync("NoBookingRef", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<SenderSearchResult>)[]);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SenderRef = "NoBookingRef";
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("This sender reference has no pre-booked block. Book a block reference for this sender before adding the sample.", sut.ModelError);
+        _submissions.Verify(s => s.AddAnimalAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }
