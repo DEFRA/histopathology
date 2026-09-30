@@ -1,7 +1,5 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
-using Histo.Histology.Interfaces;
-using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.Submissions;
@@ -17,10 +15,11 @@ namespace Histo.Tests.Unit;
 /// <summary>
 /// Verifies <see cref="AddSubmissionModel.IsAssignTissueMode"/> — reached via the "Assign Tissues
 /// to Blocks" journey (<c>Batches/BatchBlocks</c>'s "Add sample" button), the Sender Ref field must
-/// become a closed choice from the batch's own unblocked samples rather than free text, and
-/// submitting must select that existing sample (no new Animal created) and jump straight to block
-/// assignment. The Create/Edit Submission journey (reached without that context) must be entirely
-/// unaffected — it still creates a brand-new Animal from free-typed text.
+/// become a closed choice from every sample in the batch (not just unblocked ones — a sample often
+/// needs several blocks added one at a time by revisiting this same picker) rather than free text,
+/// and submitting must select that existing sample (no new Animal created) and jump straight to
+/// block assignment. The Create/Edit Submission journey (reached without that context) must be
+/// entirely unaffected — it still creates a brand-new Animal from free-typed text.
 /// </summary>
 public class AddSubmissionModelTests
 {
@@ -28,7 +27,6 @@ public class AddSubmissionModelTests
     private readonly Mock<ISubmissionService> _submissions = new();
     private readonly Mock<IBatchService> _batches = new();
     private readonly Mock<ILookupService> _lookups = new();
-    private readonly Mock<IBlockService> _blocks = new();
 
     public AddSubmissionModelTests()
     {
@@ -42,7 +40,7 @@ public class AddSubmissionModelTests
     }
 
     private AddSubmissionModel CreateSut(string? returnPage = null) =>
-        new(_session.Object, _submissions.Object, _batches.Object, _lookups.Object, _blocks.Object)
+        new(_session.Object, _submissions.Object, _batches.Object, _lookups.Object)
         {
             PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
             TempData = new TempDataDictionary(new Microsoft.AspNetCore.Http.DefaultHttpContext(), Mock.Of<ITempDataProvider>()),
@@ -65,6 +63,21 @@ public class AddSubmissionModelTests
     }
 
     [Fact]
+    public void IsAssignTissueMode_StaleSessionBreadcrumbFromEarlierBatchBlocksVisit_IsIgnored()
+    {
+        // Regression: Session.SampleDetailReturnPage is set by OTHER pages (BatchBlocks,
+        // SampleSummary, this page's own POST handler) purely to drive THEIR OWN later back-link —
+        // it must never leak into this page's own mode detection. Reported bug: a user who visited
+        // the Assign Tissue journey earlier in the same browser session, then started a completely
+        // unrelated Create Submission journey, saw the dropdown instead of the free-text field
+        // because this stale session value was still "/Batches/BatchBlocks?...".
+        _session.Setup(s => s.SampleDetailReturnPage).Returns("/Batches/BatchBlocks?batchId=999");
+        var sut = CreateSut(returnPage: null);
+
+        Assert.False(sut.IsAssignTissueMode);
+    }
+
+    [Fact]
     public void IsAssignTissueMode_ForSampleSummaryOrigin_IsAlwaysFalse()
     {
         // Regression guard: SampleSummary's own "Add sample" must ALWAYS be free text, never a
@@ -76,21 +89,23 @@ public class AddSubmissionModelTests
     }
 
     [Fact]
-    public async Task OnGetAsync_AssignTissueMode_PopulatesOnlyUnblockedSamples()
+    public async Task OnGetAsync_AssignTissueMode_PopulatesEverySampleInBatch()
     {
+        // Regression: a sample commonly needs several blocks added one at a time, so this picker
+        // must keep offering an already-blocked sample back — filtering it out once it had its
+        // first block made the dropdown appear to "stop populating" on a later visit.
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[
                 new Animal { ID = 1, SenderRef = "S1" },
                 new Animal { ID = 2, SenderRef = "S2" },
             ]);
-        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 10, AnimalID = 1, BlockRef = "01" }]);
         var sut = CreateSut(returnPage: "/Batches/BatchBlocks?batchId=5");
 
         await sut.OnGetAsync(null, null);
 
-        Assert.Single(sut.AvailableAnimals);
-        Assert.Equal("S2", sut.AvailableAnimals[0].SenderRef);
+        Assert.Equal(2, sut.AvailableAnimals.Count);
+        Assert.Contains(sut.AvailableAnimals, a => a.SenderRef == "S1");
+        Assert.Contains(sut.AvailableAnimals, a => a.SenderRef == "S2");
     }
 
     [Fact]
@@ -109,7 +124,6 @@ public class AddSubmissionModelTests
     {
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
-        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
         var sut = CreateSut(returnPage: "/Batches/BatchBlocks?batchId=5");
         sut.SenderRef = "S2";
 
@@ -130,7 +144,6 @@ public class AddSubmissionModelTests
         // samples to SubmissionDetails).
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
-        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
         _batches.Setup(b => b.GetSubmittedAsCodeAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync("WT");
         _lookups.Setup(l => l.GetLookupDataAsync(11, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { Code = "WT", Name = "Wet Tissue" }]);
@@ -150,7 +163,6 @@ public class AddSubmissionModelTests
         // to the wrong default (SampleSummary) instead of returning to BatchBlocks.
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
-        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
         var sut = CreateSut(returnPage: "/Batches/BatchBlocks?batchId=5");
         sut.SenderRef = "S2";
 
@@ -163,7 +175,6 @@ public class AddSubmissionModelTests
     public async Task OnPostAsync_AssignTissueMode_SampleNotInAvailableList_SetsModelError()
     {
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
-        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
         var sut = CreateSut(returnPage: "/Batches/BatchBlocks?batchId=5");
         sut.SenderRef = "NoSuchSample";
 

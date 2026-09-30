@@ -1,6 +1,5 @@
 using Histo.Administration.Interfaces;
 using Histo.Core.Domain;
-using Histo.Histology.Interfaces;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -14,15 +13,13 @@ public class AddSubmissionModel : HistoPageModel
     private readonly ISubmissionService _submissions;
     private readonly IBatchService _batches;
     private readonly ILookupService _lookups;
-    private readonly IBlockService _blocks;
 
-    public AddSubmissionModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups, IBlockService blocks)
+    public AddSubmissionModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups)
         : base(session)
     {
         _submissions = submissions;
         _batches = batches;
         _lookups = lookups;
-        _blocks = blocks;
     }
 
     /// <summary>Batch ID from the URL (route/query). Falls back to <see cref="ISessionService.BatchID"/>.</summary>
@@ -50,11 +47,9 @@ public class AddSubmissionModel : HistoPageModel
 
     /// <summary>
     /// True when reached from the "Assign Tissues to Blocks" journey (<c>BatchBlocks.cshtml</c>'s
-    /// "Add sample" button), as opposed to Create/Edit Submission. Matches the same
-    /// substring-on-ReturnPage convention already used by
-    /// <see cref="Histo.Web.Pages.Submissions.SubmissionDetailsBlockModel.IsAssignTissueMode"/>.
-    /// No user-area restriction. Strict: always requires picking an existing sample, since
-    /// BatchBlocks is only ever reached once a Received/InProgress batch's samples already exist.
+    /// "Add sample" button), as opposed to Create/Edit Submission. No user-area restriction.
+    /// Strict: always requires picking an existing sample, since BatchBlocks is only ever reached
+    /// once a Received/InProgress batch's samples already exist.
     ///
     /// Legacy had two distinct pages here: <c>AddSubmission.aspx</c> (Create/Edit Submission — types
     /// a brand-new Sender Ref) and <c>AddSample.aspx</c> (Assign Tissues to Blocks — associates an
@@ -65,18 +60,28 @@ public class AddSubmissionModel : HistoPageModel
     /// with a single free-text field, which incorrectly let the Assign Tissues journey type a new
     /// Sender Ref instead of picking one of the batch's own not-yet-blocked samples.
     ///
+    /// Deliberately checks ONLY <see cref="ReturnPage"/> (fresh every request — from the link's own
+    /// query string on GET, the form's hidden field on POST) and never
+    /// <see cref="ISessionService.SampleDetailReturnPage"/>. That session value is set by OTHER
+    /// pages (<c>BatchBlocks</c>, <c>SampleSummary</c>, and this page's own POST handler) purely to
+    /// drive THEIR OWN later back-link, never to describe how THIS page was reached — checking it
+    /// here previously let a stale value from an earlier, unrelated visit to the Assign Tissue
+    /// journey silently force dropdown mode onto a completely separate Create Submission journey
+    /// later in the same browser session.
+    ///
     /// Excludes "Copy sample" (<see cref="SourceAnimalId"/> set) — that flow always creates a
-    /// genuinely new Animal with copied tissues, never picks an existing one, regardless of how
-    /// stale <see cref="ISessionService.SampleDetailReturnPage"/> might be at that point.
+    /// genuinely new Animal with copied tissues, never picks an existing one.
     /// </summary>
     public bool IsAssignTissueMode =>
         (SourceAnimalId is null or <= 0)
-        && ((ReturnPage ?? string.Empty).Contains("/Batches/BatchBlocks", StringComparison.OrdinalIgnoreCase)
-            || (Session.SampleDetailReturnPage ?? string.Empty).Contains("/Batches/BatchBlocks", StringComparison.OrdinalIgnoreCase));
+        && (ReturnPage ?? string.Empty).Contains("/Batches/BatchBlocks", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Samples already in this batch that don't yet have a block — the only valid choices when
-    /// <see cref="IsAssignTissueMode"/>, populated in <see cref="OnGetAsync"/>.
+    /// Every sample in the batch — the pickable set for <see cref="IsAssignTissueMode"/>. Not
+    /// filtered to "not yet blocked" samples: a single sample commonly needs several blocks added
+    /// one at a time, so this picker must keep offering it back on every visit, matching legacy
+    /// <c>AddSample.aspx</c> (a user-reported regression when this was filtered down to a
+    /// disappearing "unblocked only" list).
     /// </summary>
     public IReadOnlyList<Animal> AvailableAnimals { get; private set; } = [];
 
@@ -104,7 +109,7 @@ public class AddSubmissionModel : HistoPageModel
             SenderRef = senderRef;
 
         if (IsAssignTissueMode && BatchId is > 0)
-            AvailableAnimals = await GetUnblockedAnimalsAsync(BatchId.Value);
+            AvailableAnimals = await GetAssignableAnimalsAsync(BatchId.Value);
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -116,7 +121,7 @@ public class AddSubmissionModel : HistoPageModel
 
         if (IsAssignTissueMode)
         {
-            var available = await GetUnblockedAnimalsAsync(batchId.Value);
+            var available = await GetAssignableAnimalsAsync(batchId.Value);
             AvailableAnimals = available;
 
             // No new Animal is created here — the user is picking one of the batch's own
@@ -233,11 +238,7 @@ public class AddSubmissionModel : HistoPageModel
         return ValidationHelpers.IsWetTissueDescription(match?.Name);
     }
 
-    /// <summary>Samples in the batch that have no block yet — the pickable set for <see cref="IsAssignTissueMode"/>.</summary>
-    private async Task<IReadOnlyList<Animal>> GetUnblockedAnimalsAsync(int batchId)
-    {
-        var animals = await _submissions.GetAnimalsByBatchAsync(batchId);
-        var blockedAnimalIds = (await _blocks.GetByBatchAsync(batchId)).Select(b => b.AnimalID).ToHashSet();
-        return animals.Where(a => !blockedAnimalIds.Contains(a.ID)).ToList();
-    }
+    /// <summary>Every sample in the batch — the pickable set for <see cref="IsAssignTissueMode"/>.</summary>
+    private async Task<IReadOnlyList<Animal>> GetAssignableAnimalsAsync(int batchId) =>
+        await _submissions.GetAnimalsByBatchAsync(batchId);
 }
