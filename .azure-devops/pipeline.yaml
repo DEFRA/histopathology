@@ -3,11 +3,13 @@ trigger:
     include:
       - develop
 
+# Cron cadence is kept as a single named variable (below, in the shared
+# variables block) so it can be changed in one place. Azure Pipelines
+# schedules are resolved at compile time, so this must be a literal or a
+# ${{ variables.x }} compile-time reference — it cannot be a queue-time parameter.
 schedules:
-  # TESTING: running every 15 minutes to verify the reset end-to-end.
-  # Revert to '0 4 1 1 *' (annual, 04:00 UTC 1 Jan) once testing is complete.
-  - cron: '*/15 * * * *'
-    displayName: 'Histology reference reset (TESTING - every 15 min)'
+  - cron: '${{ variables.histologyResetCronSchedule }}'
+    displayName: 'Histology reference reset (annual, 1 Jan)'
     branches:
       include:
         - develop
@@ -72,6 +74,8 @@ variables:
     value: 'src/Histo.Web/Histo.Web.csproj'
   - name: databaseScriptsPath
     value: 'src/Database'
+  - name: histologyResetCronSchedule
+    value: '0 4 1 1 *' # annual, 04:00 UTC on 1 Jan — change here to adjust the reset cadence
 
 stages:
   - stage: Build
