@@ -21,6 +21,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Localization;
 using Serilog;
 using Serilog.Sinks.ApplicationInsights.TelemetryConverters;
 using System.Security.Cryptography.X509Certificates;
@@ -313,6 +314,20 @@ try
     }
 
     app.UseSerilogRequestLogging();
+
+    // Pins date/number formatting to en-GB (dd/MM/yyyy) regardless of the hosting OS/container's
+    // default culture — every ToShortDateString()/plain ToString() call across the app (grids,
+    // summaries) otherwise renders MM/dd/yyyy on any host whose default culture isn't en-GB, even
+    // though it renders correctly dd/MM/yyyy on a UK-locale dev machine. This is a UK government
+    // service, so en-GB is the only supported culture — not driven by the browser's Accept-Language.
+    var enGb = new[] { new System.Globalization.CultureInfo("en-GB") };
+    app.UseRequestLocalization(new RequestLocalizationOptions
+    {
+        DefaultRequestCulture = new RequestCulture("en-GB"),
+        SupportedCultures = enGb,
+        SupportedUICultures = enGb,
+    });
+
     app.UseForwardedHeaders();  // must run before UseHttpsRedirection/UseAuthentication
     app.UseHttpsRedirection();
     app.UseStaticFiles();
