@@ -1,5 +1,7 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
+using Histo.Histology.Interfaces;
+using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.Submissions;
@@ -27,6 +29,7 @@ public class AddSubmissionModelTests
     private readonly Mock<ISubmissionService> _submissions = new();
     private readonly Mock<IBatchService> _batches = new();
     private readonly Mock<ILookupService> _lookups = new();
+    private readonly Mock<IBlockService> _blocks = new();
 
     public AddSubmissionModelTests()
     {
@@ -40,7 +43,7 @@ public class AddSubmissionModelTests
     }
 
     private AddSubmissionModel CreateSut(string? returnPage = null) =>
-        new(_session.Object, _submissions.Object, _batches.Object, _lookups.Object)
+        new(_session.Object, _submissions.Object, _batches.Object, _lookups.Object, _blocks.Object)
         {
             PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
             TempData = new TempDataDictionary(new Microsoft.AspNetCore.Http.DefaultHttpContext(), Mock.Of<ITempDataProvider>()),
@@ -182,6 +185,60 @@ public class AddSubmissionModelTests
 
         Assert.IsType<PageResult>(result);
         Assert.Equal("Select a sample from the list.", sut.ModelError);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_CreateEditSubmission_WhenSenderRefBlank_GeneratesNextMouseRef()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[
+                new Animal { ID = 1, SenderRef = "MC000123" },
+                new Animal { ID = 2, SenderRef = "MC000124" },
+            ]);
+        _submissions.Setup(s => s.AddAnimalAsync(99, "MC000125", 7, (string?)null, false, It.IsAny<CancellationToken>())).ReturnsAsync(123);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(200);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SenderRef = string.Empty;
+
+        var result = await sut.OnPostAsync();
+
+        _submissions.Verify(s => s.AddAnimalAsync(99, "MC000125", 7, (string?)null, false, It.IsAny<CancellationToken>()), Times.Once);
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Submissions/SubmissionDetailsBlock", redirect.PageName);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_CreateEditSubmission_WhenCopyingBlockTypeSample_CopiesSourceBlocksAndTissues()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _submissions.Setup(s => s.AddAnimalAsync(99, "MC000125", 7, (string?)null, false, It.IsAny<CancellationToken>())).ReturnsAsync(123);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(200);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Tissue>)[new Tissue { ID = 1, OwnerID = 10, TissueCode = "T1", NoPieces = 1 }]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[
+                new Block { ID = 10, BatchID = 5, AnimalID = 3, BlockRef = "01", Order = 1 },
+                new Block { ID = 11, BatchID = 5, AnimalID = 123, BlockRef = "02", Order = 2 },
+            ]);
+        _blocks.Setup(b => b.CopyBlockAsync(It.IsAny<Block>(), 5, 123, It.IsAny<IEnumerable<string>>(), It.IsAny<IEnumerable<int>>(), 7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(999);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SourceAnimalId = 3;
+        sut.SenderRef = "MC000125";
+
+        var result = await sut.OnPostAsync();
+
+        _blocks.Verify(b => b.CopyBlockAsync(It.IsAny<Block>(), 5, 123, It.IsAny<IEnumerable<string>>(), It.IsAny<IEnumerable<int>>(), 7, It.IsAny<CancellationToken>()), Times.Once);
+        _submissions.Verify(s => s.CopyTissueAsync(It.IsAny<Tissue>(), 999, 7, It.IsAny<CancellationToken>()), Times.Once);
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Submissions/SampleSummary", redirect.PageName);
     }
 
     [Fact]

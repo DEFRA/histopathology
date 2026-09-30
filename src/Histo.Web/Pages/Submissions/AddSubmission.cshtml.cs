@@ -1,5 +1,6 @@
 using Histo.Administration.Interfaces;
 using Histo.Core.Domain;
+using Histo.Histology.Interfaces;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -13,13 +14,15 @@ public class AddSubmissionModel : HistoPageModel
     private readonly ISubmissionService _submissions;
     private readonly IBatchService _batches;
     private readonly ILookupService _lookups;
+    private readonly IBlockService _blocks;
 
-    public AddSubmissionModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups)
+    public AddSubmissionModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups, IBlockService blocks)
         : base(session)
     {
         _submissions = submissions;
         _batches = batches;
         _lookups = lookups;
+        _blocks = blocks;
     }
 
     /// <summary>Batch ID from the URL (route/query). Falls back to <see cref="ISessionService.BatchID"/>.</summary>
@@ -158,6 +161,9 @@ public class AddSubmissionModel : HistoPageModel
 
         Session.BatchSubmissionID = submissionId;
 
+        if (string.IsNullOrWhiteSpace(SenderRef))
+            SenderRef = await ResolveNextAvailableSenderRefAsync(batchId.Value);
+
         // Legacy source: AddSubmission.aspx.vb — bNeuropath is derived from the user's area
         // (SV_HeaderUserArea = "Neuropath"), never from a manual form control.
         var isNeuropath = Session.UserArea == "Neuropath";
@@ -219,7 +225,10 @@ public class AddSubmissionModel : HistoPageModel
         }
 
         if (SourceAnimalId is > 0)
+        {
+            await CopyBlocksForSourceAnimalAsync(batchId.Value, SourceAnimalId.Value, newAnimalId, Session.UserID);
             return RedirectToPage("/Submissions/SampleSummary", new { batchId });
+        }
 
         Session.SampleDetailReturnPage = BackLinkPage;
         return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = newAnimalId });
@@ -241,4 +250,60 @@ public class AddSubmissionModel : HistoPageModel
     /// <summary>Every sample in the batch — the pickable set for <see cref="IsAssignTissueMode"/>.</summary>
     private async Task<IReadOnlyList<Animal>> GetAssignableAnimalsAsync(int batchId) =>
         await _submissions.GetAnimalsByBatchAsync(batchId);
+
+    /// <summary>
+    /// Copies the source animal's blocks and their tissues to the newly created sample when the user
+    /// is creating a new block-based sample from an existing sample. This matches the legacy
+    /// "Copy sample" behaviour for non-wet-tissue batches and prevents the batch printout from
+    /// coming back blank when the cloned sample has no copied block data.
+    /// </summary>
+    private async Task CopyBlocksForSourceAnimalAsync(int batchId, int sourceAnimalId, int targetAnimalId, int userId)
+    {
+        var allBlocks = await _blocks.GetByBatchAsync(batchId);
+        var sourceBlocks = allBlocks.Where(b => b.AnimalID == sourceAnimalId).ToList();
+        if (sourceBlocks.Count == 0) return;
+
+        var targetBlocks = allBlocks.Where(b => b.AnimalID == targetAnimalId).ToList();
+        var refs = targetBlocks.Select(b => b.BlockRef).ToList();
+        var orders = targetBlocks.Select(b => b.Order).ToList();
+
+        foreach (var sourceBlock in sourceBlocks)
+        {
+            var newBlockId = await _blocks.CopyBlockAsync(sourceBlock, batchId, targetAnimalId, refs, orders, userId);
+            if (newBlockId <= 0) continue;
+
+            refs.Add(BlockHelpers.ComputeNextBlockRef(refs));
+            orders.Add(BlockHelpers.ComputeNextOrder(orders));
+
+            var tissues = await _submissions.GetTissuesByBlockAsync(sourceBlock.BatchID, sourceBlock.ID);
+            foreach (var tissue in tissues)
+                await _submissions.CopyTissueAsync(tissue, newBlockId, userId);
+        }
+    }
+
+    /// <summary>
+    /// Legacy-style progression for mouse/PG sender refs: when a user starts a brand-new sample
+    /// without a sender ref, continue the next available serial ref in the current batch rather than
+    /// creating a blank or duplicate value. This restores the missing serial ascending behaviour seen
+    /// in the UAT defect for mouse stained-section submissions.
+    /// </summary>
+    private async Task<string> ResolveNextAvailableSenderRefAsync(int batchId)
+    {
+        var animals = await _submissions.GetAnimalsByBatchAsync(batchId);
+        var nextId = 1;
+
+        foreach (var animal in animals)
+        {
+            if (SenderRefHelpers.IsMouseNumber(animal.SenderRef) && SenderRefHelpers.TryParseMouseNumber(animal.SenderRef, out var mouseId))
+            {
+                nextId = Math.Max(nextId, mouseId + 1);
+                continue;
+            }
+
+            if (SenderRefHelpers.IsPgNumber(animal.SenderRef) && SenderRefHelpers.TryParsePgNumber(animal.SenderRef, out var pgId, out _))
+                nextId = Math.Max(nextId, pgId + 1);
+        }
+
+        return SenderRefHelpers.FormatMouseNumber(nextId);
+    }
 }
