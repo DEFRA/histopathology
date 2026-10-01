@@ -2,12 +2,15 @@ trigger:
   branches:
     include:
       - develop
+      - main
 
+# Cron cadence is a literal, since Azure Pipelines resolves `schedules:` at
+# compile time before the `variables:` block exists - a ${{ variables.x }}
+# reference here fails with "A template expression is not allowed in this
+# context". To change the cadence, edit the cron literal below directly.
 schedules:
-  # TESTING: running every 15 minutes to verify the reset end-to-end.
-  # Revert to '0 4 1 1 *' (annual, 04:00 UTC 1 Jan) once testing is complete.
-  - cron: '*/15 * * * *'
-    displayName: 'Histology reference reset (TESTING - every 15 min)'
+  - cron: '0 4 1 1 *'
+    displayName: 'Histology reference reset (annual, 1 Jan)'
     branches:
       include:
         - develop
@@ -188,7 +191,8 @@ stages:
   - stage: DEV
     displayName: DEV
     dependsOn: Build
-    condition: and(succeeded(), ne(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.deployToDev }}', true))
+    # develop-only: DEV/TST deploy from develop, Pre-Prod/Prod deploy from main.
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranchName'], 'develop'), eq('${{ parameters.deployToDev }}', true))
     variables:
     - name: appName
       value: 'DEVCDEWEBAW1401'
@@ -268,7 +272,8 @@ stages:
     dependsOn:
       - DEV
       - Build
-    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.DEV.result, 'Succeeded', 'Skipped'), ne(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.deployToTest }}', true))
+    # develop-only: DEV/TST deploy from develop, Pre-Prod/Prod deploy from main.
+    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.DEV.result, 'Succeeded', 'Skipped'), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranchName'], 'develop'), eq('${{ parameters.deployToTest }}', true))
     variables:
     - name: appName
       value: 'TSTCDEWEBAW1401'
@@ -347,7 +352,8 @@ stages:
     dependsOn:
       - TST
       - Build
-    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.TST.result, 'Succeeded', 'Skipped'), ne(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.deployToPreProd }}', true))
+    # main-only: Pre-Prod/Prod deploy from main, DEV/TST deploy from develop.
+    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.TST.result, 'Succeeded', 'Skipped'), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.deployToPreProd }}', true))
     variables:
     - name: appName
       value: 'PRECDEWEBAW1401'
@@ -424,7 +430,8 @@ stages:
   # - stage: Prod
   #   displayName: PROD
   #   dependsOn: Build
-  #   condition: and(succeeded(), eq('${{ parameters.deployToProd }}', true))
+  #   # main-only: Pre-Prod/Prod deploy from main, DEV/TST deploy from develop.
+  #   condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.deployToProd }}', true))
   #   variables:
   #   - name: appName
   #     value: 'PRD-CDE-Web-App'
@@ -504,7 +511,7 @@ stages:
     jobs:
       - job: reset_dev
         displayName: 'Reset histology reference (DEV)'
-        condition: eq('${{ parameters.resetHistologyRefDev }}', true)
+        condition: or(eq(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.resetHistologyRefDev }}', true))
         pool:
           name: 'DEFRA-COMMON-UBUNTU-SSV3'
         variables:
@@ -533,7 +540,7 @@ stages:
 
       - job: reset_tst
         displayName: 'Reset histology reference (TST)'
-        condition: eq('${{ parameters.resetHistologyRefTest }}', true)
+        condition: or(eq(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.resetHistologyRefTest }}', true))
         pool:
           name: 'DEFRA-COMMON-UBUNTU-SSV3'
         variables:
@@ -562,7 +569,7 @@ stages:
 
       - job: reset_preprod
         displayName: 'Reset histology reference (Pre-Prod)'
-        condition: eq('${{ parameters.resetHistologyRefPreProd }}', true)
+        condition: or(eq(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.resetHistologyRefPreProd }}', true))
         pool:
           name: 'DEFRA-COMMON-UBUNTU-SSV5'
         variables:
