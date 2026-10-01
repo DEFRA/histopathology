@@ -2,6 +2,7 @@ trigger:
   branches:
     include:
       - develop
+      - main
 
 # Cron cadence is a literal, since Azure Pipelines resolves `schedules:` at
 # compile time before the `variables:` block exists - a ${{ variables.x }}
@@ -190,7 +191,8 @@ stages:
   - stage: DEV
     displayName: DEV
     dependsOn: Build
-    condition: and(succeeded(), ne(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.deployToDev }}', true))
+    # develop-only: DEV/TST deploy from develop, Pre-Prod/Prod deploy from main.
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranchName'], 'develop'), eq('${{ parameters.deployToDev }}', true))
     variables:
     - name: appName
       value: 'DEVCDEWEBAW1401'
@@ -270,7 +272,8 @@ stages:
     dependsOn:
       - DEV
       - Build
-    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.DEV.result, 'Succeeded', 'Skipped'), ne(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.deployToTest }}', true))
+    # develop-only: DEV/TST deploy from develop, Pre-Prod/Prod deploy from main.
+    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.DEV.result, 'Succeeded', 'Skipped'), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranchName'], 'develop'), eq('${{ parameters.deployToTest }}', true))
     variables:
     - name: appName
       value: 'TSTCDEWEBAW1401'
@@ -349,7 +352,8 @@ stages:
     dependsOn:
       - TST
       - Build
-    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.TST.result, 'Succeeded', 'Skipped'), ne(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.deployToPreProd }}', true))
+    # main-only: Pre-Prod/Prod deploy from main, DEV/TST deploy from develop.
+    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.TST.result, 'Succeeded', 'Skipped'), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.deployToPreProd }}', true))
     variables:
     - name: appName
       value: 'PRECDEWEBAW1401'
@@ -426,7 +430,8 @@ stages:
   # - stage: Prod
   #   displayName: PROD
   #   dependsOn: Build
-  #   condition: and(succeeded(), eq('${{ parameters.deployToProd }}', true))
+  #   # main-only: Pre-Prod/Prod deploy from main, DEV/TST deploy from develop.
+  #   condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.deployToProd }}', true))
   #   variables:
   #   - name: appName
   #     value: 'PRD-CDE-Web-App'
