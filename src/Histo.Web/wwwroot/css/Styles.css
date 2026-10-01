@@ -120,15 +120,17 @@
 }
 
 /* Resets native <button> chrome so a Back link that must POST (discard/cancel) instead of
- * navigate via <a href> renders identically to govuk-back-link's <a> variant. Restates
- * padding-left explicitly rather than relying on cascade order against govuk-frontend.min.css. */
+ * navigate via <a href> renders identically to govuk-back-link's <a> variant. Must NOT reset
+ * margin or font — this element also carries the real govuk-back-link class, and resetting
+ * those two properties (unlike the chrome ones below) overrides govuk-back-link's own spacing
+ * and responsive GDS Transport font-size rather than merely filling a gap it leaves unset,
+ * making this one back link render with different spacing/typography to every other page.
+ * color must still be restated: :link/:visited never match a <button>. */
 .app-back-link-button {
     appearance: none;
     background: none;
     border: 0;
-    margin: 0;
     padding: 0 0 0 14px;
-    font: inherit;
     cursor: pointer;
     color: #0b0c0c;
 }

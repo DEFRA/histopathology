@@ -506,8 +506,6 @@ public class BatchDetailsModel : HistoPageModel
             errors["Create_Histology"] = "Select at least one histology type.";
         else if (Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.Archive) && Create_SelectedHistologyCodes.Count > 1)
             errors["Create_Histology"] = "Archive cannot be combined with other histology types.";
-        else if (Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.EO) && Create_SelectedHistologyCodes.Count > 1)
-            errors["Create_Histology"] = "EO cannot be combined with other histology types.";
 
         if (Create_SafeToHandle is null)
             errors["Create_SafeToHandle"] = "Select whether the submission is adequately fixed.";
@@ -582,6 +580,11 @@ public class BatchDetailsModel : HistoPageModel
         // and let a zero-sample submission look finished. SampleSummary.OnPostFinishAsync is the
         // actual completion gate (requires >=1 sample) — this redirect just puts the user there
         // immediately instead of on the summary/view page first.
+        // Clear any stale return-page left over from an earlier, unrelated BatchDetails/EditBatch
+        // visit in this same browser session — without this, "Finish" on a brand-new submission
+        // incorrectly redirects back to that old page instead of Print Submission, since
+        // SampleSummary.OnPostFinishAsync trusts this value unconditionally once set.
+        Session.SampleSummaryReturnPage = null;
         return RedirectToPage("/Submissions/SampleSummary", new { batchId });
     }
 

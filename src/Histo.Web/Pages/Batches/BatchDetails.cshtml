@@ -353,9 +353,10 @@
     @* Show/hide antibody and stain sections when histology checkboxes change *@
     <script>
     (function () {
-        // Legacy-matching behaviour (SubmissionDetailsBlock chkblHistology_SelectedIndexChanged):
-        // EO and Archive are both mutually exclusive with every other Histology test.
-        var exclusiveCodes = ['@Histo.Submissions.Models.HistologyCode.EO', '@Histo.Submissions.Models.HistologyCode.Archive'];
+        // Legacy-matching behaviour (BatchDetails.aspx.vb::chkblHistology_SelectedIndexChanged):
+        // only Archive is mutually exclusive with every other Histology test — EO is a normal,
+        // freely-combinable option (it's exclusive only on the per-block BlockDetails page, not here).
+        var exclusiveCodes = ['@Histo.Submissions.Models.HistologyCode.Archive'];
         var checkboxes  = document.querySelectorAll('#create-histology-checkboxes input[type=checkbox]');
 
         function enforceExclusivity(changed) {

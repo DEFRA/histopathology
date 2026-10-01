@@ -414,10 +414,16 @@ public sealed class HistologyReportDataSetBuilder
         dt.Columns.Add("RepeatBlock");
         dt.Columns.Add("CustomerRef");
 
-        // Build animal lookup: AnimalID → animal row
+        // Build animal lookup: AnimalID → animal row. GetBatchAnimal (the SP behind this result
+        // set) joins through BatchSubmission with no DISTINCT, so an animal referenced by more
+        // than one BatchSubmission in this batch (e.g. a Pre-Cassetted submission reusing an
+        // existing animal's ID) comes back more than once — this is purely a lookup consulted
+        // per-tissue-row below (never iterated itself), so keeping the first occurrence per ID
+        // is safe and doesn't drop or merge any visible output rows.
         var animalById = rawAnimals
             .Where(a => a.ContainsKey("ID"))
-            .ToDictionary(a => Convert.ToInt32(a["ID"]), a => a);
+            .GroupBy(a => Convert.ToInt32(a["ID"]))
+            .ToDictionary(g => g.Key, g => g.First());
 
         if (rawTissues.Count > 0)
         {

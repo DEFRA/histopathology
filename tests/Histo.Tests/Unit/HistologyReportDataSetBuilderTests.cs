@@ -467,6 +467,28 @@ public class HistologyReportDataSetBuilderTests
     }
 
     [Fact]
+    public void BuildSubmissionTable_AnimalReferencedByTwoSubmissions_DoesNotThrow()
+    {
+        // Regression: GetBatchAnimal joins through BatchSubmission with no DISTINCT, so an animal
+        // reused across 2+ BatchSubmission rows in the same batch (e.g. Pre-Cassetted reuse) comes
+        // back twice in rawAnimals — building the animal lookup must tolerate the duplicate ID.
+        var tissue = Row(("AnimalID", (object)42), ("ID", (object)1), ("BatchSubmissionID", (object)1), ("TissueCode", "Kidney"), ("Comment", ""));
+        var animal1 = Row(("ID", (object)42), ("SenderRef", "S-001"), ("HistologyRef", "11/999"));
+        var animal2 = Row(("ID", (object)42), ("SenderRef", "S-001"), ("HistologyRef", "11/999"));
+
+        var table = HistologyReportDataSetBuilder.BuildSubmissionTable(
+            rawBatchSubmissions: [],
+            rawTissues: [tissue],
+            rawAnimals: [animal1, animal2],
+            rawBlocks: [],
+            rawBlockTissues: [],
+            batchId: 7);
+
+        Assert.Equal(1, table.Rows.Count);
+        Assert.Equal("S-001", table.Rows[0]["SenderRef"]);
+    }
+
+    [Fact]
     public void BuildSubmissionTable_BlockTypeSubmission_UsesRealBlockRefAndBlockAnimalLink()
     {
         // Cassetted/Wax Block etc. have no BatchTissues rows at all — GetBatchBlockDetails/

@@ -124,7 +124,7 @@ public class SubmissionDetailsModel : HistoPageModel
         await _submissions.UpdateAnimalAsync(updated, Session.UserID);
         return string.IsNullOrWhiteSpace(Session.SampleDetailReturnPage)
             ? RedirectToPage(new { batchId = BatchId, animalId = AnimalId })
-            : RedirectToPage(Session.SampleDetailReturnPage);
+            : LocalRedirect(Session.SampleDetailReturnPage);
     }
 
     public async Task<IActionResult> OnPostAddTissueAsync()
