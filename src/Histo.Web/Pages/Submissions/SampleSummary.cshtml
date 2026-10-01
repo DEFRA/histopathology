@@ -48,7 +48,9 @@
 @if (Model.CanModifySamples && !Model.IsViewMode)
 {
     <div class="govuk-button-group">
-        <a asp-page="/Submissions/AddSubmission" asp-route-BatchId="@Model.BatchId" asp-route-batchSubmissionId="@Model.BatchSubmissionId" class="govuk-button" data-module="govuk-button">Add sample</a>
+        <a asp-page="/Submissions/AddSubmission" asp-route-BatchId="@Model.BatchId" asp-route-batchSubmissionId="@Model.BatchSubmissionId"
+           asp-route-ReturnPage="@Url.Page("/Submissions/SampleSummary", new { batchId = Model.BatchId })"
+           class="govuk-button" data-module="govuk-button">Add sample</a>
 
         @* "Finish" — replaces legacy btSubmit/Done (BatchBlocks.aspx.vb / BatchSummary.aspx.vb /
            BatchBlockSummary.aspx.vb): finalises the submission once at least one sample exists.

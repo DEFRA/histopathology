@@ -9,6 +9,9 @@ namespace Histo.Histology.Interfaces;
 public interface IBlockTestService
 {
     Task<IReadOnlyList<BlockTest>> GetByBatchAsync(int batchId, CancellationToken ct = default);
+
+    /// <summary>Every test for a batch's blocks, without the QC worklist's Histology code exclusion — see <see cref="Histo.Histology.Interfaces.IBlockTestRepository.GetAllSelectionsByBatchAsync"/>.</summary>
+    Task<IReadOnlyList<BlockTest>> GetAllSelectionsByBatchAsync(int batchId, CancellationToken ct = default);
     Task<BlockTest?> GetByIdAsync(int batchId, int testId, CancellationToken ct = default);
 
     /// <summary>Updates a test record. Throws <see cref="BlockTestConcurrencyException"/> on concurrent modification.</summary>

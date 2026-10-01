@@ -24,7 +24,6 @@ public class EditUserModel : HistoPageModel
     }
 
     [BindProperty(SupportsGet = true)] public int UserId { get; set; }
-    [BindProperty] public string? NtLogin { get; set; } = string.Empty;
     [BindProperty] public string Name { get; set; } = string.Empty;
     [BindProperty] public string Email { get; set; } = string.Empty;
     [BindProperty] public int GroupCode { get; set; }
@@ -72,7 +71,6 @@ public class EditUserModel : HistoPageModel
         var user = (await _users.GetAllUsersAsync()).FirstOrDefault(u => u.UserID == UserId);
         if (user is null) return RedirectToPage("/Admin/UserMaintenance", new { returnUrl = SafeReturnUrl });
 
-        NtLogin = user.NtLogin;
         Name = user.Name;
         Email = user.Email;
         GroupCode = user.GroupCode;
@@ -93,12 +91,16 @@ public class EditUserModel : HistoPageModel
         await EnsureCurrentAreaVisibleAsync(_originalAreaCode);
 
         Validate();
+        if (Errors.Count == 0 && await EmailAlreadyExistsAsync(Email.Trim(), UserId)) Errors["Email"] = "A user with this email already exists.";
         if (Errors.Count > 0) return Page();
 
         var user = new User
         {
             UserID = UserId,
-            NtLogin = NtLogin?.Trim(),
+            // NtLogin isn't shown/editable on this page (Email is the identity key now) —
+            // preserve whatever value the row already has rather than posting back a bound
+            // field, so saving unrelated changes (Name/Group/Area) never touches it.
+            NtLogin = existing?.NtLogin,
             Name = Name.Trim(),
             Email = Email.Trim(),
             GroupCode = GroupCode,
@@ -127,6 +129,13 @@ public class EditUserModel : HistoPageModel
 
         if (GroupCode <= 0) Errors["GroupCode"] = "Select a user group.";
         if (AreaCode <= 0) Errors["AreaCode"] = "Select a user area.";
+    }
+
+    /// <summary>Mirrors the DB's unconditional (not Active-filtered) unique index on Email — excludes this user's own row.</summary>
+    private async Task<bool> EmailAlreadyExistsAsync(string email, int selfUserId)
+    {
+        var users = await _users.GetAllUsersAsync();
+        return users.Any(u => u.UserID != selfUserId && string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task LoadLookupsAsync()

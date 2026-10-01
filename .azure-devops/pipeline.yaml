@@ -2,6 +2,19 @@ trigger:
   branches:
     include:
       - develop
+      - main
+
+# Cron cadence is a literal, since Azure Pipelines resolves `schedules:` at
+# compile time before the `variables:` block exists - a ${{ variables.x }}
+# reference here fails with "A template expression is not allowed in this
+# context". To change the cadence, edit the cron literal below directly.
+schedules:
+  - cron: '0 4 1 1 *'
+    displayName: 'Histology reference reset (annual, 1 Jan)'
+    branches:
+      include:
+        - develop
+    always: true
 
 parameters:
   - name: deployToDev
@@ -28,6 +41,26 @@ parameters:
     type: string
     default: 'SonarCloud-Histo'
 
+  - name: runHistologyReferenceReset
+    displayName: Run histology reference reset (EditResetHistologyRef)
+    type: boolean
+    default: false
+
+  - name: resetHistologyRefDev
+    displayName: Reset histology reference in DEV
+    type: boolean
+    default: true
+
+  - name: resetHistologyRefTest
+    displayName: Reset histology reference in TST
+    type: boolean
+    default: false
+
+  - name: resetHistologyRefPreProd
+    displayName: Reset histology reference in Pre-Prod
+    type: boolean
+    default: false
+
   # - name: deployToProd
   #   displayName: Deploy to PROD
   #   type: boolean
@@ -46,6 +79,7 @@ variables:
 stages:
   - stage: Build
     displayName: Build and Test
+    condition: ne(variables['Build.Reason'], 'Schedule')
     jobs:
       - job: build
         pool:
@@ -157,7 +191,8 @@ stages:
   - stage: DEV
     displayName: DEV
     dependsOn: Build
-    condition: and(succeeded(), eq('${{ parameters.deployToDev }}', true))
+    # develop-only: DEV/TST deploy from develop, Pre-Prod/Prod deploy from main.
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranchName'], 'develop'), eq('${{ parameters.deployToDev }}', true))
     variables:
     - name: appName
       value: 'DEVCDEWEBAW1401'
@@ -237,7 +272,8 @@ stages:
     dependsOn:
       - DEV
       - Build
-    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.DEV.result, 'Succeeded', 'Skipped'), eq('${{ parameters.deployToTest }}', true))
+    # develop-only: DEV/TST deploy from develop, Pre-Prod/Prod deploy from main.
+    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.DEV.result, 'Succeeded', 'Skipped'), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranchName'], 'develop'), eq('${{ parameters.deployToTest }}', true))
     variables:
     - name: appName
       value: 'TSTCDEWEBAW1401'
@@ -316,7 +352,8 @@ stages:
     dependsOn:
       - TST
       - Build
-    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.TST.result, 'Succeeded', 'Skipped'), eq('${{ parameters.deployToPreProd }}', true))
+    # main-only: Pre-Prod/Prod deploy from main, DEV/TST deploy from develop.
+    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.TST.result, 'Succeeded', 'Skipped'), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.deployToPreProd }}', true))
     variables:
     - name: appName
       value: 'PRECDEWEBAW1401'
@@ -393,7 +430,8 @@ stages:
   # - stage: Prod
   #   displayName: PROD
   #   dependsOn: Build
-  #   condition: and(succeeded(), eq('${{ parameters.deployToProd }}', true))
+  #   # main-only: Pre-Prod/Prod deploy from main, DEV/TST deploy from develop.
+  #   condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.deployToProd }}', true))
   #   variables:
   #   - name: appName
   #     value: 'PRD-CDE-Web-App'
@@ -466,3 +504,94 @@ stages:
   #                     -Saml2__IdPMetadataUrl "https://login.microsoftonline.com/$(tenantId)/federationmetadata/2007-06/federationmetadata.xml?appid=$(appId)"
   #                     -Authentication__Bypass "false"
   #                     -ConnectionStrings__HistologyDb "Server=tcp:$(sqlServer);Database=$(dbName);Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Managed Identity;"
+
+  - stage: HistologyReferenceReset
+    displayName: Histology Reference Reset
+    condition: or(eq(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.runHistologyReferenceReset }}', true))
+    jobs:
+      - job: reset_dev
+        displayName: 'Reset histology reference (DEV)'
+        condition: or(eq(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.resetHistologyRefDev }}', true))
+        pool:
+          name: 'DEFRA-COMMON-UBUNTU-SSV3'
+        variables:
+          sqlServerHost: 'devcdeinfsq1401.database.windows.net'
+          dbName: 'histopathology'
+        steps:
+          - task: AzureCLI@2
+            displayName: 'Execute EditResetHistologyRef (DEV)'
+            inputs:
+              azureSubscription: 'AZR-CDE-DEV1'
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+
+                TOOLS="$(Agent.TempDirectory)/sqlcmd"
+                mkdir -p "$TOOLS"
+                curl -sSL --fail --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
+                  https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.2/sqlcmd-linux-amd64.tar.bz2
+                tar -xjf "$TOOLS/sqlcmd.tar.bz2" -C "$TOOLS"
+
+                echo "Executing dbo.EditResetHistologyRef against $(sqlServerHost)/$(dbName)"
+                "$TOOLS/sqlcmd" -S "$(sqlServerHost)" -d "$(dbName)" \
+                  --authentication-method ActiveDirectoryAzCli \
+                  -Q "EXECUTE dbo.EditResetHistologyRef" -b
+
+      - job: reset_tst
+        displayName: 'Reset histology reference (TST)'
+        condition: or(eq(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.resetHistologyRefTest }}', true))
+        pool:
+          name: 'DEFRA-COMMON-UBUNTU-SSV3'
+        variables:
+          sqlServerHost: 'tstcdeinfsq1401.database.windows.net'
+          dbName: 'histopathology'
+        steps:
+          - task: AzureCLI@2
+            displayName: 'Execute EditResetHistologyRef (TST)'
+            inputs:
+              azureSubscription: 'AZR-CDE-TST1'
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+
+                TOOLS="$(Agent.TempDirectory)/sqlcmd"
+                mkdir -p "$TOOLS"
+                curl -sSL --fail --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
+                  https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.2/sqlcmd-linux-amd64.tar.bz2
+                tar -xjf "$TOOLS/sqlcmd.tar.bz2" -C "$TOOLS"
+
+                echo "Executing dbo.EditResetHistologyRef against $(sqlServerHost)/$(dbName)"
+                "$TOOLS/sqlcmd" -S "$(sqlServerHost)" -d "$(dbName)" \
+                  --authentication-method ActiveDirectoryAzCli \
+                  -Q "EXECUTE dbo.EditResetHistologyRef" -b
+
+      - job: reset_preprod
+        displayName: 'Reset histology reference (Pre-Prod)'
+        condition: or(eq(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.resetHistologyRefPreProd }}', true))
+        pool:
+          name: 'DEFRA-COMMON-UBUNTU-SSV5'
+        variables:
+          sqlServerHost: 'precdeinfsq1401.database.windows.net'
+          dbName: 'histopathology'
+        steps:
+          - task: AzureCLI@2
+            displayName: 'Execute EditResetHistologyRef (Pre-Prod)'
+            inputs:
+              azureSubscription: 'AZR-CDE-PRE1'
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+
+                TOOLS="$(Agent.TempDirectory)/sqlcmd"
+                mkdir -p "$TOOLS"
+                curl -sSL --fail --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
+                  https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.2/sqlcmd-linux-amd64.tar.bz2
+                tar -xjf "$TOOLS/sqlcmd.tar.bz2" -C "$TOOLS"
+
+                echo "Executing dbo.EditResetHistologyRef against $(sqlServerHost)/$(dbName)"
+                "$TOOLS/sqlcmd" -S "$(sqlServerHost)" -d "$(dbName)" \
+                  --authentication-method ActiveDirectoryAzCli \
+                  -Q "EXECUTE dbo.EditResetHistologyRef" -b

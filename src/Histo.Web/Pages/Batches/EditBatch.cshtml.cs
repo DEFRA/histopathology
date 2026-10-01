@@ -68,10 +68,12 @@ public class EditBatchModel : HistoPageModel
     /// <summary>Read-only, resolved from LOOKUP_SUBMITTEDAS (11). Fixed at creation — never editable on Edit Submission.</summary>
     public string? SubmittedAsDescription { get; private set; }
 
-    // Falls back to BatchesForEditing when no context is available (legacy SV_RedirectCancelPage)
-    public string ReturnPage => string.IsNullOrWhiteSpace(Session.ReturnPage)
-        ? "/Batches/BatchesForEditing"
-        : Session.ReturnPage;
+    // Prefers a caller-specific override (e.g. "Continue to edit submission" from Edit Submission
+    // Status) over the general ReturnPage, which EditSubmissionStatus itself uses for its OWN back
+    // link — falls back to BatchesForEditing when neither is available (legacy SV_RedirectCancelPage).
+    public string ReturnPage => !string.IsNullOrWhiteSpace(Session.EditBatchReturnPage)
+        ? Session.EditBatchReturnPage
+        : string.IsNullOrWhiteSpace(Session.ReturnPage) ? "/Batches/BatchesForEditing" : Session.ReturnPage;
 
     /// <summary>
     /// <see cref="ReturnPage"/> plus the sort/page query string captured when the user left the

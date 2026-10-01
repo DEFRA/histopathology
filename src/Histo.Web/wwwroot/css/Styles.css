@@ -119,6 +119,20 @@
     text-decoration: none;
 }
 
+/* Resets native <button> chrome so a Back link that must POST (discard/cancel) instead of
+ * navigate via <a href> renders identically to govuk-back-link's <a> variant. Restates
+ * padding-left explicitly rather than relying on cascade order against govuk-frontend.min.css. */
+.app-back-link-button {
+    appearance: none;
+    background: none;
+    border: 0;
+    margin: 0;
+    padding: 0 0 0 14px;
+    font: inherit;
+    cursor: pointer;
+    color: #0b0c0c;
+}
+
 /* Aligns a <select> with its "Manage …" pick-list button on the same row (e.g. Project/
  * Contract code, Pathologist, Submitted by (external) on EditBatch/BatchDetails) instead of
  * the button stacking below on its own line. Wraps on narrow screens rather than overflowing. */
@@ -149,6 +163,14 @@
     overflow-x: auto;
 }
 
+/* A long, unbroken Comment paragraph (SubmissionDetails/BlockDetails tissue tables) otherwise grows
+ * the column with no limit, squeezing the adjacent Actions column until its Edit/Delete
+ * govuk-button-group runs out of room and wraps the buttons onto separate lines. */
+.app-table-comment-cell {
+    max-width: 320px;
+    word-break: break-word;
+}
+
 /* Uniform-width submission status tag (SearchSubmissions/ViewSubmissions/BatchesForEditing grids)
  * — govuk-tag sizes to its text by default, so "On hold" and "Not received" render as different
  * widths; fixing a min-width and centring the text keeps the status column visually aligned. */
@@ -168,9 +190,10 @@
 
 /* User Maintenance table columns were sized purely by the longest value on the current page, so
  * paging/sorting to a row with a much longer/shorter name or email visibly widened or shrank the
- * whole table. Fixing the layout with explicit column widths keeps it stable across pages; long
- * values are clipped with an ellipsis (the existing title="" attribute still exposes the full
- * text on hover/focus). */
+ * whole table. Fixed explicit column widths keep the layout stable across pages. Long values WRAP
+ * onto multiple lines rather than being clipped with an ellipsis — truncating a user's actual
+ * name/email and relying on a title="" tooltip to reveal the rest fails WCAG 1.4.13 (Content on
+ * Hover or Focus: not touch/keyboard/screen-reader accessible) and isn't a pattern GDS tables use. */
 #user-maintenance-table {
     table-layout: fixed;
     width: 100%;
@@ -178,9 +201,8 @@
 
 #user-maintenance-table th,
 #user-maintenance-table td {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 #user-maintenance-table th:nth-child(1),

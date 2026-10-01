@@ -8,6 +8,7 @@
 
 BEGIN TRANSACTION;
 
+PRINT '--- V20260917_01: deactivating Mouse Bioassay / Neuropath user areas ---';
 UPDATE dbo.luUserArea
 SET IsActive = 0
 WHERE [Description] IN ('Mouse Bioassay', 'Neuropath')
@@ -26,3 +27,4 @@ BEGIN
 END;
 
 COMMIT TRANSACTION;
+PRINT '--- V20260917_01: completed ---';

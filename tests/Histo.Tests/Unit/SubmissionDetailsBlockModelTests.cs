@@ -73,6 +73,31 @@ public class SubmissionDetailsBlockModelTests
     }
 
     [Fact]
+    public async Task HistologyCodesByBlockId_IncludesSpecialStainIhcPrpAndIhcOther()
+    {
+        // Regression: GetByBatchAsync excludes Histology codes 3/4/6 (they're QC-worklist-only
+        // gating flags there) — the grid checkboxes for Special Stain/IHC-Prp/IHC-Other must read
+        // from GetAllSelectionsByBatchAsync instead, or those 3 columns could never show checked.
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 100, BatchID = 5, AnimalID = 1, BlockRef = "01" }]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[
+            new BlockTest { ID = 1, BlockID = 100, TestType = BlockTestType.Histology, Code = HistologyCode.SpecialStain },
+            new BlockTest { ID = 2, BlockID = 100, TestType = BlockTestType.Histology, Code = HistologyCode.IhcPrp },
+            new BlockTest { ID = 3, BlockID = 100, TestType = BlockTestType.Histology, Code = HistologyCode.IhcOther },
+        ]);
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+
+        await sut.OnGetAsync();
+
+        var codes = sut.HistologyCodesByBlockId.GetValueOrDefault(100, []);
+        Assert.Contains(HistologyCode.SpecialStain, codes);
+        Assert.Contains(HistologyCode.IhcPrp, codes);
+        Assert.Contains(HistologyCode.IhcOther, codes);
+    }
+
+    [Fact]
     public async Task CreateEditSubmissionJourney_AlreadyAssignedRef_StaysLocked()
     {
         var animal = new Animal { ID = 1, SenderRef = "S1", HistoRefSet = true, HistologyRef = "26/40001", PMDateSet = true, PMDate = "01/01/2026" };
@@ -96,5 +121,174 @@ public class SubmissionDetailsBlockModelTests
         Assert.False(sut.IsAssignTissueMode);
         Assert.False(sut.HistologyRefLocked);
         Assert.False(sut.PMDateLocked);
+    }
+
+    [Fact]
+    public async Task ShowHistologyRefTypePicker_NonHistopathUserArea_IsHidden()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        _session.Setup(s => s.UserArea).Returns("Neuropath");
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+
+        await sut.OnGetAsync();
+
+        Assert.False(sut.ShowHistologyRefTypePicker);
+    }
+
+    [Fact]
+    public async Task ShowHistologyRefTypePicker_HistopathUserAreaNoRefYet_IsShown()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+
+        await sut.OnGetAsync();
+
+        Assert.True(sut.ShowHistologyRefTypePicker);
+    }
+
+    [Fact]
+    public async Task ShowHistologyRefTypePicker_HistopathUserAreaViaSubmissionJourney_IsShown()
+    {
+        // Legacy has no Assign-Tissue-vs-Submission-journey split at all — ddlHistologyType's
+        // ONLY visibility gate is the Histopath user area, regardless of how the page was reached.
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        var sut = CreateSut(1, animal, "/Submissions/SampleSummary?batchId=5");
+
+        await sut.OnGetAsync();
+
+        Assert.True(sut.ShowHistologyRefTypePicker);
+    }
+
+    [Fact]
+    public async Task ShowHistologyRefTypePicker_RefAlreadySet_StaysVisible()
+    {
+        // A Histopath user can re-pick a type at any time to change the Histology Ref, even once
+        // one is already set — the "Or pick" section must stay on-screen and usable.
+        var animal = new Animal { ID = 1, SenderRef = "S1", HistologyRef = "16/40135" };
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+
+        await sut.OnGetAsync();
+
+        Assert.True(sut.ShowHistologyRefTypePicker);
+    }
+
+    [Fact]
+    public async Task OnPostGetNextHistologyRefAsync_RefAlreadySet_CanStillBeChanged()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "S1", HistologyRef = "16/40135" };
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _histologyRefs.Setup(h => h.GetUnusedRefsAsync(HistologyRefTypeCode.Neuropath, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<HistologyRef>)[]);
+        _histologyRefs.Setup(h => h.GetCountersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<HistologyRefCounter>)[new HistologyRefCounter { Type = HistologyRefTypeCode.Neuropath, NextHistologyRef = "10001" }]);
+        _histologyRefs.Setup(h => h.SetCounterAsync(HistologyRefTypeCode.Neuropath, "10002", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        Animal? saved = null;
+        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<Animal, int, CancellationToken>((a, _, _) => saved = a)
+            .ReturnsAsync(true);
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+        sut.HistologyRefType = HistologyRefTypeCode.Neuropath;
+
+        await sut.OnPostGetNextHistologyRefAsync();
+
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal($"{DateTime.Now.Year % 100:D2}/10001", saved?.HistologyRef);
+    }
+
+    [Fact]
+    public async Task OnPostGetNextHistologyRefAsync_NoPreBookedRef_FallsBackToCounterAndAdvancesIt()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _histologyRefs.Setup(h => h.GetUnusedRefsAsync(HistologyRefTypeCode.Neuropath, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<HistologyRef>)[]);
+        _histologyRefs.Setup(h => h.GetCountersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<HistologyRefCounter>)[new HistologyRefCounter { Type = HistologyRefTypeCode.Neuropath, NextHistologyRef = "10001" }]);
+        _histologyRefs.Setup(h => h.SetCounterAsync(HistologyRefTypeCode.Neuropath, "10002", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        Animal? saved = null;
+        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<Animal, int, CancellationToken>((a, _, _) => saved = a)
+            .ReturnsAsync(true);
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+        sut.HistologyRefType = HistologyRefTypeCode.Neuropath;
+
+        await sut.OnPostGetNextHistologyRefAsync();
+
+        Assert.Equal($"{DateTime.Now.Year % 100:D2}/10001", saved?.HistologyRef);
+        Assert.False(saved!.IsPGNumber);
+        _histologyRefs.Verify(h => h.SetCounterAsync(HistologyRefTypeCode.Neuropath, "10002", It.IsAny<CancellationToken>()), Times.Once);
+        // EditHistologyRef belongs to a different <form> than this handler posts, so it must be
+        // repopulated here or the redisplayed page shows the field blank despite the save succeeding.
+        Assert.Equal(saved.HistologyRef, sut.EditHistologyRef);
+    }
+
+    [Fact]
+    public async Task OnPostGetNextHistologyRefAsync_UsePgNumber_ReversesSenderRefIntoHistologyRef()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "PG0001/26" };
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        Animal? saved = null;
+        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<Animal, int, CancellationToken>((a, _, _) => saved = a)
+            .ReturnsAsync(true);
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+        sut.HistologyRefType = HistologyRefTypeCode.UsePgNumber;
+
+        await sut.OnPostGetNextHistologyRefAsync();
+
+        Assert.Equal("26/00001", saved?.HistologyRef);
+        Assert.True(saved!.IsPGNumber);
+        Assert.Equal("26/00001", sut.EditHistologyRef);
+    }
+
+    [Fact]
+    public async Task OnPostGetNextHistologyRefAsync_UsePgNumber_NonPgSenderRef_ShowsFormatHint()
+    {
+        // Legacy: SenderRef.ascx.vb::CheckPGNumber's SetErrorToolTip("PG Number Format: PGNNNN/NN"),
+        // shown when the Sender Ref doesn't match the PG format at all.
+        var animal = new Animal { ID = 1, SenderRef = "2655-09" };
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+        sut.HistologyRefType = HistologyRefTypeCode.UsePgNumber;
+
+        await sut.OnPostGetNextHistologyRefAsync();
+
+        Assert.Equal("PG Number Format: PGNNNN/NN", sut.ErrorMessage);
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostGetNextHistologyRefAsync_UsePgNumber_YearOutsideWindow_IsSilentNoOp()
+    {
+        // Legacy: DefaultHistoRefPGReverse only suppresses HistologyRef1.Text when IsAfter01(strYear)
+        // — a valid PG format with an ineligible year is a silent no-op, not an error.
+        var animal = new Animal { ID = 1, SenderRef = "PG0001/70" };
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+        sut.HistologyRefType = HistologyRefTypeCode.UsePgNumber;
+
+        await sut.OnPostGetNextHistologyRefAsync();
+
+        Assert.Null(sut.ErrorMessage);
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostGetNextHistologyRefAsync_NonHistopathUserArea_IsIgnored()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "PG0001/26" };
+        _session.Setup(s => s.UserArea).Returns("Neuropath");
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+        sut.HistologyRefType = HistologyRefTypeCode.UsePgNumber;
+
+        await sut.OnPostGetNextHistologyRefAsync();
+
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Null(sut.Animal!.HistologyRef);
     }
 }

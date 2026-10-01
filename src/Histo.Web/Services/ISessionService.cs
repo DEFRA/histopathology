@@ -37,6 +37,14 @@ public interface ISessionService
     /// </summary>
     int BatchType { get; set; }
 
+    /// <summary>
+    /// In-progress-only copy of the Cassetted TSE/Non-TSE choice, owned exclusively by the
+    /// Create Submission journey (unlike <see cref="BatchType"/>, never overwritten by opening an
+    /// unrelated existing batch). Restored only when Back from <c>BatchDetails</c> returns to
+    /// <c>Cassetted</c> mid-journey; a genuinely fresh visit ignores it and defaults to TSE.
+    /// </summary>
+    int? CassettedBatchTypeDraft { get; set; }
+
     // ── Role helpers ─────────────────────────────────────────────────────────
 
     bool IsCustomer { get; }
@@ -103,6 +111,18 @@ public interface ISessionService
     /// it before the user clicked Back here. Falls back to SampleSummary for the current batch when unset.
     /// </summary>
     string? SampleDetailReturnPage { get; set; }
+
+    /// <summary>
+    /// The page path <c>EditBatch.cshtml</c>'s Save/Cancel should return to, when set by a caller
+    /// other than its usual entry point (<c>BatchesForEditing</c>). Currently written by
+    /// <c>EditSubmissionStatus.cshtml</c>'s "Continue to edit submission" button, so the user comes
+    /// back to Edit Submission Status rather than the batch list. Kept separate from
+    /// <see cref="ReturnPage"/> because EditSubmissionStatus already uses that slot for its OWN
+    /// back link (to wherever IT was entered from) — overwriting it here would break that link
+    /// on the very page the user returns to. Falls back to <see cref="ReturnPage"/>'s own
+    /// BatchesForEditing default when unset.
+    /// </summary>
+    string? EditBatchReturnPage { get; set; }
 
     /// <summary>
     /// True when the user is in the read-only "View Submission" journey (legacy

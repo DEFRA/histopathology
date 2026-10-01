@@ -115,7 +115,10 @@ public sealed class SubmissionRepository : ISubmissionRepository
         for (var i = 0; i < blockAnimalResultSetIndex; i++)
             await multi.ReadAsync<dynamic>();
         var rows = await multi.ReadAsync<Animal>();
-        return rows.ToList();
+        // BATCH_BLOCK_ANIMAL is block-grained — an animal with several blocks is returned once per
+        // block. Every caller treats this as an animal list (and several key dictionaries by ID),
+        // so collapse to one row per animal here.
+        return rows.GroupBy(a => a.ID).Select(g => g.First()).ToList();
     }
 
     /// <inheritdoc/>
@@ -250,7 +253,9 @@ public sealed class SubmissionRepository : ISubmissionRepository
                 ID = d.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0,
                 OwnerID = submissionId,
                 Owner = TissueOwner.Submission,
-                TissueCode = d.TryGetValue("TissueCode", out var tc) ? Convert.ToString(tc) ?? "" : "",
+                // Trimmed: TissueCode is fixed-width in the database, so untrimmed values fail
+                // exact-match comparisons against the tissue lookup's Code.
+                TissueCode = d.TryGetValue("TissueCode", out var tc) ? Convert.ToString(tc)?.Trim() ?? "" : "",
                 NoPieces = d.TryGetValue("NoPieces", out var np) ? Convert.ToInt16(np) : (short)0,
                 Comment = d.TryGetValue("Comment", out var cm) && cm is not DBNull ? Convert.ToString(cm) : null,
                 ArchiveLocation = d.TryGetValue("ArchiveLocation", out var al) && al is not DBNull ? Convert.ToString(al) : null,
@@ -288,7 +293,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
                 ID = d.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0,
                 OwnerID = submId,
                 Owner = TissueOwner.Submission,
-                TissueCode = d.TryGetValue("TissueCode", out var tc) ? Convert.ToString(tc) ?? "" : "",
+                TissueCode = d.TryGetValue("TissueCode", out var tc) ? Convert.ToString(tc)?.Trim() ?? "" : "",
                 NoPieces = d.TryGetValue("NoPieces", out var np) ? Convert.ToInt16(np) : (short)0,
                 Comment = d.TryGetValue("Comment", out var c) && c is not DBNull ? Convert.ToString(c) : null,
                 ArchiveLocation = d.TryGetValue("ArchiveLocation", out var al) && al is not DBNull ? Convert.ToString(al) : null,
@@ -363,7 +368,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
                 ID = d.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0,
                 OwnerID = d.TryGetValue("BlockID", out var bid) ? Convert.ToInt32(bid) : 0,
                 Owner = TissueOwner.Block,
-                TissueCode = d.TryGetValue("TissueCode", out var tc) ? Convert.ToString(tc) ?? "" : "",
+                TissueCode = d.TryGetValue("TissueCode", out var tc) ? Convert.ToString(tc)?.Trim() ?? "" : "",
                 NoPieces = d.TryGetValue("NoPieces", out var np) ? Convert.ToInt16(np) : (short)0,
                 Comment = d.TryGetValue("Comment", out var cm) && cm is not DBNull ? Convert.ToString(cm) : null,
                 RowStamp = d.TryGetValue("RowStamp", out var rs) ? rs as byte[] : null,

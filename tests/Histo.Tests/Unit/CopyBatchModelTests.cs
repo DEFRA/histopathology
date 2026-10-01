@@ -38,10 +38,10 @@ public class CopyBatchModelTests
             PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
         };
 
-    private static Batch MakeSourceBatch() => new()
+    private static Batch MakeSourceBatch(string status = BatchStatus.Submitted) => new()
     {
         ID = 10,
-        Status = BatchStatus.Submitted,
+        Status = status,
         Comments = "source comments",
         SubmittedByUserID = 1,
         UserAreaCode = 1,
@@ -101,6 +101,40 @@ public class CopyBatchModelTests
             It.Is<IReadOnlyList<string>>(l => l.Count == 1 && l[0] == "ST1"),
             42,
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(BatchStatus.InProgress)]
+    [InlineData(BatchStatus.Completed)]
+    [InlineData(BatchStatus.Received)]
+    [InlineData(BatchStatus.Rejected)]
+    [InlineData(BatchStatus.OnHold)]
+    public async Task OnPostAsync_ResetsNewBatchStatusToNotReceived_RegardlessOfSourceStatus(string sourceStatus)
+    {
+        var sourceBatch = MakeSourceBatch(status: sourceStatus);
+        Batch? copiedBatch = null;
+
+        _batches.Setup(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(sourceBatch);
+        _batches.Setup(b => b.CopyBatchHeaderAsync(It.IsAny<Batch>(), 42, It.IsAny<CancellationToken>()))
+            .Callback<Batch, int, CancellationToken>((b, _, _) => copiedBatch = b)
+            .ReturnsAsync(99);
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BatchTestSelections());
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
+
+        var sut = CreateSut();
+        sut.SourceBatchId = 10;
+        sut.Confirm = true;
+
+        await sut.OnPostAsync();
+
+        Assert.NotNull(copiedBatch);
+        Assert.Equal(BatchStatus.Submitted, copiedBatch!.Status);
     }
 
     [Fact]

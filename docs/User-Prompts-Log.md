@@ -1952,4 +1952,281 @@ User suspected the earlier `BatchBlockSummary` → `SampleSummary` rename had ca
 
 **Files changed:** [src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs](../src/Histo.Web/Pages/Submissions/SubmissionDetails.cshtml.cs).
 
+---
+
+## Prompt 137 — SearchTest "Analyse results"/"Analyse submissions" — fix as per legacy, avoid writing new script (2026-09-25)
+
+> why @file:BatchRepository.cs has script, is same thing used in legacy, its not best approach right, can you go throgh legacy and fix as per legacy on this searchtest functinaligy SearchTest.aspx -> analysis results button and analysis submission button logic here so that we can avoid wrignting new script
+
+Rejected an earlier invented raw-SQL implementation. Read `SearchTest.aspx.vb`/`clsBatch.vb` directly and confirmed via live `sp_helptext` that 6 real SPs (`GetTestHistologyCounts`/`Antibodies`/`Stains` + `*Batch` variants) already exist and are what legacy actually calls — an earlier session's memory note wrongly declared them nonexistent (it had checked the VB wrapper method names, not the real `FillDataTable` call site). Rewrote `BatchRepository`'s premium-charge methods to call these real SPs directly, looping once per active premium charge exactly as legacy's `ProcessHistologyData`/`ProcessAntibodiesData`/`ProcessStainData` do. Also fixed a consequential Description-vs-Code keying/summing bug this exposed in `SearchTest.cshtml.cs`. Build 0 errors; SearchTest tests 3/3 pass.
+
+---
+
+## Prompt 138 — Analysis report still returns "No test items found" (2026-09-25)
+
+> still analysis report return No test items found matching the search criteria.
+
+Wrote a temporary throwaway integration test calling the real repository method against LocalDB directly, which reproduced a real `SqlException: Incorrect syntax near '1'`. Root cause: `GetActivePremiumChargeDescriptionsAsync` called `QueryAsync<string>` against `GetluPremiumCharges`'s 4-column result set — Dapper silently bound the FIRST column (`ID`, e.g. `"1"`) instead of `Description` (`"TC 1401"`), and that numeric string then broke the SP's own dynamic-SQL column alias. Fixed by reading the row as `dynamic` and selecting `Description` explicitly; re-ran the same integration test and confirmed 254 real rows returned, then deleted the test. Build 0 errors; tests pass.
+
+---
+
+## Prompt 139 — Histology checkbox un-select should cascade too (2026-09-25)
+
+> Issue is that if we unslecet the IHC-PrP or Special Stain, all the selected item should be un selected but it's not happening : specifically "IHC-PrP → antibodies, Special Stain → Special stain" — this is client-side auto-selection based on `Histo.Submissions.Models.HistologyCode`'s own documented rule.
+
+The existing checkbox auto-select JS only handled the checked→check-all direction (a known gap flagged in an earlier session but not yet fixed). Fixed to mirror legacy's `chkblHistology_SelectedIndexChanged` in both directions — unchecking now un-checks the dependent Special Stain/Antibodies column too. Build 0 errors; SearchTest tests 3/3 pass.
+
+---
+
+## Prompt 140 — Export to Excel not working + reposition above results (2026-09-28)
+
+> in searchTest.csthml — Export Outputs to Excel and Export Submissions to Excel are not currently working... The Export to Excel button should be repositioned... place it above the search results section, alongside the Analyse Submissions functionality.
+
+Investigated via live browser/Playwright and found the real cause: both export buttons (and, discovered along the way, the pre-existing "Analyse submissions" button too) used `asp-page-handler`/`formaction="?handler=X"` inside a `method="get"` form — per the HTML spec, GET form submission discards any query string already on the action URL and replaces it entirely with the serialized form fields, silently dropping `handler=X` and always falling back to the default handler. Confirmed live: clicking "Analyse submissions" produced a URL with no `handler` param at all. Fixed by switching to named-button `<button name="handler" value="X">` submits (GET-safe) and moved both Export buttons into the top button group. Also fixed a real 500 in the Submissions export caused by exceeding Excel's 32,767-character cell limit on a comma-joined batch-ID list. Build 0 errors; verified end-to-end via a real running instance + Playwright.
+
+---
+
+## Prompt 141 — Export buttons should only appear after their analysis has run (2026-09-28)
+
+> so the button movement and button will not be shown until user hit the "Analyse submissions", "Analyse Results" shown based result set
+
+Wrapped both Export buttons in `@if` conditions gated on `Searched`/`SubmissionsSearched` plus non-empty results, so each only appears after its corresponding analysis has actually produced rows. Verified live: on first page load neither export button shows; after "Analyse results" only "Export outputs to excel" appears; after "Analyse submissions" only "Export submissions to excel" appears.
+
+---
+
+## Prompt 142 — "Other" checkbox missing from Antibodies/Special Stain (2026-09-28)
+
+> can you check Other check box is missing in Antibodies and Special Stain, it's there in legacy
+
+Confirmed via legacy `LoadCheckBoxLists()`: an "Other" `ListItem` (Value="Other") is appended to `chkblAntibodies`/`chkblSpecialStain` manually after data-binding, not part of the lookup table itself — missing from the migrated page entirely. Fixed by appending it in `LoadLookupsAsync`. Verified live via browser: "Other" now appears as the last item in both columns.
+
+---
+
+## Prompt 143 — ArchiveBlocks: "Go to page" missing + need "select all" for bulk update (2026-09-28)
+
+> In ArchiveBlocks.cshtml or ArchiveBlocks.cshtml go to page implmentation is mssing and user should able to select all to update details at one streatch. Can you check and fix it
+
+Added an "All" checkbox (`SelectAllAcrossPages`, selects every filtered row server-side — not just the current page's DOM checkboxes) and a "Go to page" number-input control matching `QualityData.cshtml`'s existing pattern. Also fixed a related bug found while implementing this: the "Update selected" POST form had no hidden `PageNumber`/`SortColumn`/`SortDesc` fields, so submitting silently reset the grid to page 1. Build 0 errors; ArchiveBlocks tests 11/11 pass.
+
+---
+
+## Prompt 144 — Apply the same change to ArchiveTissues.cshtml (2026-09-28)
+
+> this change should be there for Archivetissue.cshtml as well.
+
+Ported the "All"-select-across-pages checkbox, "Go to page" control, and the page/sort-preserving hidden fields to `ArchiveTissues.cshtml`/`.cshtml.cs`, mirroring `ArchiveBlocks` exactly (this page had neither the select-all/go-to-page feature nor any row-checkbox prefill JS at all before). Build 0 errors; Archive tests 16/16 pass.
+
+---
+
+## Prompt 145 — Banner position on ArchiveTissues + remove redundant Done button on ArchiveBlocks (2026-09-28)
+
+> banner should be shown top of the page in archive tissue. If the done button only navigate to previewous page, then remove from archiveblock.cshtml
+
+Moved `ArchiveTissues.cshtml`'s success banner to the top of the page (was rendered after the batch summary), matching `ArchiveBlocks.cshtml`'s existing layout. Confirmed the "Done" button on `ArchiveBlocks.cshtml` targeted `@Model.BackLinkPage` — identical to the "Back" link already at the top of the page — and removed it as a redundant duplicate. Build 0 errors; Archive tests 16/16 pass.
+
+---
+
+## Prompt 146 — Archive Location/Date auto-population rules for single vs. multi-select (2026-09-28)
+
+> Archive Location and Archive Date Auto-Population: (1) selecting a single archived tissue should auto-populate its Archive Location/Date; (2) selecting multiple records or Select All should NOT auto-populate; (3) apply the same logic to ArchiveBlock.cshtml.
+
+Confirmed this behaviour was already implemented on both pages from the preceding fixes, then hardened it: bound row checkboxes to `Model.SelectedIds` (previously not bound at all) and ran the field-prefill script once on page load, so a validation-error postback correctly retains its visual checkbox state and the Location/Date/Comment fields reflect it immediately, not only after the user's next click. Build 0 errors; Archive tests 16/16 pass.
+
+---
+
+## Prompt 147 — Don't show "01/01/0001" for an empty archive date (2026-09-28)
+
+> If date is empty then don't show this 01/01/0001 in ArchiveTissues.cshtml ArchiveBlocks.cshtml
+
+Checked the live LocalDB data directly (column types, actual stored values) and found no genuine `0001-01-01` sentinel in the database — nulls are stored as real `NULL`. As a defensive fix against this ever surfacing (e.g. from a `Convert.ToDateTime` edge case or bad data in another environment), normalized `DateTime.MinValue` to `null` at the point `ArchivedDate` is mapped into both Archive page models' row types, so the table cell, the JS `data-archived-date` prefill, and sorting are all automatically correct from one change rather than patched per display site. Build 0 errors; Archive tests 16/16 pass.
+
+---
+
+## Prompt 148 — Update run-log-v2.md, session-metrics.md, User-Prompts-Log.md for this session (2026-09-28)
+
+> can you update run log and session metrix and user prompt
+
+Appended Run Log entry #94 (`run-log-v2.md`), Session Metrics row #156 (`session-metrics.md`), and Prompts 137–148 (this file) covering the SearchTest legacy-SP rebuild, the Dapper column-binding "No test items found" fix, the checkbox un-check cascade fix, both Export-to-Excel fixes (GET-form handler routing + Excel cell-overflow), the restored "Other" checkbox, and the ArchiveBlocks/ArchiveTissues select-all/go-to-page/banner/date-display parity work.
+
+---
+
+## Prompt 149 — Assign Tissue to Block dropdown back-link + area-restriction retraction (2026-09-29)
+
+> 1. Below back link work for edit but when it comes to Add sample it will be go to add sample and batchblock and then it has to travel back, but its not working
+
+> The below dropdwon should only come when user start journey from assing tissue to block any no restricktion with area but it's not working
+
+> sorry my mistake
+
+Investigated `AddSubmission`'s "Sample associated" dropdown and back-link chain for the Assign Tissues to Blocks journey. A Histopath-area restriction was added on the dropdown per the second message, then immediately retracted per "sorry my mistake" and fully reverted.
+
+---
+
+## Prompt 150 — Wet Tissue batch's "Sample associated" dropdown not working (concrete URL) (2026-09-29)
+
+> https://localhost:57879/Submissions/AddSubmission?BatchId=33418&batchSubmissionId=69932
+
+> it's create submission journey ->SampleSummary.cshtml's -> add sample ->
+
+> Yes — SampleSummary is the Wet Tissue equivalent of BatchBlocks, treat its Add sample the same way
+
+Root-caused via live DB query (batch 33418, `Cassetted=0` — Wet Tissue) that the failing URL was `SampleSummary.cshtml`'s own "Add sample" link, not `BatchBlocks`'. Implemented a lenient `IsSampleSummaryAssignMode` alongside the existing strict `IsAssignTissueMode`, later fully reverted per Prompt 151.
+
+---
+
+## Prompt 151 — Dropdown flip-flopping between free text and dropdown on SampleSummary (2026-09-29)
+
+> There is other isseu opent now scenaior is first when i click add sample it's show free text search sender ref and i added tissue details.
+> it's back to SampleSummary.cshtml now if again click add sample it's show dropdown it should not be , it shoud free text instead of dropdwon, why the flow making so complex, do you any better suggestion, because in this issue so many asking samething it's not fixing properlty, can change opus chage to fix this, as per legacy journey. can you some anyais on the these flow, simple
+> when user user comes from Batchreceid.cshtml in addsubmission it should show dropdwon. to fix this so many iteration but still has issue with this journey
+
+Fully reverted the Prompt 150 extension: `SampleSummary`'s own "Add sample" is always free text, unconditionally; the dropdown only ever applies to `BatchesReceived`→`BatchBlocks`→its own "Add sample" (`IsAssignTissueMode`, strict, unchanged). Added a regression test locking in this decision.
+
+---
+
+## Prompt 152 — SubmissionDetails back button goes to BatchesNotReceived instead of SampleSummary (2026-09-29)
+
+> I ahve issue now in submissionDetails.cshtml backbutton is not taking to right page it should tracked if it's coming from SampleSummary.cshtml it has to go back to there, why it's going back to BatchesNotReceived.cshtml, are you missing any navigatioon issue here
+
+Root-caused as two compounding self-inflicted regressions from Prompt 151's revert: removing `SampleSummary`'s `ReturnPage` link param broke `AddSubmission`'s Back-link default, and `SampleSummaryModel.OnPostSelect` was pointing the Back breadcrumb at `SampleSummaryReturnPage` (wherever SampleSummary itself came from) instead of SampleSummary itself. Both fixed.
+
+---
+
+## Prompt 153 — BlockDetails "Add block" then Back leaves an empty block (2026-09-29)
+
+> When i click SubmissionDetailsBlock.csthml add block button its taking me to BlockDetails.cshtml add block page without doing anything if i click back button empty block is creating it shouldn't happend
+
+Root-caused to `BlockDetails`' Add-mode auto-provisioning a real DB row on first load, with no cleanup on Back. Added `OnPostCancelAsync` (legacy `btnCancel_Click` parity) deleting the still-provisional block via the already-FK-guarded `DeleteBlockAsync`.
+
+---
+
+## Prompt 154 — Tissue type not loading on a specific Add block URL (2026-09-29)
+
+> Tissue type is not loaded on this URL
+> [Add block — Histopathology System](https://localhost:57879/Blocks/BlockDetails?batchId=33425&animalId=103547&blockId=319181&isAddFlow=True)
+
+Root-caused via live SP execution (`EXEC GetBatchAnimal`/`GetBatchBlocksByID`) that neither ever returns `BatchSubmissionID`, so the tissue-filter fallback always used the batch's FIRST submission instead of this animal's own. Fixed to match by `AnimalID` directly; added `BlockDetailsModelTests.cs` (first-ever test file for this model).
+
+---
+
+## Prompt 155 — Grid checkboxes not checked + unused Status column (2026-09-29)
+
+> issue 1 : In this page SubmissionDetailsBlock.cshtmls  below selected field vlaues not checked  in grid table
+> Archive	EO	H&E	IHC Other	Special stain
+>
+> Issue 2 :  In this page  BatchBlocks.cshtml below selected field vlaues not checked in grid table
+> Archive	EO	H&E	IHC Other	Special stain
+>
+> Issue 3 :  BatchBlocks,.cshtml why status column field show in the grid table, what is the purpsoe, remove it if it not used
+
+Root-caused to a shared repository method (`GetByBatchAsync`) whose Special Stain/IHC-Prp/IHC-Other exclusion is correct only for the QC/dispatch worklist page, reused unmodified by the grid-display/edit-form/save-diff consumers — the same bug was also silently duplicate-inserting a `BlockHistology` row on every save. Split into `GetByBatchAsync` (unchanged) and a new `GetAllSelectionsByBatchAsync` (unfiltered). Confirmed via legacy markup that `BatchBlocks.aspx` never had a Status column and removed it.
+
+---
+
+## Prompt 156 — Confirm no regression to other submission journeys from the Issue 1/2 fix (2026-09-29)
+
+> because this issue 1 and 2 fix will there be any issue create submission journey, add sample, edit sample, add block , edit block, add tissue, edit tissue, Add submission dropdown etc..
+> Can you confirm this ?
+
+Confirmed by grep/inspection that Create/Edit Submission, Add/Edit sample, Add/Edit tissue and the AddSubmission dropdown never reference `IBlockTestService` at all; Add/Edit block only benefits (fixes previously-broken checkbox state, no working behaviour changed); `GetByBatchAsync`'s own contract/consumers (QualityData, EditQualityDataTest, PrintSubmission, ViewSubmissions) are untouched.
+
+---
+
+## Prompt 157 — Four more UI issues: Submitted area, comment spacing, Post Fixation labels, select-all (2026-09-29/30)
+
+> issue 1 : BatchDetails.csthml submitted area should not be editabl like eddit BatchDetails
+>
+> issue 2:  SubmissionDetails.cshtml if i have comments has more like paragraph then Edit and Delete button coming down one by one, no space
+>
+> Issue 3  : ReceiveBatch.cshtml why Postfixation section has checkboxes without lable, if its unused remove that.
+>
+> Issue 4 :  SubmissionDetailsBlock.csthml should have select all block checkboxl so that it would useful to user to deleate all selected block it can be selected all or any one slected block, its like legacy
+
+Diagnosed all four (initially could not apply fixes — file-editing tools were disabled that turn) and confirmed via legacy source: `BatchDetails.aspx.vb` only enables Submitted Area for Histopath-area users; `ReceiveBatch.aspx.vb` genuinely still uses the `LOOKUP_POSTFIXATION` pick-list (not dead code); `SubmissionDetailsBlock.aspx` has a real `cbSelectAll`.
+
+---
+
+## Prompt 158 — Apply the four changes, scope issue 4 to delete only (2026-09-30)
+
+> apply these changes and for issue 4 only for delete action
+
+Applied all four: `BatchDetails` Submitted-area locked to match `EditBatch`'s disabled-display pattern; new `.app-table-comment-cell` CSS class (`SubmissionDetails`/`BlockDetails`) so long comments no longer squeeze Edit/Delete into stacking; `ReceiveBatch` Post Fixation label falls back to the raw code when blank; `SubmissionDetailsBlock` gained a header "select all" checkbox for bulk delete only. Build 0 errors; same 11 pre-existing test failures, nothing new.
+
+---
+
+## Prompt 159 — Update run log, session metrics, user prompt log (2026-09-30)
+
+---
+
+## Prompt 160 — BatchDetails.cshtml duplicate Back button question (2026-09-30)
+
+> In BatchDetails.cshtml below code also has backbutton top it has link, why duplicatin navigation ?
+> ```cshtml
+> <div class="govuk-button-group">
+>     <button type="submit" class="govuk-button" data-module="govuk-button">Create submission</button>
+>     <a asp-page="/Batches/Cassetted" asp-route-restore="true" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back</a>
+>     <a asp-page="/Index" class="govuk-link" onclick="return confirm('Are you sure you want to cancel? Any information you have entered will be lost.');">Cancel</a>
+> </div>
+> ```
+
+---
+
+## Prompt 161 — Three-task batch: QualityData dispatch auto-fill, BatchesForArchiving Customer Ref, DateReturned display values (2026-09-30)
+
+> 1. **QualityData.cshtml** — When the user selects the **Dispatched** checkbox: Automatically set **Dispatched To** = logged-in user. Automatically set **Dispatch Date** = today's date. Automatically set **Dispatched By** = logged-in user.
+> 2. **BatchesForArchiving.cshtml** — Remove the **Customer Ref** field/column.
+> 3. **DateReturned.cshtml** — Display the correct values for: **Project / Contract Code**, **Pathologist**
+
+---
+
+## Prompt 162 — Correct Dispatched To source (2026-09-30)
+
+> small correctin  Dispatched To submitted by user's name
+
+---
+
+## Prompt 163 — BatchesForArchiving Actions column button spacing (2026-09-30)
+
+> BatchesForArchiving.cshtml action column shows button it's doesn't have space between button can ou fix it
+
+---
+
+## Prompt 164 — DateReturned back/cancel navigation target + redundant Cancel button (2026-09-30)
+
+> ViewSubmissions.csthml  show datereturn, it goes to DateReturned.cshtml when user click back/cancel it should come back to ViewSubmissions.csthml 
+> What cancel is doing here ? if its just navigation remove that button
+
+---
+
+## Prompt 165 — DateReturned should be read-only when reached from BatchDetails (2026-09-30)
+
+> Why BatchDetails.cshtml has Datereturn button, if its for view only then dateretrun page should not show save date details, its should view only page from this journey. other journey its should allow to edit i menat if user comes from Datareturn button click from view submsiion.cshtml
+
+---
+
+## Prompt 166 — DateReturned read-only mode: spacing and wrong Back target (2026-09-30)
+
+> In DateReturned.cshtml below field shows additional space on top of below row
+> Date returned to customer	30/09/2026
+>
+> Back to submission and Back link taking to Viewsubssion, but actually user has reached this from batchdetails.cshtm page  DateReturned.cshtml  read only mode
+
+---
+
+## Prompt 167 — Fix the 11 unit test failures (2026-09-30)
+
+> Can you fix the Unit test  11 test failuer
+
+---
+
+## Prompt 168 — Update run log, session metrics, and user prompt log (2026-09-30)
+
+> update the run log and session metric and user prompt
+
+> update run log, session metric, and user prompt
+
+Appended Run Log entry #95 (`run-log-v2.md`), Session Metrics row #157 (`session-metrics.md`), and Prompts 149–159 (this file) covering the Assign-Tissue dropdown scoping saga, the two navigation-regression fixes, the BlockDetails tissue-filter and empty-block-on-cancel fixes, the grid-checkbox/duplicate-row root cause and fix, the removed Status column, and the four small UI fixes from 2026-09-29/30.
+
+
+
 

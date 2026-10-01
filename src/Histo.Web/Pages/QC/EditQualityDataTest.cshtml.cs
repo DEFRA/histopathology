@@ -3,6 +3,7 @@ using Histo.Administration.Models;
 using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
 using Histo.QualityControl.Interfaces;
+using Histo.Submissions.Interfaces;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -26,6 +27,7 @@ public class EditQualityDataTestModel : HistoPageModel
     private readonly IQCNoteService _qc;
     private readonly ILookupService _lookups;
     private readonly IUserService _users;
+    private readonly IBatchService _batches;
 
     private const int LookupQcCode          = 14;
     private const int LookupRemedialAction   = 15;
@@ -37,13 +39,15 @@ public class EditQualityDataTestModel : HistoPageModel
         IBlockTestService tests,
         IQCNoteService qc,
         ILookupService lookups,
-        IUserService users)
+        IUserService users,
+        IBatchService batches)
         : base(session)
     {
         _tests = tests;
         _qc = qc;
         _lookups = lookups;
         _users = users;
+        _batches = batches;
     }
 
     [BindProperty(SupportsGet = true)] public int TestId { get; set; }
@@ -197,6 +201,7 @@ public class EditQualityDataTestModel : HistoPageModel
             await _tests.SaveTCCodesAsync(
                 Session.BatchID.Value, TestId, Test.TestType,
                 Test.TCCodes, SelectedCharges, Session.UserID);
+            await CompleteBatchIfAllTestsDispatchedAsync(Session.BatchID.Value);
             return RedirectToPage("/QC/QualityData");
         }
         catch (BlockTestConcurrencyException)
@@ -205,6 +210,21 @@ public class EditQualityDataTestModel : HistoPageModel
             await LoadLookupsAsync();
             return Page();
         }
+    }
+
+    /// <summary>
+    /// Reproduces legacy <c>QualityData.aspx.vb::UpdateSessionWithQualityData</c>: once every test
+    /// on the batch has been dispatched, the batch is marked Completed and stamped with the latest
+    /// dispatch date. Re-reads the tests after the save so the row just edited is included.
+    /// </summary>
+    private async Task CompleteBatchIfAllTestsDispatchedAsync(int batchId)
+    {
+        var tests = await _tests.GetByBatchAsync(batchId);
+        if (tests.Count == 0) return;
+        if (!tests.All(t => t.Dispatched && t.DispatchedDate is not null)) return;
+
+        var latestDispatch = tests.Max(t => t.DispatchedDate!.Value);
+        await _batches.SetCompletedAsync(batchId, latestDispatch, Session.UserID);
     }
 
     private void SetTitle()

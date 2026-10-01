@@ -29,8 +29,6 @@ public class ReceiveBatchModel : HistoPageModel
 {
     private const int LookupTimeReceived = 3;  // Legacy source: HistopathologySystem/Common.vb — LOOKUP_TIME_RECEIVED
     private const int LookupPostFixation = 12; // Legacy source: HistopathologySystem/Common.vb — LOOKUP_POSTFIXATION
-    private const int LookupContacts     = 18; // Legacy source: HistopathologySystem/Common.vb — LOOKUP_CONTACTS
-    private const int LookupProjects     = 19; // Legacy source: HistopathologySystem/Common.vb — LOOKUP_PROJECTS
 
     /// <summary>Synthetic post-fixation code for the free-text "Other" option (not a real lookup row).</summary>
     private const string PostFixationOtherCode = "Other";
@@ -213,6 +211,7 @@ public class ReceiveBatchModel : HistoPageModel
     public IActionResult OnPostEditSubmission()
     {
         Session.ReturnPage = "/Batches/ReceiveBatch";
+        Session.EditBatchReturnPage = null; // this entry point owns EditBatch's return target, not any stale Edit Submission Status detour
         return RedirectToPage("/Batches/EditBatch");
     }
 
@@ -287,32 +286,24 @@ public class ReceiveBatchModel : HistoPageModel
         var usersTask        = _users.GetAllUsersAsync();
         var timeReceivedTask = _lookups.GetLookupDataAsync(LookupTimeReceived);
         var postFixationTask = _lookups.GetLookupDataAsync(LookupPostFixation);
-        var projectsTask     = _lookups.GetLookupDataAsync(LookupProjects);
-        var contactsTask     = _lookups.GetLookupDataAsync(LookupContacts);
-        var speciesTask      = _lookups.GetSpeciesLookupAsync();
-        // includeInactive: true — resolves the Entered/Submitted Area name for display even when
-        // the batch was entered under a since-retired area (Mouse Bioassay/Neuropath).
-        var userAreasTask    = _lookups.GetUserAreasAsync(includeInactive: true);
 
-        await Task.WhenAll(usersTask, timeReceivedTask, postFixationTask,
-            projectsTask, contactsTask, speciesTask, userAreasTask);
+        await Task.WhenAll(usersTask, timeReceivedTask, postFixationTask);
 
         Users               = usersTask.Result;
         TimeReceivedOptions = timeReceivedTask.Result;
         PostFixationOptions = postFixationTask.Result;
 
-        var projectsById = projectsTask.Result.ToDictionary(i => i.ID.ToString(), i => i.Name);
-        var contactsById = contactsTask.Result.ToDictionary(i => i.ID.ToString(), i => i.Name);
-        var speciesById  = speciesTask.Result.ToDictionary(i => i.ID.ToString(), i => i.Name, StringComparer.OrdinalIgnoreCase);
-        var userById     = usersTask.Result.ToDictionary(u => u.UserID, u => u.Name);
-        var areaByCode   = userAreasTask.Result.ToDictionary(a => a.ID.ToString(), a => a.Name, StringComparer.OrdinalIgnoreCase);
-
-        ProjectName       = !string.IsNullOrWhiteSpace(Batch.ProjectContractCode) && projectsById.TryGetValue(Batch.ProjectContractCode, out var pn) ? pn : Batch.ProjectContractCode;
-        PathologistName   = !string.IsNullOrWhiteSpace(Batch.ContactName) && contactsById.TryGetValue(Batch.ContactName, out var cn) ? cn : Batch.ContactName;
-        SpeciesName       = !string.IsNullOrWhiteSpace(Batch.Species) && speciesById.TryGetValue(Batch.Species, out var sn) ? sn : Batch.Species;
-        EnteredByName     = Batch.SubmittedBy.HasValue && userById.TryGetValue(Batch.SubmittedBy.Value, out var eb) ? eb : null;
-        SubmittedByName   = Batch.OtherSubmittedBy.HasValue && userById.TryGetValue(Batch.OtherSubmittedBy.Value, out var sb) ? sb : null;
-        EnteredAreaName   = !string.IsNullOrEmpty(Batch.SubmittedArea) && areaByCode.TryGetValue(Batch.SubmittedArea, out var ea) ? ea : null;
-        SubmittedAreaName = !string.IsNullOrEmpty(Batch.OtherSubmittedArea) && areaByCode.TryGetValue(Batch.OtherSubmittedArea, out var sa) ? sa : null;
+        // Legacy Batch.ascx.vb resolves Project/Pathologist via Common.vb::GetListTypeID, which
+        // always requests the full lookup (GetLookupData(list, True)) — an inactive project or
+        // pathologist must still resolve to its name. The shared resolver does that; resolving
+        // them here from the active-only lists showed the raw stored ID instead.
+        var summary = await BatchSummaryDisplayResolver.ResolveAsync(Batch, _lookups, _users);
+        ProjectName       = summary.ProjectName;
+        PathologistName   = summary.PathologistName;
+        SpeciesName       = summary.SpeciesName;
+        EnteredByName     = summary.EnteredByName;
+        EnteredAreaName   = summary.EnteredAreaName;
+        SubmittedByName   = summary.SubmittedByName;
+        SubmittedAreaName = summary.SubmittedAreaName;
     }
 }

@@ -55,14 +55,44 @@ else
                 </div>
             </div>
         </div>
-        <div class="govuk-form-group">
-            <label class="govuk-label" for="EditHistologyRef">Histology reference</label>
-            @if (!Model.HistologyRefLocked)
+        <div class="govuk-grid-row">
+            <div class="govuk-grid-column-one-half">
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="EditHistologyRef">Histology reference</label>
+                    @if (!Model.HistologyRefLocked)
+                    {
+                        <div class="govuk-hint">Format: NN/NNNNN (e.g., 26/40004). Must be less than the next available reference number for its type.</div>
+                    }
+                    <input class="govuk-input govuk-input--width-10" asp-for="EditHistologyRef" placeholder="e.g., 26/40004" maxlength="8" pattern="\d{2}/\d{5}"
+                           readonly="@(Model.HistologyRefLocked ? "readonly" : null)" disabled="@(Model.IsViewMode ? "disabled" : null)" />
+                </div>
+            </div>
+            @* "Or Pick" — assigns the next unused histology ref for a type and saves it immediately.
+               Histopath-user-area-only, matching legacy's Session(SV_HeaderUserArea)="Histopath" gate —
+               see Model.ShowHistologyRefTypePicker. Always enabled, even once a ref is already set — a
+               Histopath user can re-pick a type at any time to change the Histology Ref. The select/button
+               submit the separate hidden "get-next-histology-ref-form" below via the form="" attribute,
+               so picking a type saves independently of "Save details". *@
+            @if (Model.ShowHistologyRefTypePicker)
             {
-                <div class="govuk-hint">Format: NN/NNNNN (e.g., 26/40004). Must be less than the next available reference number for its type.</div>
+                <div class="govuk-grid-column-one-half">
+                    <div class="govuk-form-group">
+                        <label class="govuk-label" for="HistologyRefType">Or pick a histology reference type</label>
+                        @if (Model.IsPreCassetted)
+                        {
+                            <div class="govuk-hint">Mandatory for pre-cassetted submissions.</div>
+                        }
+                        <select class="govuk-select" asp-for="HistologyRefType" form="get-next-histology-ref-form">
+                            <option value="">-- Select --</option>
+                            @foreach (var t in Model.HistologyRefTypeOptions)
+                            {
+                                <option value="@t.ID">@t.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button" form="get-next-histology-ref-form">Get next ref</button>
+                </div>
             }
-            <input class="govuk-input govuk-input--width-10" asp-for="EditHistologyRef" placeholder="e.g., 26/40004" maxlength="8" pattern="\d{2}/\d{5}"
-                   readonly="@(Model.HistologyRefLocked ? "readonly" : null)" disabled="@(Model.IsViewMode ? "disabled" : null)" />
         </div>
         @if (!Model.IsViewMode && (!Model.HistologyRefLocked || !Model.PMDateLocked))
         {
@@ -70,29 +100,11 @@ else
         }
     </form>
 
-    @* "Or Pick" — assigns the next unused histology ref for a type and saves it immediately.
-       Shown only in the Assign Tissues to Blocks journey while no ref has been entered yet — the
-       Create/Edit/View Submission journey keeps its existing manual-entry-only behaviour. *@
-    @if (Model.IsAssignTissueMode && !Model.IsViewMode && string.IsNullOrWhiteSpace(Model.Animal.HistologyRef))
+    @if (Model.ShowHistologyRefTypePicker)
     {
-        <form method="post" asp-page-handler="GetNextHistologyRef" class="govuk-!-margin-bottom-6">
-            <input type="hidden" asp-for="BatchId" />
-            <input type="hidden" asp-for="AnimalId" />
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="HistologyRefType">Or pick a histology reference type</label>
-                @if (Model.IsPreCassetted)
-                {
-                    <div class="govuk-hint">Mandatory for pre-cassetted submissions.</div>
-                }
-                <select class="govuk-select" asp-for="HistologyRefType">
-                    <option value="">-- Select --</option>
-                    @foreach (var t in Histo.Web.Pages.Submissions.SubmissionDetailsBlockModel.HistologyRefTypeOptions)
-                    {
-                        <option value="@t.Value">@t.Label</option>
-                    }
-                </select>
-            </div>
-            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Get next ref</button>
+        <form method="post" asp-page-handler="GetNextHistologyRef" id="get-next-histology-ref-form" class="govuk-visually-hidden">
+            <input type="hidden" name="BatchId" value="@Model.BatchId" />
+            <input type="hidden" name="AnimalId" value="@Model.AnimalId" />
         </form>
     }
 
@@ -147,7 +159,20 @@ else
                         }
                         <th scope="col" class="govuk-table__header">Special stain</th>
                     }
-                    <th scope="col" class="govuk-table__header">Select</th>
+                    <th scope="col" class="govuk-table__header">
+                        Select
+                        @if (!Model.IsViewMode && Model.Blocks.Any())
+                        {
+                            <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-top-1">
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input" type="checkbox" id="select-all-blocks" />
+                                    <label class="govuk-label govuk-checkboxes__label" for="select-all-blocks">
+                                        <span class="govuk-visually-hidden">Select all blocks (for Delete block)</span>
+                                    </label>
+                                </div>
+                            </div>
+                        }
+                    </th>
                 </tr>
             </thead>
             <tbody class="govuk-table__body">
@@ -276,4 +301,19 @@ else
                class="govuk-button govuk-button--secondary" data-module="govuk-button">Block ref search</a>
         </div>
     </form>
+}
+
+@section Scripts {
+    <script>
+        // Legacy: cbSelectAll (SubmissionDetailsBlock.aspx) — ticks every block row so "Delete
+        // block" can remove them all in one go, instead of checking each one individually.
+        (function () {
+            var selectAll = document.getElementById('select-all-blocks');
+            var checkboxes = document.querySelectorAll('input[name="blockIds"]');
+            if (!selectAll || !checkboxes.length) return;
+            selectAll.addEventListener('change', function () {
+                checkboxes.forEach(function (cb) { cb.checked = selectAll.checked; });
+            });
+        })();
+    </script>
 }

@@ -342,12 +342,48 @@ public sealed class BatchRepository : IBatchRepository
     }
 
     /// <inheritdoc/>
+    public async Task SetCompletedAsync(int batchId, DateTime completedDate, int userId, CancellationToken ct = default)
+    {
+        var existing = await GetByIdAsync(batchId, ct);
+        if (existing is null) return;
+        // Goes through EditBatch rather than EditBatchStatus, which would null out the
+        // receipt columns (DateReceived/TimeReceived/StatusComments/PostFixationOther).
+        var updated = new Batch
+        {
+            ID = existing.ID, Status = BatchStatus.Completed, Comments = existing.Comments,
+            StatusComments = existing.StatusComments, BatchDate = existing.BatchDate,
+            ReceivedDate = existing.ReceivedDate, CompletedDate = completedDate,
+            SubmittedByUserID = existing.SubmittedByUserID, UserAreaCode = existing.UserAreaCode,
+            IsPreCassetted = existing.IsPreCassetted, ByPassSort = existing.ByPassSort,
+            RowStamp = existing.RowStamp, BatchType = existing.BatchType,
+            ProjectContractCode = existing.ProjectContractCode, ContactName = existing.ContactName,
+            Species = existing.Species, Fixation = existing.Fixation,
+            CustomerReceivedDate = existing.CustomerReceivedDate,
+            SubmittedBy = existing.SubmittedBy, SubmittedArea = existing.SubmittedArea,
+            OtherSubmittedBy = existing.OtherSubmittedBy, OtherSubmittedArea = existing.OtherSubmittedArea,
+            SafeToHandle = existing.SafeToHandle, IsBlocked = existing.IsBlocked,
+            SampleSameProjects = existing.SampleSameProjects, AllTissuesAssigned = existing.AllTissuesAssigned,
+            TimeReceived = existing.TimeReceived, ReceivedBy = existing.ReceivedBy,
+            PostFixationOther = existing.PostFixationOther,
+        };
+        await UpdateAsync(updated, userId, ct);
+    }
+
+    /// <inheritdoc/>
     public async Task<bool> UpdateStatusAsync(int batchId, string newStatus, int userId, CancellationToken ct = default)
     {
         if (!int.TryParse(newStatus, out var batchStatusInt)) batchStatusInt = 1;
 
-        // When marking as Received, auto-populate DateReceived (mirrors legacy ReceiveBatch.aspx).
-        DateTime? dateReceived = newStatus == BatchStatus.Received ? DateTime.Now : null;
+        // EditBatchStatus overwrites the receipt columns unconditionally, so the current values
+        // must be read and passed straight back — otherwise any status change blanks out
+        // DateReceived/TimeReceived/ReceivedBy/StatusComments/PostFixationOther.
+        var existing = await GetByIdAsync(batchId, ct);
+
+        // When marking as Received, auto-populate the receipt stamp (mirrors legacy ReceiveBatch.aspx).
+        var isReceiving = newStatus == BatchStatus.Received;
+        var dateReceived = isReceiving ? existing?.ReceivedDate ?? DateTime.Now : existing?.ReceivedDate;
+        var receivedBy = isReceiving ? userId : existing?.ReceivedBy;
+        int? timeReceived = int.TryParse(existing?.TimeReceived, out var tr) ? tr : null;
 
         using var conn = _db.CreateConnection();
         var p = new DynamicParameters();
@@ -355,10 +391,10 @@ public sealed class BatchRepository : IBatchRepository
         p.Add("ID",              batchId);
         p.Add("BatchStatus",     batchStatusInt);
         p.Add("DateReceived",    dateReceived);
-        p.Add("TimeReceived",    (int?)null);
-        p.Add("ReceivedBy",      userId);
-        p.Add("StatusComments",  (string?)null);
-        p.Add("PostFixationOther", (string?)null);
+        p.Add("TimeReceived",    timeReceived);
+        p.Add("ReceivedBy",      receivedBy);
+        p.Add("StatusComments",  existing?.StatusComments);
+        p.Add("PostFixationOther", existing?.PostFixationOther);
 
         await conn.ExecuteAsync("EditBatchStatus", p, commandType: System.Data.CommandType.StoredProcedure);
 
@@ -740,26 +776,136 @@ public sealed class BatchRepository : IBatchRepository
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Confirmed live (2026-09-25) that legacy's real SPs — <c>GetTestHistologyCounts</c>/
+    /// <c>GetTestAntibodiesCounts</c>/<c>GetTestStainsCounts</c> — DO exist in this database.
+    /// The earlier "6 SPs confirmed not to exist" note was checking the WRONG names: legacy's
+    /// <c>clsBatch.CountHistologysTestItems</c>/<c>CountAntibodesTestItems</c>/<c>CountStainTestItems</c>
+    /// are thin VB wrappers whose actual <c>FillDataTable</c> call names are these 3 SPs, not
+    /// their own method names — the same "trust the .aspx.vb call site, not the wrapper name"
+    /// lesson already documented elsewhere in this repo. Reproduces
+    /// <c>SearchTest.aspx.vb::btnCount_Click</c>/<c>ProcessHistologyData</c>/<c>ProcessAntibodiesData</c>/
+    /// <c>ProcessStainData</c> exactly: one SP call per (test type × active premium charge), each
+    /// row keyed by a dynamically-named result column equal to the premium charge's own
+    /// Description (confirmed via <c>sp_helptext</c> — the SP itself builds and EXECs that SQL).
+    /// </remarks>
     public async Task<IReadOnlyList<Models.TestPremiumChargeCount>> GetTestPremiumChargeCountsAsync(
         string? projectDesc, int batchType,
         IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
         DateTime? startDate = null, DateTime? endDate = null,
         CancellationToken ct = default)
     {
-        // TODO: Implement premium-charge analytics from SearchTest legacy screen.
-        // Stub: returns empty list pending full analytics engine porting.
-        return await Task.FromResult<IReadOnlyList<Models.TestPremiumChargeCount>>([]);
+        using var conn = _db.CreateConnection();
+        var premiumCharges = await GetActivePremiumChargeDescriptionsAsync(conn);
+
+        var results = new List<Models.TestPremiumChargeCount>();
+        await AddCountsAsync(conn, results, "GetTestHistologyCounts", histologyCodes, premiumCharges, projectDesc, batchType, startDate, endDate);
+        await AddCountsAsync(conn, results, "GetTestAntibodiesCounts", antibodyCodes, premiumCharges, projectDesc, batchType, startDate, endDate);
+        await AddCountsAsync(conn, results, "GetTestStainsCounts", stainCodes, premiumCharges, projectDesc, batchType, startDate, endDate);
+        return results;
     }
 
     /// <inheritdoc/>
+    /// <remarks>See <see cref="GetTestPremiumChargeCountsAsync"/> — same 3 real SPs, Batch variant
+    /// (<c>GetTestHistologyBatch</c>/<c>GetTestAntibodiesBatch</c>/<c>GetTestStainsBatch</c>),
+    /// reproducing <c>SearchTest.aspx.vb::bntBatch_Click</c>/<c>AttachEventHanders</c>.</remarks>
     public async Task<IReadOnlyList<Models.TestPremiumChargeBatchRef>> GetTestPremiumChargeBatchesAsync(
         string? projectDesc, int batchType,
         IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
         DateTime? startDate = null, DateTime? endDate = null,
         CancellationToken ct = default)
     {
-        // TODO: Implement premium-charge batch listing from SearchTest legacy screen.
-        // Stub: returns empty list pending full analytics engine porting.
-        return await Task.FromResult<IReadOnlyList<Models.TestPremiumChargeBatchRef>>([]);
+        using var conn = _db.CreateConnection();
+        var premiumCharges = await GetActivePremiumChargeDescriptionsAsync(conn);
+
+        var results = new List<Models.TestPremiumChargeBatchRef>();
+        await AddBatchesAsync(conn, results, "GetTestHistologyBatch", histologyCodes, premiumCharges, projectDesc, batchType, startDate, endDate);
+        await AddBatchesAsync(conn, results, "GetTestAntibodiesBatch", antibodyCodes, premiumCharges, projectDesc, batchType, startDate, endDate);
+        await AddBatchesAsync(conn, results, "GetTestStainsBatch", stainCodes, premiumCharges, projectDesc, batchType, startDate, endDate);
+        return results;
+    }
+
+    /// <summary>Legacy: <c>LookupData.GetLookupData(LOOKUP_PREMIUM_CHARGES)</c> — active-only <c>luPremiumCharges.Description</c> values, looped once per test type.</summary>
+    private static async Task<IReadOnlyList<string>> GetActivePremiumChargeDescriptionsAsync(System.Data.IDbConnection conn)
+    {
+        // GetluPremiumCharges returns ID, Code, Description, IsActive (ID first) — QueryAsync<string>
+        // would silently bind the FIRST column (ID) instead of Description, so read it as dynamic
+        // and pick the Description column explicitly.
+        var rows = await conn.QueryAsync<dynamic>(
+            "GetluPremiumCharges", commandType: System.Data.CommandType.StoredProcedure);
+        return rows
+            .Select(r => (string?)((IDictionary<string, object>)r)["Description"])
+            .Where(d => !string.IsNullOrEmpty(d))
+            .Select(d => d!)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Legacy: <c>GetSelectedTests</c> — selected codes joined by <c>','</c> with NO outer quotes,
+    /// since the target SP interpolates it directly into <c>bs.Code in ('...')</c>.
+    /// </summary>
+    private static string JoinTestCodes(IReadOnlyList<string> codes) => string.Join("','", codes);
+
+    private static async Task AddCountsAsync(
+        System.Data.IDbConnection conn, List<Models.TestPremiumChargeCount> results,
+        string procName, IReadOnlyList<string> codes, IReadOnlyList<string> premiumCharges,
+        string? projectDesc, int batchType, DateTime? startDate, DateTime? endDate)
+    {
+        if (codes.Count == 0) return;
+        var tests = JoinTestCodes(codes);
+
+        foreach (var testCode in premiumCharges)
+        {
+            var rows = await conn.QueryAsync<dynamic>(procName, new
+            {
+                ProjectContractCode = projectDesc ?? "",
+                SubmittedDateFrom = startDate,
+                SubmittedDateTo = endDate,
+                BatchType = batchType != 0,
+                Tests = tests,
+                TestCode = testCode,
+            }, commandType: System.Data.CommandType.StoredProcedure);
+
+            foreach (var row in rows)
+            {
+                // The SP names its own count column dynamically after @TestCode (e.g. "TC 1401") —
+                // read by that exact key rather than a fixed property name.
+                var d = (IDictionary<string, object>)row;
+                var count = d.TryGetValue(testCode, out var c) && c is not DBNull ? Convert.ToInt32(c) : 0;
+                var project = d.TryGetValue("Description", out var p) && p is not DBNull ? Convert.ToString(p) : null;
+                results.Add(new Models.TestPremiumChargeCount
+                {
+                    ProjectDescription = project,
+                    PremiumCode = testCode,
+                    Count = count,
+                });
+            }
+        }
+    }
+
+    private static async Task AddBatchesAsync(
+        System.Data.IDbConnection conn, List<Models.TestPremiumChargeBatchRef> results,
+        string procName, IReadOnlyList<string> codes, IReadOnlyList<string> premiumCharges,
+        string? projectDesc, int batchType, DateTime? startDate, DateTime? endDate)
+    {
+        if (codes.Count == 0) return;
+        var tests = JoinTestCodes(codes);
+
+        foreach (var testCode in premiumCharges)
+        {
+            var batchIds = await conn.QueryAsync<int>(procName, new
+            {
+                ProjectContractCode = projectDesc ?? "",
+                SubmittedDateFrom = startDate,
+                SubmittedDateTo = endDate,
+                BatchType = batchType != 0,
+                Tests = tests,
+                TestCode = testCode,
+            }, commandType: System.Data.CommandType.StoredProcedure);
+
+            foreach (var id in batchIds)
+                results.Add(new Models.TestPremiumChargeBatchRef { PremiumCode = testCode, BatchID = id });
+        }
     }
 }
+

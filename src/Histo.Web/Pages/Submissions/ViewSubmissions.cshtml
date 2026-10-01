@@ -236,7 +236,8 @@
             <a asp-page="/Reports/HistologyReport" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission</a>
 
             @* Print Submission Notes — see Print Submission comment above. Only enabled when the
-               submission has recorded notes (Batch.Comments/StatusComments), mirroring legacy EnableSubmissionNotes. *@
+               submission has recorded notes at ANY level (header comments, or any block/tissue/
+               antibody/histology/stain test comment), mirroring legacy EnableSubmissionNotes. *@
             @if (Model.HasNotes)
             {
                 <a asp-page="/Reports/SubmissionNotes" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission notes</a>

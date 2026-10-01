@@ -9,6 +9,13 @@
     <a asp-page="@Model.BackLinkPage" asp-route-batchId="@Model.BatchId" class="govuk-back-link">Back</a>
 }
 
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="govuk-panel govuk-panel--confirmation govuk-!-margin-bottom-6">
+        <p class="govuk-panel__body">@Model.SuccessMessage</p>
+    </div>
+}
+
 @if (Model.Batch is not null)
 {
     <dl class="govuk-summary-list govuk-!-margin-bottom-6">
@@ -67,19 +74,66 @@
     </div>
 }
 
-@if (!string.IsNullOrEmpty(Model.SuccessMessage))
-{
-    <div class="govuk-panel govuk-panel--confirmation govuk-!-margin-bottom-6">
-        <p class="govuk-panel__body">@Model.SuccessMessage</p>
+@* Legacy rblFilter + ddlHistologyRefList + ddlBlockRefList + "Go". GET so the criteria sit in
+   the query string and are preserved by the sort/paging links. *@
+<form method="get" class="govuk-!-margin-bottom-6">
+    <input type="hidden" name="batchId" value="@Model.BatchId" />
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-third">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="FilterHistologyRef">Histology ref</label>
+                <select class="govuk-select" id="FilterHistologyRef" name="FilterHistologyRef">
+                    <option value="">-- All --</option>
+                    @foreach (var h in Model.HistologyRefOptions)
+                    {
+                        <option value="@h" selected="@(Model.FilterHistologyRef == h)">@h</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-third">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="FilterBlockRef">Block ref</label>
+                <select class="govuk-select" id="FilterBlockRef" name="FilterBlockRef">
+                    <option value="">-- All --</option>
+                    @foreach (var b in Model.BlockRefOptions)
+                    {
+                        <option value="@b" selected="@(Model.FilterBlockRef == b)">@b</option>
+                    }
+                </select>
+            </div>
+        </div>
     </div>
-}
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Go</button>
+        @if (Model.FilterApplied)
+        {
+            <a asp-page="/Archive/ArchiveBlocks" asp-route-batchId="@Model.BatchId" class="govuk-link">Clear filter</a>
+        }
+    </div>
+</form>
 
 <form method="post" asp-page-handler="Update">
     <input type="hidden" name="BatchId" value="@Model.BatchId" />
+    @* Keep the current filter/page/sort so "Update selected" redisplays the same view instead
+       of resetting to page 1 — this form's action has no query string of its own to fall back on. *@
+    <input type="hidden" name="FilterHistologyRef" value="@Model.FilterHistologyRef" />
+    <input type="hidden" name="FilterBlockRef" value="@Model.FilterBlockRef" />
+    <input type="hidden" name="PageNumber" value="@Model.PageNumber" />
+    <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
+    <input type="hidden" name="SortDesc" value="@Model.SortDesc" />
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <th scope="col" class="govuk-table__header govuk-visually-hidden">Select</th>
+                <th scope="col" class="govuk-table__header">
+                    <div class="govuk-checkboxes govuk-checkboxes--small">
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" type="checkbox" id="select-all" name="SelectAllAcrossPages" value="true"
+                                   checked="@Model.SelectAllAcrossPages" @(Model.IsViewMode ? "disabled" : "") />
+                            <label class="govuk-label govuk-checkboxes__label" for="select-all">All</label>
+                        </div>
+                    </div>
+                </th>
                 @{ ViewData["Label"] = "Sender ref"; ViewData["Column"] = "SenderRef"; }
                 <partial name="_SortableHeader" />
                 @{ ViewData["Label"] = "Histology ref"; ViewData["Column"] = "HistologyRef"; }
@@ -99,7 +153,9 @@
                     <td class="govuk-table__cell">
                         <div class="govuk-checkboxes govuk-checkboxes--small">
                             <div class="govuk-checkboxes__item">
-                                <input class="govuk-checkboxes__input" type="checkbox" id="select-@r.ID" name="SelectedIds" value="@r.ID" @(Model.IsViewMode ? "disabled" : "") />
+                                <input class="govuk-checkboxes__input" type="checkbox" id="select-@r.ID" name="SelectedIds" value="@r.ID"
+                                       data-archive-location="@r.ArchiveLocation" data-archived-date="@r.ArchivedDate?.ToString("yyyy-MM-dd")" data-comment="@r.ArchiveComment"
+                                       checked="@(Model.SelectedIds.Contains(r.ID))" @(Model.IsViewMode ? "disabled" : "") />
                                 <label class="govuk-label govuk-checkboxes__label" for="select-@r.ID"><span class="govuk-visually-hidden">Select block @r.BlockRef</span></label>
                             </div>
                         </div>
@@ -111,18 +167,28 @@
                     <td class="govuk-table__cell">@r.ArchiveLocationName</td>
                 </tr>
             }
-            @if (!Model.Rows.Any())
+            @if (!Model.PagedEntries.Any())
             {
-                <tr class="govuk-table__row"><td colspan="5" class="govuk-table__cell">No blocks to archive.</td></tr>
+                <tr class="govuk-table__row"><td colspan="6" class="govuk-table__cell">@(Model.FilterApplied ? "No blocks match the selected filter." : "No blocks to archive.")</td></tr>
             }
         </tbody>
     </table>
     <partial name="_Pagination" />
+    @if (Model.TotalPages > 1)
+    {
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="GoToPage">Go to page (1 to @Model.TotalPages)</label>
+            <div class="app-field-with-button">
+                <input class="govuk-input govuk-input--width-3" id="GoToPage" name="PageNumber" type="number" min="1" max="@Model.TotalPages" value="@Model.PageNumber" form="go-to-page-form" />
+                <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" form="go-to-page-form">Go</button>
+            </div>
+        </div>
+    }
 
     @if (!Model.IsViewMode)
     {
         <h2 class="govuk-heading-m">Archive selected blocks</h2>
-        <p class="govuk-hint">Selecting one block lets you edit its existing archive details. Selecting two or more applies only the fields you fill in below to every selected block, leaving blanks unchanged.</p>
+        <p class="govuk-hint">Select the "All" checkbox to select every row across all pages. Selecting one block lets you edit its existing archive details. Selecting two or more applies only the fields you fill in below to every selected block, leaving blanks unchanged.</p>
         <div class="govuk-form-group">
             <label class="govuk-label" for="ArchiveLocationCode">Archive location</label>
             <select class="govuk-select" id="ArchiveLocationCode" name="ArchiveLocationCode">
@@ -142,11 +208,69 @@
             <textarea class="govuk-textarea" id="Comment" name="Comment" rows="4">@Model.Comment</textarea>
         </div>
     }
-    <div class="govuk-button-group">
-        @if (!Model.IsViewMode)
-        {
+    @if (!Model.IsViewMode)
+    {
+        <div class="govuk-button-group">
             <button type="submit" class="govuk-button" data-module="govuk-button">Update selected</button>
-        }
-        <a asp-page="@Model.BackLinkPage" asp-route-batchId="@Model.BatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Done</a>
-    </div>
+        </div>
+    }
 </form>
+
+@* Separate GET form for "Go to page" — a plain number input associated with the POST update
+   form above via the "form" attribute would submit it as a page-number filter, not a navigation. *@
+<form id="go-to-page-form" method="get" class="govuk-visually-hidden">
+    <input type="hidden" name="batchId" value="@Model.BatchId" />
+    <input type="hidden" name="FilterHistologyRef" value="@Model.FilterHistologyRef" />
+    <input type="hidden" name="FilterBlockRef" value="@Model.FilterBlockRef" />
+    <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
+    <input type="hidden" name="SortDesc" value="@Model.SortDesc" />
+</form>
+
+@section Scripts {
+    <script>
+        // Selecting exactly one block pre-fills its existing archive details for editing;
+        // selecting zero or multiple clears the fields back to bulk mode's blank-is-unchanged default.
+        // The "All" checkbox only ever reaches the server as the SelectAllAcrossPages flag (rows on
+        // other pages aren't in the DOM to check individually), so here it just mirrors the visual
+        // checked/disabled state onto this page's row checkboxes for feedback.
+        (function () {
+            var selectAll = document.getElementById('select-all');
+            var checkboxes = document.querySelectorAll('input[name="SelectedIds"]');
+            var locationSelect = document.getElementById('ArchiveLocationCode');
+            var dateInput = document.getElementById('ArchivedDate');
+            var commentInput = document.getElementById('Comment');
+            if (!checkboxes.length || !locationSelect || !dateInput || !commentInput) return;
+
+            function applySelection() {
+                var checked = Array.from(checkboxes).filter(function (cb) { return cb.checked; });
+                if (checked.length === 1 && (!selectAll || !selectAll.checked)) {
+                    var cb = checked[0];
+                    locationSelect.value = cb.dataset.archiveLocation || '';
+                    dateInput.value = cb.dataset.archivedDate || '';
+                    commentInput.value = cb.dataset.comment || '';
+                } else {
+                    locationSelect.value = '';
+                    dateInput.value = '';
+                    commentInput.value = '';
+                }
+            }
+
+            checkboxes.forEach(function (cb) { cb.addEventListener('change', applySelection); });
+
+            if (selectAll) {
+                selectAll.addEventListener('change', function () {
+                    checkboxes.forEach(function (cb) {
+                        cb.checked = selectAll.checked;
+                        cb.disabled = selectAll.checked;
+                    });
+                    applySelection();
+                });
+                if (selectAll.checked) checkboxes.forEach(function (cb) { cb.disabled = true; });
+            }
+
+            // Reflect whatever came back checked from a validation-error postback immediately,
+            // not just after the user's next change event.
+            applySelection();
+        })();
+    </script>
+}
