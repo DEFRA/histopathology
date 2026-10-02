@@ -52,6 +52,13 @@ public class EditBatchModel : HistoPageModel
     [BindProperty] public int?    OtherSubmittedBy    { get; set; }
     [BindProperty] public string? OtherSubmittedArea  { get; set; }
 
+    /// <summary>
+    /// Legacy source: <c>BatchDetails.aspx.vb::EnableDisableControls</c> — <c>ddlUserArea</c> is
+    /// only ever enabled when the current user's own area is Histopath; every other area gets it
+    /// auto-set from their own session area and locked.
+    /// </summary>
+    public bool CanEditSubmittedArea => Session.UserArea == "Histopath";
+
     // ---- Test-type selections (merged from the former EditBatchTests page) ----
     [BindProperty] public List<string> SelectedHistologyCodes { get; set; } = [];
     [BindProperty] public List<string> SelectedAntibodyCodes  { get; set; } = [];
@@ -89,6 +96,13 @@ public class EditBatchModel : HistoPageModel
     public IReadOnlyList<LookupItem> Fixations   { get; private set; } = [];
     public IReadOnlyList<LookupItem> UserAreas   { get; private set; } = [];
     public IReadOnlyList<User>       AllUsers    { get; private set; } = [];
+
+    /// <summary>
+    /// Includes retired areas (Mouse Bioassay/Neuropath) — only used to resolve <see cref="EnteredAreaName"/>
+    /// so an old batch entered under one of them still shows a name instead of blank. Never bound to
+    /// a dropdown; <see cref="UserAreas"/> (active-only) is what the Submitted area select offers.
+    /// </summary>
+    private IReadOnlyList<LookupItem> _allUserAreas = [];
 
     /// <summary>Histology type options, filtered for TSE/NonTSE (mirrors former EditBatchTestsModel).</summary>
     public IReadOnlyList<LookupItem> HistologyOptions { get; private set; } = [];
@@ -367,17 +381,20 @@ public class EditBatchModel : HistoPageModel
         var contactsTask  = _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true);
         var speciesTask   = _lookups.GetSpeciesLookupAsync();
         var fixationTask  = _lookups.GetLookupDataAsync(LookupFixation);
-        // includeInactive: true — the "Submitted area" field is read-only display here (never
-        // editable — see class doc comment), so a since-retired area (Mouse Bioassay/Neuropath)
-        // must still resolve to a name rather than falling through to "Not recorded".
-        var areaTask      = _lookups.GetUserAreasAsync(includeInactive: true);
+        // Active areas only — Mouse Bioassay/Neuropath have been retired and must not be offered
+        // as a Submitted area choice going forward. Entered Area (always read-only, resolved in
+        // LoadDisplayFieldsAsync) still needs the full includeInactive: true list separately, since
+        // an existing batch may genuinely have been entered under one of those areas historically.
+        var areaTask      = _lookups.GetUserAreasAsync();
+        var allAreasTask  = _lookups.GetUserAreasAsync(includeInactive: true);
         var usersTask     = _users.GetAllUsersAsync();
-        await Task.WhenAll(projectsTask, contactsTask, speciesTask, fixationTask, areaTask, usersTask);
+        await Task.WhenAll(projectsTask, contactsTask, speciesTask, fixationTask, areaTask, allAreasTask, usersTask);
         Projects    = projectsTask.Result;
         Contacts    = contactsTask.Result;
         SpeciesList = speciesTask.Result;
         Fixations   = fixationTask.Result;
         UserAreas   = areaTask.Result;
+        _allUserAreas = allAreasTask.Result;
         AllUsers    = [.. usersTask.Result];
     }
 
@@ -387,7 +404,7 @@ public class EditBatchModel : HistoPageModel
         if (Batch is null) return;
 
         EnteredByName = AllUsers.FirstOrDefault(u => u.UserID == Batch.SubmittedBy)?.Name;
-        EnteredAreaName = UserAreas.FirstOrDefault(a => a.ID.ToString() == Batch.SubmittedArea)?.Name;
+        EnteredAreaName = _allUserAreas.FirstOrDefault(a => a.ID.ToString() == Batch.SubmittedArea)?.Name;
 
         var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(Batch.ID);
         if (!string.IsNullOrEmpty(submittedAsCode))

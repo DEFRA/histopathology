@@ -312,8 +312,12 @@ public class SampleSummaryModel : HistoPageModel
     /// <summary>Unions two animal lists by ID, keeping the first list's entries and appending any not already present.</summary>
     private static IReadOnlyList<Animal> MergeAnimals(IReadOnlyList<Animal> primary, IReadOnlyList<Animal> supplementary)
     {
-        var seenIds = primary.Select(a => a.ID).ToHashSet();
+        var distinctPrimary = primary
+            .GroupBy(a => a.ID)
+            .Select(g => g.First())
+            .ToList();
+        var seenIds = distinctPrimary.Select(a => a.ID).ToHashSet();
         var missing = supplementary.Where(a => !seenIds.Contains(a.ID));
-        return [.. primary, .. missing];
+        return [.. distinctPrimary, .. missing];
     }
 }

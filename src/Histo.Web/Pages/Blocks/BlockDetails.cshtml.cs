@@ -113,6 +113,17 @@ public class BlockDetailsModel : HistoPageModel
     public Batch? Batch { get; private set; }
     public Block? Block { get; private set; }
     public bool IsPreCassetted => Batch?.IsPreCassetted == true;
+
+    /// <summary>Mirrors SubmissionDetailsBlockModel.ShowHistologyRefTypePicker's area check.</summary>
+    public bool IsHistopathAreaUser =>
+        string.Equals(Session.UserArea?.Trim(), "Histopath", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Legacy source: SubmissionDetailsBlock.aspx.vb::Page_Load (HistologyRef1.IsMandatory).
+    /// Mirrors SubmissionDetailsBlockModel.HistologyRefRequired — mandatory for Histopath-area
+    /// users OR Pre-Cassetted submissions.
+    /// </summary>
+    public bool HistologyRefRequired => IsHistopathAreaUser || IsPreCassetted;
     public IReadOnlyList<Block> PreBookedBlockRefs { get; private set; } = [];
 
     public IReadOnlyList<Tissue> Tissues { get; private set; } = [];
@@ -155,6 +166,9 @@ public class BlockDetailsModel : HistoPageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
+        // TEMPORARY diagnostic
+        Console.WriteLine($"[DIAG OnGetAsync] (bound-at-entry) BatchId={BatchId} AnimalId={AnimalId} BlockId={BlockId} IsAddFlow={IsAddFlow}");
+
         ViewData["Title"] = IsEditMode ? "Edit block" : "Add block";
         ViewData["PageTitle"] = IsEditMode ? "Edit block" : "Add block";
 
@@ -173,6 +187,18 @@ public class BlockDetailsModel : HistoPageModel
         }
         else
         {
+            // Legacy: SubmissionDetailsBlock.aspx.vb::ValidateMandatoryFields blocks btnAddBlock_Click
+            // when Histology Ref is mandatory (Histopath-area user or Pre-Cassetted) and blank.
+            // Enforced here too (not just a disabled button there) since this is a GET the user could
+            // reach directly — redirect back with the same GDS error-summary convention that page
+            // already uses for delete errors.
+            if (HistologyRefRequired && !Animal.HistoRefSet)
+            {
+                TempData["SubmissionDetailsBlock_Error"] = "Enter a Histology Reference for this sample before adding a block.";
+                TempData["SubmissionDetailsBlock_ErrorFieldId"] = "EditHistologyRef";
+                return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId = BatchId, animalId = AnimalId });
+            }
+
             // Legacy: BlockDetails.aspx.vb Page_Load -> CreateNewRecord() provisionally creates the
             // block immediately (in an in-memory dataset there; directly in the DB here) so tissues
             // and tests can be assigned from the very first page load, without an explicit Save
@@ -181,10 +207,16 @@ public class BlockDetailsModel : HistoPageModel
             // labelling (title/button/Number of blocks) is still correct even on the fallback
             // render paths below (e.g. no pre-booked refs left for a pre-cassetted submission).
             IsAddFlow = true;
+            var allBatchBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
+            var animalBlocks = allBatchBlocks.Where(b => b.AnimalID == Animal.ID).ToList();
+            var batchTissues = await _submissions.GetTissuesByBatchAsync(BatchId ?? 0);
+            // A block with no tissues was never actually used — exclude it from the "existing
+            // refs" the next ref is computed from, so an abandoned/never-finished block's ref
+            // becomes available again instead of being permanently skipped over.
+            var usedRefs = animalBlocks.Where(b => batchTissues.Any(t => t.OwnerID == b.ID)).Select(b => b.BlockRef);
             NewBlockRef = IsPreCassetted
                 ? PreBookedBlockRefs.FirstOrDefault()?.BlockRef
-                : BlockHelpers.ComputeNextBlockRef(
-                    (await _blocks.GetByBatchAsync(BatchId ?? 0)).Where(b => b.AnimalID == Animal.ID).Select(b => b.BlockRef));
+                : BlockHelpers.ComputeNextBlockRef(usedRefs);
 
             if (string.IsNullOrWhiteSpace(NewBlockRef))
             {
@@ -204,17 +236,30 @@ public class BlockDetailsModel : HistoPageModel
                 return Page();
             }
 
-            var existingOrders = (await _blocks.GetByBatchAsync(BatchId ?? 0)).Select(b => b.Order).ToList();
-            var newId = await _blocks.AddBlockAsync(BatchId ?? 0, Animal.ID, NewBlockRef, existingOrders, Session.UserID,
-                customerRef: null, comment: null, repeatBlock: false);
-            if (newId <= 0)
+            // Resume an existing, never-finished (zero-tissue) block with this exact ref instead
+            // of creating a duplicate row for it — e.g. one the user backed out of earlier.
+            var abandoned = animalBlocks.FirstOrDefault(b =>
+                string.Equals(b.BlockRef, NewBlockRef, StringComparison.OrdinalIgnoreCase) && !batchTissues.Any(t => t.OwnerID == b.ID));
+
+            int newId;
+            if (abandoned is not null)
             {
-                // AddBlockAsync swallows its own exceptions and logs them, returning 0 on failure —
-                // without this, the page silently re-rendered the "Add block" form with no Tissues/
-                // Add tissue section and no visible error, making a genuine DB failure look like a
-                // missing feature. Surface it so the real cause shows up instead of a blank result.
-                ErrorMessage = "Could not create the block. Please try again or contact support if the problem continues.";
-                return Page();
+                newId = abandoned.ID;
+            }
+            else
+            {
+                var existingOrders = allBatchBlocks.Select(b => b.Order).ToList();
+                newId = await _blocks.AddBlockAsync(BatchId ?? 0, Animal.ID, NewBlockRef, existingOrders, Session.UserID,
+                    customerRef: null, comment: null, repeatBlock: false);
+                if (newId <= 0)
+                {
+                    // AddBlockAsync swallows its own exceptions and logs them, returning 0 on failure —
+                    // without this, the page silently re-rendered the "Add block" form with no Tissues/
+                    // Add tissue section and no visible error, making a genuine DB failure look like a
+                    // missing feature. Surface it so the real cause shows up instead of a blank result.
+                    ErrorMessage = "Could not create the block. Please try again or contact support if the problem continues.";
+                    return Page();
+                }
             }
 
             return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = newId, isAddFlow = true });
@@ -224,16 +269,37 @@ public class BlockDetailsModel : HistoPageModel
     }
 
     /// <summary>
-    /// Legacy: btnCancel_Click — for a block still in the add flow (never reached "Done"), Back
-    /// discards it entirely rather than leaving an empty provisional row behind. Safe to attempt
-    /// even if the user did add tissues/tests before backing out: DeleteBlockAsync's own
-    /// FK-guarded delete just fails silently in that case, leaving the block (and what was added
-    /// to it) intact rather than losing data the user may already consider saved.
+    /// Legacy: btnCancel_Click — for a block still in the add flow (never reached a successful
+    /// "Done"), Back discards it entirely rather than leaving an empty provisional row behind.
+    /// IsAddFlow reliably means "Done has never succeeded for this exact block": OnPostDoneAsync's
+    /// success redirect never carries isAddFlow forward, so it's always false again by the next
+    /// load once Done has gone through. That means anything added to this block while still here —
+    /// tissues, carried-over test selections from "Next block" — was never actually confirmed
+    /// either, matching legacy (nothing persists until Done validates) — so it's safe to clear them
+    /// first, then delete the block itself, rather than leaving an incomplete, never-"Done" block
+    /// (and its tissues) behind just because the FK-guarded delete alone would otherwise no-op.
     /// </summary>
     public async Task<IActionResult> OnPostCancelAsync()
     {
         if (IsAddFlow && BlockId is > 0)
+        {
+            var tissues = await _submissions.GetTissuesByBlockAsync(BatchId ?? 0, BlockId.Value);
+            Console.WriteLine($"[DIAG OnPostCancelAsync] Deleting {tissues.Count} tissue(s) and block {BlockId}.");
+            foreach (var tissue in tissues)
+                await _submissions.DeleteTissueAsync(tissue.ID, TissueOwner.Block, Session.UserID);
+            try
+            {
+                // BlockTestService.SaveTestSelectionsAsync re-throws on failure (already logged
+                // there) — unlike the other cleanup calls here, which swallow their own errors.
+                // Cancel must still always complete and redirect, so catch this one explicitly.
+                await _blockTests.SaveTestSelectionsAsync(BatchId ?? 0, BlockId.Value, [], [], [], Session.UserID);
+            }
+            catch (Exception)
+            {
+                // Already logged inside SaveTestSelectionsAsync — nothing more to do here.
+            }
             await _blocks.DeleteBlockAsync(BlockId.Value, Session.UserID);
+        }
 
         return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId = BatchId, animalId = AnimalId });
     }
@@ -273,6 +339,28 @@ public class BlockDetailsModel : HistoPageModel
         var current = allBlocks.FirstOrDefault(b => b.ID == BlockId);
         if (current is null || string.IsNullOrWhiteSpace(NewBlockRef))
             return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
+
+        // A block with nothing assigned to it isn't a usable result — require at least one tissue
+        // before Done can complete it (also protects the "Number of blocks > 1" duplication below,
+        // which would otherwise just stamp out several equally-empty siblings).
+        var currentTissues = await _submissions.GetTissuesByBlockAsync(BatchId ?? 0, current.ID);
+        if (currentTissues.Count == 0)
+        {
+            ErrorMessage = "Add at least one tissue to this block before completing it.";
+            await LoadEditModeDataAsync();
+            return Page();
+        }
+
+        // Defense-in-depth for the same rule "Add block" already enforces on OnGetAsync — only for
+        // the brand-new-block creation sequence, never when editing an existing/already-completed
+        // block (legacy's own ValidateMandatoryFields never checks Histology Ref at all, only Block
+        // Ref/Number of blocks, so this must not become a stricter-than-legacy rule for edits).
+        if (IsAddFlow && HistologyRefRequired && !Animal.HistoRefSet)
+        {
+            ErrorMessage = "Enter a Histology Reference for this sample before completing this block.";
+            await LoadEditModeDataAsync();
+            return Page();
+        }
 
         var count = Math.Max(1, NewNumberOfBlocks);
         var refChanged = !string.Equals(NewBlockRef, current.BlockRef, StringComparison.OrdinalIgnoreCase);
@@ -488,9 +576,11 @@ public class BlockDetailsModel : HistoPageModel
             await _blockTests.SaveTestSelectionsAsync(
                 BatchId ?? 0, newBlockId, SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes, Session.UserID);
 
+        // isAddFlow must be true for the new block too — otherwise Back renders as a plain nav
+        // link instead of the Cancel-and-delete button, leaving this not-yet-"Done" block orphaned.
         return newBlockId > 0
-            ? RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = newBlockId })
-            : RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
+            ? RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = newBlockId, isAddFlow = true })
+            : RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
     }
 
     /// <summary>

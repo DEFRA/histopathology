@@ -414,6 +414,8 @@ public class HistologyReportDataSetBuilderTests
             rawBatchSubmissions: [],
             rawTissues: [],
             rawAnimals: [],
+            rawBlocks: [],
+            rawBlockTissues: [],
             batchId: 1);
 
         Assert.Equal(0, table.Rows.Count);
@@ -431,6 +433,8 @@ public class HistologyReportDataSetBuilderTests
             rawBatchSubmissions: [],
             rawTissues: [tissue1, tissue2],
             rawAnimals: [animal],
+            rawBlocks: [],
+            rawBlockTissues: [],
             batchId: 1);
 
         Assert.Equal(2, table.Rows.Count);
@@ -448,6 +452,8 @@ public class HistologyReportDataSetBuilderTests
             rawBatchSubmissions: [],
             rawTissues: [tissue],
             rawAnimals: [animal],
+            rawBlocks: [],
+            rawBlockTissues: [],
             batchId: 7);
 
         var row = table.Rows[0];
@@ -458,5 +464,52 @@ public class HistologyReportDataSetBuilderTests
         Assert.Equal("Kidney", row["TissueDetails"]);
         Assert.Equal("",       row["RepeatBlock"]);
         Assert.Equal("c-ref",  row["CustomerRef"]);
+    }
+
+    [Fact]
+    public void BuildSubmissionTable_AnimalReferencedByTwoSubmissions_DoesNotThrow()
+    {
+        // Regression: GetBatchAnimal joins through BatchSubmission with no DISTINCT, so an animal
+        // reused across 2+ BatchSubmission rows in the same batch (e.g. Pre-Cassetted reuse) comes
+        // back twice in rawAnimals — building the animal lookup must tolerate the duplicate ID.
+        var tissue = Row(("AnimalID", (object)42), ("ID", (object)1), ("BatchSubmissionID", (object)1), ("TissueCode", "Kidney"), ("Comment", ""));
+        var animal1 = Row(("ID", (object)42), ("SenderRef", "S-001"), ("HistologyRef", "11/999"));
+        var animal2 = Row(("ID", (object)42), ("SenderRef", "S-001"), ("HistologyRef", "11/999"));
+
+        var table = HistologyReportDataSetBuilder.BuildSubmissionTable(
+            rawBatchSubmissions: [],
+            rawTissues: [tissue],
+            rawAnimals: [animal1, animal2],
+            rawBlocks: [],
+            rawBlockTissues: [],
+            batchId: 7);
+
+        Assert.Equal(1, table.Rows.Count);
+        Assert.Equal("S-001", table.Rows[0]["SenderRef"]);
+    }
+
+    [Fact]
+    public void BuildSubmissionTable_BlockTypeSubmission_UsesRealBlockRefAndBlockAnimalLink()
+    {
+        // Cassetted/Wax Block etc. have no BatchTissues rows at all — GetBatchBlockDetails/
+        // GetBatchBlockTissues is the only source of detail rows for this submission type.
+        var block  = Row(("ID", (object)900), ("AnimalID", (object)42), ("BlockRef", "01"), ("RepeatBlock", (object)false));
+        var tissue = Row(("BlockID", (object)900), ("ID", (object)1), ("TissueCode", "Viscera"), ("Comment", "visc 1"));
+        var animal = Row(("ID", (object)42), ("SenderRef", "S-001"), ("HistologyRef", "11/999"));
+
+        var table = HistologyReportDataSetBuilder.BuildSubmissionTable(
+            rawBatchSubmissions: [],
+            rawTissues: [],
+            rawAnimals: [animal],
+            rawBlocks: [block],
+            rawBlockTissues: [tissue],
+            batchId: 7);
+
+        var row = table.Rows[0];
+        Assert.Equal("S-001",   row["SenderRef"]);
+        Assert.Equal("11/999",  row["HistologyRef"]);
+        Assert.Equal("01",      row["BlockRef"]);
+        Assert.Equal("Viscera", row["TissueDetails"]);
+        Assert.Equal("visc 1",  row["CustomerRef"]);
     }
 }

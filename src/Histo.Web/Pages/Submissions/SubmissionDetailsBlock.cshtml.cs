@@ -121,6 +121,13 @@ public class SubmissionDetailsBlockModel : HistoPageModel
 
     public string? ErrorMessage { get; private set; }
 
+    /// <summary>
+    /// GDS Error Summary requires each listed error to link to the id of the field it relates to.
+    /// Null when <see cref="ErrorMessage"/> has no single associated field (e.g. a generic delete
+    /// failure) — the view then falls back to plain text for that message.
+    /// </summary>
+    public string? ErrorFieldId { get; private set; }
+
     /// <summary>Mirrors SampleSummaryModel/SubmissionDetailsModel — hides all block mutation actions
     /// (Add/Edit/Delete/Copy block, Save details) in the View Submission journey.
     /// Legacy source: SubmissionDetailsBlock.aspx.vb::DisableEnableControls (SV_ViewSubmission branch).</summary>
@@ -160,6 +167,18 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     public bool ShowHistologyRefTypePicker => !IsViewMode
         && string.Equals(Session.UserArea?.Trim(), "Histopath", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Legacy source: SubmissionDetailsBlock.aspx.vb::Page_Load — HistologyRef1.IsMandatory
+    /// defaults true in the .ascx markup and is only ever explicitly touched for non-Histopath
+    /// users (set true for Pre-Cassetted, false otherwise); Histopath users never have it touched,
+    /// so it stays at its default true. Net rule across all 4 area/cassetted combinations:
+    /// mandatory for Histopath-area users OR Pre-Cassetted submissions. Deliberately independent
+    /// of <see cref="IsViewMode"/> — this is a data rule, not a display rule.
+    /// </summary>
+    public bool HistologyRefRequired =>
+        string.Equals(Session.UserArea?.Trim(), "Histopath", StringComparison.OrdinalIgnoreCase)
+        || IsPreCassetted;
+
     // Set by whichever page navigated here (SampleSummary/BatchBlocks/AddSubmission) right before
     // redirecting — falls back to SampleSummary if reached without that breadcrumb (e.g. a stale/direct link).
     public string BackLinkPage => string.IsNullOrWhiteSpace(Session.SampleDetailReturnPage)
@@ -171,6 +190,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         ViewData["Title"] = "Sample Blocks";
         ViewData["PageTitle"] = "Sample Blocks";
         if (TempData["SubmissionDetailsBlock_Error"] is string deleteError) ErrorMessage = deleteError;
+        if (TempData["SubmissionDetailsBlock_ErrorFieldId"] is string errorFieldId) ErrorFieldId = errorFieldId;
 
         // No AnimalId means the caller wants the batch-wide overview, which now lives on its own page.
         if (AnimalId is null or <= 0)
@@ -259,7 +279,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
 
         return string.IsNullOrWhiteSpace(Session.SampleDetailReturnPage)
             ? RedirectToPage(new { batchId = BatchId, animalId = AnimalId })
-            : RedirectToPage(Session.SampleDetailReturnPage);
+            : LocalRedirect(Session.SampleDetailReturnPage);
     }
 
     /// <summary>
@@ -568,6 +588,12 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         HistologyRefTypeOptions = await _lookups.GetHistologyRefTypesAsync();
 
         var allTissues = await _submissions.GetTissuesByBatchAsync(BatchId ?? 0);
+        // Incomplete/orphaned blocks — "Add block"/"Next block" auto-provisions a real row
+        // immediately, before the user has done anything with it — always have zero tissues,
+        // since "Done" requires at least one before it can succeed. Exclude them here so an
+        // abandoned (backed out of, or never finished) block never shows as a blank row in this
+        // summary; a block that completed Done always has at least one tissue by construction.
+        Blocks = Blocks.Where(b => allTissues.Any(t => t.OwnerID == b.ID)).ToList();
         var tissuesByBlockId = new Dictionary<int, IReadOnlyList<Tissue>>();
         foreach (var block in Blocks)
             tissuesByBlockId[block.ID] = allTissues.Where(t => t.OwnerID == block.ID).ToList();
