@@ -24,7 +24,7 @@ public class SubmissionNotesHelperTests
     {
         _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 42 });
         _blocks.Setup(b => b.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
-        _submissions.Setup(s => s.GetTissuesByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[]);
     }
 
@@ -68,10 +68,23 @@ public class SubmissionNotesHelperTests
     }
 
     [Fact]
-    public async Task TissueCommentOnly_NoHeaderComment_ReturnsTrue()
+    public async Task BlockOwnedTissueCommentOnly_DoesNotEnable_MatchesLegacyScope()
     {
+        // Legacy's GetAllBatchComments has no SP for per-tissue comments WITHIN a block
+        // (GetBatchBlockComments only covers the block's own header comment) — a tissue-level
+        // comment inside a Cassetted/Wax Block block must NOT enable the button, matching legacy.
         _submissions.Setup(s => s.GetTissuesByBatchAsync(42, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<Tissue>)[new Tissue { ID = 1, Comment = "Tissue note" }]);
+            .ReturnsAsync((IReadOnlyList<Tissue>)[new Tissue { ID = 1, Comment = "Block tissue note" }]);
+        Assert.False(await InvokeAsync());
+    }
+
+    [Fact]
+    public async Task SubmissionOwnedTissueCommentOnly_WetTissue_ReturnsTrue()
+    {
+        // Wet Tissue submissions have no blocks — their tissues are submission-owned and only
+        // ever surface via GetBatchSubmissionTissuesAsync, not GetTissuesByBatchAsync.
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Tissue>)[new Tissue { ID = 1, Comment = "Wet tissue note" }]);
         Assert.True(await InvokeAsync());
     }
 

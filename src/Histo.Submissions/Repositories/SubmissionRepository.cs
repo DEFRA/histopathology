@@ -94,7 +94,14 @@ public sealed class SubmissionRepository : ISubmissionRepository
             "GetBatchAnimal",
             new { ID = batchId },
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+        // GetBatchAnimal joins Batch -> BatchSubmission -> Animal with no DISTINCT/GROUP BY, so an
+        // animal referenced by more than one BatchSubmission in the same batch (e.g. a Pre-Cassetted
+        // submission reusing an existing animal's ID — see AddSubmissionModel.OnPostAsync) comes
+        // back once per BatchSubmission row, not once per animal — collapse to one row per animal
+        // here, same as GetBlockAnimalsByBatchAsync already does for its own block-grained result set.
+        var result = rows.GroupBy(a => a.ID).Select(g => g.First()).ToList();
+        ApplyHistoRefAndPMDateSetFlags(result);
+        return result;
     }
 
     /// <inheritdoc/>
@@ -118,7 +125,25 @@ public sealed class SubmissionRepository : ISubmissionRepository
         // BATCH_BLOCK_ANIMAL is block-grained — an animal with several blocks is returned once per
         // block. Every caller treats this as an animal list (and several key dictionaries by ID),
         // so collapse to one row per animal here.
-        return rows.GroupBy(a => a.ID).Select(g => g.First()).ToList();
+        var result = rows.GroupBy(a => a.ID).Select(g => g.First()).ToList();
+        ApplyHistoRefAndPMDateSetFlags(result);
+        return result;
+    }
+
+    /// <summary>
+    /// Neither GetBatchAnimal nor GetBatchBlockAnimal return HistoRefSet/PMDateSet as real columns
+    /// (the Animal table has no such columns) — legacy computes both in-memory from whether
+    /// HistologyRef/PMDate are non-blank (Common.vb, applied identically to BATCH_ANIMAL_TABLE and
+    /// BATCH_BLOCK_ANIMAL). Without this, both flags silently stay false on every fresh load,
+    /// breaking any "already set, now locked" check derived from them.
+    /// </summary>
+    private static void ApplyHistoRefAndPMDateSetFlags(IEnumerable<Animal> animals)
+    {
+        foreach (var a in animals)
+        {
+            a.HistoRefSet = !string.IsNullOrWhiteSpace(a.HistologyRef);
+            a.PMDateSet = !string.IsNullOrWhiteSpace(a.PMDate);
+        }
     }
 
     /// <inheritdoc/>

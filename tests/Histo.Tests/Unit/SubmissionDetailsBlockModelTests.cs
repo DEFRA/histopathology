@@ -81,7 +81,11 @@ public class SubmissionDetailsBlockModelTests
         var animal = new Animal { ID = 1, SenderRef = "S1" };
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 100, BatchID = 5, AnimalID = 1, BlockRef = "01" }]);
-        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        // A block with saved tests always has at least one tissue in practice (Done requires it) —
+        // the new "exclude never-completed blocks" filter needs this to keep block 100 in the list.
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 100, Owner = TissueOwner.Block, TissueCode = "AGAR" },
+        ]);
         _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[
             new BlockTest { ID = 1, BlockID = 100, TestType = BlockTestType.Histology, Code = HistologyCode.SpecialStain },
             new BlockTest { ID = 2, BlockID = 100, TestType = BlockTestType.Histology, Code = HistologyCode.IhcPrp },
@@ -95,6 +99,28 @@ public class SubmissionDetailsBlockModelTests
         Assert.Contains(HistologyCode.SpecialStain, codes);
         Assert.Contains(HistologyCode.IhcPrp, codes);
         Assert.Contains(HistologyCode.IhcOther, codes);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_BlockWithNoTissues_ExcludedFromBlocksList()
+    {
+        // A block with zero tissues was never successfully "Done" (Done requires at least one) —
+        // e.g. an auto-provisioned "Add block"/"Next block" row the user backed out of or never
+        // finished. Must not show as a blank row in this summary.
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 100, BatchID = 5, AnimalID = 1, BlockRef = "01" },
+            new Block { ID = 101, BatchID = 5, AnimalID = 1, BlockRef = "02" },
+        ]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 100, Owner = TissueOwner.Block, TissueCode = "AGAR" },
+        ]);
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+
+        await sut.OnGetAsync();
+
+        Assert.Contains(sut.Blocks, b => b.ID == 100);
+        Assert.DoesNotContain(sut.Blocks, b => b.ID == 101);
     }
 
     [Fact]
@@ -173,6 +199,64 @@ public class SubmissionDetailsBlockModelTests
         await sut.OnGetAsync();
 
         Assert.True(sut.ShowHistologyRefTypePicker);
+    }
+
+    [Fact]
+    public async Task HistologyRefRequired_HistopathArea_NotPreCassetted_IsTrue()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _batches.Setup(b => b.GetByIdAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Batch { ID = 5, IsPreCassetted = false });
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+
+        await sut.OnGetAsync();
+
+        Assert.True(sut.HistologyRefRequired);
+    }
+
+    [Fact]
+    public async Task HistologyRefRequired_NonHistopathArea_PreCassetted_IsTrue()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        _session.Setup(s => s.UserArea).Returns("Neuropath");
+        _batches.Setup(b => b.GetByIdAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Batch { ID = 5, IsPreCassetted = true });
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+
+        await sut.OnGetAsync();
+
+        Assert.True(sut.HistologyRefRequired);
+    }
+
+    [Fact]
+    public async Task HistologyRefRequired_NonHistopathArea_NotPreCassetted_IsFalse()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        _session.Setup(s => s.UserArea).Returns("Neuropath");
+        _batches.Setup(b => b.GetByIdAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Batch { ID = 5, IsPreCassetted = false });
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+
+        await sut.OnGetAsync();
+
+        Assert.False(sut.HistologyRefRequired);
+    }
+
+    [Fact]
+    public async Task OnPostSaveHistologyDetailsAsync_ReturnPageHasQueryString_RedirectsWithoutThrowing()
+    {
+        // Regression: Session.SampleDetailReturnPage is always stored as a full URL (path +
+        // query string, e.g. "/Submissions/SampleSummary?batchId=5") — RedirectToPage(string)
+        // only accepts a bare page name and throws InvalidOperationException ("No page named
+        // '...' matches the supplied values") when handed one with a query string attached.
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        var sut = CreateSut(1, animal, "/Submissions/SampleSummary?batchId=5");
+
+        var result = await sut.OnPostSaveHistologyDetailsAsync();
+
+        var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.LocalRedirectResult>(result);
+        Assert.Equal("/Submissions/SampleSummary?batchId=5", redirect.Url);
     }
 
     [Fact]
