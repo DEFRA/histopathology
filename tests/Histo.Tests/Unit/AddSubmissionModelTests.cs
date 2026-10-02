@@ -40,6 +40,8 @@ public class AddSubmissionModelTests
         _batches.Setup(b => b.GetSubmittedAsCodeAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((string?)null);
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
     }
 
     private AddSubmissionModel CreateSut(string? returnPage = null) =>
@@ -258,5 +260,30 @@ public class AddSubmissionModelTests
         _submissions.Verify(s => s.AddAnimalAsync(99, "NewRef", 7, (string?)null, false, It.IsAny<CancellationToken>()), Times.Once);
         var redirect = Assert.IsType<RedirectToPageResult>(result);
         Assert.Equal("/Submissions/SubmissionDetailsBlock", redirect.PageName);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_CreateEditSubmission_DuplicateSenderRef_ShowsModelErrorAndDoesNotCreateAnimal()
+    {
+        // Regression: typing a Sender Ref that already exists elsewhere in the batch previously
+        // went on to create a second BatchSubmission row pointing at a colliding Animal, which later
+        // crashed SampleSummary's per-animal dictionary build with "An item with the same key has
+        // already been added." Legacy message: "The specified Sender Reference is already present
+        // on the Submission."
+        _session.Object.BatchSubmissionID = 99;
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1, SenderRef = "MC000123" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SenderRef = "mc000123"; // case-insensitive match
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("The specified Sender Reference is already present on the Submission.", sut.ModelError);
+        _submissions.Verify(s => s.AddAnimalAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+        _submissions.Verify(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

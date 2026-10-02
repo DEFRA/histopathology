@@ -459,4 +459,59 @@ public class HistologyReportDataSetBuilderTests
         Assert.Equal("",       row["RepeatBlock"]);
         Assert.Equal("c-ref",  row["CustomerRef"]);
     }
+
+    // ── BuildBlockSubmissionTable ─────────────────────────────────────────────
+
+    [Fact]
+    public void BuildBlockSubmissionTable_EmptyBlocks_ReturnsZeroRows()
+    {
+        var table = HistologyReportDataSetBuilder.BuildBlockSubmissionTable(
+            blocks: [],
+            blockTissues: [],
+            rawAnimals: [],
+            batchId: 1);
+
+        Assert.Equal(0, table.Rows.Count);
+        Assert.Equal("BatchSubmission", table.TableName);
+    }
+
+    [Fact]
+    public void BuildBlockSubmissionTable_UsesRealBlockRef_NotAComputedCounter()
+    {
+        // Regression: a Pre Cassetted/Cassetted batch's tissue data lives against Blocks, not
+        // BatchTissues — BuildSubmissionTable always returned zero rows for these batches despite
+        // a correct "Total Samples" count, producing a blank printed submission form.
+        var block = new Histo.Histology.Models.Block { ID = 100, BatchID = 1, AnimalID = 42, BlockRef = "03" };
+        var tissue = new Histo.Submissions.Models.Tissue { ID = 1, OwnerID = 100, TissueCode = "Kidney", Comment = "c-ref" };
+        var animal = Row(("ID", (object)42), ("SenderRef", "S-001"), ("HistologyRef", "11/999"));
+
+        var table = HistologyReportDataSetBuilder.BuildBlockSubmissionTable(
+            blocks: [block],
+            blockTissues: [tissue],
+            rawAnimals: [animal],
+            batchId: 1);
+
+        var row = table.Rows[0];
+        Assert.Equal("1",      row["BatchID"]);
+        Assert.Equal("S-001",  row["SenderRef"]);
+        Assert.Equal("11/999", row["HistologyRef"]);
+        Assert.Equal("03",     row["BlockRef"]);
+        Assert.Equal("Kidney", row["TissueDetails"]);
+        Assert.Equal("c-ref",  row["CustomerRef"]);
+    }
+
+    [Fact]
+    public void BuildBlockSubmissionTable_TissueWithNoMatchingBlock_IsSkipped()
+    {
+        var tissue = new Histo.Submissions.Models.Tissue { ID = 1, OwnerID = 999, TissueCode = "Kidney" };
+        var block = new Histo.Histology.Models.Block { ID = 100, BatchID = 1, AnimalID = 42, BlockRef = "01" };
+
+        var table = HistologyReportDataSetBuilder.BuildBlockSubmissionTable(
+            blocks: [block],
+            blockTissues: [tissue],
+            rawAnimals: [],
+            batchId: 1);
+
+        Assert.Equal(0, table.Rows.Count);
+    }
 }

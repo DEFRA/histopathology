@@ -53,6 +53,7 @@ public class SubmissionDetailsModel : HistoPageModel
     public Animal? Animal { get; private set; }
     public IReadOnlyList<Tissue> Tissues { get; private set; } = [];
     public IReadOnlyList<LookupItem> TissueOptions { get; private set; } = [];
+    public string? ErrorMessage { get; private set; }
 
     /// <summary>Resolves a tissue code to its description, matching legacy's GetListType(TissueCode, LOOKUP_TISSUE_CODE).</summary>
     public string TissueName(string code) => TissueOptions.FirstOrDefault(o => o.Code == code)?.Name ?? code;
@@ -121,10 +122,21 @@ public class SubmissionDetailsModel : HistoPageModel
             RowStamp = Animal.RowStamp,
         };
 
-        await _submissions.UpdateAnimalAsync(updated, Session.UserID);
+        var saved = await _submissions.UpdateAnimalAsync(updated, Session.UserID);
+        if (!saved)
+        {
+            // Previously swallowed: a concurrency conflict or SP failure left the user silently
+            // redirected with nothing saved.
+            ErrorMessage = "Could not save the sample details — the record may have been updated elsewhere. Please check the current values and try again.";
+            PMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
+            Tissues = await _submissions.GetTissuesBySubmissionAsync(BatchId ?? 0, Animal.BatchSubmissionID);
+            TissueOptions = await _lookups.GetLookupDataAsync(LookupTissueCode);
+            return Page();
+        }
+
         return string.IsNullOrWhiteSpace(Session.SampleDetailReturnPage)
             ? RedirectToPage(new { batchId = BatchId, animalId = AnimalId })
-            : RedirectToPage(Session.SampleDetailReturnPage);
+            : Redirect(Session.SampleDetailReturnPage);
     }
 
     public async Task<IActionResult> OnPostAddTissueAsync()

@@ -254,12 +254,22 @@ public class SubmissionDetailsBlockModel : HistoPageModel
                 BookedHistologyRef = Animal.BookedHistologyRef,
                 RowStamp = Animal.RowStamp,
             };
-            await _submissions.UpdateAnimalAsync(updated, Session.UserID);
+            var saved = await _submissions.UpdateAnimalAsync(updated, Session.UserID);
+            if (!saved)
+            {
+                // Previously swallowed: a concurrency conflict (another request already changed
+                // this row) or SP failure left the user silently redirected with nothing saved.
+                ErrorMessage = "Could not save the sample details — the record may have been updated elsewhere. Please check the current values and try again.";
+                var allBlocksForError = await _blocks.GetByBatchAsync(BatchId ?? 0);
+                Blocks = allBlocksForError.Where(b => b.AnimalID == Animal.ID).ToList();
+                await LoadSupportingDataAsync();
+                return Page();
+            }
         }
 
         return string.IsNullOrWhiteSpace(Session.SampleDetailReturnPage)
             ? RedirectToPage(new { batchId = BatchId, animalId = AnimalId })
-            : RedirectToPage(Session.SampleDetailReturnPage);
+            : Redirect(Session.SampleDetailReturnPage);
     }
 
     /// <summary>

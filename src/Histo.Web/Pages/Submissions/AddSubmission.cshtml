@@ -42,8 +42,8 @@
         }
         else
         {
-            <div class="govuk-hint">Enter the reference for the sample you are submitting tissue for, then click Add sample. It is recommended that the sender reference does not exceed 10 characters.</div>
-            <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" required />
+            <div class="govuk-hint">Enter the reference for the sample you are submitting tissue for, then click Add sample. It is recommended that the sender reference does not exceed 10 characters. Leave blank to auto-generate the next serial reference.</div>
+            <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" />
         }
     </div>
     @if (!Model.IsAssignTissueMode)

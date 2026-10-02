@@ -161,8 +161,19 @@ public class AddSubmissionModel : HistoPageModel
 
         Session.BatchSubmissionID = submissionId;
 
+        var existingAnimals = await _submissions.GetAnimalsByBatchAsync(batchId.Value);
+
         if (string.IsNullOrWhiteSpace(SenderRef))
-            SenderRef = await ResolveNextAvailableSenderRefAsync(batchId.Value);
+            SenderRef = ResolveNextAvailableSenderRef(existingAnimals);
+
+        // Legacy: "The specified Sender Reference is already present on the Submission" — a
+        // duplicate ref here previously went on to create a second BatchSubmission row for the
+        // same batch, which crashed SampleSummary's per-animal dictionary build downstream.
+        else if (existingAnimals.Any(a => string.Equals(a.SenderRef, SenderRef, StringComparison.OrdinalIgnoreCase)))
+        {
+            ModelError = "The specified Sender Reference is already present on the Submission.";
+            return Page();
+        }
 
         // Legacy source: AddSubmission.aspx.vb — bNeuropath is derived from the user's area
         // (SV_HeaderUserArea = "Neuropath"), never from a manual form control.
@@ -287,9 +298,8 @@ public class AddSubmissionModel : HistoPageModel
     /// creating a blank or duplicate value. This restores the missing serial ascending behaviour seen
     /// in the UAT defect for mouse stained-section submissions.
     /// </summary>
-    private async Task<string> ResolveNextAvailableSenderRefAsync(int batchId)
+    private static string ResolveNextAvailableSenderRef(IReadOnlyList<Animal> animals)
     {
-        var animals = await _submissions.GetAnimalsByBatchAsync(batchId);
         var nextId = 1;
 
         foreach (var animal in animals)

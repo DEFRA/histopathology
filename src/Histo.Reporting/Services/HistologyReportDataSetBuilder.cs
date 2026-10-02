@@ -1,7 +1,10 @@
 using System.Data;
 using Dapper;
 using Histo.Administration.Interfaces;
+using Histo.Core.Domain;
+using Histo.Histology.Interfaces;
 using Histo.Infrastructure;
+using Histo.Submissions.Interfaces;
 using Microsoft.Extensions.Configuration;
 
 namespace Histo.Reporting.Services;
@@ -42,17 +45,26 @@ public sealed class HistologyReportDataSetBuilder
     private readonly IConfiguration _config;
     private readonly ILookupService _lookups;
     private readonly IUserService _users;
+    private readonly IBatchService _batches;
+    private readonly IBlockService _blocks;
+    private readonly ISubmissionService _submissions;
 
     public HistologyReportDataSetBuilder(
         IDbConnectionFactory db,
         IConfiguration config,
         ILookupService lookups,
-        IUserService users)
+        IUserService users,
+        IBatchService batches,
+        IBlockService blocks,
+        ISubmissionService submissions)
     {
         _db = db;
         _config = config;
         _lookups = lookups;
         _users = users;
+        _batches = batches;
+        _blocks = blocks;
+        _submissions = submissions;
     }
 
     /// <summary>
@@ -159,7 +171,26 @@ public sealed class HistologyReportDataSetBuilder
         ds.Tables.Add(BuildPostFixationTable(rawPostFix, batchId));
         ds.Tables.Add(BuildHistologyTable(rawHistology, batchId, rawAntibodies, rawStains, batchType,
             histologyByCode, specialStainByCode, tseAntibodiesByCode, nonTseAntibodiesByCode));
-        ds.Tables.Add(BuildSubmissionTable(rawBatchSubmissions, rawTissues, rawAnimals, batchId));
+
+        // Tissue data for a Pre Cassetted/Cassetted (block-type) batch lives against Blocks
+        // (BLOCK_TISSUES), never against BatchTissues — using BuildSubmissionTable's wet-tissue
+        // rows for those batches always produced zero rows despite a correct "Total Samples"
+        // count, which was the root cause of the blank printed submission form.
+        var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId, ct);
+        var submittedAsMatch = submittedAsTask.Result.FirstOrDefault(i => i.Code == submittedAsCode);
+        var isWetTissue = ValidationHelpers.IsWetTissueDescription(submittedAsMatch?.Name);
+
+        if (isWetTissue)
+        {
+            ds.Tables.Add(BuildSubmissionTable(rawBatchSubmissions, rawTissues, rawAnimals, batchId));
+        }
+        else
+        {
+            var blocks = await _blocks.GetByBatchAsync(batchId, ct);
+            var blockTissues = await _submissions.GetTissuesByBatchAsync(batchId, ct);
+            ds.Tables.Add(BuildBlockSubmissionTable(blocks, blockTissues, rawAnimals, batchId));
+        }
+
         ds.Tables.Add(BuildVersionTable(rawBatch));
 
         return ds;
@@ -436,6 +467,60 @@ public sealed class HistologyReportDataSetBuilder
             dr["TissueDetails"] = Str(tissue, "TissueCode");
             dr["RepeatBlock"]   = string.Empty;
             dr["CustomerRef"]   = Str(tissue, "Comment");
+            dt.Rows.Add(dr);
+        }
+
+        return dt;
+    }
+
+    /// <summary>
+    /// Builds the BatchSubmission rows for a Pre Cassetted/Cassetted (block-type) batch, where
+    /// tissue data lives against Blocks rather than BatchTissues — see <see cref="BuildAsync"/>.
+    /// Unlike <see cref="BuildSubmissionTable"/>, the block ref is the block's own real
+    /// <c>BlockRef</c> rather than a computed per-animal counter.
+    /// </summary>
+    internal static DataTable BuildBlockSubmissionTable(
+        IReadOnlyList<Histology.Models.Block> blocks,
+        IReadOnlyList<Submissions.Models.Tissue> blockTissues,
+        IList<IDictionary<string, object>> rawAnimals,
+        int batchId)
+    {
+        var dt = new DataTable("BatchSubmission");
+        dt.Columns.Add("BatchID");
+        dt.Columns.Add("SenderRef");
+        dt.Columns.Add("HistologyRef");
+        dt.Columns.Add("BlockRef");
+        dt.Columns.Add("TissueDetails");
+        dt.Columns.Add("RepeatBlock");
+        dt.Columns.Add("CustomerRef");
+
+        if (blocks.Count == 0)
+            return dt;
+
+        var animalById = rawAnimals
+            .Where(a => a.ContainsKey("ID"))
+            .ToDictionary(a => Convert.ToInt32(a["ID"]), a => a);
+        var blockById = blocks.ToDictionary(b => b.ID);
+
+        var sortedTissues = blockTissues
+            .OrderBy(t => blockById.TryGetValue(t.OwnerID, out var b) ? b.AnimalID : 0)
+            .ThenBy(t => t.OwnerID)
+            .ThenBy(t => t.ID)
+            .ToList();
+
+        foreach (var tissue in sortedTissues)
+        {
+            if (!blockById.TryGetValue(tissue.OwnerID, out var block)) continue;
+            animalById.TryGetValue(block.AnimalID, out var animal);
+
+            var dr = dt.NewRow();
+            dr["BatchID"]       = batchId.ToString();
+            dr["SenderRef"]     = animal is not null ? Str(animal, "SenderRef")    : string.Empty;
+            dr["HistologyRef"]  = animal is not null ? Str(animal, "HistologyRef") : string.Empty;
+            dr["BlockRef"]      = block.BlockRef;
+            dr["TissueDetails"] = tissue.TissueCode;
+            dr["RepeatBlock"]   = block.RepeatBlock ? "Yes" : string.Empty;
+            dr["CustomerRef"]   = tissue.Comment ?? string.Empty;
             dt.Rows.Add(dr);
         }
 
