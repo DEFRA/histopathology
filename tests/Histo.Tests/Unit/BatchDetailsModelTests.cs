@@ -76,6 +76,17 @@ public class BatchDetailsModelTests
     }
 
     [Fact]
+    public async Task OnGetAsync_CreateMode_DoesNotShowExitWarningByDefault()
+    {
+        var sut = CreateSut();
+        sut.Mode = "create";
+
+        await sut.OnGetAsync();
+
+        Assert.False(sut.ShowLeaveWarning);
+    }
+
+    [Fact]
     public async Task OnPostCreateAsync_Success_ClearsStaleSampleSummaryReturnPage()
     {
         // Regression: Session.SampleSummaryReturnPage is only ever set (by BatchDetails/EditBatch's

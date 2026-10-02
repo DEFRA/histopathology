@@ -55,6 +55,10 @@ public class BatchDetailsModel : HistoPageModel
     // ── Query param — "create" activates the new-batch form ──
     [BindProperty(SupportsGet = true)] public string? Mode { get; set; }
     public bool IsCreateMode => string.Equals(Mode, "create", StringComparison.OrdinalIgnoreCase);
+    public bool ShowLeaveWarning => false;
+
+    public const string CreateSubmissionLeaveWarning =
+        "If you exit now all the data you have entered will be lost. Are you sure you wish to exit?";
 
     /// <summary>
     /// Batch ID from the URL (route/query), used in view mode only — create mode has no batch yet.
