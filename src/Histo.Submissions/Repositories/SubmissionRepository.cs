@@ -13,6 +13,7 @@ namespace Histo.Submissions.Repositories;
 /// </summary>
 public sealed class SubmissionRepository : ISubmissionRepository
 {
+    private const int MaxMouseRangeEntries = 1000;
     private readonly IDbConnectionFactory _db;
 
     public SubmissionRepository(IDbConnectionFactory db) => _db = db;
@@ -63,8 +64,19 @@ public sealed class SubmissionRepository : ISubmissionRepository
     }
 
     /// <inheritdoc/>
-    public async Task<bool> CreateMouseRangeAsync(int batchId, int? sourceAnimalId, IReadOnlyList<string> mouseNumbers, int userId, CancellationToken ct = default)
+    public async Task<bool> CreateMouseRangeAsync(int batchId, int? sourceAnimalId, string mouseNumberFrom, string mouseNumberTo, int userId, CancellationToken ct = default)
     {
+        if (!ValidationHelpers.ValidateMouseNumber(mouseNumberFrom) || !ValidationHelpers.ValidateMouseNumber(mouseNumberTo)
+            || !SenderRefHelpers.TryParseMouseNumber(mouseNumberFrom, out var fromId) || !SenderRefHelpers.TryParseMouseNumber(mouseNumberTo, out var toId))
+            return false;
+
+        if (fromId >= toId)
+            return false;
+
+        var rangeSize = toId - fromId + 1;
+        if (rangeSize > MaxMouseRangeEntries)
+            return false;
+
         using var conn = _db.CreateConnection();
         await conn.OpenAsync(ct);
         using var tx = conn.BeginTransaction();
@@ -82,8 +94,9 @@ public sealed class SubmissionRepository : ISubmissionRepository
                     sourceTissues = await GetTissuesBySubmissionAsync(conn, tx, batchId, sourceSubmission.ID);
             }
 
-            foreach (var mouseNumber in mouseNumbers)
+            for (var currentNumber = fromId; currentNumber <= toId; currentNumber++)
             {
+                var mouseNumber = SenderRefHelpers.FormatMouseNumber(currentNumber);
                 var animalId = await AddAnimalAsync(conn, tx, new Animal
                 {
                     BatchSubmissionID = 0,

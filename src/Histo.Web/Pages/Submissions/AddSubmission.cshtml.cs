@@ -376,6 +376,8 @@ public class AddSubmissionModel : HistoPageModel
     /// </summary>
     private async Task<IActionResult> OnPostMouseRangeAsync(int batchId, int submissionId, Batch? batch)
     {
+        const int maxMouseRangeEntries = 1000;
+
         var from = MouseNumberFrom.Trim().ToUpperInvariant();
         var to = MouseNumberTo.Trim().ToUpperInvariant();
 
@@ -394,15 +396,28 @@ public class AddSubmissionModel : HistoPageModel
             return Page();
         }
 
-        var mouseNumbers = Enumerable.Range(0, toId - fromId + 1)
-            .Select(offset => SenderRefHelpers.FormatMouseNumber(fromId + offset))
-            .ToList();
+        var rangeSize = toId - fromId + 1;
+        if (rangeSize > maxMouseRangeEntries)
+        {
+            ModelError = $"The mouse number range cannot exceed {maxMouseRangeEntries} entries. Use a smaller range or create a bulk job.";
+            MouseRangeHasError = true;
+            return Page();
+        }
 
         // Validate the whole range against samples already in this batch before creating anything —
-        // simpler and safer than legacy's in-memory-dataset add-then-rollback, since each creation
-        // here is a real DB write rather than a discardable local row.
+        // this keeps the duplicate check bounded without materialising a million-item list in memory.
         var existingInBatch = await _submissions.GetAnimalsByBatchAsync(batchId);
-        var duplicate = mouseNumbers.FirstOrDefault(m => existingInBatch.Any(a => string.Equals(a.SenderRef, m, StringComparison.OrdinalIgnoreCase)));
+        string? duplicate = null;
+        for (var current = fromId; current <= toId; current++)
+        {
+            var candidate = SenderRefHelpers.FormatMouseNumber(current);
+            if (existingInBatch.Any(a => string.Equals(a.SenderRef, candidate, StringComparison.OrdinalIgnoreCase)))
+            {
+                duplicate = candidate;
+                break;
+            }
+        }
+
         if (duplicate is not null)
         {
             ModelError = $"Mouse number {duplicate} already exists on the submission. Alter the range and try again.";
@@ -410,26 +425,7 @@ public class AddSubmissionModel : HistoPageModel
             return Page();
         }
 
-        var siblings = await _submissions.GetSubmissionsByBatchAsync(batchId);
-        var nextOrder = siblings.Count > 0 ? siblings.Max(s => s.Order) + 1 : 1;
-
-        // Mirror the single-SenderRef Copy-sample path: for Wet Tissue batches, every animal this
-        // loop creates should inherit the source sample's tissues too — this is the only journey
-        // that reaches here (ShowMouseRange requires SourceAnimalId), so without this each copied
-        // mouse number would otherwise come back empty unlike its single-SenderRef counterpart.
-        IReadOnlyList<Tissue> sourceTissues = [];
-        if (SourceAnimalId is > 0)
-        {
-            var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId);
-            if (await IsWetTissueCodeAsync(submittedAsCode))
-            {
-                var sourceSubmission = siblings.FirstOrDefault(s => s.AnimalID == SourceAnimalId);
-                if (sourceSubmission is not null)
-                    sourceTissues = await _submissions.GetTissuesBySubmissionAsync(batchId, sourceSubmission.ID);
-            }
-        }
-
-        var created = await _submissions.CreateMouseRangeAsync(batchId, SourceAnimalId, mouseNumbers, Session.UserID);
+        var created = await _submissions.CreateMouseRangeAsync(batchId, SourceAnimalId, from, to, Session.UserID);
         if (!created)
         {
             ModelError = "Could not add the sample range. Please try again.";

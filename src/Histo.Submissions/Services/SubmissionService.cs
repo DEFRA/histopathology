@@ -40,9 +40,9 @@ public sealed class SubmissionService : ISubmissionService
     }
 
     /// <summary>Creates a whole mouse-number range in one transaction so failures roll back without leaving partial data.</summary>
-    public async Task<bool> CreateMouseRangeAsync(int batchId, int? sourceAnimalId, IReadOnlyList<string> mouseNumbers, int userId, CancellationToken ct = default)
+    public async Task<bool> CreateMouseRangeAsync(int batchId, int? sourceAnimalId, string mouseNumberFrom, string mouseNumberTo, int userId, CancellationToken ct = default)
     {
-        try { return await _repo.CreateMouseRangeAsync(batchId, sourceAnimalId, mouseNumbers, userId, ct); }
+        try { return await _repo.CreateMouseRangeAsync(batchId, sourceAnimalId, mouseNumberFrom, mouseNumberTo, userId, ct); }
         catch (Exception ex) { _logger.LogError("Failed to create mouse range for batch {BatchId}.", ex, batchId); return false; }
     }
 

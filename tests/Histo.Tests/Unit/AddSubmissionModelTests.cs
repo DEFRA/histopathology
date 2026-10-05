@@ -433,8 +433,7 @@ public class AddSubmissionModelTests
             .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[]);
-        _submissions.Setup(s => s.CreateMouseRangeAsync(5, 1, It.Is<IReadOnlyList<string>>(numbers => numbers.SequenceEqual(new[] { "MC000001", "MC000002" })), 7, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+        _submissions.Setup(s => s.CreateMouseRangeAsync(5, 1, "MC000001", "MC000002", 7, It.IsAny<CancellationToken>())).ReturnsAsync(true);
         var sut = CreateSut(returnPage: null);
         sut.BatchSubmissionId = 99;
         sut.SourceAnimalId = 1;
@@ -445,7 +444,28 @@ public class AddSubmissionModelTests
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
         Assert.Equal("/Submissions/SampleSummary", redirect.PageName);
-        _submissions.Verify(s => s.CreateMouseRangeAsync(5, 1, It.Is<IReadOnlyList<string>>(numbers => numbers.SequenceEqual(new[] { "MC000001", "MC000002" })), 7, It.IsAny<CancellationToken>()), Times.Once);
+        _submissions.Verify(s => s.CreateMouseRangeAsync(5, 1, "MC000001", "MC000002", 7, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_MouseRange_ExceedsMaximumRangeSize_SetsModelError()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SourceAnimalId = 1;
+        sut.MouseNumberFrom = "MC000001";
+        sut.MouseNumberTo = "MC001001";
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("The mouse number range cannot exceed 1000 entries. Use a smaller range or create a bulk job.", sut.ModelError);
     }
 
     [Fact]
@@ -457,8 +477,7 @@ public class AddSubmissionModelTests
             .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 50, BatchID = 5, AnimalID = 1, Order = 1 }]);
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[]);
-        _submissions.Setup(s => s.CreateMouseRangeAsync(5, 1, It.Is<IReadOnlyList<string>>(numbers => numbers.SequenceEqual(new[] { "MC000001", "MC000002" })), 7, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+        _submissions.Setup(s => s.CreateMouseRangeAsync(5, 1, "MC000001", "MC000002", 7, It.IsAny<CancellationToken>())).ReturnsAsync(true);
         var sut = CreateSut(returnPage: null);
         sut.BatchSubmissionId = 99;
         sut.SourceAnimalId = 1;
@@ -468,7 +487,7 @@ public class AddSubmissionModelTests
         var result = await sut.OnPostAsync();
 
         Assert.IsType<RedirectToPageResult>(result);
-        _submissions.Verify(s => s.CreateMouseRangeAsync(5, 1, It.Is<IReadOnlyList<string>>(numbers => numbers.SequenceEqual(new[] { "MC000001", "MC000002" })), 7, It.IsAny<CancellationToken>()), Times.Once);
+        _submissions.Verify(s => s.CreateMouseRangeAsync(5, 1, "MC000001", "MC000002", 7, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -480,8 +499,7 @@ public class AddSubmissionModelTests
             .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 50, BatchID = 5, AnimalID = 1, Order = 1 }]);
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[]);
-        _submissions.Setup(s => s.CreateMouseRangeAsync(5, 1, It.IsAny<IReadOnlyList<string>>(), 7, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
+        _submissions.Setup(s => s.CreateMouseRangeAsync(5, 1, "MC000001", "MC000002", 7, It.IsAny<CancellationToken>())).ReturnsAsync(false);
         var sut = CreateSut(returnPage: null);
         sut.BatchSubmissionId = 99;
         sut.SourceAnimalId = 1;
