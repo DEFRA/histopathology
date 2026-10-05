@@ -1,0 +1,58 @@
+@page
+@model Histo.Web.Pages.Admin.SpeciesItemsModel
+@{
+    ViewData["Title"] = "Species";
+    ViewData["PageTitle"] = "Species";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Admin/PickListMaintenance" class="govuk-back-link">Back</a>
+}
+
+<h2 class="govuk-heading-m">Species</h2>
+
+@if (!string.IsNullOrEmpty(Model.StatusMessage))
+{
+    <div class="govuk-notification-banner govuk-notification-banner--success" role="alert" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
+        <div class="govuk-notification-banner__header">
+            <h2 class="govuk-notification-banner__title" id="govuk-notification-banner-title">Success</h2>
+        </div>
+        <div class="govuk-notification-banner__content">
+            <p class="govuk-notification-banner__heading">@Model.StatusMessage</p>
+        </div>
+    </div>
+}
+
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            @{ ViewData["Label"] = "Species ID"; ViewData["Column"] = "SpeciesID"; }
+            <partial name="_SortableHeader" />
+            @{ ViewData["Label"] = "Species"; ViewData["Column"] = "Species"; }
+            <partial name="_SortableHeader" />
+            @{ ViewData["Label"] = "Common name"; ViewData["Column"] = "CommonName"; }
+            <partial name="_SortableHeader" />
+            <th scope="col" class="govuk-table__header govuk-table__header--numeric"><span class="govuk-visually-hidden">Actions</span></th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @foreach (var i in Model.PagedEntries)
+        {
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">@i.SpeciesID</td>
+                <td class="govuk-table__cell">@i.Species</td>
+                <td class="govuk-table__cell">@i.CommonName</td>
+                <td class="govuk-table__cell govuk-table__cell--numeric">
+                    <a asp-page="/Admin/EditSpeciesItem" asp-route-speciesId="@i.SpeciesID" class="govuk-link">Change<span class="govuk-visually-hidden"> @i.Species</span></a>
+                </td>
+            </tr>
+        }
+        @if (Model.TotalCount == 0)
+        {
+            <tr class="govuk-table__row"><td colspan="4" class="govuk-table__cell">No items found.</td></tr>
+        }
+    </tbody>
+</table>
+<partial name="_Pagination" />
+
+<a asp-page="/Admin/AddSpeciesItem" class="govuk-button" data-module="govuk-button">Add item</a>

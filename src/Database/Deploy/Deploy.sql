@@ -24,13 +24,13 @@ GO
 GO
 :r ../StoredProcedures/dbo.GetAnimalBlockArchiveInformation.sql
 GO
-:r ../StoredProcedures/GettlkpSpecies.sql
+:r ../StoredProcedures/dbo.GettlkpSpecies.sql
 GO
-:r ../StoredProcedures/AddtlkpSpecies.sql
+:r ../StoredProcedures/dbo.AddtlkpSpecies.sql
 GO
-:r ../StoredProcedures/EdittlkpSpecies.sql
+:r ../StoredProcedures/dbo.EdittlkpSpecies.sql
 GO
-:r ../StoredProcedures/DeletetlkpSpecies.sql
+:r ../StoredProcedures/dbo.DeletetlkpSpecies.sql
 GO
 
 -- Step 2: Deployment script to used to alter/create tables, columns etc

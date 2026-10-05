@@ -1,3 +1,16 @@
+/****** Object:  StoredProcedure [dbo].[EdittlkpSpecies] ******/
+/****** ONE-TIME DEPLOYMENT SCRIPT — Safe to re-run via pipeline ******/
+
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- Idempotent: DROP + CREATE ensures no conflicts on re-deployment
+IF OBJECT_ID('[dbo].[EdittlkpSpecies]', 'P') IS NOT NULL
+    DROP PROCEDURE [dbo].[EdittlkpSpecies];
+GO
+
 CREATE PROCEDURE EdittlkpSpecies
 	@SpeciesID integer,
 	@Species varchar(20),

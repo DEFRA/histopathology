@@ -140,6 +140,36 @@ public sealed class LookupRepository : ILookupRepository
     }
 
     /// <inheritdoc/>
+    public async Task<IReadOnlyList<SpeciesItem>> GetSpeciesItemsAsync(CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<SpeciesItem>(
+            "GettlkpSpecies",
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task AddSpeciesItemAsync(int speciesId, string species, string? commonName, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        await conn.ExecuteAsync(
+            "AddtlkpSpecies",
+            new { SpeciesID = speciesId, Species = species, CommonName = commonName },
+            commandType: System.Data.CommandType.StoredProcedure);
+    }
+
+    /// <inheritdoc/>
+    public async Task UpdateSpeciesItemAsync(int speciesId, string species, string? commonName, int userId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        await conn.ExecuteAsync(
+            "EdittlkpSpecies",
+            new { SpeciesID = speciesId, Species = species, CommonName = commonName, UserID = userId },
+            commandType: System.Data.CommandType.StoredProcedure);
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<LookupItem>> GetUserAreasAsync(bool includeInactive = false, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();

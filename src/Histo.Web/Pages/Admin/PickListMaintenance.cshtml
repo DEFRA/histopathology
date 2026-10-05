@@ -23,7 +23,14 @@
             <tr class="govuk-table__row">
                 <td class="govuk-table__cell">@l.TableName</td>
                 <td class="govuk-table__cell govuk-table__cell--numeric">
-                    <a asp-page="/Admin/LookupItems" asp-route-tableId="@l.ID" class="govuk-link">Edit items</a>
+                    @if (l.TableName == "Species")
+                    {
+                        <a asp-page="/Admin/SpeciesItems" class="govuk-link">Edit items</a>
+                    }
+                    else
+                    {
+                        <a asp-page="/Admin/LookupItems" asp-route-tableId="@l.ID" class="govuk-link">Edit items</a>
+                    }
                 </td>
             </tr>
         }
