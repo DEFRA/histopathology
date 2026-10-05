@@ -1,4 +1,5 @@
 using Histo.Administration.Interfaces;
+using Histo.Core.Domain;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -153,7 +154,8 @@ public class CopyBatchModel : HistoPageModel
         var userId = Session.UserID;
         var batchToCopy = new Batch
         {
-            Status              = SourceBatch.Status,
+            // A copy always starts a fresh receipt cycle, regardless of the source's status.
+            Status              = BatchStatus.Submitted,
             Comments            = SourceBatch.Comments,
             SubmittedByUserID   = SourceBatch.SubmittedByUserID,
             UserAreaCode        = SourceBatch.UserAreaCode,

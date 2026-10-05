@@ -35,6 +35,20 @@ public sealed class BlockTestService : IBlockTestService
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BlockTest>> GetAllSelectionsByBatchAsync(int batchId, CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repo.GetAllSelectionsByBatchAsync(batchId, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to retrieve all test selections for batch {BatchId}.", ex, batchId);
+            return [];
+        }
+    }
+
     /// <summary>Returns a single test by ID, or <see langword="null"/> if not found.</summary>
     public async Task<BlockTest?> GetByIdAsync(int batchId, int testId, CancellationToken ct = default)
     {

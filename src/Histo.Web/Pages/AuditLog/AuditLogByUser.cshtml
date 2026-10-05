@@ -59,7 +59,7 @@
         </div>
     </div>
     <div class="govuk-grid-row">
-        <div class="govuk-grid-column-one-half">
+        <div class="govuk-grid-column-full">
             <div class="govuk-form-group @(Model.Errors.Any(e => e.Contains("start")) ? "govuk-form-group--error" : "")">
                 <label class="govuk-label" for="StartDate">From</label>
                 @if (Model.Errors.Any(e => e.Contains("start")))
@@ -69,7 +69,9 @@
                 <input class="govuk-input govuk-input--width-10 @(Model.Errors.Any(e => e.Contains("start")) ? "govuk-input--error" : "")" type="date" asp-for="StartDate" />
             </div>
         </div>
-        <div class="govuk-grid-column-one-half">
+    </div>
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-full">
             <div class="govuk-form-group @(Model.Errors.Any(e => e.Contains("end")) ? "govuk-form-group--error" : "")">
                 <label class="govuk-label" for="EndDate">To</label>
                 @if (Model.Errors.Any(e => e.Contains("end")))

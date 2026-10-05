@@ -6,8 +6,36 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" class="govuk-back-link">Back</a>
+    @if (Model.IsAddFlow)
+    {
+        @* Legacy: btnCancel_Click discards a newly-provisioned block entirely rather than leaving
+           an empty row behind — the plain Back link had no way to do this, so Back silently left
+           an orphan block whenever the user left without adding anything. Posts a separate,
+           genuinely hidden <form> below (via the form= attribute) rather than nesting the button
+           inside an inline-display form — that nesting was the cause of the back-link's visual
+           overlap with the page heading. *@
+        <button type="submit" form="cancel-add-block-form" class="govuk-back-link app-back-link-button">Back</button>
+    }
+    else
+    {
+        <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" class="govuk-back-link">Back</a>
+    }
 
+}
+
+@if (Model.IsAddFlow)
+{
+    @* Plain name/value (not asp-for) — the main Add/Edit form below already has asp-for
+       inputs for these same properties; asp-for here would emit duplicate element IDs.
+       IsAddFlow must be restated here too — without it, this POST always binds IsAddFlow to its
+       default (false), so OnPostCancelAsync's "still in add flow" guard never fires and the
+       auto-provisioned block is never deleted when Back is clicked. *@
+    <form method="post" asp-page-handler="Cancel" asp-antiforgery="true" id="cancel-add-block-form" class="govuk-visually-hidden">
+        <input type="hidden" name="BatchId" value="@Model.BatchId" />
+        <input type="hidden" name="AnimalId" value="@Model.AnimalId" />
+        <input type="hidden" name="BlockId" value="@Model.BlockId" />
+        <input type="hidden" name="IsAddFlow" value="@Model.IsAddFlow" />
+    </form>
 }
 
 @if (Model.Animal is null)
@@ -74,21 +102,17 @@ else
                     }
                     <input class="govuk-input govuk-input--width-3" asp-for="NewBlockRef" maxlength="3" />
                 </div>
-                @if (Model.IsAddFlow)
-                {
-                    <div class="govuk-form-group">
-                        <label class="govuk-label" for="NewNumberOfBlocks">Number of blocks</label>
-                        <div class="govuk-hint">Creates this many identical blocks, with auto-incrementing block refs.</div>
-                        <input class="govuk-input govuk-input--width-3" asp-for="NewNumberOfBlocks" />
-                    </div>
-                }
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="NewNumberOfBlocks">Number of blocks</label>
+                    <div class="govuk-hint">Number of blocks containing the same tissues and tests.</div>
+                    <input class="govuk-input govuk-input--width-3" asp-for="NewNumberOfBlocks" maxlength="3" inputmode="numeric" />
+                </div>
                 
             </div>
             <div class="govuk-grid-column-one-half">
                 <div class="govuk-form-group">
-                    <label class="govuk-label" for="EditHistologyRef">Histology reference</label>
-                    <div class="govuk-hint">Format: NN/NNNNN (e.g., 26/40004). Year (first 2 digits) must not exceed current year.</div>
-                    <input class="govuk-input govuk-input--width-10" asp-for="EditHistologyRef" placeholder="e.g., 26/40004" maxlength="8" pattern="\d{2}/\d{5}" readonly="@(Model.HistologyRefLocked ? "readonly" : null)" />
+                    <span class="govuk-label" id="histology-ref-label">Histology reference</span>
+                    <p class="govuk-body govuk-!-font-weight-bold" aria-labelledby="histology-ref-label">@(string.IsNullOrWhiteSpace(Model.Animal.HistologyRef) ? "—" : Model.Animal.HistologyRef)</p>
                 </div>
                 <div class="govuk-form-group">
                     <label class="govuk-label" for="NewCustomerRef">Customer reference</label>
@@ -116,14 +140,21 @@ else
                 </div>
             </div>
         </div>
-        <div class="govuk-form-group">
-            <label class="govuk-label" for="NewComment">Comments and details of other tests</label>
-            <textarea class="govuk-textarea" asp-for="NewComment" rows="3"></textarea>
-        </div>
     </form>
 
     @if (Model.Block is not null)
     {
+        @* Add/Edit/Delete tissue, Next block and the inline tissue edit row all save immediately
+           and reload the page — they submit their own separate <form>, not block-details-form, so
+           any not-yet-saved Comments/Tests edits below are discarded unless Done is clicked first. *@
+        <div class="govuk-warning-text">
+            <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+            <strong class="govuk-warning-text__text">
+                <span class="govuk-visually-hidden">Warning</span>
+                Adding, editing or deleting a tissue, or starting the next block, saves straight away. Any unsaved changes to Comments or Tests below will be lost unless you select Done first.
+            </strong>
+        </div>
+
         <h2 class="govuk-heading-m">Tissues</h2>
         <table class="govuk-table">
             <thead class="govuk-table__head">
@@ -175,9 +206,9 @@ else
                     else
                     {
                         <tr class="govuk-table__row">
-                            <td class="govuk-table__cell">@(Model.TissueOptions.FirstOrDefault(o => o.Code == t.TissueCode)?.Name ?? t.TissueCode)</td>
+                            <td class="govuk-table__cell">@(Model.EditTissueOptions.FirstOrDefault(o => o.Code == t.TissueCode)?.Name ?? t.TissueCode)</td>
                             <td class="govuk-table__cell">@t.NoPieces</td>
-                            <td class="govuk-table__cell">@t.Comment</td>
+                            <td class="govuk-table__cell app-table-comment-cell">@t.Comment</td>
                             <td class="govuk-table__cell">
                                 <div class="govuk-button-group govuk-!-margin-bottom-0">
                                     <a asp-page="/Blocks/BlockDetails" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-BlockId="@Model.BlockId"
@@ -324,6 +355,7 @@ else
             <input type="hidden" asp-for="BatchId" />
             <input type="hidden" asp-for="AnimalId" />
             <input type="hidden" asp-for="BlockId" />
+            <input type="hidden" asp-for="IsAddFlow" />
             @foreach (var code in Model.ExistingHistologyCodes)
             {
                 <input type="hidden" name="SelectedHistologyCodes" value="@code" />
@@ -347,9 +379,26 @@ else
             </div>
         </form>
 
+        <div class="govuk-form-group govuk-!-margin-top-6">
+            <label class="govuk-label" for="NewComment">Comments and details of other tests</label>
+            <textarea class="govuk-textarea" asp-for="NewComment" rows="3" form="block-details-form"></textarea>
+        </div>
+
         <div class="govuk-button-group">
             <button type="submit" form="next-block-form" class="govuk-button govuk-button--secondary" data-module="govuk-button">Next block</button>
             <button type="submit" form="block-details-form" class="govuk-button" data-module="govuk-button">Done</button>
+            @* Explicit, labelled discard action alongside Done/Next block — matches every other
+               form page in this app (Cancel button next to the primary action) and the Help page's
+               own documented text ("Select Cancel to discard the data..."), rather than relying on
+               the ambiguous top-of-page Back link alone. *@
+            @if (Model.IsAddFlow)
+            {
+                <button type="submit" form="cancel-add-block-form" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</button>
+            }
+            else
+            {
+                <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+            }
         </div>
     }
 

@@ -152,6 +152,18 @@ public class EditSubmissionStatusModel : HistoPageModel
         return RedirectToPage(ReturnPage, ParseReturnQuery());
     }
 
+    /// <summary>
+    /// "Continue to edit submission" — records that <c>EditBatch</c>'s Save/Cancel should come
+    /// back here (via <see cref="ISessionService.EditBatchReturnPage"/>) rather than EditBatch's
+    /// own default of BatchesForEditing, mirroring how "Samples on hold" already always returns
+    /// to this page.
+    /// </summary>
+    public IActionResult OnPostContinueAsync()
+    {
+        Session.EditBatchReturnPage = "/Batches/EditSubmissionStatus";
+        return RedirectToPage("/Batches/EditBatch");
+    }
+
     /// <summary>Parses <see cref="ISessionService.ReturnPageQuery"/> into route values so a
     /// post-save redirect restores the list's sort/page state, not just its bare page name.</summary>
     private Microsoft.AspNetCore.Routing.RouteValueDictionary ParseReturnQuery()

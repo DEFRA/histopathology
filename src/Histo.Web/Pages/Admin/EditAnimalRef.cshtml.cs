@@ -77,7 +77,7 @@ public class EditAnimalRefModel : HistoPageModel
             return Page();
         }
 
-        CurrentHistologyRef = string.IsNullOrEmpty(match.HistologyRef) ? "<null>" : match.HistologyRef;
+        CurrentHistologyRef = match.HistologyRef;
         return Page();
     }
 

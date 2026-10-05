@@ -200,8 +200,11 @@ public class SampleSummaryModel : HistoPageModel
         var batchId = BatchId ?? Session.BatchID;
         if (batchId is null or <= 0) return RedirectToPage("/Index");
 
-        // Preserve the current sample summary as the landing point when the user hits Back from
-        // the detail screen, rather than forcing a fixed jump back to the batch summary.
+        // Back/Save from the detail screen must return here (SampleSummary), the page the user
+        // actually clicked the sample from — not further back to wherever SampleSummary itself
+        // was reached from. Previously fell through to Session.SampleSummaryReturnPage, which
+        // skipped SampleSummary entirely whenever it held a stale value from an earlier,
+        // unrelated BatchDetails/EditBatch visit.
         Session.SampleDetailReturnPage = $"/Submissions/SampleSummary?batchId={batchId.Value}";
 
         // Re-resolve submission type server-side on POST.
@@ -245,12 +248,19 @@ public class SampleSummaryModel : HistoPageModel
     /// "submission created" business gate, restoring the legacy rule that a submission must have
     /// at least one sample before it is considered finished.
     ///
-    /// Uses <see cref="IBatchService.CompleteBlockAssignmentAsync"/> — the same call
-    /// <c>BatchBlocks.cshtml.cs::OnPostDoneAsync</c> uses for the verified legacy source
-    /// (<c>BatchBlocks.aspx.vb::btSubmit_Click</c>: sets IsBlocked=True, status In progress,
-    /// and AllTissuesAssigned) — NOT <c>UpdateStatusAsync</c>/<c>EditBatchStatus</c>, which
-    /// doesn't appear anywhere in the legacy source and whose backing procedure never sets
-    /// IsBlocked/AllTissuesAssigned at all.
+    /// <summary>
+    /// Legacy source: <c>BatchSummary.aspx.vb::btSubmit_Click</c> and its cassetted counterpart —
+    /// neither changes <c>BatchStatus</c> at "Finish". Every submission type stays Submitted
+    /// ("Not started") until Histopathology explicitly receives it via <c>ReceiveBatch</c>; the
+    /// block-based journey only advances to In progress later, via <c>BatchBlocks.cshtml.cs</c>'s
+    /// own "Done" button (<see cref="IBatchService.CompleteBlockAssignmentAsync"/>), once the
+    /// user has actually started assigning blocks — not at submission-creation time.
+    ///
+    /// A previous version of this handler called <c>CompleteBlockAssignmentAsync</c> here for every
+    /// non-Wet-Tissue type, which set the batch In progress immediately on Finish — before it had
+    /// even been received. That skipped "Received" entirely and is why non-Wet-Tissue submissions
+    /// (Pre-Cassetted, Stained/Unstained Section, Wax Block) appeared to jump straight past the
+    /// awaiting-receipt list. Removed; status is no longer touched here for any submission type.
     ///
     /// <c>FinalPrintBatch.aspx</c> itself remains unmigrated (blocked on the Phase 2 Reporting
     /// work — see <c>docs/Parity-Audit-Report.md</c>), so on success this mirrors the same
@@ -273,27 +283,15 @@ public class SampleSummaryModel : HistoPageModel
             return RedirectToPage(new { batchId });
         }
 
-        // Wet Tissue has no Block table rows at submission time — blocks are only created later,
-        // once Histopathology receives the sample. Legacy's BatchSummary.aspx.vb::btSubmit_Click
-        // (the Wet Tissue journey) only inserted the samples and left the batch's status as
-        // Submitted ("Not received"); only the block-based journey (BatchBlocks.aspx.vb, reached
-        // via BatchBlockSummary.aspx for Wax Block/Pre-Cassetted/Stained-Section submissions)
-        // advances status to In Progress at this step. Finishing a Wet Tissue submission must not
-        // jump it straight to In Progress before Histopathology has even received it.
-        var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId.Value);
-        var isWetTissue = ValidationHelpers.IsWetTissueDescription(await ResolveSubmittedAsDescriptionAsync(submittedAsCode));
+        // When the user reached this page from Edit Submission/Submission Details, the logical
+        // completion target is the originating submission page rather than the final print screen.
+        if (!string.IsNullOrWhiteSpace(Session.SampleSummaryReturnPage))
+            return RedirectToPage(Session.SampleSummaryReturnPage);
 
         // Legacy flow continues to the printable confirmation page after finishing a submission,
         // with the follow-up return target kept as the awaiting-receipt list.
         Session.ReturnPage = "/Batches/BatchesNotReceived";
 
-        if (isWetTissue)
-            return RedirectToPage("/Batches/PrintSubmission");
-
-        var blocks = await _blocks.GetByBatchAsync(batchId.Value);
-        var allTissuesAssigned = animals.All(a => blocks.Any(b => b.AnimalID == a.ID));
-
-        await _batches.CompleteBlockAssignmentAsync(batchId.Value, allTissuesAssigned, Session.UserID);
         return RedirectToPage("/Batches/PrintSubmission");
     }
 
@@ -314,8 +312,12 @@ public class SampleSummaryModel : HistoPageModel
     /// <summary>Unions two animal lists by ID, keeping the first list's entries and appending any not already present.</summary>
     private static IReadOnlyList<Animal> MergeAnimals(IReadOnlyList<Animal> primary, IReadOnlyList<Animal> supplementary)
     {
-        var seenIds = primary.Select(a => a.ID).ToHashSet();
+        var distinctPrimary = primary
+            .GroupBy(a => a.ID)
+            .Select(g => g.First())
+            .ToList();
+        var seenIds = distinctPrimary.Select(a => a.ID).ToHashSet();
         var missing = supplementary.Where(a => !seenIds.Contains(a.ID));
-        return [.. primary, .. missing];
+        return [.. distinctPrimary, .. missing];
     }
 }

@@ -130,6 +130,16 @@ public sealed class LookupRepository : ILookupRepository
     }
 
     /// <inheritdoc/>
+    public async Task<IReadOnlyList<LookupItem>> GetHistologyRefTypesAsync(CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<dynamic>(
+            "GetluHistologyRefType",
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.Select(MapCodeDescription).ToList();
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<LookupItem>> GetUserAreasAsync(bool includeInactive = false, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
@@ -265,11 +275,13 @@ public sealed class LookupRepository : ILookupRepository
         var d = (IDictionary<string, object>)row;
         return new LookupItem
         {
-            ID     = d.TryGetValue("ID",          out var id)     ? ToIntSafe(id)                : 0,
-            Name   = d.TryGetValue("Description", out var desc)   ? Convert.ToString(desc) ?? "" : "",
-            Active = d.TryGetValue("IsActive",     out var active) ? Convert.ToBoolean(active)    : true,
-            Code   = d.TryGetValue("Code",         out var code)   ? Convert.ToString(code)       : null,
-            Area   = d.TryGetValue("Area",         out var area)   ? Convert.ToString(area)       : null,
+            ID = d.TryGetValue("ID", out var id) ? ToIntSafe(id) : 0,
+            Name = d.TryGetValue("Description", out var desc) ? Convert.ToString(desc) ?? "" : "",
+            Active = d.TryGetValue("IsActive", out var active) ? Convert.ToBoolean(active) : true,
+            // Trimmed: several lookup Code columns are fixed-width char(n), so values come back
+            // space-padded and fail exact-match comparisons against codes stored elsewhere.
+            Code = d.TryGetValue("Code", out var code) ? Convert.ToString(code)?.Trim() : null,
+            Area = d.TryGetValue("Area", out var area) ? Convert.ToString(area)?.Trim() : null,
         };
     }
 

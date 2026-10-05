@@ -48,6 +48,13 @@ public interface ILookupService
     /// <summary>Returns all active premium/TC charge codes from <c>GetluPremiumCharges</c>.</summary>
     Task<IReadOnlyList<LookupItem>> GetPremiumChargesAsync(CancellationToken ct = default);
 
+    /// <summary>
+    /// Returns the database-driven Histology Ref Type pick list (Code 1-5 = Neuropath/Abattoir
+    /// Survey/TB Diag/General Pool/Mouse Projects, Code 6 = "use pg number") from
+    /// <c>GetluHistologyRefType</c> — legacy source: <c>SubmissionDetailsBlock.aspx.vb::LoadLookupLists</c>.
+    /// </summary>
+    Task<IReadOnlyList<LookupItem>> GetHistologyRefTypesAsync(CancellationToken ct = default);
+
     /// <summary>Creates a new pick-list row. Returns <see langword="false"/> on failure.</summary>
     Task<bool> CreateLookupItemAsync(int tableId, LookupItem item, int userId, CancellationToken ct = default);
 

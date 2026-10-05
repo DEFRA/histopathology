@@ -35,23 +35,59 @@ public class AddSubmissionModel : HistoPageModel
     [BindProperty] public string SenderRef   { get; set; } = string.Empty;
 
     /// <summary>
-    /// Set when reached from a caller other than <c>SampleSummary</c> (currently only
-    /// <c>Batches/BatchBlocks</c>'s "Add sample", the Assign Tissues to Blocks journey) so the
-    /// Back link and the post-add redirect return there instead of defaulting to SampleSummary.
-    /// </summary>
-    [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
-
-    /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
-    public string BackLinkPage => !string.IsNullOrWhiteSpace(ReturnPage) && Url.IsLocalUrl(ReturnPage)
-        ? ReturnPage
-        : $"/Submissions/SampleSummary?batchId={BatchId}";
-
-    /// <summary>
     /// Set when this form was reached via "Copy sample" — the animal whose tissues should be
     /// duplicated onto the newly created sample. Round-tripped via a hidden field so it survives
     /// the POST (and the SearchSender picker detour, which only restores <see cref="SenderRef"/>).
     /// </summary>
     [BindProperty] public int? SourceAnimalId { get; set; }
+
+    /// <summary>Explicit return page for this flow, used by the Back/Cancel links when the user arrives from a page other than the default batch list.</summary>
+    [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
+
+    /// <summary>Resolved back-link for this page. Falls back to any session-scoped return context, then to the batch list.</summary>
+    public string BackLinkPage => string.IsNullOrWhiteSpace(ReturnPage)
+        ? string.IsNullOrWhiteSpace(Session.ReturnPage) ? "/Batches/BatchesNotReceived" : Session.ReturnPage
+        : ReturnPage;
+
+    /// <summary>
+    /// True when reached from the "Assign Tissues to Blocks" journey (<c>BatchBlocks.cshtml</c>'s
+    /// "Add sample" button), as opposed to Create/Edit Submission. No user-area restriction.
+    /// Strict: always requires picking an existing sample, since BatchBlocks is only ever reached
+    /// once a Received/InProgress batch's samples already exist.
+    ///
+    /// Legacy had two distinct pages here: <c>AddSubmission.aspx</c> (Create/Edit Submission — types
+    /// a brand-new Sender Ref) and <c>AddSample.aspx</c> (Assign Tissues to Blocks — associates an
+    /// *existing* sample, found via search, with the current batch; confirmed via
+    /// docs/Functionality-Traceability-Matrix.md and this session's own prior finding that
+    /// AddSample.aspx "is not a separate sample-creation workflow — it's the landing page for
+    /// adding an existing animal to the current batch"). Both were consolidated onto this one page
+    /// with a single free-text field, which incorrectly let the Assign Tissues journey type a new
+    /// Sender Ref instead of picking one of the batch's own not-yet-blocked samples.
+    ///
+    /// Deliberately checks ONLY <see cref="ReturnPage"/> (fresh every request — from the link's own
+    /// query string on GET, the form's hidden field on POST) and never
+    /// <see cref="ISessionService.SampleDetailReturnPage"/>. That session value is set by OTHER
+    /// pages (<c>BatchBlocks</c>, <c>SampleSummary</c>, and this page's own POST handler) purely to
+    /// drive THEIR OWN later back-link, never to describe how THIS page was reached — checking it
+    /// here previously let a stale value from an earlier, unrelated visit to the Assign Tissue
+    /// journey silently force dropdown mode onto a completely separate Create Submission journey
+    /// later in the same browser session.
+    ///
+    /// Excludes "Copy sample" (<see cref="SourceAnimalId"/> set) — that flow always creates a
+    /// genuinely new Animal with copied tissues, never picks an existing one.
+    /// </summary>
+    public bool IsAssignTissueMode =>
+        (SourceAnimalId is null or <= 0)
+        && (ReturnPage ?? string.Empty).Contains("/Batches/BatchBlocks", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Every sample in the batch — the pickable set for <see cref="IsAssignTissueMode"/>. Not
+    /// filtered to "not yet blocked" samples: a single sample commonly needs several blocks added
+    /// one at a time, so this picker must keep offering it back on every visit, matching legacy
+    /// <c>AddSample.aspx</c> (a user-reported regression when this was filtered down to a
+    /// disappearing "unblocked only" list).
+    /// </summary>
+    public IReadOnlyList<Animal> AvailableAnimals { get; private set; } = [];
 
     public string? ModelError { get; private set; }
 
@@ -75,6 +111,9 @@ public class AddSubmissionModel : HistoPageModel
             SenderRef = chosenRef;
         else if (!string.IsNullOrWhiteSpace(senderRef))
             SenderRef = senderRef;
+
+        if (IsAssignTissueMode && BatchId is > 0)
+            AvailableAnimals = await GetAssignableAnimalsAsync(BatchId.Value);
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -83,6 +122,24 @@ public class AddSubmissionModel : HistoPageModel
 
         var batchId = BatchId ?? Session.BatchID;
         if (batchId is null or <= 0) return RedirectToPage("/Index");
+
+        if (IsAssignTissueMode)
+        {
+            var available = await GetAssignableAnimalsAsync(batchId.Value);
+            AvailableAnimals = available;
+
+            // No new Animal is created here — the user is picking one of the batch's own
+            // samples that still needs blocks assigned, mirroring legacy AddSample.aspx.
+            var chosen = available.FirstOrDefault(a => string.Equals(a.SenderRef, SenderRef, StringComparison.OrdinalIgnoreCase));
+            if (chosen is null)
+            {
+                ModelError = "Select a sample from the list.";
+                return Page();
+            }
+
+            Session.SampleDetailReturnPage = BackLinkPage;
+            return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = chosen.ID });
+        }
 
         var submissionId = BatchSubmissionId ?? Session.BatchSubmissionID;
         if (submissionId is null or <= 0)
@@ -105,15 +162,19 @@ public class AddSubmissionModel : HistoPageModel
 
         Session.BatchSubmissionID = submissionId;
 
+        // Pre-cassetted samples may only use a block ref already pre-booked for this sender
+        // (Book Blocks) — legacy: clsBlock.NewBlock -> GetPreBookedBlock. Checking here, before
+        // navigating away, avoids the user only finding out on the block page that nothing is
+        // available. Reuses the pre-booked animal's own ID so its pre-booked blocks carry over,
+        // rather than creating a separate, unbooked Animal for the same sender.
+        // Regression note: this check existed previously and was silently dropped as collateral
+        // damage by an unrelated refactor (commit e40a473) that removed the IBlockService
+        // dependency this page no longer used for anything else at the time — restored here.
         var batch = await _batches.GetByIdAsync(batchId.Value);
 
         int newAnimalId;
         if (batch?.IsPreCassetted == true)
         {
-            // Pre-cassetted samples may only use a block ref already pre-booked for this sender
-            // (Book Blocks) — legacy: clsBlock.NewBlock -> GetPreBookedBlock. Checking here, before
-            // navigating away, avoids the user only finding out on the block page that nothing is
-            // available. Reuses the pre-booked animal's own ID so its pre-booked blocks carry over.
             // A sender ref can match more than one animal row (e.g. an unrelated past submission
             // with no pre-booked blocks, alongside the actual pre-booked placeholder) — check each
             // candidate rather than assuming the first match is the pre-booked one.
@@ -138,7 +199,12 @@ public class AddSubmissionModel : HistoPageModel
         }
         else
         {
-            newAnimalId = await _submissions.AddAnimalAsync(submissionId.Value, SenderRef, Session.UserID);
+            newAnimalId = await _submissions.AddAnimalAsync(
+                submissionId.Value,
+                SenderRef,
+                Session.UserID,
+                pmDate: null,
+                pmDateSet: false);
             if (newAnimalId <= 0)
             {
                 // AddAnimalAsync swallows the underlying SQL exception and returns 0 on failure —
@@ -206,9 +272,12 @@ public class AddSubmissionModel : HistoPageModel
     private async Task<bool> IsWetTissueCodeAsync(string? submittedAsCode)
     {
         if (string.IsNullOrEmpty(submittedAsCode)) return false;
-        // includeInactive: true — same gap as SampleSummaryModel's identical resolver.
-        var items = await _lookups.GetLookupDataAsync(11, includeInactive: true); // LOOKUP_SUBMITTEDAS
+        var items = await _lookups.GetLookupDataAsync(11); // LOOKUP_SUBMITTEDAS
         var match = items.FirstOrDefault(i => i.Code == submittedAsCode);
         return ValidationHelpers.IsWetTissueDescription(match?.Name);
     }
+
+    /// <summary>Every sample in the batch — the pickable set for <see cref="IsAssignTissueMode"/>.</summary>
+    private async Task<IReadOnlyList<Animal>> GetAssignableAnimalsAsync(int batchId) =>
+        await _submissions.GetAnimalsByBatchAsync(batchId);
 }
