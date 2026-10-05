@@ -363,7 +363,7 @@
       var exitLinks = document.querySelectorAll('[data-leave-check="submission"]');
       if (!warning || !form) return;
 
-      var hasUnsavedChanges = false;
+      var hasUnsavedChanges = @((Model.Errors.Count > 0).ToString().ToLowerInvariant());
       var warningWasShown = false;
 
       function showWarning() {
