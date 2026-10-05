@@ -172,8 +172,15 @@ public class AddSubmissionModel : HistoPageModel
             return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = chosen.ID });
         }
 
+        var hasMouseRangeInput = ShowMouseRange && (!string.IsNullOrWhiteSpace(MouseNumberFrom) || !string.IsNullOrWhiteSpace(MouseNumberTo));
         var usingMouseRange = ShowMouseRange && !string.IsNullOrWhiteSpace(MouseNumberFrom) && !string.IsNullOrWhiteSpace(MouseNumberTo);
         var usingSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
+        if (hasMouseRangeInput && !usingMouseRange)
+        {
+            ModelError = "Enter both the from and to mouse numbers.";
+            MouseRangeHasError = true;
+            return Page();
+        }
         if (usingSenderRef == usingMouseRange)
         {
             // Legacy: exactly one of Sender Ref or the mouse-number range must be filled in.
