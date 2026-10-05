@@ -25,6 +25,7 @@
     <input type="hidden" asp-for="BatchId" />
     <input type="hidden" asp-for="BatchSubmissionId" />
     <input type="hidden" asp-for="SourceAnimalId" />
+    <input type="hidden" asp-for="RowIndex" />
     <input type="hidden" asp-for="ReturnPage" />
     <input type="hidden" id="icc-filter" name="Filter" value="" />
     <div class="govuk-form-group @(Model.ModelError is not null && !Model.MouseRangeHasError ? "govuk-form-group--error" : "")">

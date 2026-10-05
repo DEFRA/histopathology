@@ -4,9 +4,11 @@ using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
+using Histo.Web.Pages.Batches;
 using Histo.Web.Pages.Submissions;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
@@ -205,6 +207,35 @@ public class AddSubmissionModelTests
         _submissions.Verify(s => s.AddAnimalAsync(99, "NewRef", 7, (string?)null, false, It.IsAny<CancellationToken>()), Times.Once);
         var redirect = Assert.IsType<RedirectToPageResult>(result);
         Assert.Equal("/Submissions/SubmissionDetailsBlock", redirect.PageName);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_CopySubmissionReturnFlow_RedirectsBackToCopyBatch()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _submissions.Setup(s => s.AddAnimalAsync(99, "NewRef", 7, (string?)null, false, It.IsAny<CancellationToken>())).ReturnsAsync(123);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(200);
+        var sut = CreateSut(returnPage: "/Batches/CopyBatch");
+        sut.BatchSubmissionId = 99;
+        sut.SourceAnimalId = 42;
+        sut.SenderRef = "NewRef";
+        sut.RowIndex = 1;
+        sut.TempData["CopyBatch_Animals"] = JsonSerializer.Serialize(new List<CopyBatchModel.AnimalRow>
+        {
+            new() { AnimalId = 10, SenderRef = "OldA", NewSenderRef = string.Empty },
+            new() { AnimalId = 11, SenderRef = "OldB", NewSenderRef = string.Empty },
+        });
+
+        var result = await sut.OnPostAsync();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Batches/CopyBatch", redirect.PageName);
+        Assert.Equal(5, redirect.RouteValues!["sourceBatchId"]);
+
+        var animals = JsonSerializer.Deserialize<List<CopyBatchModel.AnimalRow>>(sut.TempData["CopyBatch_Animals"] as string ?? "[]");
+        Assert.Equal("NewRef", animals![1].NewSenderRef);
     }
 
     [Fact]

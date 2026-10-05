@@ -243,7 +243,7 @@ public class CopyBatchModel : HistoPageModel
         var sourceAnimalId = rowIndex >= 0 && rowIndex < Animals.Count ? Animals[rowIndex].AnimalId : 0;
         return RedirectToPage("/Submissions/AddSubmission", new
         {
-            returnPage = "/Batches/CopyBatch",
+            returnPage = $"/Batches/CopyBatch?sourceBatchId={SourceBatchId}",
             sourceBatchId = SourceBatchId,
             rowIndex,
             sourceAnimalId,

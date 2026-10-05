@@ -4,8 +4,10 @@ using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
+using Histo.Web.Pages.Batches;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace Histo.Web.Pages.Submissions;
 
@@ -62,7 +64,9 @@ public class AddSubmissionModel : HistoPageModel
     /// the POST (and the SearchSender picker detour, which only restores <see cref="SenderRef"/>).
     /// </summary>
     [BindProperty] public int? SourceAnimalId { get; set; }
-
+    /// <summary>Index of the row being edited on the copy-submission page. When the user is returned to
+    /// <c>/Batches/CopyBatch</c>, this lets us persist the updated sender ref into the staged list before Finish.</summary>
+    [BindProperty(SupportsGet = true)] public int? RowIndex { get; set; }
     /// <summary>Explicit return page for this flow, used by the Back/Cancel links when the user arrives from a page other than the default batch list.</summary>
     [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
 
@@ -244,6 +248,15 @@ public class AddSubmissionModel : HistoPageModel
                         await _submissions.CopyTissueAsync(tissue, ownSubmissionId, Session.UserID);
                 }
 
+                // Copy-submission "Change" flow must return to the batch copy list so the user can
+                // still press Finish and complete the copy. Otherwise they are stranded on the
+                // sample summary page without a final submission action.
+                if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase))
+                {
+                    PersistCopyBatchState();
+                    return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
+                }
+
                 // Copy sample started from Sample Summary — return there so it's clear the new
                 // sample was added, rather than continuing straight into its (empty) detail page.
                 return RedirectToPage("/Submissions/SampleSummary", new { batchId });
@@ -254,10 +267,46 @@ public class AddSubmissionModel : HistoPageModel
         }
 
         if (SourceAnimalId is > 0)
+        {
+            if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase))
+            {
+                PersistCopyBatchState();
+                return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
+            }
             return RedirectToPage("/Submissions/SampleSummary", new { batchId });
+        }
 
         Session.SampleDetailReturnPage = BackLinkPage;
         return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = newAnimalId });
+    }
+
+    private void PersistCopyBatchState()
+    {
+        if (TempData is null || !string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (TempData["CopyBatch_Animals"] is not string savedJson)
+            return;
+
+        var animals = JsonSerializer.Deserialize<List<CopyBatchModel.AnimalRow>>(savedJson) ?? [];
+        if (RowIndex is >= 0 && RowIndex < animals.Count)
+        {
+            animals[RowIndex.Value].NewSenderRef = string.IsNullOrWhiteSpace(SenderRef)
+                ? string.IsNullOrWhiteSpace(MouseNumberFrom) ? string.Empty : MouseNumberFrom.Trim()
+                : SenderRef.Trim();
+        }
+        else if (!string.IsNullOrWhiteSpace(SenderRef) || !string.IsNullOrWhiteSpace(MouseNumberFrom))
+        {
+            animals.Add(new CopyBatchModel.AnimalRow
+            {
+                AnimalId = SourceAnimalId ?? 0,
+                SubmissionId = BatchSubmissionId ?? 0,
+                SenderRef = string.IsNullOrWhiteSpace(SenderRef) ? MouseNumberFrom.Trim() : SenderRef.Trim(),
+                NewSenderRef = string.IsNullOrWhiteSpace(SenderRef) ? MouseNumberFrom.Trim() : SenderRef.Trim(),
+            });
+        }
+
+        TempData["CopyBatch_Animals"] = JsonSerializer.Serialize(animals);
     }
 
     /// <summary>
@@ -398,6 +447,12 @@ public class AddSubmissionModel : HistoPageModel
             if (sourceTissues.Count > 0 && ownSubmissionId > 0)
                 foreach (var tissue in sourceTissues)
                     await _submissions.CopyTissueAsync(tissue, ownSubmissionId, Session.UserID);
+        }
+
+        if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase))
+        {
+            PersistCopyBatchState();
+            return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
         }
 
         return RedirectToPage("/Submissions/SampleSummary", new { batchId });

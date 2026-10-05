@@ -184,7 +184,7 @@ public class CopyBatchModelTests
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
         Assert.Equal("/Submissions/AddSubmission", redirect.PageName);
-        Assert.Equal("/Batches/CopyBatch", redirect.RouteValues!["returnPage"]);
+        Assert.Equal("/Batches/CopyBatch?sourceBatchId=10", redirect.RouteValues!["returnPage"]);
         Assert.Equal(10, redirect.RouteValues["sourceBatchId"]);
         Assert.Equal(8, redirect.RouteValues["sourceAnimalId"]);
     }
