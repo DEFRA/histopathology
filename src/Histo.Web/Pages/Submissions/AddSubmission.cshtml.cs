@@ -429,24 +429,12 @@ public class AddSubmissionModel : HistoPageModel
             }
         }
 
-        foreach (var mouseNumber in mouseNumbers)
+        var created = await _submissions.CreateMouseRangeAsync(batchId, SourceAnimalId, mouseNumbers, Session.UserID);
+        if (!created)
         {
-            var (animalId, error) = await CreateAnimalForSenderAsync(batchId, submissionId, batch, mouseNumber);
-            if (error is not null)
-            {
-                ModelError = $"{mouseNumber}: {error}";
-                MouseRangeHasError = true;
-                return Page();
-            }
-
-            var ownSubmissionId = await _submissions.AddSubmissionAsync(
-                new BatchSubmission { BatchID = batchId, AnimalID = animalId, SubmissionName = "Default", Order = nextOrder++ },
-                Session.UserID);
-            if (ownSubmissionId > 0) Session.BatchSubmissionID = ownSubmissionId;
-
-            if (sourceTissues.Count > 0 && ownSubmissionId > 0)
-                foreach (var tissue in sourceTissues)
-                    await _submissions.CopyTissueAsync(tissue, ownSubmissionId, Session.UserID);
+            ModelError = "Could not add the sample range. Please try again.";
+            MouseRangeHasError = true;
+            return Page();
         }
 
         if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase))

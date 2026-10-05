@@ -425,7 +425,7 @@ public class AddSubmissionModelTests
     }
 
     [Fact]
-    public async Task OnPostAsync_MouseRange_CreatesAnimalForEachNumber_RedirectsToSampleSummary()
+    public async Task OnPostAsync_MouseRange_UsesTransactionalRangeCreate_WhenValid()
     {
         _session.Object.BatchSubmissionID = 99;
         _session.Setup(s => s.UserArea).Returns("Histopath");
@@ -433,9 +433,8 @@ public class AddSubmissionModelTests
             .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[]);
-        _submissions.Setup(s => s.AddAnimalAsync(99, "MC000001", 7, (string?)null, false, It.IsAny<CancellationToken>())).ReturnsAsync(201);
-        _submissions.Setup(s => s.AddAnimalAsync(99, "MC000002", 7, (string?)null, false, It.IsAny<CancellationToken>())).ReturnsAsync(202);
-        _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(300);
+        _submissions.Setup(s => s.CreateMouseRangeAsync(5, 1, It.Is<IReadOnlyList<string>>(numbers => numbers.SequenceEqual(new[] { "MC000001", "MC000002" })), 7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
         var sut = CreateSut(returnPage: null);
         sut.BatchSubmissionId = 99;
         sut.SourceAnimalId = 1;
@@ -446,31 +445,20 @@ public class AddSubmissionModelTests
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
         Assert.Equal("/Submissions/SampleSummary", redirect.PageName);
-        _submissions.Verify(s => s.AddAnimalAsync(99, "MC000001", 7, (string?)null, false, It.IsAny<CancellationToken>()), Times.Once);
-        _submissions.Verify(s => s.AddAnimalAsync(99, "MC000002", 7, (string?)null, false, It.IsAny<CancellationToken>()), Times.Once);
-        _submissions.Verify(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        _submissions.Verify(s => s.CreateMouseRangeAsync(5, 1, It.Is<IReadOnlyList<string>>(numbers => numbers.SequenceEqual(new[] { "MC000001", "MC000002" })), 7, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task OnPostAsync_MouseRange_WetTissueCopySample_CopiesSourceTissuesToEachCreatedAnimal()
+    public async Task OnPostAsync_MouseRange_DelegatesToTransactionalRangeService()
     {
-        // Mirrors the single-SenderRef Copy-sample path: mouse range is only reachable via Copy
-        // sample (ShowMouseRange requires SourceAnimalId), so each created animal should inherit
-        // the source sample's tissues too on Wet Tissue batches.
         _session.Object.BatchSubmissionID = 99;
         _session.Setup(s => s.UserArea).Returns("Histopath");
-        _batches.Setup(b => b.GetSubmittedAsCodeAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync("WT");
-        _lookups.Setup(l => l.GetLookupDataAsync(11, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { Code = "WT", Name = "Wet Tissue" }]);
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 50, BatchID = 5, AnimalID = 1, Order = 1 }]);
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[]);
-        _submissions.Setup(s => s.GetTissuesBySubmissionAsync(5, 50, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<Tissue>)[new Tissue { ID = 701, OwnerID = 50 }]);
-        _submissions.Setup(s => s.AddAnimalAsync(99, "MC000001", 7, (string?)null, false, It.IsAny<CancellationToken>())).ReturnsAsync(201);
-        _submissions.Setup(s => s.AddAnimalAsync(99, "MC000002", 7, (string?)null, false, It.IsAny<CancellationToken>())).ReturnsAsync(202);
-        _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(300);
+        _submissions.Setup(s => s.CreateMouseRangeAsync(5, 1, It.Is<IReadOnlyList<string>>(numbers => numbers.SequenceEqual(new[] { "MC000001", "MC000002" })), 7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
         var sut = CreateSut(returnPage: null);
         sut.BatchSubmissionId = 99;
         sut.SourceAnimalId = 1;
@@ -480,33 +468,29 @@ public class AddSubmissionModelTests
         var result = await sut.OnPostAsync();
 
         Assert.IsType<RedirectToPageResult>(result);
-        _submissions.Verify(s => s.CopyTissueAsync(It.Is<Tissue>(t => t.ID == 701), 300, 7, It.IsAny<CancellationToken>()), Times.Exactly(2));
+        _submissions.Verify(s => s.CreateMouseRangeAsync(5, 1, It.Is<IReadOnlyList<string>>(numbers => numbers.SequenceEqual(new[] { "MC000001", "MC000002" })), 7, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task OnPostAsync_MouseRange_NonWetTissueCopySample_DoesNotCopyTissues()
+    public async Task OnPostAsync_MouseRange_ServiceFailure_SetsModelError()
     {
         _session.Object.BatchSubmissionID = 99;
         _session.Setup(s => s.UserArea).Returns("Histopath");
-        _batches.Setup(b => b.GetSubmittedAsCodeAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync("BL");
-        _lookups.Setup(l => l.GetLookupDataAsync(11, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { Code = "BL", Name = "Block" }]);
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 50, BatchID = 5, AnimalID = 1, Order = 1 }]);
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[]);
-        _submissions.Setup(s => s.AddAnimalAsync(99, "MC000001", 7, (string?)null, false, It.IsAny<CancellationToken>())).ReturnsAsync(201);
-        _submissions.Setup(s => s.AddAnimalAsync(99, "MC000002", 7, (string?)null, false, It.IsAny<CancellationToken>())).ReturnsAsync(202);
-        _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(300);
+        _submissions.Setup(s => s.CreateMouseRangeAsync(5, 1, It.IsAny<IReadOnlyList<string>>(), 7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
         var sut = CreateSut(returnPage: null);
         sut.BatchSubmissionId = 99;
         sut.SourceAnimalId = 1;
         sut.MouseNumberFrom = "MC000001";
         sut.MouseNumberTo = "MC000002";
 
-        await sut.OnPostAsync();
+        var result = await sut.OnPostAsync();
 
-        _submissions.Verify(s => s.GetTissuesBySubmissionAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
-        _submissions.Verify(s => s.CopyTissueAsync(It.IsAny<Tissue>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("Could not add the sample range. Please try again.", sut.ModelError);
     }
 }

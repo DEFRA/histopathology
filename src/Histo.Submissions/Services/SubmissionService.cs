@@ -39,6 +39,13 @@ public sealed class SubmissionService : ISubmissionService
         catch (Exception ex) { _logger.LogError("Failed to add submission.", ex); return 0; }
     }
 
+    /// <summary>Creates a whole mouse-number range in one transaction so failures roll back without leaving partial data.</summary>
+    public async Task<bool> CreateMouseRangeAsync(int batchId, int? sourceAnimalId, IReadOnlyList<string> mouseNumbers, int userId, CancellationToken ct = default)
+    {
+        try { return await _repo.CreateMouseRangeAsync(batchId, sourceAnimalId, mouseNumbers, userId, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to create mouse range for batch {BatchId}.", ex, batchId); return false; }
+    }
+
     /// <summary>
     /// Creates a copy of an existing batch submission (sample group) under a new
     /// batch. Used by the "Copy batch" workflow.
