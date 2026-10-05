@@ -35,9 +35,10 @@
             <div class="govuk-hint">Select the sample you want to assign tissues/blocks to.</div>
             @if (Model.ModelError is not null && !Model.MouseRangeHasError)
             {
-                <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @Model.ModelError</p>
+                <p id="SenderRef-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @Model.ModelError</p>
             }
-            <select class="govuk-select" asp-for="SenderRef" required>
+            <select class="govuk-select @(Model.ModelError is not null && !Model.MouseRangeHasError ? "govuk-select--error" : "")" asp-for="SenderRef" required
+                    aria-describedby="@(Model.ModelError is not null && !Model.MouseRangeHasError ? "SenderRef-error" : null)">
                 <option value="">-- Select a sample --</option>
                 @foreach (var animal in Model.AvailableAnimals)
                 {
