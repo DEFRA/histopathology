@@ -233,14 +233,20 @@ public class CopyBatchModel : HistoPageModel
     /// </summary>
     public IActionResult OnPostPick(int rowIndex)
     {
-        TempData["CopyBatch_Animals"]     = JsonSerializer.Serialize(Animals);
-        TempData["CopyBatch_IsCassetted"] = IsCassetted.ToString();
-        TempData["CopyBatch_RowIndex"]    = rowIndex.ToString();
-        return RedirectToPage("/Search/SearchSender", new
+        if (TempData is not null)
+        {
+            TempData["CopyBatch_Animals"]     = JsonSerializer.Serialize(Animals);
+            TempData["CopyBatch_IsCassetted"] = IsCassetted.ToString();
+            TempData["CopyBatch_RowIndex"]    = rowIndex.ToString();
+        }
+
+        var sourceAnimalId = rowIndex >= 0 && rowIndex < Animals.Count ? Animals[rowIndex].AnimalId : 0;
+        return RedirectToPage("/Submissions/AddSubmission", new
         {
             returnPage = "/Batches/CopyBatch",
-            returnId   = SourceBatchId,
+            sourceBatchId = SourceBatchId,
             rowIndex,
+            sourceAnimalId,
         });
     }
 

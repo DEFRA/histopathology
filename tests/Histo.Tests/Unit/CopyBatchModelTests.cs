@@ -4,6 +4,7 @@ using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.Batches;
 using Histo.Web.Services;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
@@ -166,5 +167,25 @@ public class CopyBatchModelTests
         Assert.Equal("The submission to copy could not be found.", sut.Error);
         _batches.Verify(b => b.CopyBatchHeaderAsync(It.IsAny<Batch>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         _batches.Verify(b => b.GetBatchTestSelectionsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public void OnPostPick_RedirectsToAddSubmissionSoUserCanChooseSenderOrMouseRange()
+    {
+        var sut = CreateSut();
+        sut.SourceBatchId = 10;
+        sut.Animals =
+        [
+            new CopyBatchModel.AnimalRow { AnimalId = 7, SenderRef = "S1", NewSenderRef = string.Empty },
+            new CopyBatchModel.AnimalRow { AnimalId = 8, SenderRef = "S2", NewSenderRef = string.Empty }
+        ];
+
+        var result = sut.OnPostPick(1);
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Submissions/AddSubmission", redirect.PageName);
+        Assert.Equal("/Batches/CopyBatch", redirect.RouteValues!["returnPage"]);
+        Assert.Equal(10, redirect.RouteValues["sourceBatchId"]);
+        Assert.Equal(8, redirect.RouteValues["sourceAnimalId"]);
     }
 }
