@@ -405,15 +405,14 @@
       });
 
       window.history.pushState(null, '', window.location.href);
-      window.addEventListener('popstate', function (event) {
-          if (!hasUnsavedChanges) return;
-
-          if (!warningWasShown) {
-              event.preventDefault();
-              showWarning();
-              window.history.pushState(null, '', window.location.href);
+      window.addEventListener('popstate', function () {
+          if (!hasUnsavedChanges || warningWasShown) {
+              window.history.back();
               return;
           }
+
+          showWarning();
+          window.history.pushState(null, '', window.location.href);
       });
     })();
     </script>
