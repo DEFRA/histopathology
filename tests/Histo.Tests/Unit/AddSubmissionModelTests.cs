@@ -210,13 +210,9 @@ public class AddSubmissionModelTests
     }
 
     [Fact]
-    public async Task OnPostAsync_CopySubmissionReturnFlow_RedirectsBackToCopyBatch()
+    public async Task OnPostAsync_CopySubmissionReturnFlow_StagesTheUpdatedSenderRefWithoutCreatingSourceRecords()
     {
         _session.Object.BatchSubmissionID = 99;
-        _submissions.Setup(s => s.AddAnimalAsync(99, "NewRef", 7, (string?)null, false, It.IsAny<CancellationToken>())).ReturnsAsync(123);
-        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
-        _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(200);
         var sut = CreateSut(returnPage: "/Batches/CopyBatch");
         sut.BatchSubmissionId = 99;
         sut.SourceAnimalId = 42;
@@ -233,6 +229,9 @@ public class AddSubmissionModelTests
         var redirect = Assert.IsType<RedirectToPageResult>(result);
         Assert.Equal("/Batches/CopyBatch", redirect.PageName);
         Assert.Equal(5, redirect.RouteValues!["sourceBatchId"]);
+
+        _submissions.Verify(s => s.AddAnimalAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+        _submissions.Verify(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
 
         var animals = JsonSerializer.Deserialize<List<CopyBatchModel.AnimalRow>>(sut.TempData["CopyBatch_Animals"] as string ?? "[]");
         Assert.Equal("NewRef", animals![1].NewSenderRef);

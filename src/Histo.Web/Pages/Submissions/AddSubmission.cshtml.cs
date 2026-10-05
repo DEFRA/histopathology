@@ -188,6 +188,13 @@ public class AddSubmissionModel : HistoPageModel
             return Page();
         }
 
+        if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase)
+            && SourceAnimalId is > 0)
+        {
+            PersistCopyBatchState();
+            return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
+        }
+
         var submissionId = BatchSubmissionId ?? Session.BatchSubmissionID;
         if (submissionId is null or <= 0)
         {
@@ -431,6 +438,13 @@ public class AddSubmissionModel : HistoPageModel
             ModelError = $"Mouse number {duplicate} already exists on the submission. Alter the range and try again.";
             MouseRangeHasError = true;
             return Page();
+        }
+
+        if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase)
+            && SourceAnimalId is > 0)
+        {
+            PersistCopyBatchState();
+            return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
         }
 
         var created = await _submissions.CreateMouseRangeAsync(batchId, SourceAnimalId, from, to, Session.UserID);
