@@ -399,7 +399,7 @@ public class AddSubmissionModel : HistoPageModel
 
         if (fromId >= toId)
         {
-            ModelError = "The from number cannot be greater than the to number.";
+            ModelError = "The from number must be less than the to number.";
             MouseRangeHasError = true;
             return Page();
         }
