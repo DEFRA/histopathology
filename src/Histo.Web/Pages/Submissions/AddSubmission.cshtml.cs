@@ -172,8 +172,15 @@ public class AddSubmissionModel : HistoPageModel
             return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = chosen.ID });
         }
 
+        var hasMouseRangeInput = ShowMouseRange && (!string.IsNullOrWhiteSpace(MouseNumberFrom) || !string.IsNullOrWhiteSpace(MouseNumberTo));
         var usingMouseRange = ShowMouseRange && !string.IsNullOrWhiteSpace(MouseNumberFrom) && !string.IsNullOrWhiteSpace(MouseNumberTo);
         var usingSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
+        if (hasMouseRangeInput && !usingMouseRange)
+        {
+            ModelError = "Enter both the from and to mouse numbers.";
+            MouseRangeHasError = true;
+            return Page();
+        }
         if (usingSenderRef == usingMouseRange)
         {
             // Legacy: exactly one of Sender Ref or the mouse-number range must be filled in.
@@ -381,7 +388,8 @@ public class AddSubmissionModel : HistoPageModel
         var from = MouseNumberFrom.Trim().ToUpperInvariant();
         var to = MouseNumberTo.Trim().ToUpperInvariant();
 
-        if (!ValidationHelpers.ValidateMouseNumber(from) || !ValidationHelpers.ValidateMouseNumber(to)
+        if (from.Length != 8 || to.Length != 8
+            || !ValidationHelpers.ValidateMouseNumber(from) || !ValidationHelpers.ValidateMouseNumber(to)
             || !SenderRefHelpers.TryParseMouseNumber(from, out var fromId) || !SenderRefHelpers.TryParseMouseNumber(to, out var toId))
         {
             ModelError = "The mouse number format is MC followed by 6 digits, i.e. MC000105.";
