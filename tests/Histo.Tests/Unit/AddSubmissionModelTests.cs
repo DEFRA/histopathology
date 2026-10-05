@@ -398,7 +398,7 @@ public class AddSubmissionModelTests
         var result = await sut.OnPostAsync();
 
         Assert.IsType<PageResult>(result);
-        Assert.Equal("The from number cannot be greater than the to number.", sut.ModelError);
+        Assert.Equal("The from number must be less than the to number.", sut.ModelError);
     }
 
     [Fact]
