@@ -29,4 +29,12 @@ public interface IHistologyRefService
     /// (unknown type, or a concurrency conflict).
     /// </summary>
     Task<bool> SetCounterAsync(int histologyType, string newNextHistologyRef, CancellationToken ct = default);
+
+    /// <summary>
+    /// Prefers a pre-booked-but-unused ref of the given type; when none remain, mints the next ref
+    /// directly from the type's counter and advances it by one. Returns <see langword="null"/> when
+    /// the type is unknown or the counter can't be read. Legacy source:
+    /// <c>clsHistology.GetNextAvailableHistologyRef</c> (SP <c>GetNextHistologyRef</c>).
+    /// </summary>
+    Task<string?> GetNextAvailableRefAsync(int histologyType, CancellationToken ct = default);
 }

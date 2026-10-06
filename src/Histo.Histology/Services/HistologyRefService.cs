@@ -167,4 +167,29 @@ public sealed class HistologyRefService : IHistologyRefService
             return new HistologyBookingResult { Success = false, Error = "The database has not been updated because an error occurred. Please try again." };
         }
     }
+
+    /// <inheritdoc/>
+    public async Task<string?> GetNextAvailableRefAsync(int histologyType, CancellationToken ct = default)
+    {
+        try
+        {
+            var unused = await GetUnusedRefsAsync(histologyType, ct);
+            var fromPool = unused.FirstOrDefault()?.Ref;
+            if (fromPool is not null) return fromPool;
+
+            var counters = await GetCountersAsync(ct);
+            var counter = counters.FirstOrDefault(c => c.Type == histologyType);
+            if (counter is null || !int.TryParse(counter.NextHistologyRef, out var current)) return null;
+
+            var advanced = await SetCounterAsync(histologyType, (current + 1).ToString(), ct);
+            if (!advanced) return null;
+
+            return $"{DateTime.Now.Year % 100:D2}/{counter.NextHistologyRef}";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to draw the next available histology ref for type {HistologyType}.", ex, histologyType);
+            return null;
+        }
+    }
 }

@@ -14,26 +14,28 @@ namespace Histo.Web.Pages.Blocks;
 /// <see cref="Histo.Web.Pages.Batches.BatchBlocksModel"/> (batch-wide) onto one
 /// or more other samples in the same batch, duplicating each block's tissues.
 ///
-/// SIMPLIFIED: the legacy page also offered an "auto-generate histology ref"
-/// option for the target samples (<c>cbAutoGenerateHisto</c>, PG-number reversal,
-/// neuropath range lookups). That histology-ref generation is not reproduced —
-/// target samples keep whatever histology reference they already have. See
-/// <see cref="Histo.Submissions.Services.SubmissionService.CopyAnimalAsync"/> and
-/// <c>AnimalHelpers.ComputePgAutoHistologyRef</c> for the equivalent logic used
-/// elsewhere, which could be wired in here in a follow-on phase if required.
+/// Also reproduces legacy's <c>cbAutoGenerateHisto</c> "Auto Generate Histology Refs" option:
+/// when ticked, every target sample that doesn't already have a histology ref is assigned the
+/// next available ref of the same type as the source sample's own ref. The PG-number-reversal
+/// fallback (<c>DefaultHistoRefPGReverse</c>) is NOT reproduced — that path was deliberately
+/// removed app-wide with the Neuropath/Mouse Bioassay area (see
+/// docs/Mouse-Bioassay-Neuropath-Removal-Analysis.md); only the counter-draw path applies here.
 /// </summary>
 public class CopyBlocksModel : HistoPageModel
 {
     private readonly IBlockService _blocks;
     private readonly ISubmissionService _submissions;
     private readonly IBatchService _batches;
+    private readonly IHistologyRefService _histologyRefs;
 
-    public CopyBlocksModel(ISessionService session, IBlockService blocks, ISubmissionService submissions, IBatchService batches)
+    public CopyBlocksModel(ISessionService session, IBlockService blocks, ISubmissionService submissions,
+        IBatchService batches, IHistologyRefService histologyRefs)
         : base(session)
     {
         _blocks = blocks;
         _submissions = submissions;
         _batches = batches;
+        _histologyRefs = histologyRefs;
     }
 
     [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
@@ -47,6 +49,9 @@ public class CopyBlocksModel : HistoPageModel
 
     [BindProperty] public List<int> BlockIds { get; set; } = [];
     [BindProperty] public List<int> TargetAnimalIds { get; set; } = [];
+
+    /// <summary>Legacy <c>cbAutoGenerateHisto</c> — "Auto Generate Histology Refs".</summary>
+    [BindProperty] public bool AutoGenerateHistologyRefs { get; set; }
 
     public IReadOnlyList<Block> SourceBlocks { get; private set; } = [];
     public IReadOnlyList<Animal> TargetAnimals { get; private set; } = [];
@@ -104,8 +109,43 @@ public class CopyBlocksModel : HistoPageModel
         foreach (var targetAnimalId in TargetAnimalIds)
             await CopyBlocksToAnimalAsync(sourceBlocks, allBlocks, batchId.Value, targetAnimalId, userId);
 
-        TempData["StatusMessage"] = $"Copied {sourceBlocks.Count} block(s) to {TargetAnimalIds.Count} sample(s).";
+        var histoRefsAssigned = 0;
+        if (AutoGenerateHistologyRefs && sourceBlocks.Count > 0)
+            histoRefsAssigned = await AssignHistologyRefsAsync(batchId.Value, sourceBlocks[0].AnimalID, userId);
+
+        TempData["StatusMessage"] = $"Copied {sourceBlocks.Count} block(s) to {TargetAnimalIds.Count} sample(s)."
+            + (histoRefsAssigned > 0 ? $" Assigned a histology ref to {histoRefsAssigned} sample(s)." : string.Empty);
         return RedirectToOrigin(batchId.Value);
+    }
+
+    /// <summary>
+    /// Legacy <c>cbAutoGenerateHisto</c> path: assigns the next available histology ref (of the
+    /// same type as the source sample's own ref) to every target sample that doesn't already have
+    /// one. Returns the number of samples assigned. Legacy source: CopyBlocks.aspx.vb::GetNextHistoNumber.
+    /// </summary>
+    private async Task<int> AssignHistologyRefsAsync(int batchId, int sourceAnimalId, int userId)
+    {
+        var animals = await _submissions.GetAnimalsByBatchAsync(batchId);
+        var sourceAnimal = animals.FirstOrDefault(a => a.ID == sourceAnimalId);
+        var histologyType = HistologyRefTypeCode.FromExistingRef(sourceAnimal?.HistologyRef);
+        if (histologyType is null) return 0;
+
+        var assigned = 0;
+        foreach (var targetAnimalId in TargetAnimalIds)
+        {
+            var target = animals.FirstOrDefault(a => a.ID == targetAnimalId);
+            if (target is null || target.HistoRefSet) continue;
+
+            var nextRef = await _histologyRefs.GetNextAvailableRefAsync(histologyType.Value);
+            if (nextRef is null) continue;
+
+            target.HistologyRef = nextRef;
+            target.HistoRefSet = true;
+            if (await _submissions.UpdateAnimalAsync(target, userId))
+                assigned++;
+        }
+
+        return assigned;
     }
 
     private IActionResult RedirectToOrigin(int? batchId) => AnimalId is > 0
