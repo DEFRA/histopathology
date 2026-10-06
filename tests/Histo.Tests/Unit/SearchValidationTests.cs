@@ -29,6 +29,7 @@ public class SearchValidationTests
     private readonly Mock<ILookupService> _lookups = new();
     private readonly Mock<ISubmissionService> _submissions = new();
     private readonly Mock<IBlockService> _blocks = new();
+    private readonly Mock<IBlockTestService> _tests = new();
 
     public SearchValidationTests()
     {
@@ -59,7 +60,7 @@ public class SearchValidationTests
         };
 
     private SearchSubmissionsModel CreateSearchSubmissions() =>
-        new(_session.Object, _batches.Object, _users.Object, _lookups.Object) { PageContext = NewPageContext() };
+        new(_session.Object, _batches.Object, _users.Object, _lookups.Object, _blocks.Object, _submissions.Object, _tests.Object) { PageContext = NewPageContext() };
 
     private SearchPMDatesModel CreateSearchPmDates() =>
         new(_session.Object, _submissions.Object) { PageContext = NewPageContext() };
