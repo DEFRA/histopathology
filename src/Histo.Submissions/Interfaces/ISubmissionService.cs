@@ -11,6 +11,7 @@ public interface ISubmissionService
     // Submissions
     Task<IReadOnlyList<BatchSubmission>> GetSubmissionsByBatchAsync(int batchId, CancellationToken ct = default);
     Task<int> AddSubmissionAsync(BatchSubmission submission, int userId, CancellationToken ct = default);
+    Task<bool> CreateMouseRangeAsync(int batchId, int? sourceAnimalId, string mouseNumberFrom, string mouseNumberTo, int userId, CancellationToken ct = default);
     /// <summary>Copies a submission under a new batch. Pass <paramref name="animalId"/> once the destination animal is known so the copy is correctly linked (see AddSubmissionModel.OnPostAsync fix) — defaults to the unlinked placeholder used for submissions with no known animal yet.</summary>
     Task<int> CopySubmissionAsync(BatchSubmission source, int newBatchId, int userId, int animalId = 0, CancellationToken ct = default);
 

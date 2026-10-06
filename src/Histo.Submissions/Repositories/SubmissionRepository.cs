@@ -3,6 +3,7 @@ using Histo.Core.Domain;
 using Histo.Infrastructure;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
+using System.Data;
 
 namespace Histo.Submissions.Repositories;
 
@@ -12,6 +13,7 @@ namespace Histo.Submissions.Repositories;
 /// </summary>
 public sealed class SubmissionRepository : ISubmissionRepository
 {
+    private const int MaxMouseRangeEntries = 1000;
     private readonly IDbConnectionFactory _db;
 
     public SubmissionRepository(IDbConnectionFactory db) => _db = db;
@@ -59,6 +61,180 @@ public sealed class SubmissionRepository : ISubmissionRepository
         await conn.ExecuteAsync("AddBatchSubmission", parameters,
             commandType: System.Data.CommandType.StoredProcedure);
         return parameters.Get<int>("NewID");
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> CreateMouseRangeAsync(int batchId, int? sourceAnimalId, string mouseNumberFrom, string mouseNumberTo, int userId, CancellationToken ct = default)
+    {
+        if (!ValidationHelpers.ValidateMouseNumber(mouseNumberFrom) || !ValidationHelpers.ValidateMouseNumber(mouseNumberTo)
+            || !SenderRefHelpers.TryParseMouseNumber(mouseNumberFrom, out var fromId) || !SenderRefHelpers.TryParseMouseNumber(mouseNumberTo, out var toId))
+            return false;
+
+        if (fromId >= toId)
+            return false;
+
+        var rangeSize = toId - fromId + 1;
+        if (rangeSize > MaxMouseRangeEntries)
+            return false;
+
+        using var conn = _db.CreateConnection();
+        await conn.OpenAsync(ct);
+        using var tx = conn.BeginTransaction();
+
+        try
+        {
+            var siblings = await GetSubmissionsByBatchAsync(conn, tx, batchId);
+            var nextOrder = siblings.Count > 0 ? siblings.Max(s => s.Order) + 1 : 1;
+
+            IReadOnlyList<Tissue> sourceTissues = [];
+            if (sourceAnimalId is > 0)
+            {
+                var sourceSubmission = siblings.FirstOrDefault(s => s.AnimalID == sourceAnimalId.Value);
+                if (sourceSubmission is not null)
+                    sourceTissues = await GetTissuesBySubmissionAsync(conn, tx, batchId, sourceSubmission.ID);
+            }
+
+            for (var currentNumber = fromId; currentNumber <= toId; currentNumber++)
+            {
+                var mouseNumber = SenderRefHelpers.FormatMouseNumber(currentNumber);
+                var animalId = await AddAnimalAsync(conn, tx, new Animal
+                {
+                    BatchSubmissionID = 0,
+                    SenderRef = mouseNumber,
+                    NextBlockRef = "01",
+                    HistologyRef = null,
+                    HistoRefSet = false,
+                    OnHold = false,
+                    PMDate = null,
+                    PMDateSet = false,
+                    IsPGNumber = false,
+                    BookedHistologyRef = false,
+                }, userId);
+                if (animalId <= 0)
+                    throw new InvalidOperationException($"Failed to create animal {mouseNumber}.");
+
+                var submissionId = await AddSubmissionAsync(conn, tx,
+                    new BatchSubmission { BatchID = batchId, AnimalID = animalId, SubmissionName = "Default", Order = nextOrder++ },
+                    userId);
+                if (submissionId <= 0)
+                    throw new InvalidOperationException($"Failed to add submission for {mouseNumber}.");
+
+                if (sourceTissues.Count > 0)
+                {
+                    foreach (var tissue in sourceTissues)
+                    {
+                        var copied = await CopyTissueAsync(conn, tx, tissue, submissionId, userId);
+                        if (copied <= 0)
+                            throw new InvalidOperationException($"Failed to copy tissues for {mouseNumber}.");
+                    }
+                }
+            }
+
+            tx.Commit();
+            return true;
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
+    }
+
+    private static async Task<IReadOnlyList<BatchSubmission>> GetSubmissionsByBatchAsync(IDbConnection conn, IDbTransaction tx, int batchId)
+    {
+        using var multi = await conn.QueryMultipleAsync(
+            "GetBatchSubmissionDetailsByBatchID",
+            new { ID = batchId },
+            transaction: tx,
+            commandType: System.Data.CommandType.StoredProcedure);
+
+        var rows = await multi.ReadAsync<BatchSubmission>();
+        return rows.ToList();
+    }
+
+    private static async Task<IReadOnlyList<Tissue>> GetTissuesBySubmissionAsync(IDbConnection conn, IDbTransaction tx, int batchId, int submissionId)
+    {
+        var rows = await conn.QueryAsync<dynamic>(
+            "GetBatchTissues",
+            new { ID = batchId },
+            transaction: tx,
+            commandType: System.Data.CommandType.StoredProcedure);
+
+        return rows
+            .Select(r => (IDictionary<string, object>)r)
+            .Where(d => d.TryGetValue("BatchSubmissionID", out var bsid) && Convert.ToInt32(bsid) == submissionId)
+            .Select(d => new Tissue
+            {
+                ID = d.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0,
+                OwnerID = submissionId,
+                Owner = TissueOwner.Submission,
+                TissueCode = d.TryGetValue("TissueCode", out var tc) ? Convert.ToString(tc)?.Trim() ?? "" : "",
+                NoPieces = d.TryGetValue("NoPieces", out var np) ? Convert.ToInt16(np) : (short)0,
+                Comment = d.TryGetValue("Comment", out var cm) && cm is not DBNull ? Convert.ToString(cm) : null,
+                ArchiveLocation = d.TryGetValue("ArchiveLocation", out var al) && al is not DBNull ? Convert.ToString(al) : null,
+                ArchivedDate = d.TryGetValue("ArchivedDate", out var ad) && ad is not DBNull && DateTime.TryParse(Convert.ToString(ad), out var adv) ? adv : null,
+                ArchiveComment = d.TryGetValue("ArchiveComment", out var ac) && ac is not DBNull ? Convert.ToString(ac) : null,
+                RowStamp = d.TryGetValue("RowStamp", out var rs) ? rs as byte[] : null,
+            })
+            .ToList();
+    }
+
+    private static async Task<int> AddSubmissionAsync(IDbConnection conn, IDbTransaction tx, BatchSubmission submission, int userId)
+    {
+        var parameters = new DynamicParameters();
+        parameters.Add("ID", 0, dbType: System.Data.DbType.Int32);
+        parameters.Add("BatchID", submission.BatchID, dbType: System.Data.DbType.Int32);
+        parameters.Add("AnimalID", submission.AnimalID, dbType: System.Data.DbType.Int32);
+        parameters.Add("Order", submission.Order, dbType: System.Data.DbType.Int32);
+        parameters.Add("OldID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+        parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+
+        await conn.ExecuteAsync("AddBatchSubmission", parameters, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
+        return parameters.Get<int>("NewID");
+    }
+
+    private static async Task<int> AddAnimalAsync(IDbConnection conn, IDbTransaction tx, Animal animal, int userId)
+    {
+        var parameters = new DynamicParameters();
+        parameters.Add("SenderRef", animal.SenderRef);
+        parameters.Add("HistologyRef", animal.HistologyRef, dbType: System.Data.DbType.String);
+        parameters.Add("NextBlockRef", animal.NextBlockRef);
+        parameters.Add("PMDate", (object?)animal.PMDate ?? DBNull.Value, dbType: System.Data.DbType.String);
+        parameters.Add("OnHold", animal.OnHold);
+        parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+
+        await conn.ExecuteAsync("AddAnimal", parameters, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
+        return parameters.Get<int>("NewID");
+    }
+
+    private static async Task<int> CopyTissueAsync(IDbConnection conn, IDbTransaction tx, Tissue source, int newOwnerId, int userId)
+    {
+        var tissue = new Tissue
+        {
+            OwnerID = newOwnerId,
+            Owner = source.Owner,
+            TissueCode = source.TissueCode,
+            NoPieces = source.NoPieces,
+            Comment = source.Comment,
+        };
+
+        return await AddTissueAsync(conn, tx, tissue, userId);
+    }
+
+    private static async Task<int> AddTissueAsync(IDbConnection conn, IDbTransaction tx, Tissue tissue, int userId)
+    {
+        var procName = tissue.Owner == TissueOwner.Submission ? "AddTissue" : "AddBlockTissue";
+        var keyParam = tissue.Owner == TissueOwner.Submission ? "BatchSubmissionID" : "BlockID";
+
+        var parameters = new DynamicParameters();
+        parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
+        parameters.Add(keyParam, tissue.OwnerID);
+        parameters.Add("TissueCode", tissue.TissueCode);
+        parameters.Add("NoPieces", tissue.NoPieces);
+        parameters.Add("Comment", (object?)tissue.Comment ?? DBNull.Value, dbType: System.Data.DbType.String);
+
+        await conn.ExecuteAsync(procName, parameters, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
+        return parameters.Get<int>("RETURN_VALUE");
     }
 
     /// <inheritdoc/>

@@ -15,7 +15,7 @@
         <div role="alert">
             <h2 class="govuk-error-summary__title">There is a problem</h2>
             <div class="govuk-error-summary__body">
-                <ul class="govuk-list govuk-error-summary__list"><li><a href="#SenderRef">@Model.ModelError</a></li></ul>
+                <ul class="govuk-list govuk-error-summary__list"><li><a href="#@(Model.MouseRangeHasError ? "MouseNumberFrom" : "SenderRef")">@Model.ModelError</a></li></ul>
             </div>
         </div>
     </div>
@@ -25,14 +25,20 @@
     <input type="hidden" asp-for="BatchId" />
     <input type="hidden" asp-for="BatchSubmissionId" />
     <input type="hidden" asp-for="SourceAnimalId" />
+    <input type="hidden" asp-for="RowIndex" />
     <input type="hidden" asp-for="ReturnPage" />
     <input type="hidden" id="icc-filter" name="Filter" value="" />
-    <div class="govuk-form-group">
+    <div class="govuk-form-group @(Model.ModelError is not null && !Model.MouseRangeHasError ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="SenderRef">@(Model.IsAssignTissueMode ? "Sample associated" : "Sender reference")</label>
         @if (Model.IsAssignTissueMode)
         {
             <div class="govuk-hint">Select the sample you want to assign tissues/blocks to.</div>
-            <select class="govuk-select" asp-for="SenderRef" required>
+            @if (Model.ModelError is not null && !Model.MouseRangeHasError)
+            {
+                <p id="SenderRef-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @Model.ModelError</p>
+            }
+            <select class="govuk-select @(Model.ModelError is not null && !Model.MouseRangeHasError ? "govuk-select--error" : "")" asp-for="SenderRef" required
+                    aria-describedby="@(Model.ModelError is not null && !Model.MouseRangeHasError ? "SenderRef-error" : null)">
                 <option value="">-- Select a sample --</option>
                 @foreach (var animal in Model.AvailableAnimals)
                 {
@@ -43,7 +49,11 @@
         else
         {
             <div class="govuk-hint">Enter the reference for the sample you are submitting tissue for, then click Add sample. It is recommended that the sender reference does not exceed 10 characters.</div>
-            <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" required />
+            @if (Model.ModelError is not null && !Model.MouseRangeHasError)
+            {
+                <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @Model.ModelError</p>
+            }
+            <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" />
         }
     </div>
     @if (!Model.IsAssignTissueMode)
@@ -53,6 +63,31 @@
                 Search for a previously used sender reference
             </a>
         </p>
+    }
+    @if (!Model.IsAssignTissueMode && Model.ShowMouseRange)
+    {
+        <fieldset class="govuk-fieldset govuk-!-margin-bottom-6 @(Model.MouseRangeHasError ? "govuk-form-group--error" : "")">
+            <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Alternatively, assign mouse ranges</legend>
+            <div class="govuk-hint">Enter the mouse numbers below instead of a sender reference, then click Add sample. The mouse number format is MC followed by 6 digits, i.e. MC000105.</div>
+            @if (Model.MouseRangeHasError)
+            {
+                <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @Model.ModelError</p>
+            }
+            <div class="govuk-grid-row">
+                <div class="govuk-grid-column-one-half">
+                    <div class="govuk-form-group govuk-!-margin-bottom-0">
+                        <label class="govuk-label" for="MouseNumberFrom">Mouse number from</label>
+                        <input class="govuk-input govuk-input--width-10" id="MouseNumberFrom" name="MouseNumberFrom" type="text" value="@Model.MouseNumberFrom" maxlength="8" />
+                    </div>
+                </div>
+                <div class="govuk-grid-column-one-half">
+                    <div class="govuk-form-group govuk-!-margin-bottom-0">
+                        <label class="govuk-label" for="MouseNumberTo">Mouse number to</label>
+                        <input class="govuk-input govuk-input--width-10" id="MouseNumberTo" name="MouseNumberTo" type="text" value="@Model.MouseNumberTo" maxlength="8" />
+                    </div>
+                </div>
+            </div>
+        </fieldset>
     }
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Add sample</button>

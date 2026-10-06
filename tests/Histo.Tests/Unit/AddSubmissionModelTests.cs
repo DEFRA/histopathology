@@ -4,9 +4,11 @@ using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
+using Histo.Web.Pages.Batches;
 using Histo.Web.Pages.Submissions;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
@@ -208,6 +210,34 @@ public class AddSubmissionModelTests
     }
 
     [Fact]
+    public async Task OnPostAsync_CopySubmissionReturnFlow_StagesTheUpdatedSenderRefWithoutCreatingSourceRecords()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        var sut = CreateSut(returnPage: "/Batches/CopyBatch");
+        sut.BatchSubmissionId = 99;
+        sut.SourceAnimalId = 42;
+        sut.SenderRef = "NewRef";
+        sut.RowIndex = 1;
+        sut.TempData["CopyBatch_Animals"] = JsonSerializer.Serialize(new List<CopyBatchModel.AnimalRow>
+        {
+            new() { AnimalId = 10, SenderRef = "OldA", NewSenderRef = string.Empty },
+            new() { AnimalId = 11, SenderRef = "OldB", NewSenderRef = string.Empty },
+        });
+
+        var result = await sut.OnPostAsync();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Batches/CopyBatch", redirect.PageName);
+        Assert.Equal(5, redirect.RouteValues!["sourceBatchId"]);
+
+        _submissions.Verify(s => s.AddAnimalAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+        _submissions.Verify(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        var animals = JsonSerializer.Deserialize<List<CopyBatchModel.AnimalRow>>(sut.TempData["CopyBatch_Animals"] as string ?? "[]");
+        Assert.Equal("NewRef", animals![1].NewSenderRef);
+    }
+
+    [Fact]
     public async Task OnPostAsync_PreCassetted_SenderHasPreBookedBlock_ReusesPreBookedAnimal()
     {
         _session.Object.BatchSubmissionID = 99;
@@ -249,5 +279,235 @@ public class AddSubmissionModelTests
         Assert.IsType<PageResult>(result);
         Assert.Equal("This sender reference has no pre-booked block. Book a block reference for this sender before adding the sample.", sut.ModelError);
         _submissions.Verify(s => s.AddAnimalAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_SenderRefError_DoesNotSetMouseRangeHasError()
+    {
+        var sut = CreateSut(returnPage: null);
+
+        await sut.OnPostAsync();
+
+        Assert.False(sut.MouseRangeHasError);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_MouseRangeError_SetsMouseRangeHasError()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SourceAnimalId = 1;
+        sut.MouseNumberFrom = "BAD";
+        sut.MouseNumberTo = "MC000002";
+
+        await sut.OnPostAsync();
+
+        Assert.True(sut.MouseRangeHasError);
+    }
+
+    [Fact]
+    public void ShowMouseRange_ForHistopathUserAreaWithSourceAnimal_IsTrue()
+    {
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        var sut = CreateSut();
+        sut.SourceAnimalId = 1;
+        Assert.True(sut.ShowMouseRange);
+    }
+
+    [Fact]
+    public void ShowMouseRange_ForOtherUserArea_IsFalse()
+    {
+        _session.Setup(s => s.UserArea).Returns("External Customer");
+        var sut = CreateSut();
+        sut.SourceAnimalId = 1;
+        Assert.False(sut.ShowMouseRange);
+    }
+
+    [Fact]
+    public void ShowMouseRange_ForHistopathUserAreaWithoutSourceAnimal_IsFalse()
+    {
+        // Legacy only shows this section on the "copying a submission" journey — the plain
+        // Create/Edit Submission journey (no Copy sample context) never qualifies.
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        Assert.False(CreateSut().ShowMouseRange);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_NeitherSenderRefNorMouseRange_SetsModelError()
+    {
+        var sut = CreateSut(returnPage: null);
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("Enter the sender reference.", sut.ModelError);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_BothSenderRefAndMouseRange_SetsModelError()
+    {
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        var sut = CreateSut(returnPage: null);
+        sut.SourceAnimalId = 1;
+        sut.SenderRef = "S1";
+        sut.MouseNumberFrom = "MC000001";
+        sut.MouseNumberTo = "MC000002";
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("Enter either the Sender ref or the mouse number ranges.", sut.ModelError);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_MouseRange_InvalidFormat_SetsModelError()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SourceAnimalId = 1;
+        sut.MouseNumberFrom = "BAD";
+        sut.MouseNumberTo = "MC000002";
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("The mouse number format is MC followed by 6 digits, i.e. MC000105.", sut.ModelError);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_MouseRange_FromNotLessThanTo_SetsModelError()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SourceAnimalId = 1;
+        sut.MouseNumberFrom = "MC000005";
+        sut.MouseNumberTo = "MC000002";
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("The from number must be less than the to number.", sut.ModelError);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_MouseRange_DuplicateInBatch_SetsModelErrorAndDoesNotCreateAnimal()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1, SenderRef = "MC000002" }]);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SourceAnimalId = 1;
+        sut.MouseNumberFrom = "MC000001";
+        sut.MouseNumberTo = "MC000003";
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("Mouse number MC000002 already exists on the submission. Alter the range and try again.", sut.ModelError);
+        _submissions.Verify(s => s.AddAnimalAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_MouseRange_UsesTransactionalRangeCreate_WhenValid()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.CreateMouseRangeAsync(5, 1, "MC000001", "MC000002", 7, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SourceAnimalId = 1;
+        sut.MouseNumberFrom = "MC000001";
+        sut.MouseNumberTo = "MC000002";
+
+        var result = await sut.OnPostAsync();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Submissions/SampleSummary", redirect.PageName);
+        _submissions.Verify(s => s.CreateMouseRangeAsync(5, 1, "MC000001", "MC000002", 7, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_MouseRange_ExceedsMaximumRangeSize_SetsModelError()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SourceAnimalId = 1;
+        sut.MouseNumberFrom = "MC000001";
+        sut.MouseNumberTo = "MC001001";
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("The mouse number range cannot exceed 1000 entries. Use a smaller range or create a bulk job.", sut.ModelError);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_MouseRange_DelegatesToTransactionalRangeService()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 50, BatchID = 5, AnimalID = 1, Order = 1 }]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.CreateMouseRangeAsync(5, 1, "MC000001", "MC000002", 7, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SourceAnimalId = 1;
+        sut.MouseNumberFrom = "MC000001";
+        sut.MouseNumberTo = "MC000002";
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<RedirectToPageResult>(result);
+        _submissions.Verify(s => s.CreateMouseRangeAsync(5, 1, "MC000001", "MC000002", 7, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_MouseRange_ServiceFailure_SetsModelError()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 50, BatchID = 5, AnimalID = 1, Order = 1 }]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.CreateMouseRangeAsync(5, 1, "MC000001", "MC000002", 7, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SourceAnimalId = 1;
+        sut.MouseNumberFrom = "MC000001";
+        sut.MouseNumberTo = "MC000002";
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("Could not add the sample range. Please try again.", sut.ModelError);
     }
 }

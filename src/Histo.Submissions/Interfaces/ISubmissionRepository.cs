@@ -23,6 +23,9 @@ public interface ISubmissionRepository
     /// <summary>Adds a batch submission. Maps to <c>AddBatchSubmission</c>. Returns new ID.</summary>
     Task<int> AddSubmissionAsync(BatchSubmission submission, int userId, CancellationToken ct = default);
 
+    /// <summary>Creates a complete mouse-number range in one transaction so the whole operation rolls back if any animal, submission, or tissue copy fails.</summary>
+    Task<bool> CreateMouseRangeAsync(int batchId, int? sourceAnimalId, string mouseNumberFrom, string mouseNumberTo, int userId, CancellationToken ct = default);
+
     /// <summary>Updates a batch submission. Maps to <c>EditBatchSubmission</c>.</summary>
     Task UpdateSubmissionAsync(BatchSubmission submission, int userId, CancellationToken ct = default);
 

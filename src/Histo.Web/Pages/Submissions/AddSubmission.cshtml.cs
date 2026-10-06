@@ -4,8 +4,10 @@ using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
+using Histo.Web.Pages.Batches;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace Histo.Web.Pages.Submissions;
 
@@ -34,13 +36,37 @@ public class AddSubmissionModel : HistoPageModel
 
     [BindProperty] public string SenderRef   { get; set; } = string.Empty;
 
+    /// <summary>Alternative to <see cref="SenderRef"/>: start of an "MC######" range (legacy AddSample.aspx/AddSubmission.aspx "Alternatively you can assign mouse ranges...").</summary>
+    [BindProperty] public string MouseNumberFrom { get; set; } = string.Empty;
+
+    /// <summary>End of the mouse-number range (inclusive). See <see cref="MouseNumberFrom"/>.</summary>
+    [BindProperty] public string MouseNumberTo { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Legacy gating (AddSubmission.aspx.vb::InitialiseUserAreaControls) requires BOTH the user
+    /// area check AND a "copying a submission" context (legacy: reached via CopyBatch.aspx/
+    /// CopyBatchBlocks.aspx). The modern Copy Batch journey (<c>CopyBatchModel</c>) no longer
+    /// routes through this page at all, so the closest equivalent "copying" context here is the
+    /// per-sample "Copy sample" action (<see cref="SourceAnimalId"/> set) — the plain Create/Edit
+    /// Submission journey (brand-new Sender Ref, no SourceAnimalId) never qualifies.
+    ///
+    /// Legacy's area check also allowed "Mouse Bioassay" — dropped here because that
+    /// <c>luUserArea</c> row has since been deactivated (migration
+    /// V20260917_01_Deactivate_MouseBioassay_Neuropath_UserAreas.sql; see
+    /// docs/Mouse-Bioassay-Neuropath-Removal-ChangeReport.md), so no user can be assigned it any
+    /// more — only "Histopath" remains a reachable value.
+    /// </summary>
+    public bool ShowMouseRange => SourceAnimalId is > 0 && Session.UserArea == "Histopath";
+
     /// <summary>
     /// Set when this form was reached via "Copy sample" — the animal whose tissues should be
     /// duplicated onto the newly created sample. Round-tripped via a hidden field so it survives
     /// the POST (and the SearchSender picker detour, which only restores <see cref="SenderRef"/>).
     /// </summary>
     [BindProperty] public int? SourceAnimalId { get; set; }
-
+    /// <summary>Index of the row being edited on the copy-submission page. When the user is returned to
+    /// <c>/Batches/CopyBatch</c>, this lets us persist the updated sender ref into the staged list before Finish.</summary>
+    [BindProperty(SupportsGet = true)] public int? RowIndex { get; set; }
     /// <summary>Explicit return page for this flow, used by the Back/Cancel links when the user arrives from a page other than the default batch list.</summary>
     [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
 
@@ -90,6 +116,11 @@ public class AddSubmissionModel : HistoPageModel
     public IReadOnlyList<Animal> AvailableAnimals { get; private set; } = [];
 
     public string? ModelError { get; private set; }
+
+    /// <summary>True when <see cref="ModelError"/> came from <see cref="OnPostMouseRangeAsync"/> — lets
+    /// the view anchor the error summary link and inline error message at the mouse-number fields
+    /// instead of Sender Ref.</summary>
+    public bool MouseRangeHasError { get; private set; }
 
     public async Task OnGetAsync(string? senderRef, int? sourceAnimalId)
     {
@@ -141,6 +172,29 @@ public class AddSubmissionModel : HistoPageModel
             return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = chosen.ID });
         }
 
+        var hasMouseRangeInput = ShowMouseRange && (!string.IsNullOrWhiteSpace(MouseNumberFrom) || !string.IsNullOrWhiteSpace(MouseNumberTo));
+        var usingMouseRange = ShowMouseRange && !string.IsNullOrWhiteSpace(MouseNumberFrom) && !string.IsNullOrWhiteSpace(MouseNumberTo);
+        var usingSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
+        if (hasMouseRangeInput && !usingMouseRange)
+        {
+            ModelError = "Enter both the from and to mouse numbers.";
+            MouseRangeHasError = true;
+            return Page();
+        }
+        if (usingSenderRef == usingMouseRange)
+        {
+            // Legacy: exactly one of Sender Ref or the mouse-number range must be filled in.
+            ModelError = ShowMouseRange ? "Enter either the Sender ref or the mouse number ranges." : "Enter the sender reference.";
+            return Page();
+        }
+
+        if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase)
+            && SourceAnimalId is > 0)
+        {
+            PersistCopyBatchState();
+            return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
+        }
+
         var submissionId = BatchSubmissionId ?? Session.BatchSubmissionID;
         if (submissionId is null or <= 0)
         {
@@ -162,56 +216,16 @@ public class AddSubmissionModel : HistoPageModel
 
         Session.BatchSubmissionID = submissionId;
 
-        // Pre-cassetted samples may only use a block ref already pre-booked for this sender
-        // (Book Blocks) — legacy: clsBlock.NewBlock -> GetPreBookedBlock. Checking here, before
-        // navigating away, avoids the user only finding out on the block page that nothing is
-        // available. Reuses the pre-booked animal's own ID so its pre-booked blocks carry over,
-        // rather than creating a separate, unbooked Animal for the same sender.
-        // Regression note: this check existed previously and was silently dropped as collateral
-        // damage by an unrelated refactor (commit e40a473) that removed the IBlockService
-        // dependency this page no longer used for anything else at the time — restored here.
         var batch = await _batches.GetByIdAsync(batchId.Value);
 
-        int newAnimalId;
-        if (batch?.IsPreCassetted == true)
-        {
-            // A sender ref can match more than one animal row (e.g. an unrelated past submission
-            // with no pre-booked blocks, alongside the actual pre-booked placeholder) — check each
-            // candidate rather than assuming the first match is the pre-booked one.
-            Block[] preBookedBlocks = [];
-            SenderSearchResult? preBookedAnimal = null;
-            foreach (var candidate in await _submissions.GetAnimalBySenderAsync(SenderRef))
-            {
-                var candidateBlocks = await _blocks.GetPreBookedByAnimalAsync(candidate.ID);
-                if (candidateBlocks.Count == 0) continue;
-                preBookedAnimal = candidate;
-                preBookedBlocks = [.. candidateBlocks];
-                break;
-            }
+        if (usingMouseRange)
+            return await OnPostMouseRangeAsync(batchId.Value, submissionId.Value, batch);
 
-            if (preBookedAnimal is null || preBookedBlocks.Length == 0)
-            {
-                ModelError = "This sender reference has no pre-booked block. Book a block reference for this sender before adding the sample.";
-                return Page();
-            }
-
-            newAnimalId = preBookedAnimal.ID;
-        }
-        else
+        var (newAnimalId, createError) = await CreateAnimalForSenderAsync(batchId.Value, submissionId.Value, batch, SenderRef);
+        if (createError is not null)
         {
-            newAnimalId = await _submissions.AddAnimalAsync(
-                submissionId.Value,
-                SenderRef,
-                Session.UserID,
-                pmDate: null,
-                pmDateSet: false);
-            if (newAnimalId <= 0)
-            {
-                // AddAnimalAsync swallows the underlying SQL exception and returns 0 on failure —
-                // redirecting anyway here previously hid the fact that no sample was actually saved.
-                ModelError = "Could not add the sample. Please try again.";
-                return Page();
-            }
+            ModelError = createError;
+            return Page();
         }
 
         // Legacy AddSubmission.aspx::btnNext_Click continues straight into the per-sample detail
@@ -248,6 +262,15 @@ public class AddSubmissionModel : HistoPageModel
                         await _submissions.CopyTissueAsync(tissue, ownSubmissionId, Session.UserID);
                 }
 
+                // Copy-submission "Change" flow must return to the batch copy list so the user can
+                // still press Finish and complete the copy. Otherwise they are stranded on the
+                // sample summary page without a final submission action.
+                if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase))
+                {
+                    PersistCopyBatchState();
+                    return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
+                }
+
                 // Copy sample started from Sample Summary — return there so it's clear the new
                 // sample was added, rather than continuing straight into its (empty) detail page.
                 return RedirectToPage("/Submissions/SampleSummary", new { batchId });
@@ -258,10 +281,46 @@ public class AddSubmissionModel : HistoPageModel
         }
 
         if (SourceAnimalId is > 0)
+        {
+            if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase))
+            {
+                PersistCopyBatchState();
+                return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
+            }
             return RedirectToPage("/Submissions/SampleSummary", new { batchId });
+        }
 
         Session.SampleDetailReturnPage = BackLinkPage;
         return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = newAnimalId });
+    }
+
+    private void PersistCopyBatchState()
+    {
+        if (TempData is null || !string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (TempData["CopyBatch_Animals"] is not string savedJson)
+            return;
+
+        var animals = JsonSerializer.Deserialize<List<CopyBatchModel.AnimalRow>>(savedJson) ?? [];
+        if (RowIndex is >= 0 && RowIndex < animals.Count)
+        {
+            animals[RowIndex.Value].NewSenderRef = string.IsNullOrWhiteSpace(SenderRef)
+                ? string.IsNullOrWhiteSpace(MouseNumberFrom) ? string.Empty : MouseNumberFrom.Trim()
+                : SenderRef.Trim();
+        }
+        else if (!string.IsNullOrWhiteSpace(SenderRef) || !string.IsNullOrWhiteSpace(MouseNumberFrom))
+        {
+            animals.Add(new CopyBatchModel.AnimalRow
+            {
+                AnimalId = SourceAnimalId ?? 0,
+                SubmissionId = BatchSubmissionId ?? 0,
+                SenderRef = string.IsNullOrWhiteSpace(SenderRef) ? MouseNumberFrom.Trim() : SenderRef.Trim(),
+                NewSenderRef = string.IsNullOrWhiteSpace(SenderRef) ? MouseNumberFrom.Trim() : SenderRef.Trim(),
+            });
+        }
+
+        TempData["CopyBatch_Animals"] = JsonSerializer.Serialize(animals);
     }
 
     /// <summary>
@@ -280,4 +339,128 @@ public class AddSubmissionModel : HistoPageModel
     /// <summary>Every sample in the batch — the pickable set for <see cref="IsAssignTissueMode"/>.</summary>
     private async Task<IReadOnlyList<Animal>> GetAssignableAnimalsAsync(int batchId) =>
         await _submissions.GetAnimalsByBatchAsync(batchId);
+
+    /// <summary>
+    /// Creates (or, for pre-cassetted batches, reuses the pre-booked placeholder for) a single
+    /// Animal for <paramref name="senderRef"/>. Shared by the single Sender Ref path and the
+    /// mouse-range loop in <see cref="OnPostMouseRangeAsync"/>.
+    /// </summary>
+    private async Task<(int AnimalId, string? Error)> CreateAnimalForSenderAsync(int batchId, int submissionId, Batch? batch, string senderRef)
+    {
+        // Pre-cassetted samples may only use a block ref already pre-booked for this sender
+        // (Book Blocks) — legacy: clsBlock.NewBlock -> GetPreBookedBlock. Checking here, before
+        // navigating away, avoids the user only finding out on the block page that nothing is
+        // available. Reuses the pre-booked animal's own ID so its pre-booked blocks carry over,
+        // rather than creating a separate, unbooked Animal for the same sender.
+        // Regression note: this check existed previously and was silently dropped as collateral
+        // damage by an unrelated refactor (commit e40a473) that removed the IBlockService
+        // dependency this page no longer used for anything else at the time — restored here.
+        if (batch?.IsPreCassetted == true)
+        {
+            // A sender ref can match more than one animal row (e.g. an unrelated past submission
+            // with no pre-booked blocks, alongside the actual pre-booked placeholder) — check each
+            // candidate rather than assuming the first match is the pre-booked one.
+            Block[] preBookedBlocks = [];
+            SenderSearchResult? preBookedAnimal = null;
+            foreach (var candidate in await _submissions.GetAnimalBySenderAsync(senderRef))
+            {
+                var candidateBlocks = await _blocks.GetPreBookedByAnimalAsync(candidate.ID);
+                if (candidateBlocks.Count == 0) continue;
+                preBookedAnimal = candidate;
+                preBookedBlocks = [.. candidateBlocks];
+                break;
+            }
+
+            if (preBookedAnimal is null || preBookedBlocks.Length == 0)
+                return (0, "This sender reference has no pre-booked block. Book a block reference for this sender before adding the sample.");
+
+            return (preBookedAnimal.ID, null);
+        }
+
+        var newAnimalId = await _submissions.AddAnimalAsync(submissionId, senderRef, Session.UserID, pmDate: null, pmDateSet: false);
+        // AddAnimalAsync swallows the underlying SQL exception and returns 0 on failure —
+        // redirecting anyway here previously hid the fact that no sample was actually saved.
+        return newAnimalId > 0 ? (newAnimalId, null) : (0, "Could not add the sample. Please try again.");
+    }
+
+    /// <summary>
+    /// Legacy "Alternatively you can assign mouse ranges..." — creates one Animal per MC number in
+    /// [<see cref="MouseNumberFrom"/>, <see cref="MouseNumberTo"/>], each with its own BatchSubmission
+    /// row, then returns to Sample Summary rather than a single sample's detail page.
+    /// </summary>
+    private async Task<IActionResult> OnPostMouseRangeAsync(int batchId, int submissionId, Batch? batch)
+    {
+        const int maxMouseRangeEntries = 1000;
+
+        var from = MouseNumberFrom.Trim().ToUpperInvariant();
+        var to = MouseNumberTo.Trim().ToUpperInvariant();
+
+        if (from.Length != 8 || to.Length != 8
+            || !ValidationHelpers.ValidateMouseNumber(from) || !ValidationHelpers.ValidateMouseNumber(to)
+            || !SenderRefHelpers.TryParseMouseNumber(from, out var fromId) || !SenderRefHelpers.TryParseMouseNumber(to, out var toId))
+        {
+            ModelError = "The mouse number format is MC followed by 6 digits, i.e. MC000105.";
+            MouseRangeHasError = true;
+            return Page();
+        }
+
+        if (fromId >= toId)
+        {
+            ModelError = "The from number must be less than the to number.";
+            MouseRangeHasError = true;
+            return Page();
+        }
+
+        var rangeSize = toId - fromId + 1;
+        if (rangeSize > maxMouseRangeEntries)
+        {
+            ModelError = $"The mouse number range cannot exceed {maxMouseRangeEntries} entries. Use a smaller range or create a bulk job.";
+            MouseRangeHasError = true;
+            return Page();
+        }
+
+        // Validate the whole range against samples already in this batch before creating anything —
+        // this keeps the duplicate check bounded without materialising a million-item list in memory.
+        var existingInBatch = await _submissions.GetAnimalsByBatchAsync(batchId);
+        string? duplicate = null;
+        for (var current = fromId; current <= toId; current++)
+        {
+            var candidate = SenderRefHelpers.FormatMouseNumber(current);
+            if (existingInBatch.Any(a => string.Equals(a.SenderRef, candidate, StringComparison.OrdinalIgnoreCase)))
+            {
+                duplicate = candidate;
+                break;
+            }
+        }
+
+        if (duplicate is not null)
+        {
+            ModelError = $"Mouse number {duplicate} already exists on the submission. Alter the range and try again.";
+            MouseRangeHasError = true;
+            return Page();
+        }
+
+        if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase)
+            && SourceAnimalId is > 0)
+        {
+            PersistCopyBatchState();
+            return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
+        }
+
+        var created = await _submissions.CreateMouseRangeAsync(batchId, SourceAnimalId, from, to, Session.UserID);
+        if (!created)
+        {
+            ModelError = "Could not add the sample range. Please try again.";
+            MouseRangeHasError = true;
+            return Page();
+        }
+
+        if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase))
+        {
+            PersistCopyBatchState();
+            return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
+        }
+
+        return RedirectToPage("/Submissions/SampleSummary", new { batchId });
+    }
 }
