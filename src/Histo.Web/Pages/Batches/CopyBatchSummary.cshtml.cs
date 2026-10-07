@@ -50,4 +50,21 @@ public class CopyBatchSummaryModel : HistoPageModel
         Session.IsViewSubmissionMode = false;
         return RedirectToPage("/Batches/BatchDetails");
     }
+
+    public IActionResult OnPostSamplesAsync(int newBatchId)
+    {
+        Session.BatchID = newBatchId;
+        Session.IsViewSubmissionMode = false;
+        Session.SampleSummaryReturnPage = "/Batches/CopyBatchSummary";
+        return RedirectToPage("/Submissions/SampleSummary", new { batchId = newBatchId });
+    }
+
+    public IActionResult OnPostEditAsync(int newBatchId)
+    {
+        Session.BatchID = newBatchId;
+        Session.IsViewSubmissionMode = false;
+        Session.SampleSummaryReturnPage = "/Batches/CopyBatchSummary";
+        Session.EditBatchReturnPage = "/Batches/CopyBatchSummary";
+        return RedirectToPage("/Batches/EditBatch");
+    }
 }

@@ -154,12 +154,14 @@ public class CopyBatchModel : HistoPageModel
         // Nothing is written to the database here — the samples are staged and the user is sent
         // to the normal Create Submission form, pre-filled from this source batch, so the new
         // batch (and these samples) are only created once that form is actually submitted.
-        // The token lets BatchDetailsModel tell "the user is continuing THIS copy" apart from
-        // "the user abandoned it and later made an unrelated Create Submission visit" — a plain
-        // TempData.Keep() has no such distinction, so a stale entry would otherwise resurface and
-        // get applied to a completely unrelated submission.
+        // Only rows with an actual replacement sender ref are part of the copied submission.
+        // Blank rows represent "not selected" or a cancelled range edit and must never be carried
+        // into the new batch.
         var token = Guid.NewGuid().ToString("N");
-        TempData["CopyBatch_PendingCopy"] = JsonSerializer.Serialize(new PendingCopy(SourceBatchId, Animals, token));
+        var selected = Animals
+            .Where(a => !string.IsNullOrWhiteSpace(a.NewSenderRef))
+            .ToList();
+        TempData["CopyBatch_PendingCopy"] = JsonSerializer.Serialize(new PendingCopy(SourceBatchId, selected, token));
 
         // BatchDetailsModel's create-mode form reads Session.BatchType (not the source batch
         // directly) to pick the TSE/Non-TSE antibody lookup table and to stamp the new batch's own

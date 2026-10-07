@@ -7,6 +7,7 @@ using Histo.Submissions.Models;
 using Histo.Web.Pages.Submissions;
 using Histo.Web.Services;
 using ExcelDataReader;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
@@ -53,6 +54,8 @@ public class ViewSubmissionsModelTests
                 ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()),
                 HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext(),
             },
+            TempData = new TempDataDictionary(
+                new Microsoft.AspNetCore.Http.DefaultHttpContext(), Mock.Of<ITempDataProvider>()),
         };
 
     [Fact]
@@ -71,27 +74,40 @@ public class ViewSubmissionsModelTests
     }
 
     [Fact]
-    public async Task OnPostSelectAsync_BlockCommentOnly_NoHeaderComment_EnablesPrintSubmissionNotes()
+    public async Task OnGetAsync_BlockCommentOnly_NoHeaderComment_EnablesPrintSubmissionNotes()
     {
         _blocks.Setup(b => b.GetByBatchAsync(7, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 1, Comment = "Block note" }]);
         var sut = CreateSut();
         sut.SelectedBatchId = 7;
 
-        await sut.OnPostSelectAsync();
+        await sut.OnGetAsync();
 
         Assert.True(sut.HasNotes);
     }
 
     [Fact]
-    public async Task OnPostSelectAsync_NoCommentsAnywhere_PrintSubmissionNotesStaysDisabled()
+    public async Task OnGetAsync_NoCommentsAnywhere_PrintSubmissionNotesStaysDisabled()
     {
         var sut = CreateSut();
         sut.SelectedBatchId = 7;
 
-        await sut.OnPostSelectAsync();
+        await sut.OnGetAsync();
 
         Assert.False(sut.HasNotes);
+    }
+
+    [Fact]
+    public void OnPostSelect_RedirectsSoBackButtonDoesNotReplayThePost()
+    {
+        var sut = CreateSut();
+        sut.SelectedBatchId = 7;
+
+        var result = sut.OnPostSelect();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal(7, redirect.RouteValues!["SelectedBatchId"]);
+        _session.VerifySet(s => s.BatchID = 7);
     }
 
     [Fact]
