@@ -302,12 +302,13 @@ public class BatchDetailsModel : HistoPageModel
 
     /// <summary>
     /// One-time token minted by <see cref="CopyBatchModel"/> when it stages a pending copy, carried
-    /// via the query string (GET) and the form's own action URL (POST, same mechanism as
-    /// <see cref="Mode"/> — no hidden field needed). Required to tell "the user is continuing THIS
-    /// copy" apart from "the user abandoned it (Cancel/navigated away) and later made an unrelated
-    /// Create Submission visit" — without it, <c>TempData.Keep()</c> alone has no way to
-    /// distinguish the two, so an abandoned pending copy would resurface and get applied to an
-    /// unrelated submission.
+    /// via the query string (GET) and a hidden form field (POST — the Create form uses
+    /// <c>asp-page-handler</c>, which makes the tag helper generate an explicit action URL that
+    /// does NOT carry over the ambient query string, unlike a plain self-submitting form). Required
+    /// to tell "the user is continuing THIS copy" apart from "the user abandoned it
+    /// (Cancel/navigated away) and later made an unrelated Create Submission visit" — without it,
+    /// <c>TempData.Keep()</c> alone has no way to distinguish the two, so an abandoned pending copy
+    /// would resurface and get applied to an unrelated submission.
     /// </summary>
     [BindProperty(SupportsGet = true)] public string? CopyToken { get; set; }
 

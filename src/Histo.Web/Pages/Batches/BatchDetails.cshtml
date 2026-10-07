@@ -55,6 +55,11 @@
     }
 
     <form method="post" asp-page-handler="Create">
+        @* asp-page-handler makes the tag helper generate an explicit action URL (?handler=Create),
+           which drops the ambient copyToken query string from the GET — without this hidden field
+           a pending "Copy submission" silently looks abandoned on POST and the batch is created
+           with zero samples. *@
+        <input type="hidden" asp-for="CopyToken" />
 
         @* Read-only: Entered By and Entered Area set from current session user — legacy ddlEnteredBy (disabled) *@
         <dl class="govuk-summary-list govuk-!-margin-bottom-4">
