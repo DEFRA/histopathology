@@ -340,7 +340,7 @@ public class EditBatchModel : HistoPageModel
         {
             await _batches.UpdateAsync(updated, Session.UserID);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             SaveError = "Failed to save the submission. Please try again.";
             return Page();

@@ -191,6 +191,109 @@ public class AddSubmissionModelTests
     }
 
     [Fact]
+    public async Task OnPostAsync_WhenBatchIdIsMissing_RedirectsToIndex()
+    {
+        var sut = CreateSut();
+        sut.BatchId = null;
+
+        var result = await sut.OnPostAsync();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Index", redirect.PageName);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_WhenSenderRefAndMouseRangeAreBothProvided_RejectsInput()
+    {
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        var sut = CreateSut();
+        sut.SourceAnimalId = 1;
+        sut.SenderRef = "S1";
+        sut.MouseNumberFrom = "MC000001";
+        sut.MouseNumberTo = "MC000002";
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("Enter either the Sender ref or the mouse number ranges.", sut.ModelError);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_WhenMouseRangeInputIsIncomplete_SetsMouseRangeValidationError()
+    {
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        var sut = CreateSut();
+        sut.SourceAnimalId = 1;
+        sut.MouseNumberFrom = "MC000001";
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.True(sut.MouseRangeHasError);
+        Assert.Equal("Enter both the from and to mouse numbers.", sut.ModelError);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_WhenCopyBatchRowIndexIsOutOfRange_AppendsNewAnimalEntry()
+    {
+        var sut = CreateSut(returnPage: "/Batches/CopyBatch");
+        sut.SourceAnimalId = 42;
+        sut.RowIndex = 99;
+        sut.SenderRef = "NewRef";
+        sut.TempData["CopyBatch_Animals"] = JsonSerializer.Serialize(new List<CopyBatchModel.AnimalRow>
+        {
+            new() { AnimalId = 7, SubmissionId = 9, SenderRef = "OldRef", NewSenderRef = "OldRef" },
+        });
+
+        var result = await sut.OnPostAsync();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Batches/CopyBatch", redirect.PageName);
+
+        var animals = JsonSerializer.Deserialize<List<CopyBatchModel.AnimalRow>>(sut.TempData["CopyBatch_Animals"] as string ?? "[]");
+        Assert.NotNull(animals);
+        Assert.Equal(2, animals!.Count);
+        Assert.Equal("NewRef", animals[1].NewSenderRef);
+        Assert.Equal(42, animals[1].AnimalId);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_WhenWetTissueSourceSampleIsCopied_CopiesSourceTissuesAndReturnsToSampleSummary()
+    {
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _session.Setup(s => s.UserID).Returns(7);
+        _batches.Setup(b => b.GetByIdAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 5, IsPreCassetted = false });
+        _batches.Setup(b => b.GetSubmittedAsCodeAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync("WT");
+        _lookups.Setup(l => l.GetLookupDataAsync(11, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { Code = "WT", Name = "Wet Tissue" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[
+                new() { ID = 99, BatchID = 5, AnimalID = 10, Order = 1 },
+                new() { ID = 100, BatchID = 5, AnimalID = 42, Order = 2 },
+            ]);
+        _submissions.Setup(s => s.AddAnimalAsync(99, "S1", 7, null, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(101);
+        _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), 7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(200);
+        _submissions.Setup(s => s.GetTissuesBySubmissionAsync(5, 100, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Tissue>)[new Tissue { ID = 1, TissueCode = "LIVER" }, new Tissue { ID = 2, TissueCode = "LUNG" }]);
+        _submissions.Setup(s => s.CopyTissueAsync(It.IsAny<Tissue>(), 200, 7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var sut = CreateSut();
+        sut.BatchId = 5;
+        sut.SourceAnimalId = 42;
+        sut.SenderRef = "S1";
+
+        var result = await sut.OnPostAsync();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Submissions/SampleSummary", redirect.PageName);
+        Assert.Equal(5, redirect.RouteValues!["batchId"]);
+        _submissions.Verify(s => s.CopyTissueAsync(It.IsAny<Tissue>(), 200, 7, It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    [Fact]
     public async Task OnPostAsync_CreateEditSubmission_StillCreatesNewAnimal()
     {
         _session.Object.BatchSubmissionID = 99;

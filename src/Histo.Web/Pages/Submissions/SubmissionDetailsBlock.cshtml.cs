@@ -241,6 +241,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
 
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
+        if (Animal is null) return Page();
 
         // Locked fields can't be changed by a crafted POST — silently keep the existing value
         // rather than trusting the submitted one, mirroring the readonly inputs in the view.

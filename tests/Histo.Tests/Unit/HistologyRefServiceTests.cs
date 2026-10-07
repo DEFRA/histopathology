@@ -7,14 +7,12 @@ using Moq;
 namespace Histo.Tests.Unit;
 
 /// <summary>
-/// Verifies <see cref="HistologyRefService.GetNextAvailableRefAsync"/> draws both the pool and the
-/// counter atomically rather than via a racy read-then-write pair:
-/// <see cref="IHistologyRepository.ClaimUnusedRefAsync"/> (not a plain
-/// <see cref="IHistologyRepository.GetUnusedRefsAsync"/> read) for the pool, and
-/// <see cref="IHistologyRepository.ClaimNextCounterAsync"/> (not <see cref="IHistologyRepository.GetCountersAsync"/>
-/// + <see cref="IHistologyRepository.UpdateCounterAsync"/>) for the counter fallback. Either
-/// two-step read-then-write path let two concurrent calls both read the same value and both
-/// successfully claim it, returning duplicate refs.
+/// Verifies <see cref="HistologyRefService.GetNextAvailableRefAsync"/> draws via the
+/// <c>GetNextHistologyRef</c> SP (<see cref="IHistologyRepository.DrawNextRefAsync"/>), which reads
+/// and advances the counter in one server-side step, rather than a racy
+/// <see cref="IHistologyRepository.GetCountersAsync"/> + <see cref="IHistologyRepository.UpdateCounterAsync"/>
+/// pair. Mirrors legacy <c>clsHistology.vb::GetNextAvailableHistologyRef</c>, which likewise never
+/// consults the unused-refs pool — that is only ever searched by Sender Ref for a specific sample.
 /// </summary>
 public class HistologyRefServiceTests
 {

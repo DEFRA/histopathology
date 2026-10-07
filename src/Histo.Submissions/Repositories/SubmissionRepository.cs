@@ -4,6 +4,7 @@ using Histo.Infrastructure;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using System.Data;
+using System.Globalization;
 
 namespace Histo.Submissions.Repositories;
 
@@ -66,11 +67,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
     /// <inheritdoc/>
     public async Task<bool> CreateMouseRangeAsync(int batchId, int? sourceAnimalId, string mouseNumberFrom, string mouseNumberTo, int userId, CancellationToken ct = default)
     {
-        if (!ValidationHelpers.ValidateMouseNumber(mouseNumberFrom) || !ValidationHelpers.ValidateMouseNumber(mouseNumberTo)
-            || !SenderRefHelpers.TryParseMouseNumber(mouseNumberFrom, out var fromId) || !SenderRefHelpers.TryParseMouseNumber(mouseNumberTo, out var toId))
-            return false;
-
-        if (fromId >= toId)
+        if (!TryGetMouseRangeBounds(mouseNumberFrom, mouseNumberTo, out var fromId, out var toId))
             return false;
 
         var rangeSize = toId - fromId + 1;
@@ -79,61 +76,30 @@ public sealed class SubmissionRepository : ISubmissionRepository
 
         using var conn = _db.CreateConnection();
         await conn.OpenAsync(ct);
-        using var tx = conn.BeginTransaction();
+        using var tx = await conn.BeginTransactionAsync(ct);
 
         try
         {
             var siblings = await GetSubmissionsByBatchAsync(conn, tx, batchId);
             var nextOrder = siblings.Count > 0 ? siblings.Max(s => s.Order) + 1 : 1;
+            var sourceTissues = await GetSourceTissuesAsync(conn, tx, batchId, sourceAnimalId, siblings);
 
-            IReadOnlyList<Tissue> sourceTissues = [];
-            if (sourceAnimalId is > 0)
-            {
-                var sourceSubmission = siblings.FirstOrDefault(s => s.AnimalID == sourceAnimalId.Value);
-                if (sourceSubmission is not null)
-                    sourceTissues = await GetTissuesBySubmissionAsync(conn, tx, batchId, sourceSubmission.ID);
-            }
-
-            for (var currentNumber = fromId; currentNumber <= toId; currentNumber++)
+            foreach (var currentNumber in Enumerable.Range(fromId, rangeSize))
             {
                 var mouseNumber = SenderRefHelpers.FormatMouseNumber(currentNumber);
-                var animalId = await AddAnimalAsync(conn, tx, new Animal
-                {
-                    BatchSubmissionID = 0,
-                    SenderRef = mouseNumber,
-                    NextBlockRef = "01",
-                    HistologyRef = null,
-                    HistoRefSet = false,
-                    OnHold = false,
-                    PMDate = null,
-                    PMDateSet = false,
-                    IsPGNumber = false,
-                    BookedHistologyRef = false,
-                }, userId);
-                if (animalId <= 0)
-                    throw new InvalidOperationException($"Failed to create animal {mouseNumber}.");
-
+                var animalId = await CreateMouseAnimalAsync(conn, tx, mouseNumber);
                 var submissionId = await AddSubmissionAsync(conn, tx,
-                    new BatchSubmission { BatchID = batchId, AnimalID = animalId, SubmissionName = "Default", Order = nextOrder++ },
-                    userId);
-                if (submissionId <= 0)
-                    throw new InvalidOperationException($"Failed to add submission for {mouseNumber}.");
+                    new BatchSubmission { BatchID = batchId, AnimalID = animalId, SubmissionName = "Default", Order = nextOrder++ });
 
-                if (sourceTissues.Count > 0)
-                {
-                    // See CreateBatchWithCopiedSamplesAsync: AddTissue's RETURN_VALUE is a status
-                    // code (0 = success), not a new-row id.
-                    foreach (var tissue in sourceTissues)
-                        await CopyTissueAsync(conn, tx, tissue, submissionId, userId);
-                }
+                await CopySourceTissuesAsync(conn, tx, sourceTissues, submissionId);
             }
 
-            tx.Commit();
+            await tx.CommitAsync(ct);
             return true;
         }
         catch
         {
-            tx.Rollback();
+            await tx.RollbackAsync(ct);
             throw;
         }
     }
@@ -151,7 +117,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
     {
         using var conn = _db.CreateConnection();
         await conn.OpenAsync(ct);
-        using var tx = conn.BeginTransaction();
+        using var tx = await conn.BeginTransactionAsync(ct);
 
         // Names the statement in flight so a SQL failure can say which step broke.
         var step = "create the submission header";
@@ -197,7 +163,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
                 try
                 {
                     step = $"create sample {sample.NewSenderRef}";
-                    newAnimalId = await AddAnimalAsync(conn, tx, animal, userId);
+                    newAnimalId = await AddAnimalAsync(conn, tx, animal);
                 }
                 catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number is 2601 or 2627)
                 {
@@ -218,18 +184,12 @@ public sealed class SubmissionRepository : ISubmissionRepository
                 };
 
                 step = $"link sample {sample.NewSenderRef} to the submission";
-                var newSubmissionId = await AddSubmissionAsync(conn, tx, submission, userId);
+                var newSubmissionId = await AddSubmissionAsync(conn, tx, submission);
                 if (newSubmissionId <= 0)
                     throw new InvalidOperationException($"Failed to create the submission record for {sample.NewSenderRef}.");
 
                 step = $"copy the tissues for sample {sample.NewSenderRef}";
-                foreach (var tissue in sample.Tissues)
-                {
-                    // AddTissue has no identity OUTPUT param — its RETURN_VALUE is the SP's return
-                    // code, which is 0 on success, so it must not be treated as a new-row id.
-                    // A genuine failure raises a SqlException, which rolls the transaction back.
-                    await CopyTissueAsync(conn, tx, tissue, newSubmissionId, userId);
-                }
+                await CopySourceTissuesAsync(conn, tx, sample.Tissues, newSubmissionId);
 
                 foreach (var block in sample.Blocks)
                 {
@@ -239,17 +199,16 @@ public sealed class SubmissionRepository : ISubmissionRepository
                         throw new InvalidOperationException(
                             $"Could not copy block '{block.BlockRef}' for sample '{sample.NewSenderRef}'.");
 
-                    foreach (var tissue in block.Tissues)
-                        await CopyTissueAsync(conn, tx, tissue, newBlockId, userId);
+                    await CopySourceTissuesAsync(conn, tx, block.Tissues, newBlockId);
                 }
             }
 
-            tx.Commit();
+            await tx.CommitAsync(ct);
             return newBatchId;
         }
         catch (Microsoft.Data.SqlClient.SqlException ex)
         {
-            tx.Rollback();
+            await tx.RollbackAsync(ct);
             // Names the failing step and the SQL error number only — never the raw SQL text.
             throw new InvalidOperationException($"Could not {step} (database error {ex.Number}). Nothing was saved.", ex);
         }
@@ -257,7 +216,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         {
             // Rethrow rather than returning 0: SubmissionService logs the real failure, which a
             // silent 0 hid behind a generic "Failed to create the submission" page error.
-            tx.Rollback();
+            await tx.RollbackAsync(ct);
             throw;
         }
     }
@@ -289,6 +248,70 @@ public sealed class SubmissionRepository : ISubmissionRepository
         return 0;
     }
 
+    private static bool TryGetMouseRangeBounds(string mouseNumberFrom, string mouseNumberTo, out int fromId, out int toId)
+    {
+        if (!ValidationHelpers.ValidateMouseNumber(mouseNumberFrom)
+            || !ValidationHelpers.ValidateMouseNumber(mouseNumberTo)
+            || !SenderRefHelpers.TryParseMouseNumber(mouseNumberFrom, out fromId)
+            || !SenderRefHelpers.TryParseMouseNumber(mouseNumberTo, out toId))
+        {
+            fromId = 0;
+            toId = 0;
+            return false;
+        }
+
+        if (fromId >= toId)
+        {
+            fromId = 0;
+            toId = 0;
+            return false;
+        }
+
+        return true;
+    }
+
+    private static async Task<IReadOnlyList<Tissue>> GetSourceTissuesAsync(IDbConnection conn, IDbTransaction tx, int batchId, int? sourceAnimalId, IReadOnlyList<BatchSubmission> siblings)
+    {
+        if (sourceAnimalId is not > 0)
+            return [];
+
+        var sourceSubmission = siblings.FirstOrDefault(s => s.AnimalID == sourceAnimalId.Value);
+        return sourceSubmission is null ? [] : await GetTissuesBySubmissionAsync(conn, tx, batchId, sourceSubmission.ID);
+    }
+
+    private static async Task<int> CreateMouseAnimalAsync(IDbConnection conn, IDbTransaction tx, string mouseNumber)
+    {
+        var animalId = await AddAnimalAsync(conn, tx, new Animal
+        {
+            BatchSubmissionID = 0,
+            SenderRef = mouseNumber,
+            NextBlockRef = "01",
+            HistologyRef = null,
+            HistoRefSet = false,
+            OnHold = false,
+            PMDate = null,
+            PMDateSet = false,
+            IsPGNumber = false,
+            BookedHistologyRef = false,
+        });
+
+        if (animalId <= 0)
+            throw new InvalidOperationException($"Failed to create animal {mouseNumber}.");
+
+        return animalId;
+    }
+
+    /// <summary>
+    /// Copies tissues onto a new owner. The result of each insert is deliberately not checked:
+    /// AddTissue/AddBlockTissue have no identity OUTPUT param, so their RETURN_VALUE is the SP's
+    /// status code (0 = success). A genuine failure raises a SqlException, which rolls back.
+    /// </summary>
+    private static async Task CopySourceTissuesAsync(IDbConnection conn, IDbTransaction tx, IReadOnlyList<Tissue> sourceTissues, int newOwnerId)
+    {
+        foreach (var tissue in sourceTissues)
+            await CopyTissueAsync(conn, tx, tissue, newOwnerId);
+    }
+
     private static async Task<IReadOnlyList<BatchSubmission>> GetSubmissionsByBatchAsync(IDbConnection conn, IDbTransaction tx, int batchId)
     {
         using var multi = await conn.QueryMultipleAsync(
@@ -312,23 +335,34 @@ public sealed class SubmissionRepository : ISubmissionRepository
         return rows
             .Select(r => (IDictionary<string, object>)r)
             .Where(d => d.TryGetValue("BatchSubmissionID", out var bsid) && Convert.ToInt32(bsid) == submissionId)
-            .Select(d => new Tissue
-            {
-                ID = d.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0,
-                OwnerID = submissionId,
-                Owner = TissueOwner.Submission,
-                TissueCode = d.TryGetValue("TissueCode", out var tc) ? Convert.ToString(tc)?.Trim() ?? "" : "",
-                NoPieces = d.TryGetValue("NoPieces", out var np) ? Convert.ToInt16(np) : (short)0,
-                Comment = d.TryGetValue("Comment", out var cm) && cm is not DBNull ? Convert.ToString(cm) : null,
-                ArchiveLocation = d.TryGetValue("ArchiveLocation", out var al) && al is not DBNull ? Convert.ToString(al) : null,
-                ArchivedDate = d.TryGetValue("ArchivedDate", out var ad) && ad is not DBNull && DateTime.TryParse(Convert.ToString(ad), out var adv) ? adv : null,
-                ArchiveComment = d.TryGetValue("ArchiveComment", out var ac) && ac is not DBNull ? Convert.ToString(ac) : null,
-                RowStamp = d.TryGetValue("RowStamp", out var rs) ? rs as byte[] : null,
-            })
+            .Select(d => MapTissueRow(d, submissionId, TissueOwner.Submission))
             .ToList();
     }
 
-    private static async Task<int> AddSubmissionAsync(IDbConnection conn, IDbTransaction tx, BatchSubmission submission, int userId)
+    private static Tissue MapTissueRow(IDictionary<string, object> d, int ownerId, TissueOwner owner)
+    {
+        var tissueCode = d.TryGetValue("TissueCode", out var tc) ? Convert.ToString(tc)?.Trim() ?? string.Empty : string.Empty;
+        DateTime? archivedDate = d.TryGetValue("ArchivedDate", out var ad) && ad is not DBNull
+            && DateTime.TryParse(Convert.ToString(ad), CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out var parsed)
+            ? parsed
+            : null;
+
+        return new Tissue
+        {
+            ID = d.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0,
+            OwnerID = ownerId,
+            Owner = owner,
+            TissueCode = tissueCode,
+            NoPieces = d.TryGetValue("NoPieces", out var np) ? Convert.ToInt16(np) : (short)0,
+            Comment = d.TryGetValue("Comment", out var cm) && cm is not DBNull ? Convert.ToString(cm) : null,
+            ArchiveLocation = d.TryGetValue("ArchiveLocation", out var al) && al is not DBNull ? Convert.ToString(al) : null,
+            ArchivedDate = archivedDate,
+            ArchiveComment = d.TryGetValue("ArchiveComment", out var ac) && ac is not DBNull ? Convert.ToString(ac) : null,
+            RowStamp = d.TryGetValue("RowStamp", out var rs) ? rs as byte[] : null,
+        };
+    }
+
+    private static async Task<int> AddSubmissionAsync(IDbConnection conn, IDbTransaction tx, BatchSubmission submission)
     {
         var parameters = new DynamicParameters();
         parameters.Add("ID", 0, dbType: System.Data.DbType.Int32);
@@ -342,7 +376,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         return parameters.Get<int>("NewID");
     }
 
-    private static async Task<int> AddAnimalAsync(IDbConnection conn, IDbTransaction tx, Animal animal, int userId)
+    private static async Task<int> AddAnimalAsync(IDbConnection conn, IDbTransaction tx, Animal animal)
     {
         var parameters = new DynamicParameters();
         parameters.Add("SenderRef", animal.SenderRef);
@@ -383,7 +417,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         return parameters.Get<int?>("NewID") ?? 0;
     }
 
-    private static async Task<int> CopyTissueAsync(IDbConnection conn, IDbTransaction tx, Tissue source, int newOwnerId, int userId)
+    private static async Task<int> CopyTissueAsync(IDbConnection conn, IDbTransaction tx, Tissue source, int newOwnerId)
     {
         var tissue = new Tissue
         {
@@ -394,10 +428,10 @@ public sealed class SubmissionRepository : ISubmissionRepository
             Comment = source.Comment,
         };
 
-        return await AddTissueAsync(conn, tx, tissue, userId);
+        return await AddTissueAsync(conn, tx, tissue);
     }
 
-    private static async Task<int> AddTissueAsync(IDbConnection conn, IDbTransaction tx, Tissue tissue, int userId)
+    private static async Task<int> AddTissueAsync(IDbConnection conn, IDbTransaction tx, Tissue tissue)
     {
         var procName = tissue.Owner == TissueOwner.Submission ? "AddTissue" : "AddBlockTissue";
         var keyParam = tissue.Owner == TissueOwner.Submission ? "BatchSubmissionID" : "BlockID";
@@ -531,7 +565,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         // nvarchar, or SQL Server throws "Error converting data type nvarchar to datetime" (always
         // for an empty string), which fails the whole UPDATE — dropping every other field too.
         var isoPmDate = DateFormatHelpers.ToIsoDate(animal.PMDate);
-        object pmDateParam = isoPmDate is not null && DateTime.TryParse(isoPmDate, out var parsedPmDate)
+        object pmDateParam = isoPmDate is not null && DateTime.TryParse(isoPmDate, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out var parsedPmDate)
             ? parsedPmDate
             : DBNull.Value;
 
