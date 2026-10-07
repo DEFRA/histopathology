@@ -1,5 +1,7 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
+using Histo.Histology.Interfaces;
+using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.Batches;
@@ -28,6 +30,7 @@ public class BatchDetailsModelTests
     private readonly Mock<ILookupService> _lookups = new();
     private readonly Mock<IUserService> _users = new();
     private readonly Mock<ISubmissionService> _submissions = new();
+    private readonly Mock<IBlockService> _blocks = new();
 
     public BatchDetailsModelTests()
     {
@@ -47,10 +50,12 @@ public class BatchDetailsModelTests
         _users.Setup(u => u.GetAllUsersAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Histo.Administration.Models.User>)[]);
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[]);
     }
 
     private BatchDetailsModel CreateSut() =>
-        new(_session.Object, _batches.Object, _lookups.Object, _users.Object, _submissions.Object)
+        new(_session.Object, _batches.Object, _lookups.Object, _users.Object, _submissions.Object, _blocks.Object)
         {
             PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
             TempData = new TempDataDictionary(new Microsoft.AspNetCore.Http.DefaultHttpContext(), Mock.Of<ITempDataProvider>()),
@@ -219,6 +224,49 @@ public class BatchDetailsModelTests
         Assert.Equal(100, redirect.RouteValues!["newBatchId"]);
         _batches.Verify(b => b.AddAsync(It.IsAny<Batch>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         Assert.False(sut.TempData.ContainsKey("CopyBatch_PendingCopy"));
+    }
+
+    [Fact]
+    public async Task OnPostCreateAsync_PendingCopyStaged_CopiesTheSamplesBlocksAndBlockTissues()
+    {
+        var stagedAnimal = new Animal { ID = 1, SenderRef = "S1", BatchSubmissionID = 50 };
+        var sourceSubmission = new BatchSubmission { ID = 50, BatchID = 10, AnimalID = 1, Order = 1 };
+        var blockTissue = new Tissue { ID = 9, OwnerID = 70, TissueCode = "BT1", Owner = TissueOwner.Block };
+
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[sourceSubmission]);
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[stagedAnimal]);
+        _submissions.Setup(s => s.GetTissuesBySubmissionAsync(10, 50, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[
+                new Block { ID = 70, BatchID = 10, AnimalID = 1, BlockRef = "01", Order = 1, CustomerRef = "C1" }]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(10, 70, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Tissue>)[blockTissue]);
+
+        CopiedSamplePlan? captured = null;
+        _submissions.Setup(s => s.CreateBatchWithCopiedSamplesAsync(
+                It.IsAny<Batch>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<string?>(), It.IsAny<IReadOnlyList<CopiedSamplePlan>>(), 7, It.IsAny<CancellationToken>()))
+            .Callback((Batch _, IReadOnlyList<string> _, IReadOnlyList<string> _, IReadOnlyList<string> _,
+                       string? _, IReadOnlyList<CopiedSamplePlan> p, int _, CancellationToken _) => captured = p.Single())
+            .ReturnsAsync(100);
+
+        var sut = CreateSut();
+        sut.Create_SelectedHistologyCodes = [HistologyCode.EO];
+        sut.CopyToken = "tok-1";
+        var pending = new CopyBatchModel.PendingCopy(10, [new CopyBatchModel.AnimalRow { AnimalId = 1, SenderRef = "S1", NewSenderRef = "S1-NEW" }], "tok-1");
+        sut.TempData["CopyBatch_PendingCopy"] = System.Text.Json.JsonSerializer.Serialize(pending);
+
+        await sut.OnPostCreateAsync();
+
+        var block = Assert.Single(captured!.Blocks);
+        Assert.Equal("01", block.BlockRef);
+        Assert.Equal("C1", block.CustomerRef);
+        Assert.Equal("BT1", Assert.Single(block.Tissues).TissueCode);
     }
 
     /// <summary>

@@ -173,30 +173,18 @@ public sealed class HistologyRefService : IHistologyRefService
     {
         try
         {
-            // Atomically claims (marks used) one pool row instead of a plain read + separate
-            // "mark used" write — the old read-only GetUnusedRefsAsync().FirstOrDefault() let two
-            // concurrent callers both pick the same unused ref before either assignment landed.
-            var fromPool = await _repo.ClaimUnusedRefAsync(histologyType, ct);
-            if (fromPool is not null) return fromPool;
+            if (!HistologyRefTypeCode.TryGetRange(histologyType, out _, out var upperBoundExclusive))
+                return null;
 
-            var upperBound = histologyType switch
-            {
-                HistologyRefTypeCode.Neuropath => 20000,
-                HistologyRefTypeCode.AbattoirSurvey => 30000,
-                HistologyRefTypeCode.TBDiagnostic => 40000,
-                HistologyRefTypeCode.GeneralPool => 60000,
-                HistologyRefTypeCode.MouseProjects => 90000,
-                _ => 0,
-            };
-            if (upperBound == 0) return null;
-
-            // Claims the counter atomically (single UPDATE ... OUTPUT, bound check in the same
-            // statement) instead of a separate GetCountersAsync read + SetCounterAsync write — that
-            // two-step path let two concurrent callers both read the same "current" value and both
-            // successfully write current + 1 (SetCounterAsync re-fetches its own RowStamp rather
-            // than using the one from the original read), so both calls returned the same ref.
-            var claimed = await _repo.ClaimNextCounterAsync(histologyType, upperBound, ct);
+            // Legacy clsHistology.vb::GetNextAvailableHistologyRef — the GetNextHistologyRef SP
+            // reads and advances the counter itself. The unused-refs pool is deliberately NOT
+            // consulted here: legacy only ever searches it by SenderRef for a specific sample.
+            var claimed = await _repo.DrawNextRefAsync(histologyType, ct);
             if (claimed is null) return null;
+
+            // Legacy warns (and keeps going) past the type's ceiling rather than failing.
+            if (int.TryParse(claimed, out var number) && number >= upperBoundExclusive)
+                _logger.LogWarning("Histology ref {Claimed} exceeds the maximum for type {HistologyType}.", claimed, histologyType);
 
             return $"{DateTime.Now.Year % 100:D2}/{claimed}";
         }

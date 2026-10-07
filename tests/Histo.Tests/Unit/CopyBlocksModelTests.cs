@@ -23,6 +23,7 @@ public class CopyBlocksModelTests
     private readonly Mock<ISubmissionService> _submissions = new();
     private readonly Mock<IBatchService> _batches = new();
     private readonly Mock<IHistologyRefService> _histologyRefs = new();
+    private readonly Mock<IBlockTestService> _blockTests = new();
 
     public CopyBlocksModelTests()
     {
@@ -35,13 +36,15 @@ public class CopyBlocksModelTests
             .ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[]);
         _blocks.Setup(b => b.CopyBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<int>(),
                 It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>()))
             .ReturnsAsync(99);
     }
 
     private CopyBlocksModel CreateSut() =>
-        new(_session.Object, _blocks.Object, _submissions.Object, _batches.Object, _histologyRefs.Object)
+        new(_session.Object, _blocks.Object, _submissions.Object, _batches.Object, _histologyRefs.Object, _blockTests.Object)
         {
             PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
             TempData = new TempDataDictionary(new Microsoft.AspNetCore.Http.DefaultHttpContext(), Mock.Of<ITempDataProvider>()),
@@ -106,6 +109,66 @@ public class CopyBlocksModelTests
         await sut.OnPostAsync();
 
         _histologyRefs.Verify(h => h.GetNextAvailableRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_SourceHasNoHistologyRef_ExplainsWhyNoneWereGenerated()
+    {
+        var target = new Animal { ID = 20, SenderRef = "S2", HistoRefSet = false };
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 10, SenderRef = "S1", HistologyRef = null, HistoRefSet = false }, target]);
+
+        var sut = CreateSut();
+        sut.TargetAnimalIds = [20];
+        sut.AutoGenerateHistologyRefs = true;
+
+        await sut.OnPostAsync();
+
+        Assert.Contains("the reference type could not be determined from sample S1", sut.TempData["StatusMessage"] as string);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_NoRefsLeftForType_ReportsItInsteadOfSilentlySkipping()
+    {
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[
+                new Animal { ID = 10, SenderRef = "S1", HistologyRef = "26/60001", HistoRefSet = true },
+                new Animal { ID = 20, SenderRef = "S2", HistoRefSet = false }]);
+        _histologyRefs.Setup(h => h.GetNextAvailableRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
+
+        var sut = CreateSut();
+        sut.TargetAnimalIds = [20];
+        sut.AutoGenerateHistologyRefs = true;
+
+        await sut.OnPostAsync();
+
+        Assert.Contains("No more histology references are available", sut.TempData["StatusMessage"] as string);
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_CopiesTheSourceBlocksTestSelectionsOntoTheNewBlock()
+    {
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 10, SenderRef = "S1" }, new Animal { ID = 20, SenderRef = "S2" }]);
+        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[
+                new BlockTest { BlockID = 1, TestType = BlockTestType.Histology, Code = HistologyCode.HAndE },
+                new BlockTest { BlockID = 1, TestType = BlockTestType.Stain, Code = "ST1" },
+                new BlockTest { BlockID = 99, TestType = BlockTestType.Histology, Code = "SHOULD-NOT-COPY" }]);
+
+        var sut = CreateSut();
+        sut.TargetAnimalIds = [20];
+
+        await sut.OnPostAsync();
+
+        _blockTests.Verify(t => t.SaveTestSelectionsAsync(
+            5, 99,
+            It.Is<IReadOnlyList<string>>(c => c.Single() == HistologyCode.HAndE),
+            It.Is<IReadOnlyList<string>>(c => c.Count == 0),
+            It.Is<IReadOnlyList<string>>(c => c.Single() == "ST1"),
+            It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

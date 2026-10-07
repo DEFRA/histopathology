@@ -230,6 +230,18 @@ public sealed class SubmissionRepository : ISubmissionRepository
                     // A genuine failure raises a SqlException, which rolls the transaction back.
                     await CopyTissueAsync(conn, tx, tissue, newSubmissionId, userId);
                 }
+
+                foreach (var block in sample.Blocks)
+                {
+                    step = $"copy block {block.BlockRef} for sample {sample.NewSenderRef}";
+                    var newBlockId = await AddBlockAsync(conn, tx, newBatchId, newAnimalId, block);
+                    if (newBlockId <= 0)
+                        throw new InvalidOperationException(
+                            $"Could not copy block '{block.BlockRef}' for sample '{sample.NewSenderRef}'.");
+
+                    foreach (var tissue in block.Tissues)
+                        await CopyTissueAsync(conn, tx, tissue, newBlockId, userId);
+                }
             }
 
             tx.Commit();
@@ -345,6 +357,29 @@ public sealed class SubmissionRepository : ISubmissionRepository
         await conn.ExecuteAsync("AddAnimal", parameters, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
         // AddAnimal leaves @NewID NULL when it declines the insert (e.g. the SenderRef or
         // HistologyRef is already in use) rather than raising an error.
+        return parameters.Get<int?>("NewID") ?? 0;
+    }
+
+    /// <summary>
+    /// Calls the <c>AddBlock</c> SP inside the copy transaction — mirrors
+    /// <c>BlockRepository.SaveAsync</c>'s insert branch (no @UserID; new id via @NewID output).
+    /// </summary>
+    private static async Task<int> AddBlockAsync(IDbConnection conn, IDbTransaction tx, int newBatchId, int newAnimalId, CopiedBlockPlan block)
+    {
+        var parameters = new DynamicParameters();
+        parameters.Add("ID", 0);
+        parameters.Add("BatchID", newBatchId);
+        parameters.Add("AnimalID", newAnimalId);
+        parameters.Add("BlockRef", block.BlockRef);
+        parameters.Add("CustomerRef", block.CustomerRef);
+        parameters.Add("RepeatBlock", block.RepeatBlock);
+        parameters.Add("Comment", block.Comment);
+        parameters.Add("Status", block.Status);
+        parameters.Add("Order", block.Order);
+        parameters.Add("OldID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+        parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+
+        await conn.ExecuteAsync("AddBlock", parameters, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
         return parameters.Get<int?>("NewID") ?? 0;
     }
 

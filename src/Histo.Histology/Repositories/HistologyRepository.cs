@@ -17,13 +17,15 @@ public sealed class HistologyRepository : IHistologyRepository
     /// <inheritdoc/>
     public async Task<IReadOnlyList<HistologyRef>> GetUnusedRefsAsync(int histologyType, CancellationToken ct = default)
     {
-        // GetUnusedHistologyRefs returns an unaliased "HistologyRef" column, which doesn't match
-        // the HistologyRef.Ref property name, so Dapper's implicit binding leaves Ref blank —
+        // GetUnusedHistologyRefs takes NO parameters and returns the whole pool — passing
+        // @HistologyType made SQL Server reject every call with "too many arguments specified".
+        // The pool table has no type column either; a ref's type is its number range.
+        // It also returns an unaliased "HistologyRef" column, which doesn't match the
+        // HistologyRef.Ref property name, so Dapper's implicit binding leaves Ref blank —
         // map explicitly instead (same defensive-read pattern as BlockTestRepository's Map()).
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync(
             "GetUnusedHistologyRefs",
-            new { HistologyType = histologyType },
             commandType: System.Data.CommandType.StoredProcedure);
 
         return rows.Select(r =>
@@ -32,14 +34,16 @@ public sealed class HistologyRepository : IHistologyRepository
             return new HistologyRef
             {
                 Ref = row.TryGetValue("HistologyRef", out var refVal) && refVal is not DBNull
-                    ? Convert.ToString(refVal) ?? string.Empty
+                    ? Convert.ToString(refVal)?.Trim() ?? string.Empty
                     : string.Empty,
                 HistologyType = histologyType,
                 SenderRef = row.TryGetValue("SenderRef", out var senderVal) && senderVal is not DBNull
                     ? Convert.ToString(senderVal)
                     : null,
             };
-        }).ToList();
+        })
+        .Where(r => HistologyRefTypeCode.FromExistingRef(r.Ref) == histologyType)
+        .ToList();
     }
 
     /// <inheritdoc/>
@@ -97,35 +101,17 @@ public sealed class HistologyRepository : IHistologyRepository
     }
 
     /// <inheritdoc/>
-    public async Task<string?> ClaimNextCounterAsync(int histologyType, int upperBoundExclusive, CancellationToken ct = default)
+    public async Task<string?> DrawNextRefAsync(int histologyType, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        return await conn.ExecuteScalarAsync<string?>(
-            @"UPDATE HistologyRef
-              SET NextHistologyRef = CAST(CAST(NextHistologyRef AS INT) + 1 AS VARCHAR(10))
-              OUTPUT DELETED.NextHistologyRef
-              WHERE Type = @Type AND CAST(NextHistologyRef AS INT) < @UpperBound",
-            new { Type = histologyType, UpperBound = upperBoundExclusive });
-    }
+        var p = new DynamicParameters();
+        p.Add("Type", histologyType, dbType: System.Data.DbType.Int32);
+        p.Add("NextHistologyRef", dbType: System.Data.DbType.String, size: 5, direction: System.Data.ParameterDirection.Output);
+        p.Add("RowStamp", dbType: System.Data.DbType.Binary, size: 8, direction: System.Data.ParameterDirection.Output);
 
-    /// <inheritdoc/>
-    public async Task<string?> ClaimUnusedRefAsync(int histologyType, CancellationToken ct = default)
-    {
-        using var conn = _db.CreateConnection();
-        // READPAST skips rows another concurrent claim already has locked (rather than blocking
-        // on/re-reading them), so two simultaneous callers each land on a different unused row
-        // instead of both selecting the same one before either UPDATE commits.
-        return await conn.ExecuteScalarAsync<string?>(
-            @"UPDATE UnUsedHistologyRefs
-              SET Used = 1
-              OUTPUT DELETED.HistologyRef
-              WHERE HistologyType = @HistologyType AND Used = 0
-                AND HistologyRef = (
-                    SELECT TOP (1) HistologyRef
-                    FROM UnUsedHistologyRefs WITH (UPDLOCK, ROWLOCK, READPAST)
-                    WHERE HistologyType = @HistologyType AND Used = 0
-                      AND HistologyRef IS NOT NULL AND HistologyRef <> ''
-                    ORDER BY HistologyRef)",
-            new { HistologyType = histologyType });
+        await conn.ExecuteAsync("GetNextHistologyRef", p, commandType: System.Data.CommandType.StoredProcedure);
+
+        var next = p.Get<string?>("NextHistologyRef");
+        return string.IsNullOrWhiteSpace(next) ? null : next.Trim();
     }
 }

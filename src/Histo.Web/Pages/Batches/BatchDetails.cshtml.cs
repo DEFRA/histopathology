@@ -1,6 +1,8 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
 using Histo.Core.Domain;
+using Histo.Histology.Interfaces;
+using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -42,14 +44,16 @@ public class BatchDetailsModel : HistoPageModel
     private readonly ILookupService _lookups;
     private readonly IUserService _users;
     private readonly ISubmissionService _submissions;
+    private readonly IBlockService _blocks;
 
-    public BatchDetailsModel(ISessionService session, IBatchService batches, ILookupService lookups, IUserService users, ISubmissionService submissions)
+    public BatchDetailsModel(ISessionService session, IBatchService batches, ILookupService lookups, IUserService users, ISubmissionService submissions, IBlockService blocks)
         : base(session)
     {
         _batches = batches;
         _lookups = lookups;
         _users   = users;
         _submissions = submissions;
+        _blocks = blocks;
     }
 
     // ── Query param — "create" activates the new-batch form ──
@@ -395,8 +399,12 @@ public class BatchDetailsModel : HistoPageModel
         var animals = blockAnimals.Count > 0 ? blockAnimals : await _submissions.GetAnimalsByBatchAsync(sourceBatchId);
         var animalsById = animals.GroupBy(a => a.ID).ToDictionary(g => g.Key, g => g.First());
         var firstSubmId = submissions.Count > 0 ? submissions[0].ID : 0;
+        var blocksByAnimalId = (await _blocks.GetByBatchAsync(sourceBatchId))
+            .GroupBy(b => b.AnimalID)
+            .ToDictionary(g => g.Key, g => g.OrderBy(b => b.Order).ToList());
 
         var tissuesBySubmissionId = new Dictionary<int, IReadOnlyList<Tissue>>();
+        var blockPlansByAnimalId = new Dictionary<int, IReadOnlyList<CopiedBlockPlan>>();
         var plan = new List<CopiedSamplePlan>();
 
         // Driven by the staged rows rather than the source animals: a mouse-range copy stages
@@ -416,15 +424,42 @@ public class BatchDetailsModel : HistoPageModel
                 tissuesBySubmissionId[submission.ID] = tissues;
             }
 
+            if (!blockPlansByAnimalId.TryGetValue(animal.ID, out var blockPlans))
+            {
+                blockPlans = await BuildBlockPlansAsync(sourceBatchId, blocksByAnimalId.GetValueOrDefault(animal.ID) ?? []);
+                blockPlansByAnimalId[animal.ID] = blockPlans;
+            }
+
             plan.Add(new CopiedSamplePlan
             {
                 SourceAnimal = animal,
                 NewSenderRef = string.IsNullOrWhiteSpace(pending.NewSenderRef) ? animal.SenderRef : pending.NewSenderRef,
                 SourceSubmission = submission,
                 Tissues = tissues,
+                Blocks = blockPlans,
             });
         }
         return plan;
+    }
+
+    /// <summary>Flattens a sample's blocks (and each block's own tissues) into the copy plan's module-neutral shape.</summary>
+    private async Task<IReadOnlyList<CopiedBlockPlan>> BuildBlockPlansAsync(int sourceBatchId, IReadOnlyList<Block> blocks)
+    {
+        var plans = new List<CopiedBlockPlan>(blocks.Count);
+        foreach (var block in blocks)
+        {
+            plans.Add(new CopiedBlockPlan
+            {
+                BlockRef = block.BlockRef,
+                CustomerRef = block.CustomerRef,
+                Comment = block.Comment,
+                RepeatBlock = block.RepeatBlock,
+                Status = block.Status,
+                Order = block.Order,
+                Tissues = await _submissions.GetTissuesByBlockAsync(sourceBatchId, block.ID),
+            });
+        }
+        return plans;
     }
 
     public async Task<IActionResult> OnGetAsync()

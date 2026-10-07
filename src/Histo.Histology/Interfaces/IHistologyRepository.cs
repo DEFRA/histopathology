@@ -57,20 +57,12 @@ public interface IHistologyRepository
     /// Atomically reads and advances a type's "next histology ref" counter in a single
     /// <c>UPDATE ... OUTPUT</c> statement, returning the claimed (pre-increment) value, or
     /// <see langword="null"/> if the type doesn't exist or the counter is already at/past
-    /// <paramref name="upperBoundExclusive"/> (checked in the same statement, so a blocked claim
-    /// never advances the counter). The row lock SQL Server holds for the statement's duration
-    /// means two concurrent callers can never claim the same value — unlike
-    /// a separate read (<see cref="GetCountersAsync"/>) followed by a write
-    /// (<see cref="UpdateCounterAsync"/>), which races.
-    /// </summary>
-    Task<string?> ClaimNextCounterAsync(int histologyType, int upperBoundExclusive, CancellationToken ct = default);
-
     /// <summary>
-    /// Atomically claims (marks used) and returns one pre-booked-but-unused ref of the given
-    /// type, or <see langword="null"/> if none remain. Uses <c>UPDLOCK, ROWLOCK, READPAST</c> so
-    /// concurrent callers each claim a different row instead of racing to read-then-update the
-    /// same one — unlike <see cref="GetUnusedRefsAsync"/> followed by a separate "mark used" write,
-    /// which two callers could both read before either write landed.
+    /// Reads and advances a type's "next histology ref" counter via the <c>GetNextHistologyRef</c>
+    /// SP (<c>@Type</c> in, <c>@NextHistologyRef</c>/<c>@RowStamp</c> out), returning the claimed
+    /// (pre-increment) 5-digit number, or <see langword="null"/> if the type has no counter row.
+    /// This is the one draw legacy uses (clsHistology.vb::GetNextAvailableHistologyRef) — the
+    /// read and the increment happen inside the SP, not across two round trips.
     /// </summary>
-    Task<string?> ClaimUnusedRefAsync(int histologyType, CancellationToken ct = default);
+    Task<string?> DrawNextRefAsync(int histologyType, CancellationToken ct = default);
 }

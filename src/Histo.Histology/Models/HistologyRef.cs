@@ -84,8 +84,11 @@ public static class HistologyRefTypeCode
     /// </summary>
     public static int? FromExistingRef(string? histologyRef)
     {
-        if (string.IsNullOrWhiteSpace(histologyRef) || histologyRef.Length < 5) return null;
-        if (!int.TryParse(histologyRef[^5..], out var number)) return null;
+        // Trimmed: the column is varchar and some rows carry trailing spaces, which otherwise
+        // shift the last-5-character window and fail to parse.
+        var trimmed = histologyRef?.Trim();
+        if (string.IsNullOrEmpty(trimmed) || trimmed.Length < 5) return null;
+        if (!int.TryParse(trimmed[^5..], out var number)) return null;
 
         return number switch
         {
@@ -96,5 +99,23 @@ public static class HistologyRefTypeCode
             >= 60000 and < 90000 => MouseProjects,
             _ => null,
         };
+    }
+
+    /// <summary>
+    /// The inclusive lower and exclusive upper number bound for a type. Returns <see langword="false"/>
+    /// for types with no range of their own (e.g. <see cref="UsePgNumber"/>).
+    /// </summary>
+    public static bool TryGetRange(int histologyType, out int lowerInclusive, out int upperExclusive)
+    {
+        (lowerInclusive, upperExclusive) = histologyType switch
+        {
+            Neuropath      => (10000, 20000),
+            AbattoirSurvey => (20000, 30000),
+            TBDiagnostic   => (30000, 40000),
+            GeneralPool    => (40000, 60000),
+            MouseProjects  => (60000, 90000),
+            _              => (0, 0),
+        };
+        return upperExclusive > 0;
     }
 }
