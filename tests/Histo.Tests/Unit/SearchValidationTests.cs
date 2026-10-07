@@ -310,12 +310,10 @@ public class SearchValidationTests
         new(_session.Object, _submissions.Object, _lookups.Object) { PageContext = NewPageContext() };
 
     [Fact]
-    public async Task ViewSamples_BothRefsSupplied_SearchesSuccessfully()
+    public async Task ViewSamples_BothRefsSupplied_ShowsValidationError()
     {
-        // GetAnimalBatchTissues/GetAnimalBlockTissues tolerate both being supplied — each
-        // branches internally on one ref and ignores the other, no error either way.
-        _submissions.Setup(s => s.GetAnimalTissuesAsync("S1", "H1", null, null, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<AnimalTissueSearchResult>)[]);
+        // Legacy requires EXACTLY ONE of Sender ref / Histology ref — confirmed live 2026-10-07
+        // that legacy rejects both blank AND both given with the same message.
         var sut = CreateViewSamples();
         sut.SenderRef = "S1";
         sut.HistologyRef = "H1";
@@ -323,8 +321,8 @@ public class SearchValidationTests
 
         await sut.OnGetAsync();
 
-        Assert.Empty(sut.Errors);
-        Assert.True(sut.Searched);
+        Assert.True(sut.Errors.ContainsKey(nameof(sut.SenderRef)));
+        Assert.False(sut.Searched);
     }
 
     [Fact]

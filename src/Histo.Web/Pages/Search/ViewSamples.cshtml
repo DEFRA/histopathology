@@ -21,7 +21,7 @@
             <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">
                 Which reference do you want to search by?
             </legend>
-            <div id="reference-search-hint" class="govuk-hint">Enter either the sender ref or the histology ref — you do not need to fill in both.</div>
+            <div id="reference-search-hint" class="govuk-hint">Enter either the sender ref or the histology ref, not both.</div>
             <div class="govuk-grid-row">
                 <div class="govuk-grid-column-one-half">
                     <div class="govuk-form-group @(Model.Errors.ContainsKey(nameof(Model.SenderRef)) ? "govuk-form-group--error" : "")">
@@ -93,6 +93,7 @@
     </div>
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Search</button>
+        <a asp-page="/Search/ViewSamples" asp-route-ReturnPage="@Model.ReturnPage" class="govuk-button govuk-button--secondary" data-module="govuk-button">Clear all</a>
         @if (Model.Searched && Model.Errors.Count == 0)
         {
             <a asp-page="/Search/ViewSamples" asp-page-handler="ExportExcel"
