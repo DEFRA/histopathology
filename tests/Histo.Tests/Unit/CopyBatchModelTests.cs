@@ -31,6 +31,7 @@ public class CopyBatchModelTests
     public CopyBatchModelTests()
     {
         _session.Setup(s => s.UserID).Returns(42);
+        _session.SetupProperty(s => s.BatchType);
     }
 
     private CopyBatchModel CreateSut() =>
@@ -105,6 +106,43 @@ public class CopyBatchModelTests
         Assert.Equal(2, pending.Samples.Count);
         Assert.False(string.IsNullOrEmpty(pending.Token));
         Assert.Equal(pending.Token, redirect.RouteValues["copyToken"]);
+    }
+
+    /// <summary>
+    /// Regression: BatchDetailsModel's create-mode form reads Session.BatchType (not the source
+    /// batch directly) to pick the TSE/Non-TSE antibody lookup table and to stamp the new batch's
+    /// own BatchType. View/Search Submissions only ever set Session.BatchID, so copying a Non-TSE
+    /// submission previously left whatever BatchType was already in session (e.g. a stale TSE
+    /// value from an earlier, unrelated visit), rendering the wrong options and creating the copy
+    /// with the wrong type.
+    /// </summary>
+    [Fact]
+    public async Task OnPostAsync_Confirmed_SetsSessionBatchTypeFromSourceBatch()
+    {
+        var sourceBatch = MakeSourceBatch();
+        var nonTseBatch = new Batch
+        {
+            ID = sourceBatch.ID,
+            Status = sourceBatch.Status,
+            BatchType = BatchTypeConstants.NonTse,
+            ProjectContractCode = sourceBatch.ProjectContractCode,
+            ContactName = sourceBatch.ContactName,
+            Species = sourceBatch.Species,
+            BatchDate = sourceBatch.BatchDate,
+            Fixation = sourceBatch.Fixation,
+            SafeToHandle = sourceBatch.SafeToHandle,
+        };
+        _batches.Setup(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(nonTseBatch);
+        _session.Object.BatchType = BatchTypeConstants.Tse; // stale value from an earlier visit
+
+        var sut = CreateSut();
+        sut.SourceBatchId = 10;
+        sut.Confirm = true;
+        sut.Animals = [new CopyBatchModel.AnimalRow { AnimalId = 7, SenderRef = "S1" }];
+
+        await sut.OnPostAsync();
+
+        Assert.Equal(BatchTypeConstants.NonTse, _session.Object.BatchType);
     }
 
     [Fact]

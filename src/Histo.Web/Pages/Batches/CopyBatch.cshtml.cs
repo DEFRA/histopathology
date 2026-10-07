@@ -161,6 +161,12 @@ public class CopyBatchModel : HistoPageModel
         var token = Guid.NewGuid().ToString("N");
         TempData["CopyBatch_PendingCopy"] = JsonSerializer.Serialize(new PendingCopy(SourceBatchId, Animals, token));
 
+        // BatchDetailsModel's create-mode form reads Session.BatchType (not the source batch
+        // directly) to pick the TSE/Non-TSE antibody lookup table and to stamp the new batch's own
+        // BatchType — View/Search Submissions' entry points only ever set Session.BatchID, so
+        // without this a Non-TSE source could render TSE options and create the copy as TSE.
+        Session.BatchType = SourceBatch.BatchType;
+
         return RedirectToPage("/Batches/BatchDetails", new { mode = "create", copyToken = token });
     }
 
