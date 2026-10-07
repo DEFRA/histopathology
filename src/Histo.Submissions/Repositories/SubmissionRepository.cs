@@ -148,10 +148,9 @@ public sealed class SubmissionRepository : ISubmissionRepository
                     BatchSubmissionID  = 0,
                     SenderRef          = sample.NewSenderRef,
                     NextBlockRef       = sample.SourceAnimal.NextBlockRef,
-                    // A histology ref identifies exactly one sample, so a copy must start without
-                    // one — AddAnimal silently declines the insert on a duplicate.
-                    HistoRefSet        = false,
-                    HistologyRef       = null,
+                    // Never the source's own ref — AddAnimal silently declines a duplicate.
+                    HistologyRef       = sample.NewHistologyRef,
+                    HistoRefSet        = !string.IsNullOrWhiteSpace(sample.NewHistologyRef),
                     BookedHistologyRef = false,
                     OnHold             = sample.SourceAnimal.OnHold,
                     PMDate             = sample.SourceAnimal.PMDate,
@@ -200,6 +199,9 @@ public sealed class SubmissionRepository : ISubmissionRepository
                             $"Could not copy block '{block.BlockRef}' for sample '{sample.NewSenderRef}'.");
 
                     await CopySourceTissuesAsync(conn, tx, block.Tissues, newBlockId);
+
+                    step = $"copy the test selections for block {block.BlockRef}";
+                    await AddBlockTestsAsync(conn, tx, newBatchId, newBlockId, userId, block);
                 }
             }
 
@@ -408,13 +410,35 @@ public sealed class SubmissionRepository : ISubmissionRepository
         parameters.Add("CustomerRef", block.CustomerRef);
         parameters.Add("RepeatBlock", block.RepeatBlock);
         parameters.Add("Comment", block.Comment);
-        parameters.Add("Status", block.Status);
+        // Legacy clsBlock.NewBlock always stamps a copied block STATUS_USED (1) rather than
+        // carrying the source block's own status across.
+        parameters.Add("Status", 1);
         parameters.Add("Order", block.Order);
         parameters.Add("OldID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
         parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync("AddBlock", parameters, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
         return parameters.Get<int?>("NewID") ?? 0;
+    }
+
+    /// <summary>
+    /// Inserts a copied block's test-type ticks using the same SPs as
+    /// <c>BlockTestRepository.SaveTestSelectionsAsync</c> — a new block has no existing rows, so
+    /// this is the insert half of that delta, run inside the copy transaction.
+    /// </summary>
+    private static async Task AddBlockTestsAsync(IDbConnection conn, IDbTransaction tx, int newBatchId, int newBlockId, int userId, CopiedBlockPlan block)
+    {
+        await AddCodesAsync(block.HistologyCodes, "AddBlockHistology");
+        await AddCodesAsync(block.AntibodyCodes, "AddBlockAntibodies");
+        await AddCodesAsync(block.StainCodes, "AddBlockStain");
+
+        async Task AddCodesAsync(IReadOnlyList<string> codes, string addSp)
+        {
+            foreach (var code in codes.Distinct(StringComparer.OrdinalIgnoreCase))
+                await conn.ExecuteAsync(addSp,
+                    new { BlockID = newBlockId, Code = code, Comment = (string?)null, UserID = userId, BatchID = newBatchId },
+                    tx, commandType: System.Data.CommandType.StoredProcedure);
+        }
     }
 
     private static async Task<int> CopyTissueAsync(IDbConnection conn, IDbTransaction tx, Tissue source, int newOwnerId)

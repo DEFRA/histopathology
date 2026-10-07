@@ -66,7 +66,9 @@ public class CopyBlocksModelTests
         await sut.OnPostAsync();
 
         _histologyRefs.Verify(h => h.GetNextAvailableRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
-        _submissions.Verify(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        // The sample is still saved (NextBlockRef advances with the copied blocks) — just without a ref.
+        _submissions.Verify(s => s.UpdateAnimalAsync(
+            It.Is<Animal>(a => a.ID == 20 && a.HistologyRef == null && !a.HistoRefSet), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -91,8 +93,9 @@ public class CopyBlocksModelTests
         _histologyRefs.Verify(h => h.GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()), Times.Once);
         _submissions.Verify(s => s.UpdateAnimalAsync(
             It.Is<Animal>(a => a.ID == 20 && a.HistologyRef == "26/60002" && a.HistoRefSet), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+        // Already had one, so legacy leaves it alone — the save only carries its NextBlockRef.
         _submissions.Verify(s => s.UpdateAnimalAsync(
-            It.Is<Animal>(a => a.ID == 30), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.Is<Animal>(a => a.ID == 30 && a.HistologyRef == "26/60050"), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -144,7 +147,8 @@ public class CopyBlocksModelTests
         await sut.OnPostAsync();
 
         Assert.Contains("No more histology references are available", sut.TempData["StatusMessage"] as string);
-        _submissions.Verify(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _submissions.Verify(s => s.UpdateAnimalAsync(
+            It.Is<Animal>(a => a.ID == 20 && a.HistologyRef == null), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

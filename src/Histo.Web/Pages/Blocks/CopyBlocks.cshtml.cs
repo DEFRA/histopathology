@@ -108,14 +108,53 @@ public class CopyBlocksModel : HistoPageModel
         var allBlocks = await _blocks.GetByBatchAsync(batchId.Value);
         var sourceBlocks = allBlocks.Where(b => BlockIds.Contains(b.ID)).ToList();
         var allTests = await _blockTests.GetAllSelectionsByBatchAsync(batchId.Value);
-
-        foreach (var targetAnimalId in TargetAnimalIds)
-            await CopyBlocksToAnimalAsync(sourceBlocks, allBlocks, allTests, batchId.Value, targetAnimalId, userId);
+        var animals = await GetAllAnimalsAsync(batchId.Value);
+        var sourceAnimal = sourceBlocks.Count > 0
+            ? animals.FirstOrDefault(a => a.ID == sourceBlocks[0].AnimalID)
+            : null;
 
         var histoRefsAssigned = 0;
         string? histoRefProblem = null;
-        if (AutoGenerateHistologyRefs && sourceBlocks.Count > 0)
-            (histoRefsAssigned, histoRefProblem) = await AssignHistologyRefsAsync(batchId.Value, sourceBlocks[0].AnimalID, userId);
+        var histologyType = AutoGenerateHistologyRefs && sourceBlocks.Count > 0
+            ? HistologyRefTypeCode.FromExistingRef(sourceAnimal?.HistologyRef)
+            : null;
+        if (AutoGenerateHistologyRefs && sourceBlocks.Count > 0 && histologyType is null)
+            histoRefProblem = $"No histology refs were generated because the reference type could not be determined from sample {sourceAnimal?.SenderRef ?? "the source sample"}. Give that sample a histology reference first.";
+
+        var skippedExisting = 0;
+        foreach (var targetAnimalId in TargetAnimalIds)
+        {
+            var target = animals.FirstOrDefault(a => a.ID == targetAnimalId);
+            if (target is null) continue;
+
+            await SampleCopyHelper.CopyBlocksToAnimalAsync(
+                _blocks, _submissions, _blockTests, sourceBlocks, allBlocks, allTests, batchId.Value, target, userId);
+
+            // Legacy CopyBlocks.aspx.vb only generates for targets with no ref of their own.
+            var drawRef = histologyType is not null && !target.HistoRefSet;
+            if (histologyType is not null && target.HistoRefSet) skippedExisting++;
+
+            if (drawRef)
+            {
+                var nextRef = await SampleCopyHelper.DrawRefMatchingAsync(_histologyRefs, sourceAnimal?.HistologyRef);
+                if (nextRef is null)
+                {
+                    histoRefProblem = "No more histology references are available for that reference type.";
+                }
+                else
+                {
+                    target.HistologyRef = nextRef;
+                    target.HistoRefSet = true;
+                    histoRefsAssigned++;
+                }
+            }
+
+            // One save per sample — carries both the drawn ref and the advanced NextBlockRef.
+            await _submissions.UpdateAnimalAsync(target, userId);
+        }
+
+        if (histoRefProblem is null && histoRefsAssigned == 0 && skippedExisting > 0)
+            histoRefProblem = "No histology refs were generated because the selected samples already have one.";
 
         TempData["StatusMessage"] = $"Copied {sourceBlocks.Count} block(s) to {TargetAnimalIds.Count} sample(s)."
             + (histoRefsAssigned > 0 ? $" Assigned a histology ref to {histoRefsAssigned} sample(s)." : string.Empty)
@@ -123,101 +162,9 @@ public class CopyBlocksModel : HistoPageModel
         return RedirectToOrigin(batchId.Value);
     }
 
-    /// <summary>
-    /// Legacy <c>cbAutoGenerateHisto</c> path: runs the same "get next ref" draw as
-    /// <c>SubmissionDetailsBlock</c>'s button for every target sample that doesn't already have a
-    /// histology ref, using the ref type of the source sample's own ref. Returns how many samples
-    /// were assigned and, when none were, why. Legacy source: CopyBlocks.aspx.vb::GetNextHistoNumber.
-    /// </summary>
-    private async Task<(int Assigned, string? Problem)> AssignHistologyRefsAsync(int batchId, int sourceAnimalId, int userId)
-    {
-        var animals = await GetAllAnimalsAsync(batchId);
-        var sourceAnimal = animals.FirstOrDefault(a => a.ID == sourceAnimalId);
-        var histologyType = HistologyRefTypeCode.FromExistingRef(sourceAnimal?.HistologyRef);
-        if (histologyType is null)
-            return (0, $"No histology refs were generated because the reference type could not be determined from sample {sourceAnimal?.SenderRef ?? "the source sample"}. Give that sample a histology reference first.");
-
-        var assigned = 0;
-        var skippedExisting = 0;
-        var exhausted = false;
-        foreach (var targetAnimalId in TargetAnimalIds)
-        {
-            var target = animals.FirstOrDefault(a => a.ID == targetAnimalId);
-            if (target is null) continue;
-            if (target.HistoRefSet)
-            {
-                skippedExisting++;
-                continue;
-            }
-
-            var nextRef = await _histologyRefs.GetNextAvailableRefAsync(histologyType.Value);
-            if (nextRef is null)
-            {
-                exhausted = true;
-                break;
-            }
-
-            target.HistologyRef = nextRef;
-            target.HistoRefSet = true;
-            if (await _submissions.UpdateAnimalAsync(target, userId))
-                assigned++;
-        }
-
-        if (exhausted)
-            return (assigned, "No more histology references are available for that reference type.");
-        if (assigned == 0 && skippedExisting > 0)
-            return (0, "No histology refs were generated because the selected samples already have one.");
-
-        return (assigned, null);
-    }
-
     private IActionResult RedirectToOrigin(int? batchId) => AnimalId is > 0
         ? RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = AnimalId })
         : RedirectToPage("/Batches/BatchBlocks", new { batchId });
-
-    /// <summary>
-    /// Copies each source block (its tissues and its Histology/Antibody/Stain test selections)
-    /// onto the target animal, computing each new block's reference and order in sequence so
-    /// multiple copies onto the same animal do not collide.
-    /// </summary>
-    private async Task CopyBlocksToAnimalAsync(
-        IReadOnlyList<Block> sourceBlocks, IReadOnlyList<Block> allBlocks, IReadOnlyList<BlockTest> allTests,
-        int batchId, int targetAnimalId, int userId)
-    {
-        var animalBlocks = allBlocks.Where(b => b.AnimalID == targetAnimalId).ToList();
-        var refs = animalBlocks.Select(b => b.BlockRef).ToList();
-        var orders = animalBlocks.Select(b => b.Order).ToList();
-
-        foreach (var sourceBlock in sourceBlocks)
-        {
-            var newBlockId = await _blocks.CopyBlockAsync(sourceBlock, batchId, targetAnimalId, refs, orders, userId);
-            if (newBlockId <= 0) continue;
-
-            refs.Add(BlockHelpers.ComputeNextBlockRef(refs));
-            orders.Add(BlockHelpers.ComputeNextOrder(orders));
-
-            var tissues = await _submissions.GetTissuesByBlockAsync(sourceBlock.BatchID, sourceBlock.ID);
-            foreach (var tissue in tissues)
-                await _submissions.CopyTissueAsync(tissue, newBlockId, userId);
-
-            await CopyBlockTestsAsync(allTests, sourceBlock.ID, batchId, newBlockId, userId);
-        }
-    }
-
-    /// <summary>Reproduces the source block's test-type ticks on the copy — without this the copied block's Archive/EO/H&amp;E/IHC/Special stain boxes all come back empty.</summary>
-    private async Task CopyBlockTestsAsync(IReadOnlyList<BlockTest> allTests, int sourceBlockId, int batchId, int newBlockId, int userId)
-    {
-        var sourceTests = allTests.Where(t => t.BlockID == sourceBlockId).ToList();
-        if (sourceTests.Count == 0) return;
-
-        await _blockTests.SaveTestSelectionsAsync(
-            batchId,
-            newBlockId,
-            [.. sourceTests.Where(t => t.TestType == BlockTestType.Histology).Select(t => t.Code)],
-            [.. sourceTests.Where(t => t.TestType == BlockTestType.Antibodies).Select(t => t.Code)],
-            [.. sourceTests.Where(t => t.TestType == BlockTestType.Stain).Select(t => t.Code)],
-            userId);
-    }
 
     /// <summary>Loads <see cref="SourceBlocks"/> and <see cref="TargetAnimals"/>. Returns false if nothing to copy.</summary>
     private async Task<bool> LoadDisplayDataAsync()

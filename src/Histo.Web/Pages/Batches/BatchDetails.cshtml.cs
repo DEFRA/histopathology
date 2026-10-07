@@ -45,8 +45,11 @@ public class BatchDetailsModel : HistoPageModel
     private readonly IUserService _users;
     private readonly ISubmissionService _submissions;
     private readonly IBlockService _blocks;
+    private readonly IBlockTestService _blockTests;
+    private readonly IHistologyRefService _histologyRefs;
 
-    public BatchDetailsModel(ISessionService session, IBatchService batches, ILookupService lookups, IUserService users, ISubmissionService submissions, IBlockService blocks)
+    public BatchDetailsModel(ISessionService session, IBatchService batches, ILookupService lookups, IUserService users, ISubmissionService submissions,
+        IBlockService blocks, IBlockTestService blockTests, IHistologyRefService histologyRefs)
         : base(session)
     {
         _batches = batches;
@@ -54,6 +57,8 @@ public class BatchDetailsModel : HistoPageModel
         _users   = users;
         _submissions = submissions;
         _blocks = blocks;
+        _blockTests = blockTests;
+        _histologyRefs = histologyRefs;
     }
 
     // ── Query param — "create" activates the new-batch form ──
@@ -405,6 +410,7 @@ public class BatchDetailsModel : HistoPageModel
 
         var tissuesBySubmissionId = new Dictionary<int, IReadOnlyList<Tissue>>();
         var blockPlansByAnimalId = new Dictionary<int, IReadOnlyList<CopiedBlockPlan>>();
+        var allTests = await _blockTests.GetAllSelectionsByBatchAsync(sourceBatchId);
         var plan = new List<CopiedSamplePlan>();
 
         // Driven by the staged rows rather than the source animals: a mouse-range copy stages
@@ -426,7 +432,7 @@ public class BatchDetailsModel : HistoPageModel
 
             if (!blockPlansByAnimalId.TryGetValue(animal.ID, out var blockPlans))
             {
-                blockPlans = await BuildBlockPlansAsync(sourceBatchId, blocksByAnimalId.GetValueOrDefault(animal.ID) ?? []);
+                blockPlans = await BuildBlockPlansAsync(sourceBatchId, blocksByAnimalId.GetValueOrDefault(animal.ID) ?? [], allTests);
                 blockPlansByAnimalId[animal.ID] = blockPlans;
             }
 
@@ -437,17 +443,21 @@ public class BatchDetailsModel : HistoPageModel
                 SourceSubmission = submission,
                 Tissues = tissues,
                 Blocks = blockPlans,
+                // Drawn per staged row, so a mouse-range copy of one source sample still gives
+                // every new sample its own reference.
+                NewHistologyRef = await SampleCopyHelper.DrawRefMatchingAsync(_histologyRefs, animal.HistologyRef),
             });
         }
         return plan;
     }
 
-    /// <summary>Flattens a sample's blocks (and each block's own tissues) into the copy plan's module-neutral shape.</summary>
-    private async Task<IReadOnlyList<CopiedBlockPlan>> BuildBlockPlansAsync(int sourceBatchId, IReadOnlyList<Block> blocks)
+    /// <summary>Flattens a sample's blocks (tissues and test selections) into the copy plan's module-neutral shape.</summary>
+    private async Task<IReadOnlyList<CopiedBlockPlan>> BuildBlockPlansAsync(int sourceBatchId, IReadOnlyList<Block> blocks, IReadOnlyList<BlockTest> allTests)
     {
         var plans = new List<CopiedBlockPlan>(blocks.Count);
         foreach (var block in blocks)
         {
+            var tests = allTests.Where(t => t.BlockID == block.ID).ToList();
             plans.Add(new CopiedBlockPlan
             {
                 BlockRef = block.BlockRef,
@@ -457,6 +467,9 @@ public class BatchDetailsModel : HistoPageModel
                 Status = block.Status,
                 Order = block.Order,
                 Tissues = await _submissions.GetTissuesByBlockAsync(sourceBatchId, block.ID),
+                HistologyCodes = [.. tests.Where(t => t.TestType == BlockTestType.Histology).Select(t => t.Code)],
+                AntibodyCodes = [.. tests.Where(t => t.TestType == BlockTestType.Antibodies).Select(t => t.Code)],
+                StainCodes = [.. tests.Where(t => t.TestType == BlockTestType.Stain).Select(t => t.Code)],
             });
         }
         return plans;

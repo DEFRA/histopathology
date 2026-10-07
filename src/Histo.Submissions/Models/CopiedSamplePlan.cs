@@ -13,6 +13,12 @@ public sealed class CopiedSamplePlan
     public required BatchSubmission SourceSubmission { get; init; }
     public required IReadOnlyList<Tissue> Tissues { get; init; }
 
+    /// <summary>
+    /// Histology ref drawn for the copy. Never the source's own — a ref identifies exactly one
+    /// sample, and AddAnimal silently declines an insert that duplicates one.
+    /// </summary>
+    public string? NewHistologyRef { get; init; }
+
     /// <summary>The source sample's blocks, recreated against the new sample.</summary>
     public IReadOnlyList<CopiedBlockPlan> Blocks { get; init; } = [];
 }
@@ -31,4 +37,9 @@ public sealed class CopiedBlockPlan
     public int Status { get; init; }
     public int Order { get; init; }
     public required IReadOnlyList<Tissue> Tissues { get; init; }
+
+    /// <summary>Archive/EO/H&amp;E/... ticks to reproduce on the copy.</summary>
+    public IReadOnlyList<string> HistologyCodes { get; init; } = [];
+    public IReadOnlyList<string> AntibodyCodes { get; init; } = [];
+    public IReadOnlyList<string> StainCodes { get; init; } = [];
 }

@@ -18,14 +18,19 @@ public class AddSubmissionModel : HistoPageModel
     private readonly IBatchService _batches;
     private readonly ILookupService _lookups;
     private readonly IBlockService _blocks;
+    private readonly IBlockTestService _blockTests;
+    private readonly IHistologyRefService _histologyRefs;
 
-    public AddSubmissionModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups, IBlockService blocks)
+    public AddSubmissionModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups,
+        IBlockService blocks, IBlockTestService blockTests, IHistologyRefService histologyRefs)
         : base(session)
     {
         _submissions = submissions;
         _batches = batches;
         _lookups = lookups;
         _blocks = blocks;
+        _blockTests = blockTests;
+        _histologyRefs = histologyRefs;
     }
 
     /// <summary>Batch ID from the URL (route/query). Falls back to <see cref="ISessionService.BatchID"/>.</summary>
@@ -295,6 +300,10 @@ public class AddSubmissionModel : HistoPageModel
 
         if (SourceAnimalId is > 0)
         {
+            // Block-type "Copy sample": reproduce the source sample's blocks and give the copy its
+            // own histology ref, so it lands complete rather than needing Copy blocks afterwards.
+            await CopySourceSampleToAsync(batchId, newAnimalId);
+
             if (IsCopyBatchReturn)
             {
                 PersistCopyBatchState();
@@ -305,6 +314,45 @@ public class AddSubmissionModel : HistoPageModel
 
         Session.SampleDetailReturnPage = BackLinkPage;
         return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = newAnimalId });
+    }
+
+    /// <summary>Gives one newly created sample the source sample's blocks and its own histology ref.</summary>
+    private async Task CopySourceSampleToAsync(int batchId, int newAnimalId)
+    {
+        var animals = await _submissions.GetAnimalsByBatchAsync(batchId);
+        var source = animals.FirstOrDefault(a => a.ID == SourceAnimalId);
+        var target = animals.FirstOrDefault(a => a.ID == newAnimalId);
+        if (source is null || target is null) return;
+
+        var allBlocks = await _blocks.GetByBatchAsync(batchId);
+        await CopySourceSampleToTargetAsync(batchId, allBlocks, source, target);
+    }
+
+    /// <summary>
+    /// Shared per-sample copy step: blocks (with tissues and test ticks), then the histology ref,
+    /// saved in one update so the advanced NextBlockRef goes with it.
+    /// </summary>
+    private async Task CopySourceSampleToTargetAsync(int batchId, IReadOnlyList<Block> allBlocks, Animal source, Animal target)
+    {
+        var sourceBlocks = allBlocks.Where(b => b.AnimalID == source.ID).ToList();
+        if (sourceBlocks.Count > 0)
+        {
+            var allTests = await _blockTests.GetAllSelectionsByBatchAsync(batchId);
+            await SampleCopyHelper.CopyBlocksToAnimalAsync(
+                _blocks, _submissions, _blockTests, sourceBlocks, allBlocks, allTests, batchId, target, Session.UserID);
+        }
+
+        if (!target.HistoRefSet)
+        {
+            var nextRef = await SampleCopyHelper.DrawRefMatchingAsync(_histologyRefs, source.HistologyRef);
+            if (nextRef is not null)
+            {
+                target.HistologyRef = nextRef;
+                target.HistoRefSet = true;
+            }
+        }
+
+        await _submissions.UpdateAnimalAsync(target, Session.UserID);
     }
 
     /// <summary>
@@ -497,7 +545,7 @@ public class AddSubmissionModel : HistoPageModel
     /// </summary>
     private async Task<IActionResult> OnPostMouseRangeAsync(int batchId, int submissionId, Batch? batch)
     {
-        var (_, rangeError) = await ResolveMouseRangeRefsAsync();
+        var (rangeRefs, rangeError) = await ResolveMouseRangeRefsAsync();
         if (rangeError is not null)
         {
             ModelError = rangeError;
@@ -516,6 +564,25 @@ public class AddSubmissionModel : HistoPageModel
             return Page();
         }
 
+        // CreateMouseRangeAsync only copies submission tissues, so the blocks and histology refs
+        // the single-sample copy performs have to be applied to each new sample here too.
+        await CopyToRangeSamplesAsync(batchId, rangeRefs);
+
         return RedirectToPage("/Submissions/SampleSummary", new { batchId });
+    }
+
+    /// <summary>Gives every sample just created by a range copy the same blocks and histology ref a single-sample copy would get.</summary>
+    private async Task CopyToRangeSamplesAsync(int batchId, IReadOnlyList<string> rangeRefs)
+    {
+        if (SourceAnimalId is not > 0 || rangeRefs.Count == 0) return;
+
+        var animals = await _submissions.GetAnimalsByBatchAsync(batchId);
+        var source = animals.FirstOrDefault(a => a.ID == SourceAnimalId);
+        if (source is null) return;
+
+        var allBlocks = await _blocks.GetByBatchAsync(batchId);
+        var wanted = rangeRefs.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var target in animals.Where(a => wanted.Contains(a.SenderRef)))
+            await CopySourceSampleToTargetAsync(batchId, allBlocks, source, target);
     }
 }
