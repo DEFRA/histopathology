@@ -17,12 +17,29 @@ public sealed class HistologyRepository : IHistologyRepository
     /// <inheritdoc/>
     public async Task<IReadOnlyList<HistologyRef>> GetUnusedRefsAsync(int histologyType, CancellationToken ct = default)
     {
+        // GetUnusedHistologyRefs returns an unaliased "HistologyRef" column, which doesn't match
+        // the HistologyRef.Ref property name, so Dapper's implicit binding leaves Ref blank —
+        // map explicitly instead (same defensive-read pattern as BlockTestRepository's Map()).
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<HistologyRef>(
+        var rows = await conn.QueryAsync(
             "GetUnusedHistologyRefs",
             new { HistologyType = histologyType },
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+
+        return rows.Select(r =>
+        {
+            var row = (IDictionary<string, object>)r;
+            return new HistologyRef
+            {
+                Ref = row.TryGetValue("HistologyRef", out var refVal) && refVal is not DBNull
+                    ? Convert.ToString(refVal) ?? string.Empty
+                    : string.Empty,
+                HistologyType = histologyType,
+                SenderRef = row.TryGetValue("SenderRef", out var senderVal) && senderVal is not DBNull
+                    ? Convert.ToString(senderVal)
+                    : null,
+            };
+        }).ToList();
     }
 
     /// <inheritdoc/>
@@ -77,5 +94,17 @@ public sealed class HistologyRepository : IHistologyRepository
             "EditHistologyRef",
             new { Type = histologyType, NextHistologyRef = newNextHistologyRef, RowStamp = rowStamp },
             commandType: System.Data.CommandType.StoredProcedure);
+    }
+
+    /// <inheritdoc/>
+    public async Task<string?> ClaimNextCounterAsync(int histologyType, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        return await conn.ExecuteScalarAsync<string?>(
+            @"UPDATE HistologyRef
+              SET NextHistologyRef = CAST(CAST(NextHistologyRef AS INT) + 1 AS VARCHAR(10))
+              OUTPUT DELETED.NextHistologyRef
+              WHERE Type = @Type",
+            new { Type = histologyType });
     }
 }

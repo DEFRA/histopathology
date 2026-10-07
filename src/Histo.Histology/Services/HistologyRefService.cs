@@ -174,17 +174,18 @@ public sealed class HistologyRefService : IHistologyRefService
         try
         {
             var unused = await GetUnusedRefsAsync(histologyType, ct);
-            var fromPool = unused.FirstOrDefault()?.Ref;
+            var fromPool = unused.FirstOrDefault(r => !string.IsNullOrWhiteSpace(r.Ref))?.Ref;
             if (fromPool is not null) return fromPool;
 
-            var counters = await GetCountersAsync(ct);
-            var counter = counters.FirstOrDefault(c => c.Type == histologyType);
-            if (counter is null || !int.TryParse(counter.NextHistologyRef, out var current)) return null;
+            // Claims the counter atomically (single UPDATE ... OUTPUT) instead of a separate
+            // GetCountersAsync read + SetCounterAsync write — that two-step path let two
+            // concurrent callers both read the same "current" value and both successfully write
+            // current + 1 (SetCounterAsync re-fetches its own RowStamp rather than using the one
+            // from the original read), so both calls returned the same histology ref.
+            var claimed = await _repo.ClaimNextCounterAsync(histologyType, ct);
+            if (claimed is null) return null;
 
-            var advanced = await SetCounterAsync(histologyType, (current + 1).ToString(), ct);
-            if (!advanced) return null;
-
-            return $"{DateTime.Now.Year % 100:D2}/{counter.NextHistologyRef}";
+            return $"{DateTime.Now.Year % 100:D2}/{claimed}";
         }
         catch (Exception ex)
         {

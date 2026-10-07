@@ -473,7 +473,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     private async Task<string?> GetNextRefForTypeAsync(int histologyType)
     {
         var unused = await _histologyRefs.GetUnusedRefsAsync(histologyType);
-        var fromPool = unused.FirstOrDefault()?.Ref;
+        var fromPool = unused.FirstOrDefault(r => !string.IsNullOrWhiteSpace(r.Ref))?.Ref;
         if (fromPool is not null) return fromPool;
 
         var counters = await _histologyRefs.GetCountersAsync();
