@@ -167,4 +167,31 @@ public sealed class HistologyRefService : IHistologyRefService
             return new HistologyBookingResult { Success = false, Error = "The database has not been updated because an error occurred. Please try again." };
         }
     }
+
+    /// <inheritdoc/>
+    public async Task<string?> GetNextAvailableRefAsync(int histologyType, CancellationToken ct = default)
+    {
+        try
+        {
+            if (!HistologyRefTypeCode.TryGetRange(histologyType, out _, out var upperBoundExclusive))
+                return null;
+
+            // Legacy clsHistology.vb::GetNextAvailableHistologyRef — the GetNextHistologyRef SP
+            // reads and advances the counter itself. The unused-refs pool is deliberately NOT
+            // consulted here: legacy only ever searches it by SenderRef for a specific sample.
+            var claimed = await _repo.DrawNextRefAsync(histologyType, ct);
+            if (claimed is null) return null;
+
+            // Legacy warns (and keeps going) past the type's ceiling rather than failing.
+            if (int.TryParse(claimed, out var number) && number >= upperBoundExclusive)
+                _logger.LogWarning("Histology ref {Claimed} exceeds the maximum for type {HistologyType}.", claimed, histologyType);
+
+            return $"{DateTime.Now.Year % 100:D2}/{claimed}";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to draw the next available histology ref for type {HistologyType}.", ex, histologyType);
+            return null;
+        }
+    }
 }

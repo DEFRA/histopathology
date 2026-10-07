@@ -30,7 +30,9 @@
         <a class="govuk-button govuk-button--secondary" asp-page="/Search/ViewImportedData" asp-route-ReturnPage="@Model.ReturnPage">Clear</a>
         @if (!string.IsNullOrEmpty(Model.SelectedTable) && Model.Results.Any())
         {
-            <button type="submit" asp-page-handler="ExportCsv" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</button>
+            @* A GET form discards an existing formaction query string on submit, so asp-page-handler
+               silently never reaches the server here — a named submit button survives instead. *@
+            <button type="submit" name="handler" value="ExportExcel" class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</button>
         }
     </div>
 </form>

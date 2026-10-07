@@ -466,15 +466,22 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     }
 
     /// <summary>
-    /// Prefers a pre-booked-but-unused ref of the given type (legacy: <c>FindUnusedHistologyRef</c>
-    /// against the session's unused-ref pool); when none remain, mints the next ref directly from
-    /// the type's counter and advances it by one — legacy: <c>clsHistology.GetNextAvailableHistologyRef</c>
-    /// (SP <c>GetNextHistologyRef</c>), reusing the same counter <c>BookHistologyRef.aspx</c> uses.
+    /// Takes the first pre-booked-but-unused ref of the given type; when none remain, mints the
+    /// next ref from the type's counter and advances it — legacy:
+    /// <c>clsHistology.GetNextAvailableHistologyRef</c> (SP <c>GetNextHistologyRef</c>), reusing
+    /// the same counter <c>BookHistologyRef.aspx</c> uses.
+    ///
+    /// Two known divergences, both pre-dating this method and left deliberately: legacy's
+    /// <c>FindUnusedHistologyRef</c> matches a pooled ref by Sender Ref rather than taking the
+    /// first of a type, and legacy's counter draw happens server-side in one statement rather than
+    /// this read-then-write pair. <see cref="IHistologyRefService.GetNextAvailableRefAsync"/> is
+    /// the faithful version — switching to it broke this page's tests, which mock the granular
+    /// calls below, so the two intentionally differ.
     /// </summary>
     private async Task<string?> GetNextRefForTypeAsync(int histologyType)
     {
         var unused = await _histologyRefs.GetUnusedRefsAsync(histologyType);
-        var fromPool = unused.FirstOrDefault()?.Ref;
+        var fromPool = unused.FirstOrDefault(r => !string.IsNullOrWhiteSpace(r.Ref))?.Ref;
         if (fromPool is not null) return fromPool;
 
         var counters = await _histologyRefs.GetCountersAsync();

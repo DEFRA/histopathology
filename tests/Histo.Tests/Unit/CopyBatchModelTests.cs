@@ -15,11 +15,11 @@ namespace Histo.Tests.Unit;
 /// <summary>
 /// Unit tests for <see cref="CopyBatchModel"/> — the Copy Submission workflow.
 ///
-/// Regression coverage for the fix that restores parity with legacy
-/// <c>clsBatch.vb::CopyBatch()</c>, which always copies the source batch's
-/// Histology/Antibody/Special Stain test-type selections onto the new batch
-/// alongside the header. Prior to the fix, <c>OnPostAsync</c> only copied the
-/// batch header, silently dropping the test-type template on every copy.
+/// Redesigned (2026-10-07): Finish no longer writes anything to the database. It stages every
+/// sample in the source submission (matching legacy's always-copy-everything behaviour — no
+/// per-sample selection) and redirects to the Create Submission form (<see cref="BatchDetailsModel"/>,
+/// mode=create), which performs the actual copy once the user submits that form — see
+/// <c>BatchDetailsModelTests</c> for the consuming side.
 /// </summary>
 public class CopyBatchModelTests
 {
@@ -31,12 +31,14 @@ public class CopyBatchModelTests
     public CopyBatchModelTests()
     {
         _session.Setup(s => s.UserID).Returns(42);
+        _session.SetupProperty(s => s.BatchType);
     }
 
     private CopyBatchModel CreateSut() =>
         new(_session.Object, _batches.Object, _submissions.Object, _lookups.Object)
         {
             PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
+            TempData = new TempDataDictionary(new Microsoft.AspNetCore.Http.DefaultHttpContext(), Mock.Of<ITempDataProvider>()),
         };
 
     private static Batch MakeSourceBatch(string status = BatchStatus.Submitted) => new()
@@ -59,87 +61,7 @@ public class CopyBatchModelTests
     };
 
     [Fact]
-    public async Task OnPostAsync_CopiesBatchTestSelections_OntoNewBatch()
-    {
-        var sourceBatch = MakeSourceBatch();
-        var sourceSelections = new BatchTestSelections
-        {
-            Histology = [new BatchTestSelectionRow { ID = 1, BatchID = 10, Code = "2" }],
-            Antibodies = [new BatchTestSelectionRow { ID = 2, BatchID = 10, Code = "AB1" }],
-            Stains = [new BatchTestSelectionRow { ID = 3, BatchID = 10, Code = "ST1" }],
-        };
-
-        _batches.Setup(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(sourceBatch);
-        _batches.Setup(b => b.CopyBatchHeaderAsync(It.IsAny<Batch>(), 42, It.IsAny<CancellationToken>())).ReturnsAsync(99);
-        _batches.Setup(b => b.GetBatchTestSelectionsAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(sourceSelections);
-        _batches.Setup(b => b.SaveBatchTestSelectionsAsync(
-                99,
-                It.IsAny<IReadOnlyList<string>>(),
-                It.IsAny<IReadOnlyList<string>>(),
-                It.IsAny<IReadOnlyList<string>>(),
-                42,
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
-
-        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(10, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
-        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<Animal>)[]);
-        _submissions.Setup(s => s.GetAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<Animal>)[]);
-
-        var sut = CreateSut();
-        sut.SourceBatchId = 10;
-        sut.Confirm = true;
-
-        var result = await sut.OnPostAsync();
-
-        _batches.Verify(b => b.GetBatchTestSelectionsAsync(10, It.IsAny<CancellationToken>()), Times.Once);
-        _batches.Verify(b => b.SaveBatchTestSelectionsAsync(
-            99,
-            It.Is<IReadOnlyList<string>>(l => l.Count == 1 && l[0] == "2"),
-            It.Is<IReadOnlyList<string>>(l => l.Count == 1 && l[0] == "AB1"),
-            It.Is<IReadOnlyList<string>>(l => l.Count == 1 && l[0] == "ST1"),
-            42,
-            It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Theory]
-    [InlineData(BatchStatus.InProgress)]
-    [InlineData(BatchStatus.Completed)]
-    [InlineData(BatchStatus.Received)]
-    [InlineData(BatchStatus.Rejected)]
-    [InlineData(BatchStatus.OnHold)]
-    public async Task OnPostAsync_ResetsNewBatchStatusToNotReceived_RegardlessOfSourceStatus(string sourceStatus)
-    {
-        var sourceBatch = MakeSourceBatch(status: sourceStatus);
-        Batch? copiedBatch = null;
-
-        _batches.Setup(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(sourceBatch);
-        _batches.Setup(b => b.CopyBatchHeaderAsync(It.IsAny<Batch>(), 42, It.IsAny<CancellationToken>()))
-            .Callback<Batch, int, CancellationToken>((b, _, _) => copiedBatch = b)
-            .ReturnsAsync(99);
-        _batches.Setup(b => b.GetBatchTestSelectionsAsync(10, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new BatchTestSelections());
-        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(10, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
-        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<Animal>)[]);
-        _submissions.Setup(s => s.GetAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<Animal>)[]);
-
-        var sut = CreateSut();
-        sut.SourceBatchId = 10;
-        sut.Confirm = true;
-
-        await sut.OnPostAsync();
-
-        Assert.NotNull(copiedBatch);
-        Assert.Equal(BatchStatus.Submitted, copiedBatch!.Status);
-    }
-
-    [Fact]
-    public async Task OnPostAsync_NotConfirmed_ShowsConfirmPanelWithoutCopying()
+    public async Task OnPostAsync_NotConfirmed_ShowsConfirmPanelWithoutStaging()
     {
         var sourceBatch = MakeSourceBatch();
         _batches.Setup(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(sourceBatch);
@@ -147,15 +69,84 @@ public class CopyBatchModelTests
         var sut = CreateSut();
         sut.SourceBatchId = 10;
         sut.Confirm = false;
+        sut.Animals = [new CopyBatchModel.AnimalRow { AnimalId = 7, SenderRef = "S1" }];
 
-        await sut.OnPostAsync();
+        var result = await sut.OnPostAsync();
 
+        Assert.IsType<PageResult>(result);
         Assert.True(sut.ShowConfirmPanel);
-        _batches.Verify(b => b.CopyBatchHeaderAsync(It.IsAny<Batch>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.False(sut.TempData.ContainsKey("CopyBatch_PendingCopy"));
     }
 
     [Fact]
-    public async Task OnPostAsync_SourceBatchNotFound_DoesNotAttemptCopy()
+    public async Task OnPostAsync_Confirmed_StagesEverySampleAndRedirectsToCreateSubmission()
+    {
+        var sourceBatch = MakeSourceBatch();
+        _batches.Setup(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(sourceBatch);
+
+        var sut = CreateSut();
+        sut.SourceBatchId = 10;
+        sut.Confirm = true;
+        sut.Animals =
+        [
+            new CopyBatchModel.AnimalRow { AnimalId = 7, SenderRef = "S1", NewSenderRef = "S1-NEW" },
+            new CopyBatchModel.AnimalRow { AnimalId = 8, SenderRef = "S2", NewSenderRef = "S2-NEW" },
+        ];
+
+        var result = await sut.OnPostAsync();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Batches/BatchDetails", redirect.PageName);
+        Assert.Equal("create", redirect.RouteValues!["mode"]);
+
+        var json = Assert.IsType<string>(sut.TempData["CopyBatch_PendingCopy"]);
+        var pending = System.Text.Json.JsonSerializer.Deserialize<CopyBatchModel.PendingCopy>(json);
+        Assert.NotNull(pending);
+        Assert.Equal(10, pending!.SourceBatchId);
+        Assert.Equal(2, pending.Samples.Count);
+        Assert.False(string.IsNullOrEmpty(pending.Token));
+        Assert.Equal(pending.Token, redirect.RouteValues["copyToken"]);
+    }
+
+    /// <summary>
+    /// Regression: BatchDetailsModel's create-mode form reads Session.BatchType (not the source
+    /// batch directly) to pick the TSE/Non-TSE antibody lookup table and to stamp the new batch's
+    /// own BatchType. View/Search Submissions only ever set Session.BatchID, so copying a Non-TSE
+    /// submission previously left whatever BatchType was already in session (e.g. a stale TSE
+    /// value from an earlier, unrelated visit), rendering the wrong options and creating the copy
+    /// with the wrong type.
+    /// </summary>
+    [Fact]
+    public async Task OnPostAsync_Confirmed_SetsSessionBatchTypeFromSourceBatch()
+    {
+        var sourceBatch = MakeSourceBatch();
+        var nonTseBatch = new Batch
+        {
+            ID = sourceBatch.ID,
+            Status = sourceBatch.Status,
+            BatchType = BatchTypeConstants.NonTse,
+            ProjectContractCode = sourceBatch.ProjectContractCode,
+            ContactName = sourceBatch.ContactName,
+            Species = sourceBatch.Species,
+            BatchDate = sourceBatch.BatchDate,
+            Fixation = sourceBatch.Fixation,
+            SafeToHandle = sourceBatch.SafeToHandle,
+        };
+        _batches.Setup(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(nonTseBatch);
+        _session.Object.BatchType = BatchTypeConstants.Tse; // stale value from an earlier visit
+
+        var sut = CreateSut();
+        sut.SourceBatchId = 10;
+        sut.Confirm = true;
+        sut.Animals = [new CopyBatchModel.AnimalRow { AnimalId = 7, SenderRef = "S1" }];
+
+        await sut.OnPostAsync();
+
+        Assert.Equal(BatchTypeConstants.NonTse, _session.Object.BatchType);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_SourceBatchNotFound_DoesNotStage()
     {
         _batches.Setup(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
 
@@ -165,8 +156,7 @@ public class CopyBatchModelTests
         await sut.OnPostAsync();
 
         Assert.Equal("The submission to copy could not be found.", sut.Error);
-        _batches.Verify(b => b.CopyBatchHeaderAsync(It.IsAny<Batch>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
-        _batches.Verify(b => b.GetBatchTestSelectionsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.False(sut.TempData.ContainsKey("CopyBatch_PendingCopy"));
     }
 
     [Fact]

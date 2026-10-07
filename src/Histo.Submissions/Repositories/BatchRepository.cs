@@ -108,7 +108,7 @@ public sealed class BatchRepository : IBatchRepository
     }
 
     /// <summary>Converts a nullable string to nullable int for SP FK parameters (int NOT NULL columns).</summary>
-    private static object ToIntParam(string? value, int fallback = 0)
+    internal static object ToIntParam(string? value, int fallback = 0)
     {
         if (string.IsNullOrEmpty(value)) return fallback;
         return int.TryParse(value, out var i) ? i : fallback;
@@ -221,7 +221,8 @@ public sealed class BatchRepository : IBatchRepository
         return 0;
     }
 
-    private DynamicParameters BuildAddBatchParams(Batch batch, int userId)
+    /// <summary>Builds the parameter set for the <c>AddBatch</c> SP — shared with <see cref="Histo.Submissions.Repositories.SubmissionRepository.CreateBatchWithCopiedSamplesAsync"/>, which needs to call the same SP within its own transaction.</summary>
+    internal static DynamicParameters BuildAddBatchParams(Batch batch, int userId)
     {
         var p = new DynamicParameters();
         p.Add("ProjectContractCode", ToIntParam(batch.ProjectContractCode));
@@ -613,7 +614,9 @@ public sealed class BatchRepository : IBatchRepository
                 await multi.ReadAsync<dynamic>();
 
             var rows = (await multi.ReadAsync<dynamic>()).ToList();
-            return rows.Count > 0 ? rows[0].Code?.ToString() : null;
+            // Code comes from a fixed-width char column — untrimmed it fails every == comparison
+            // callers make against the lookup list.
+            return rows.Count > 0 ? ((string?)rows[0].Code?.ToString())?.Trim() : null;
         }
         catch
         {

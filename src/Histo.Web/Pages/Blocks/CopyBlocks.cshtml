@@ -71,6 +71,19 @@
         </fieldset>
     </div>
 
+    @if (Model.TargetAnimals.Any())
+    {
+        <div class="govuk-form-group">
+            <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                <div class="govuk-checkboxes__item">
+                    <input class="govuk-checkboxes__input" type="checkbox" asp-for="AutoGenerateHistologyRefs" aria-describedby="AutoGenerateHistologyRefs-hint" />
+                    <label class="govuk-label govuk-checkboxes__label" for="AutoGenerateHistologyRefs">Auto generate histology refs</label>
+                    <div id="AutoGenerateHistologyRefs-hint" class="govuk-hint govuk-checkboxes__hint">Assigns the next available histology reference to each selected sample that doesn't already have one.</div>
+                </div>
+            </div>
+        </div>
+    }
+
     <div class="govuk-button-group">
         @if (Model.TargetAnimals.Any())
         {

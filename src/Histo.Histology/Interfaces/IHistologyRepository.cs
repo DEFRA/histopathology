@@ -52,4 +52,13 @@ public interface IHistologyRepository
     /// Legacy source: clsHistology.vb::UpdateHistologyRefRow.
     /// </summary>
     Task UpdateCounterAsync(int histologyType, string newNextHistologyRef, byte[]? rowStamp, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reads and advances a type's "next histology ref" counter via the <c>GetNextHistologyRef</c>
+    /// SP (<c>@Type</c> in, <c>@NextHistologyRef</c>/<c>@RowStamp</c> out), returning the claimed
+    /// (pre-increment) 5-digit number, or <see langword="null"/> if the type has no counter row.
+    /// This is the one draw legacy uses (clsHistology.vb::GetNextAvailableHistologyRef) — the
+    /// read and the increment happen inside the SP, not across two round trips.
+    /// </summary>
+    Task<string?> DrawNextRefAsync(int histologyType, CancellationToken ct = default);
 }

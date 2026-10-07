@@ -91,7 +91,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
                 var submissionId = await AddSubmissionAsync(conn, tx,
                     new BatchSubmission { BatchID = batchId, AnimalID = animalId, SubmissionName = "Default", Order = nextOrder++ });
 
-                await CopySourceTissuesAsync(conn, tx, sourceTissues, submissionId, mouseNumber);
+                await CopySourceTissuesAsync(conn, tx, sourceTissues, submissionId);
             }
 
             await tx.CommitAsync(ct);
@@ -102,6 +102,154 @@ public sealed class SubmissionRepository : ISubmissionRepository
             await tx.RollbackAsync(ct);
             throw;
         }
+    }
+
+    /// <inheritdoc/>
+    public async Task<int> CreateBatchWithCopiedSamplesAsync(
+        Batch batch,
+        IReadOnlyList<string> histologyCodes,
+        IReadOnlyList<string> antibodyCodes,
+        IReadOnlyList<string> stainCodes,
+        string? submittedAsCode,
+        IReadOnlyList<CopiedSamplePlan> plan,
+        int userId,
+        CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        await conn.OpenAsync(ct);
+        using var tx = await conn.BeginTransactionAsync(ct);
+
+        // Names the statement in flight so a SQL failure can say which step broke.
+        var step = "create the submission header";
+
+        try
+        {
+            var newBatchId = await AddBatchAsync(conn, tx, batch, userId);
+            if (newBatchId <= 0)
+                throw new InvalidOperationException("Failed to create the new submission header.");
+
+            step = "save the histology selections";
+            foreach (var code in histologyCodes.Distinct(StringComparer.OrdinalIgnoreCase))
+                await conn.ExecuteAsync("AddHistology", new { BatchID = newBatchId, Code = code, UserID = userId }, tx, commandType: System.Data.CommandType.StoredProcedure);
+            step = "save the antibody selections";
+            foreach (var code in antibodyCodes.Distinct(StringComparer.OrdinalIgnoreCase))
+                await conn.ExecuteAsync("AddAntibodies", new { BatchID = newBatchId, Code = code, UserID = userId }, tx, commandType: System.Data.CommandType.StoredProcedure);
+            step = "save the special stain selections";
+            foreach (var code in stainCodes.Distinct(StringComparer.OrdinalIgnoreCase))
+                await conn.ExecuteAsync("AddSpecialStain", new { BatchID = newBatchId, Code = code, UserID = userId }, tx, commandType: System.Data.CommandType.StoredProcedure);
+            step = "save the submission type";
+            if (!string.IsNullOrWhiteSpace(submittedAsCode))
+                await conn.ExecuteAsync("AddSubmittedAs", new { BatchID = newBatchId, Code = submittedAsCode, UserID = userId }, tx, commandType: System.Data.CommandType.StoredProcedure);
+
+            foreach (var sample in plan)
+            {
+                step = $"draw a histology ref for sample {sample.NewSenderRef}";
+                var newHistologyRef = await DrawHistologyRefAsync(conn, tx, sample.HistologyRefType);
+
+                var animal = new Animal
+                {
+                    BatchSubmissionID  = 0,
+                    SenderRef          = sample.NewSenderRef,
+                    NextBlockRef       = sample.SourceAnimal.NextBlockRef,
+                    // Never the source's own ref — AddAnimal silently declines a duplicate.
+                    HistologyRef       = newHistologyRef,
+                    HistoRefSet        = !string.IsNullOrWhiteSpace(newHistologyRef),
+                    BookedHistologyRef = false,
+                    OnHold             = sample.SourceAnimal.OnHold,
+                    PMDate             = sample.SourceAnimal.PMDate,
+                    PMDateSet          = sample.SourceAnimal.PMDateSet,
+                    IsPGNumber         = sample.SourceAnimal.IsPGNumber,
+                };
+
+                step = $"create sample {sample.NewSenderRef}";
+                var (newAnimalId, addResult) = await AddAnimalAsync(conn, tx, animal);
+
+                // Legacy's copy journey never inserts animals — it links the submission's existing
+                // ones into the new batch (clsBatchSubmission.CopyDataToNewBatch). AddAnimal's
+                // return 1 is that same case: the Sender Ref already exists, so @NewID is the
+                // existing sample and we link to it rather than failing.
+                if (addResult == 2)
+                    throw new InvalidOperationException(
+                        $"Could not copy sample '{sample.NewSenderRef}' because histology reference '{newHistologyRef}' is already assigned to another sample. Nothing was saved.");
+
+                if (newAnimalId <= 0)
+                    throw new InvalidOperationException(
+                        $"Could not create sample '{sample.NewSenderRef}'. Nothing was saved.");
+
+                var submission = new BatchSubmission
+                {
+                    BatchID        = newBatchId,
+                    AnimalID       = newAnimalId,
+                    SubmissionName = sample.SourceSubmission.SubmissionName,
+                    Order          = sample.SourceSubmission.Order,
+                };
+
+                step = $"link sample {sample.NewSenderRef} to the submission";
+                var newSubmissionId = await AddSubmissionAsync(conn, tx, submission);
+                if (newSubmissionId <= 0)
+                    throw new InvalidOperationException($"Failed to create the submission record for {sample.NewSenderRef}.");
+
+                step = $"copy the tissues for sample {sample.NewSenderRef}";
+                await CopySourceTissuesAsync(conn, tx, sample.Tissues, newSubmissionId);
+
+                foreach (var block in sample.Blocks)
+                {
+                    step = $"copy block {block.BlockRef} for sample {sample.NewSenderRef}";
+                    var newBlockId = await AddBlockAsync(conn, tx, newBatchId, newAnimalId, block);
+                    if (newBlockId <= 0)
+                        throw new InvalidOperationException(
+                            $"Could not copy block '{block.BlockRef}' for sample '{sample.NewSenderRef}'.");
+
+                    await CopySourceTissuesAsync(conn, tx, block.Tissues, newBlockId);
+
+                    step = $"copy the test selections for block {block.BlockRef}";
+                    await AddBlockTestsAsync(conn, tx, newBatchId, newBlockId, userId, block);
+                }
+            }
+
+            await tx.CommitAsync(ct);
+            return newBatchId;
+        }
+        catch (Microsoft.Data.SqlClient.SqlException ex)
+        {
+            await tx.RollbackAsync(ct);
+            // Names the failing step and the SQL error number only — never the raw SQL text.
+            throw new InvalidOperationException($"Could not {step} (database error {ex.Number}). Nothing was saved.", ex);
+        }
+        catch
+        {
+            // Rethrow rather than returning 0: SubmissionService logs the real failure, which a
+            // silent 0 hid behind a generic "Failed to create the submission" page error.
+            await tx.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Calls the <c>AddBatch</c> SP within an existing transaction, including the OUTPUT-param/
+    /// RETURN_VALUE fallback already needed by <see cref="Histo.Submissions.Repositories.BatchRepository.AddAsync"/>
+    /// for the same SP (deployment-dependent shape).
+    /// </summary>
+    private static async Task<int> AddBatchAsync(IDbConnection conn, IDbTransaction tx, Batch batch, int userId)
+    {
+        var p = BatchRepository.BuildAddBatchParams(batch, userId);
+        p.Add("BatchID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+
+        try
+        {
+            await conn.ExecuteAsync("AddBatch", p, tx, commandType: System.Data.CommandType.StoredProcedure);
+            var batchId = p.Get<int>("BatchID");
+            if (batchId > 0) return batchId;
+        }
+        catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 8144)
+        {
+            var p2 = BatchRepository.BuildAddBatchParams(batch, userId);
+            p2.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
+            await conn.ExecuteAsync("AddBatch", p2, tx, commandType: System.Data.CommandType.StoredProcedure);
+            return p2.Get<int>("RETURN_VALUE");
+        }
+
+        return 0;
     }
 
     private static bool TryGetMouseRangeBounds(string mouseNumberFrom, string mouseNumberTo, out int fromId, out int toId)
@@ -137,7 +285,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
 
     private static async Task<int> CreateMouseAnimalAsync(IDbConnection conn, IDbTransaction tx, string mouseNumber)
     {
-        var animalId = await AddAnimalAsync(conn, tx, new Animal
+        var (animalId, addResult) = await AddAnimalAsync(conn, tx, new Animal
         {
             BatchSubmissionID = 0,
             SenderRef = mouseNumber,
@@ -151,23 +299,26 @@ public sealed class SubmissionRepository : ISubmissionRepository
             BookedHistologyRef = false,
         });
 
+        // A range creates brand-new samples, so unlike the copy journey an existing Sender Ref
+        // (return 1) is a clash to report, not an animal to reuse.
+        if (addResult == 1)
+            throw new InvalidOperationException($"Mouse number {mouseNumber} already exists. Alter the range and try again.");
+
         if (animalId <= 0)
             throw new InvalidOperationException($"Failed to create animal {mouseNumber}.");
 
         return animalId;
     }
 
-    private static async Task CopySourceTissuesAsync(IDbConnection conn, IDbTransaction tx, IReadOnlyList<Tissue> sourceTissues, int submissionId, string mouseNumber)
+    /// <summary>
+    /// Copies tissues onto a new owner. The result of each insert is deliberately not checked:
+    /// AddTissue/AddBlockTissue have no identity OUTPUT param, so their RETURN_VALUE is the SP's
+    /// status code (0 = success). A genuine failure raises a SqlException, which rolls back.
+    /// </summary>
+    private static async Task CopySourceTissuesAsync(IDbConnection conn, IDbTransaction tx, IReadOnlyList<Tissue> sourceTissues, int newOwnerId)
     {
-        if (sourceTissues.Count == 0)
-            return;
-
         foreach (var tissue in sourceTissues)
-        {
-            var copied = await CopyTissueAsync(conn, tx, tissue, submissionId);
-            if (copied <= 0)
-                throw new InvalidOperationException($"Failed to copy tissues for {mouseNumber}.");
-        }
+            await CopyTissueAsync(conn, tx, tissue, newOwnerId);
     }
 
     private static async Task<IReadOnlyList<BatchSubmission>> GetSubmissionsByBatchAsync(IDbConnection conn, IDbTransaction tx, int batchId)
@@ -234,18 +385,94 @@ public sealed class SubmissionRepository : ISubmissionRepository
         return parameters.Get<int>("NewID");
     }
 
-    private static async Task<int> AddAnimalAsync(IDbConnection conn, IDbTransaction tx, Animal animal)
+    /// <summary>
+    /// Calls <c>AddAnimal</c> and reports both the id and the SP's return code, which legacy
+    /// (clsAnimal.vb::UpdateAnimalRow) branches on:
+    /// <c>0</c> inserted; <c>1</c> the Sender Ref already exists and <c>@NewID</c> is that
+    /// existing sample; <c>2</c> the Histology Ref belongs to another sample and nothing was
+    /// inserted. Without reading it, a declined insert is indistinguishable from a failure.
+    /// </summary>
+    private static async Task<(int AnimalId, int ReturnValue)> AddAnimalAsync(IDbConnection conn, IDbTransaction tx, Animal animal)
     {
         var parameters = new DynamicParameters();
+        parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
         parameters.Add("SenderRef", animal.SenderRef);
         parameters.Add("HistologyRef", animal.HistologyRef, dbType: System.Data.DbType.String);
         parameters.Add("NextBlockRef", animal.NextBlockRef);
+        // Unlike EditAnimal's, this SP's @PMDate takes the legacy dd/MM/yyyy string as-is —
+        // parsing it to a DateTime here breaks every insert.
         parameters.Add("PMDate", (object?)animal.PMDate ?? DBNull.Value, dbType: System.Data.DbType.String);
         parameters.Add("OnHold", animal.OnHold);
         parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync("AddAnimal", parameters, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
-        return parameters.Get<int>("NewID");
+        return (parameters.Get<int?>("NewID") ?? 0, parameters.Get<int?>("RETURN_VALUE") ?? 0);
+    }
+
+    /// <summary>
+    /// Calls the <c>AddBlock</c> SP inside the copy transaction — mirrors
+    /// <c>BlockRepository.SaveAsync</c>'s insert branch (no @UserID; new id via @NewID output).
+    /// </summary>
+    private static async Task<int> AddBlockAsync(IDbConnection conn, IDbTransaction tx, int newBatchId, int newAnimalId, CopiedBlockPlan block)
+    {
+        var parameters = new DynamicParameters();
+        parameters.Add("ID", 0);
+        parameters.Add("BatchID", newBatchId);
+        parameters.Add("AnimalID", newAnimalId);
+        parameters.Add("BlockRef", block.BlockRef);
+        parameters.Add("CustomerRef", block.CustomerRef);
+        parameters.Add("RepeatBlock", block.RepeatBlock);
+        parameters.Add("Comment", block.Comment);
+        // Legacy clsBlock.NewBlock always stamps a copied block STATUS_USED (1) rather than
+        // carrying the source block's own status across.
+        parameters.Add("Status", 1);
+        parameters.Add("Order", block.Order);
+        parameters.Add("OldID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+        parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+
+        await conn.ExecuteAsync("AddBlock", parameters, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
+        return parameters.Get<int?>("NewID") ?? 0;
+    }
+
+    /// <summary>
+    /// Draws the next histology ref for a type inside the copy transaction, so a rollback returns
+    /// the counter rather than permanently skipping the claimed numbers. Mirrors
+    /// <c>HistologyRefService.GetNextAvailableRefAsync</c> (SP <c>GetNextHistologyRef</c> plus the
+    /// <c>yy/NNNNN</c> format) — duplicated because this module can't reference Histo.Histology.
+    /// </summary>
+    private static async Task<string?> DrawHistologyRefAsync(IDbConnection conn, IDbTransaction tx, int? histologyType)
+    {
+        if (histologyType is not > 0) return null;
+
+        var p = new DynamicParameters();
+        p.Add("Type", histologyType.Value, dbType: System.Data.DbType.Int32);
+        p.Add("NextHistologyRef", dbType: System.Data.DbType.String, size: 5, direction: System.Data.ParameterDirection.Output);
+        p.Add("RowStamp", dbType: System.Data.DbType.Binary, size: 8, direction: System.Data.ParameterDirection.Output);
+
+        await conn.ExecuteAsync("GetNextHistologyRef", p, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
+
+        var next = p.Get<string?>("NextHistologyRef")?.Trim();
+        return string.IsNullOrEmpty(next) ? null : $"{DateTime.Now.Year % 100:D2}/{next}";
+    }
+
+    /// <summary>
+    /// Inserts a copied block's test-type ticks using the same SPs as
+    /// <c>BlockTestRepository.SaveTestSelectionsAsync</c> — a new block has no existing rows, so
+    /// this is the insert half of that delta, run inside the copy transaction.
+    /// </summary>
+    private static async Task AddBlockTestsAsync(IDbConnection conn, IDbTransaction tx, int newBatchId, int newBlockId, int userId, CopiedBlockPlan block)
+    {
+        await AddCodesAsync(block.HistologyCodes, "AddBlockHistology");
+        await AddCodesAsync(block.AntibodyCodes, "AddBlockAntibodies");
+        await AddCodesAsync(block.StainCodes, "AddBlockStain");
+
+        async Task AddCodesAsync(IReadOnlyList<string> codes, string addSp)
+        {
+            foreach (var code in codes.Distinct(StringComparer.OrdinalIgnoreCase))
+                await conn.ExecuteAsync(addSp,
+                    new { BlockID = newBlockId, Code = code, Comment = (string?)null, UserID = userId, BatchID = newBatchId },
+                    tx, commandType: System.Data.CommandType.StoredProcedure);
+        }
     }
 
     private static async Task<int> CopyTissueAsync(IDbConnection conn, IDbTransaction tx, Tissue source, int newOwnerId)
@@ -380,7 +607,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
 
         await conn.ExecuteAsync("AddAnimal", parameters,
             commandType: System.Data.CommandType.StoredProcedure);
-        return parameters.Get<int>("NewID");
+        return parameters.Get<int?>("NewID") ?? 0;
     }
 
     /// <inheritdoc/>
@@ -676,6 +903,21 @@ public sealed class SubmissionRepository : ISubmissionRepository
                                d.TryGetValue("HistoRef", out var hr2) ? Convert.ToString(hr2) : null,
             };
         }).ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<string>> GetExistingSenderRefsAsync(IEnumerable<string> senderRefs, CancellationToken ct = default)
+    {
+        var refs = senderRefs.ToList();
+        if (refs.Count == 0) return [];
+
+        // No legacy SP covers a bulk existence check — direct query, same pattern as
+        // GetAllUnusedRefsAsync (HistologyRepository) where the SP shape doesn't fit.
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<string>(
+            "SELECT SenderRef FROM Animal WHERE SenderRef IN @SenderRefs",
+            new { SenderRefs = refs });
+        return rows.ToList();
     }
 
     /// <inheritdoc/>
