@@ -100,6 +100,9 @@ public class BatchDetailsModel : HistoPageModel
     public IReadOnlyList<User>       Create_AllUsers   { get; private set; } = [];
     public string? Create_SubmittedAsName { get; private set; }
 
+    /// <summary>Samples staged by the Copy Submission journey, shown on this form before they are created.</summary>
+    public IReadOnlyList<CopyBatchModel.AnimalRow> Create_CopiedSamples { get; private set; } = [];
+
     // ── Test type lookup lists ──
     public IReadOnlyList<LookupItem> Create_HistologyOptions { get; private set; } = [];
     public IReadOnlyList<LookupItem> Create_AntibodyOptions  { get; private set; } = [];
@@ -365,13 +368,16 @@ public class BatchDetailsModel : HistoPageModel
         var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(pending.SourceBatchId);
         if (!string.IsNullOrWhiteSpace(submittedAsCode))
         {
-            var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs);
-            var match = saLookup.FirstOrDefault(x => string.Equals(x.Code ?? x.ID.ToString(), submittedAsCode, StringComparison.OrdinalIgnoreCase));
-            if (match is not null)
-            {
-                TempData["CreateSubmittedAsId"]   = match.ID.ToString();
-                TempData["CreateSubmittedAsCode"] = match.Code ?? match.ID.ToString();
-            }
+            // includeInactive: the source submission may have been created against a lookup row
+            // that has since been deactivated — it must still copy and display.
+            var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs, includeInactive: true);
+            var match = saLookup.FirstOrDefault(x => string.Equals((x.Code ?? x.ID.ToString()).Trim(), submittedAsCode, StringComparison.OrdinalIgnoreCase));
+
+            // Carry the source's own code through even when no lookup row matches, so the copy
+            // keeps its submission type instead of silently losing it.
+            TempData["CreateSubmittedAsId"]   = match?.ID.ToString() ?? string.Empty;
+            TempData["CreateSubmittedAsCode"] = match?.Code?.Trim() ?? submittedAsCode;
+            Create_SubmittedAsName            = match?.Name;
         }
         TempData["CreateIsPreCassetted"] = sourceBatch.IsPreCassetted.ToString();
     }
@@ -387,32 +393,36 @@ public class BatchDetailsModel : HistoPageModel
         var submissions = await _submissions.GetSubmissionsByBatchAsync(sourceBatchId);
         var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(sourceBatchId);
         var animals = blockAnimals.Count > 0 ? blockAnimals : await _submissions.GetAnimalsByBatchAsync(sourceBatchId);
-        var newSenderRefs = pendingSamples.ToDictionary(p => p.AnimalId, p => p.NewSenderRef);
-        var selectedAnimalIds = newSenderRefs.Keys.ToHashSet();
+        var animalsById = animals.GroupBy(a => a.ID).ToDictionary(g => g.Key, g => g.First());
         var firstSubmId = submissions.Count > 0 ? submissions[0].ID : 0;
 
+        var tissuesBySubmissionId = new Dictionary<int, IReadOnlyList<Tissue>>();
         var plan = new List<CopiedSamplePlan>();
-        foreach (var submission in submissions)
+
+        // Driven by the staged rows rather than the source animals: a mouse-range copy stages
+        // several new sender refs against the same source sample, which a per-animal lookup
+        // would collapse back down to one.
+        foreach (var pending in pendingSamples)
         {
-            var tissues = await _submissions.GetTissuesBySubmissionAsync(sourceBatchId, submission.ID);
+            if (!animalsById.TryGetValue(pending.AnimalId, out var animal)) continue;
 
-            var matchedAnimals = animals.Where(a =>
-                selectedAnimalIds.Contains(a.ID) &&
-                (a.BatchSubmissionID == submission.ID || (a.BatchSubmissionID == 0 && submission.ID == firstSubmId)));
+            var submission = submissions.FirstOrDefault(s =>
+                animal.BatchSubmissionID == s.ID || (animal.BatchSubmissionID == 0 && s.ID == firstSubmId));
+            if (submission is null) continue;
 
-            foreach (var animal in matchedAnimals)
+            if (!tissuesBySubmissionId.TryGetValue(submission.ID, out var tissues))
             {
-                var newSenderRef = newSenderRefs.GetValueOrDefault(animal.ID, animal.SenderRef);
-                if (string.IsNullOrWhiteSpace(newSenderRef)) newSenderRef = animal.SenderRef;
-
-                plan.Add(new CopiedSamplePlan
-                {
-                    SourceAnimal = animal,
-                    NewSenderRef = newSenderRef,
-                    SourceSubmission = submission,
-                    Tissues = tissues,
-                });
+                tissues = await _submissions.GetTissuesBySubmissionAsync(sourceBatchId, submission.ID);
+                tissuesBySubmissionId[submission.ID] = tissues;
             }
+
+            plan.Add(new CopiedSamplePlan
+            {
+                SourceAnimal = animal,
+                NewSenderRef = string.IsNullOrWhiteSpace(pending.NewSenderRef) ? animal.SenderRef : pending.NewSenderRef,
+                SourceSubmission = submission,
+                Tissues = tissues,
+            });
         }
         return plan;
     }
@@ -426,6 +436,7 @@ public class BatchDetailsModel : HistoPageModel
         {
             await LoadCreateLookupsAsync();
             var pendingCopy = TryGetValidPendingCopy();
+            Create_CopiedSamples = pendingCopy?.Samples ?? [];
 
             if (!RestoreCreateDraft())
             {
@@ -445,8 +456,11 @@ public class BatchDetailsModel : HistoPageModel
             // Resolve SubmittedAs name from TempData for display
             if (TempData.TryGetValue("CreateSubmittedAsId", out var saId))
             {
-                var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs);
-                Create_SubmittedAsName = saLookup.FirstOrDefault(x => x.ID.ToString() == saId?.ToString())?.Name;
+                if (Create_SubmittedAsName is null)
+                {
+                    var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs, includeInactive: true);
+                    Create_SubmittedAsName = saLookup.FirstOrDefault(x => x.ID.ToString() == saId?.ToString())?.Name;
+                }
                 TempData.Keep("CreateSubmittedAsId");
                 TempData.Keep("CreateSubmittedAsCode");
                 TempData.Keep("CreateIsPreCassetted");
@@ -601,11 +615,12 @@ public class BatchDetailsModel : HistoPageModel
         TempData.Keep("CreateSubmittedAsCode");
         TempData.Keep("CreateIsPreCassetted");
         var pendingCopy = TryGetValidPendingCopy();
+        Create_CopiedSamples = pendingCopy?.Samples ?? [];
 
         // Resolve SubmittedAs name for redisplay
         if (TempData.TryGetValue("CreateSubmittedAsId", out var saId))
         {
-            var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs);
+            var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs, includeInactive: true);
             Create_SubmittedAsName = saLookup.FirstOrDefault(x => x.ID.ToString() == saId?.ToString())?.Name;
         }
 
@@ -688,14 +703,24 @@ public class BatchDetailsModel : HistoPageModel
         if (pendingCopy is not null && pendingCopy.Samples.Count > 0)
         {
             var plan = await BuildCopyPlanAsync(pendingCopy.SourceBatchId, pendingCopy.Samples);
-            var newBatchId = await _submissions.CreateBatchWithCopiedSamplesAsync(
-                batch,
-                Create_SelectedHistologyCodes,
-                needsAntibodies ? Create_SelectedAntibodyCodes : new List<string>(),
-                needsStains     ? Create_SelectedStainCodes    : new List<string>(),
-                submittedAsCode,
-                plan,
-                Session.UserID);
+            int newBatchId;
+            try
+            {
+                newBatchId = await _submissions.CreateBatchWithCopiedSamplesAsync(
+                    batch,
+                    Create_SelectedHistologyCodes,
+                    needsAntibodies ? Create_SelectedAntibodyCodes : new List<string>(),
+                    needsStains     ? Create_SelectedStainCodes    : new List<string>(),
+                    submittedAsCode,
+                    plan,
+                    Session.UserID);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Errors = new Dictionary<string, string> { ["Create_Save"] = ex.Message };
+                Mode = "create";
+                return Page();
+            }
 
             if (newBatchId <= 0)
             {

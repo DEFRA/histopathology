@@ -76,6 +76,17 @@ public class AddSubmissionModel : HistoPageModel
         : ReturnPage;
 
     /// <summary>
+    /// True when reached from the Copy Submission "Change" button. Matched on the path only:
+    /// <c>CopyBatchModel.OnPostPick</c> sends <c>/Batches/CopyBatch?sourceBatchId=N</c>, so an exact
+    /// string comparison never matched and the flow fell through to the normal create-and-redirect
+    /// path, writing samples to the source batch and stranding the user on Sample Summary with no
+    /// way back to Finish.
+    /// </summary>
+    private bool IsCopyBatchReturn =>
+        (ReturnPage ?? string.Empty).Split('?')[0]
+            .Equals("/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// True when reached from the "Assign Tissues to Blocks" journey (<c>BatchBlocks.cshtml</c>'s
     /// "Add sample" button), as opposed to Create/Edit Submission. No user-area restriction.
     /// Strict: always requires picking an existing sample, since BatchBlocks is only ever reached
@@ -188,10 +199,25 @@ public class AddSubmissionModel : HistoPageModel
             return Page();
         }
 
-        if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase)
-            && SourceAnimalId is > 0)
+        if (IsCopyBatchReturn && SourceAnimalId is > 0)
         {
-            PersistCopyBatchState();
+            // Staging only — the copy journey writes nothing until the Create Submission form is submitted.
+            if (usingMouseRange)
+            {
+                var (rangeRefs, rangeError) = await ResolveMouseRangeRefsAsync();
+                if (rangeError is not null)
+                {
+                    ModelError = rangeError;
+                    MouseRangeHasError = true;
+                    return Page();
+                }
+                PersistCopyBatchState(rangeRefs);
+            }
+            else
+            {
+                PersistCopyBatchState();
+            }
+
             return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
         }
 
@@ -265,7 +291,7 @@ public class AddSubmissionModel : HistoPageModel
                 // Copy-submission "Change" flow must return to the batch copy list so the user can
                 // still press Finish and complete the copy. Otherwise they are stranded on the
                 // sample summary page without a final submission action.
-                if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase))
+                if (IsCopyBatchReturn)
                 {
                     PersistCopyBatchState();
                     return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
@@ -282,7 +308,7 @@ public class AddSubmissionModel : HistoPageModel
 
         if (SourceAnimalId is > 0)
         {
-            if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase))
+            if (IsCopyBatchReturn)
             {
                 PersistCopyBatchState();
                 return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
@@ -294,9 +320,14 @@ public class AddSubmissionModel : HistoPageModel
         return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = newAnimalId });
     }
 
-    private void PersistCopyBatchState()
+    /// <summary>
+    /// Writes the chosen sender ref(s) back into the staged Copy Submission list.
+    /// <paramref name="rangeRefs"/> stages one row per mouse number in a range copy, cloning the
+    /// edited row so each new sample still copies the same source sample's tissues.
+    /// </summary>
+    private void PersistCopyBatchState(IReadOnlyList<string>? rangeRefs = null)
     {
-        if (TempData is null || !string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase))
+        if (TempData is null || !IsCopyBatchReturn)
             return;
 
         if (TempData["CopyBatch_Animals"] is not string savedJson)
@@ -305,9 +336,28 @@ public class AddSubmissionModel : HistoPageModel
         var animals = JsonSerializer.Deserialize<List<CopyBatchModel.AnimalRow>>(savedJson) ?? [];
         if (RowIndex is >= 0 && RowIndex < animals.Count)
         {
-            animals[RowIndex.Value].NewSenderRef = string.IsNullOrWhiteSpace(SenderRef)
-                ? string.IsNullOrWhiteSpace(MouseNumberFrom) ? string.Empty : MouseNumberFrom.Trim()
-                : SenderRef.Trim();
+            if (rangeRefs is { Count: > 0 })
+            {
+                var edited = animals[RowIndex.Value];
+                edited.NewSenderRef = rangeRefs[0];
+                for (var i = 1; i < rangeRefs.Count; i++)
+                {
+                    animals.Insert(RowIndex.Value + i, new CopyBatchModel.AnimalRow
+                    {
+                        AnimalId = edited.AnimalId,
+                        SubmissionId = edited.SubmissionId,
+                        SenderRef = edited.SenderRef,
+                        NewSenderRef = rangeRefs[i],
+                        TissueDetails = edited.TissueDetails,
+                    });
+                }
+            }
+            else
+            {
+                animals[RowIndex.Value].NewSenderRef = string.IsNullOrWhiteSpace(SenderRef)
+                    ? string.IsNullOrWhiteSpace(MouseNumberFrom) ? string.Empty : MouseNumberFrom.Trim()
+                    : SenderRef.Trim();
+            }
         }
         else if (!string.IsNullOrWhiteSpace(SenderRef) || !string.IsNullOrWhiteSpace(MouseNumberFrom))
         {
@@ -384,11 +434,11 @@ public class AddSubmissionModel : HistoPageModel
     }
 
     /// <summary>
-    /// Legacy "Alternatively you can assign mouse ranges..." — creates one Animal per MC number in
-    /// [<see cref="MouseNumberFrom"/>, <see cref="MouseNumberTo"/>], each with its own BatchSubmission
-    /// row, then returns to Sample Summary rather than a single sample's detail page.
+    /// Validates the mouse-number range and expands it to its individual sender refs.
+    /// Returns the error message instead of the refs when the range is invalid or collides with
+    /// an existing sample.
     /// </summary>
-    private async Task<IActionResult> OnPostMouseRangeAsync(int batchId, int submissionId, Batch? batch)
+    private async Task<(List<string> Refs, string? Error)> ResolveMouseRangeRefsAsync()
     {
         const int maxMouseRangeEntries = 1000;
 
@@ -399,25 +449,15 @@ public class AddSubmissionModel : HistoPageModel
             || !ValidationHelpers.ValidateMouseNumber(from) || !ValidationHelpers.ValidateMouseNumber(to)
             || !SenderRefHelpers.TryParseMouseNumber(from, out var fromId) || !SenderRefHelpers.TryParseMouseNumber(to, out var toId))
         {
-            ModelError = "The mouse number format is MC followed by 6 digits, i.e. MC000105.";
-            MouseRangeHasError = true;
-            return Page();
+            return ([], "The mouse number format is MC followed by 6 digits, i.e. MC000105.");
         }
 
         if (fromId >= toId)
-        {
-            ModelError = "The from number must be less than the to number.";
-            MouseRangeHasError = true;
-            return Page();
-        }
+            return ([], "The from number must be less than the to number.");
 
         var rangeSize = toId - fromId + 1;
         if (rangeSize > maxMouseRangeEntries)
-        {
-            ModelError = $"The mouse number range cannot exceed {maxMouseRangeEntries} entries. Use a smaller range or create a bulk job.";
-            MouseRangeHasError = true;
-            return Page();
-        }
+            return ([], $"The mouse number range cannot exceed {maxMouseRangeEntries} entries. Use a smaller range or create a bulk job.");
 
         // Validate the whole range against EVERY animal in the database (not just this batch) —
         // SenderRef collisions from a different batch (e.g. leftover test/fixture data) still
@@ -425,19 +465,28 @@ public class AddSubmissionModel : HistoPageModel
         var candidates = Enumerable.Range(fromId, rangeSize).Select(SenderRefHelpers.FormatMouseNumber).ToList();
         var duplicate = (await _submissions.GetExistingSenderRefsAsync(candidates)).FirstOrDefault();
 
-        if (duplicate is not null)
+        return duplicate is not null
+            ? ([], $"Mouse number {duplicate} already exists. Alter the range and try again.")
+            : (candidates, null);
+    }
+
+    /// <summary>
+    /// Legacy "Alternatively you can assign mouse ranges..." — creates one Animal per MC number in
+    /// [<see cref="MouseNumberFrom"/>, <see cref="MouseNumberTo"/>], each with its own BatchSubmission
+    /// row, then returns to Sample Summary rather than a single sample's detail page.
+    /// </summary>
+    private async Task<IActionResult> OnPostMouseRangeAsync(int batchId, int submissionId, Batch? batch)
+    {
+        var (_, rangeError) = await ResolveMouseRangeRefsAsync();
+        if (rangeError is not null)
         {
-            ModelError = $"Mouse number {duplicate} already exists. Alter the range and try again.";
+            ModelError = rangeError;
             MouseRangeHasError = true;
             return Page();
         }
 
-        if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase)
-            && SourceAnimalId is > 0)
-        {
-            PersistCopyBatchState();
-            return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
-        }
+        var from = MouseNumberFrom.Trim().ToUpperInvariant();
+        var to = MouseNumberTo.Trim().ToUpperInvariant();
 
         var created = await _submissions.CreateMouseRangeAsync(batchId, SourceAnimalId, from, to, Session.UserID);
         if (!created)
@@ -445,12 +494,6 @@ public class AddSubmissionModel : HistoPageModel
             ModelError = "Could not add the sample range. Please try again.";
             MouseRangeHasError = true;
             return Page();
-        }
-
-        if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase))
-        {
-            PersistCopyBatchState();
-            return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
         }
 
         return RedirectToPage("/Submissions/SampleSummary", new { batchId });

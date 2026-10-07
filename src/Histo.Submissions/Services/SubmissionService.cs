@@ -58,6 +58,12 @@ public sealed class SubmissionService : ISubmissionService
         CancellationToken ct = default)
     {
         try { return await _repo.CreateBatchWithCopiedSamplesAsync(batch, histologyCodes, antibodyCodes, stainCodes, submittedAsCode, plan, userId, ct); }
+        catch (InvalidOperationException)
+        {
+            // Step-level, user-safe diagnostics ("A sample with sender reference 'X' already
+            // exists.") — the page shows these rather than a generic failure.
+            throw;
+        }
         catch (Exception ex) { _logger.LogError("Failed to create batch copy with {SampleCount} staged sample(s).", ex, plan.Count); return 0; }
     }
 

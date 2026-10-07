@@ -77,6 +77,37 @@
             </div>
         </dl>
 
+        @if (Model.Create_CopiedSamples.Any())
+        {
+            @* Disclosure rather than a link/button: the samples aren't created until this form is
+               submitted, and navigating away would discard everything typed so far. *@
+            <details class="govuk-details govuk-!-margin-bottom-4">
+                <summary class="govuk-details__summary">
+                    <span class="govuk-details__summary-text">View samples being copied (@Model.Create_CopiedSamples.Count)</span>
+                </summary>
+                <div class="govuk-details__text">
+                    <p class="govuk-body">These samples will be created when you submit this form.</p>
+                    <table class="govuk-table">
+                        <thead class="govuk-table__head">
+                            <tr class="govuk-table__row">
+                                <th scope="col" class="govuk-table__header">Copied from</th>
+                                <th scope="col" class="govuk-table__header">New sender ref</th>
+                            </tr>
+                        </thead>
+                        <tbody class="govuk-table__body">
+                            @foreach (var s in Model.Create_CopiedSamples)
+                            {
+                                <tr class="govuk-table__row">
+                                    <td class="govuk-table__cell">@s.SenderRef</td>
+                                    <td class="govuk-table__cell">@(string.IsNullOrWhiteSpace(s.NewSenderRef) ? s.SenderRef : s.NewSenderRef)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        }
+
         @* Field pairing mirrors the Edit submission page — each pair is its own govuk-grid-row
            using two-thirds/one-third columns so the right field lines up with the "Special
            stains" column below, and a single tall pair (e.g. a "Manage ..." button under a

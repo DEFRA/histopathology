@@ -238,6 +238,65 @@ public class AddSubmissionModelTests
     }
 
     [Fact]
+    public async Task OnPostAsync_CopySubmissionReturnFlow_ReturnPageCarriesQueryString_StillStagesAndReturns()
+    {
+        // Regression: CopyBatchModel.OnPostPick sends "/Batches/CopyBatch?sourceBatchId=N", so the
+        // old exact-string match never fired — the Change flow fell through, wrote samples into the
+        // SOURCE batch and dumped the user on Sample Summary with no way back to Finish.
+        _session.Object.BatchSubmissionID = 99;
+        var sut = CreateSut(returnPage: "/Batches/CopyBatch?sourceBatchId=5");
+        sut.BatchSubmissionId = 99;
+        sut.SourceAnimalId = 42;
+        sut.SenderRef = "NewRef";
+        sut.RowIndex = 0;
+        sut.TempData["CopyBatch_Animals"] = JsonSerializer.Serialize(new List<CopyBatchModel.AnimalRow>
+        {
+            new() { AnimalId = 10, SenderRef = "OldA", NewSenderRef = string.Empty },
+        });
+
+        var result = await sut.OnPostAsync();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Batches/CopyBatch", redirect.PageName);
+        _submissions.Verify(s => s.AddAnimalAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        var animals = JsonSerializer.Deserialize<List<CopyBatchModel.AnimalRow>>(sut.TempData["CopyBatch_Animals"] as string ?? "[]");
+        Assert.Equal("NewRef", animals![0].NewSenderRef);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_CopySubmissionReturnFlow_MouseRange_StagesOneRowPerMouseNumber()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _submissions.Setup(s => s.GetExistingSenderRefsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<string>)[]);
+        var sut = CreateSut(returnPage: "/Batches/CopyBatch?sourceBatchId=5");
+        sut.BatchSubmissionId = 99;
+        sut.SourceAnimalId = 42;
+        sut.RowIndex = 0;
+        sut.MouseNumberFrom = "MC000001";
+        sut.MouseNumberTo = "MC000003";
+        sut.TempData["CopyBatch_Animals"] = JsonSerializer.Serialize(new List<CopyBatchModel.AnimalRow>
+        {
+            new() { AnimalId = 10, SenderRef = "OldA", NewSenderRef = string.Empty },
+            new() { AnimalId = 11, SenderRef = "OldB", NewSenderRef = string.Empty },
+        });
+
+        var result = await sut.OnPostAsync();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Batches/CopyBatch", redirect.PageName);
+        _submissions.Verify(s => s.CreateMouseRangeAsync(It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        var animals = JsonSerializer.Deserialize<List<CopyBatchModel.AnimalRow>>(sut.TempData["CopyBatch_Animals"] as string ?? "[]");
+        Assert.Equal(4, animals!.Count);
+        Assert.Equal(["MC000001", "MC000002", "MC000003"], animals.Take(3).Select(a => a.NewSenderRef));
+        Assert.All(animals.Take(3), a => Assert.Equal(10, a.AnimalId));
+        Assert.Equal("OldB", animals[3].SenderRef);
+    }
+
+    [Fact]
     public async Task OnPostAsync_PreCassetted_SenderHasPreBookedBlock_ReusesPreBookedAnimal()
     {
         _session.Object.BatchSubmissionID = 99;

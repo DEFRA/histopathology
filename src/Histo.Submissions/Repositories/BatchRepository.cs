@@ -614,7 +614,9 @@ public sealed class BatchRepository : IBatchRepository
                 await multi.ReadAsync<dynamic>();
 
             var rows = (await multi.ReadAsync<dynamic>()).ToList();
-            return rows.Count > 0 ? rows[0].Code?.ToString() : null;
+            // Code comes from a fixed-width char column — untrimmed it fails every == comparison
+            // callers make against the lookup list.
+            return rows.Count > 0 ? ((string?)rows[0].Code?.ToString())?.Trim() : null;
         }
         catch
         {

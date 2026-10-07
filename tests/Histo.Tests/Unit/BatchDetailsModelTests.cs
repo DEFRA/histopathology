@@ -45,6 +45,8 @@ public class BatchDetailsModelTests
         _lookups.Setup(l => l.GetUserAreasAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[]);
         _lookups.Setup(l => l.GetHistologyTypesAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[]);
         _users.Setup(u => u.GetAllUsersAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Histo.Administration.Models.User>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
     }
 
     private BatchDetailsModel CreateSut() =>
@@ -133,7 +135,7 @@ public class BatchDetailsModelTests
             Histology = [new BatchTestSelectionRow { ID = 1, BatchID = 10, Code = "2" }],
         });
         _batches.Setup(b => b.GetSubmittedAsCodeAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync("WT");
-        _lookups.Setup(l => l.GetLookupDataAsync(11, false, It.IsAny<CancellationToken>()))
+        _lookups.Setup(l => l.GetLookupDataAsync(11, true, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 99, Code = "WT", Name = "Wet Tissue" }]);
 
         var sut = CreateSut();
@@ -149,7 +151,10 @@ public class BatchDetailsModelTests
         Assert.Equal("Mouse", sut.Create_SpeciesId);
         Assert.Equal(["2"], sut.Create_SelectedHistologyCodes);
         Assert.Equal("99", sut.TempData["CreateSubmittedAsId"]);
+        Assert.Equal("WT", sut.TempData["CreateSubmittedAsCode"]);
+        Assert.Equal("Wet Tissue", sut.Create_SubmittedAsName);
         Assert.Equal("True", sut.TempData["CreateIsPreCassetted"]);
+        Assert.Equal(["S1"], sut.Create_CopiedSamples.Select(s => s.SenderRef));
     }
 
     /// <summary>
