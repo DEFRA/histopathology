@@ -161,21 +161,20 @@ public sealed class SubmissionRepository : ISubmissionRepository
                     IsPGNumber         = sample.SourceAnimal.IsPGNumber,
                 };
 
-                int newAnimalId;
-                try
-                {
-                    step = $"create sample {sample.NewSenderRef}";
-                    newAnimalId = await AddAnimalAsync(conn, tx, animal);
-                }
-                catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number is 2601 or 2627)
-                {
+                step = $"create sample {sample.NewSenderRef}";
+                var (newAnimalId, addResult) = await AddAnimalAsync(conn, tx, animal);
+
+                // Legacy's copy journey never inserts animals — it links the submission's existing
+                // ones into the new batch (clsBatchSubmission.CopyDataToNewBatch). AddAnimal's
+                // return 1 is that same case: the Sender Ref already exists, so @NewID is the
+                // existing sample and we link to it rather than failing.
+                if (addResult == 2)
                     throw new InvalidOperationException(
-                        $"A sample with sender reference '{sample.NewSenderRef}' already exists. Change it on the Copy submission page and try again.", ex);
-                }
+                        $"Could not copy sample '{sample.NewSenderRef}' because histology reference '{newHistologyRef}' is already assigned to another sample. Nothing was saved.");
 
                 if (newAnimalId <= 0)
                     throw new InvalidOperationException(
-                        $"Could not create sample '{sample.NewSenderRef}' — the sender reference may already be in use. Change it on the Copy submission page and try again.");
+                        $"Could not create sample '{sample.NewSenderRef}'. Nothing was saved.");
 
                 var submission = new BatchSubmission
                 {
@@ -286,7 +285,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
 
     private static async Task<int> CreateMouseAnimalAsync(IDbConnection conn, IDbTransaction tx, string mouseNumber)
     {
-        var animalId = await AddAnimalAsync(conn, tx, new Animal
+        var (animalId, addResult) = await AddAnimalAsync(conn, tx, new Animal
         {
             BatchSubmissionID = 0,
             SenderRef = mouseNumber,
@@ -299,6 +298,11 @@ public sealed class SubmissionRepository : ISubmissionRepository
             IsPGNumber = false,
             BookedHistologyRef = false,
         });
+
+        // A range creates brand-new samples, so unlike the copy journey an existing Sender Ref
+        // (return 1) is a clash to report, not an animal to reuse.
+        if (addResult == 1)
+            throw new InvalidOperationException($"Mouse number {mouseNumber} already exists. Alter the range and try again.");
 
         if (animalId <= 0)
             throw new InvalidOperationException($"Failed to create animal {mouseNumber}.");
@@ -381,9 +385,17 @@ public sealed class SubmissionRepository : ISubmissionRepository
         return parameters.Get<int>("NewID");
     }
 
-    private static async Task<int> AddAnimalAsync(IDbConnection conn, IDbTransaction tx, Animal animal)
+    /// <summary>
+    /// Calls <c>AddAnimal</c> and reports both the id and the SP's return code, which legacy
+    /// (clsAnimal.vb::UpdateAnimalRow) branches on:
+    /// <c>0</c> inserted; <c>1</c> the Sender Ref already exists and <c>@NewID</c> is that
+    /// existing sample; <c>2</c> the Histology Ref belongs to another sample and nothing was
+    /// inserted. Without reading it, a declined insert is indistinguishable from a failure.
+    /// </summary>
+    private static async Task<(int AnimalId, int ReturnValue)> AddAnimalAsync(IDbConnection conn, IDbTransaction tx, Animal animal)
     {
         var parameters = new DynamicParameters();
+        parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
         parameters.Add("SenderRef", animal.SenderRef);
         parameters.Add("HistologyRef", animal.HistologyRef, dbType: System.Data.DbType.String);
         parameters.Add("NextBlockRef", animal.NextBlockRef);
@@ -394,9 +406,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync("AddAnimal", parameters, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
-        // AddAnimal leaves @NewID NULL when it declines the insert (e.g. the SenderRef or
-        // HistologyRef is already in use) rather than raising an error.
-        return parameters.Get<int?>("NewID") ?? 0;
+        return (parameters.Get<int?>("NewID") ?? 0, parameters.Get<int?>("RETURN_VALUE") ?? 0);
     }
 
     /// <summary>
