@@ -77,4 +77,33 @@ public class SpeciesItemsModelTests
 
         Assert.Equal(2, sut.PagedEntries.First().SpeciesID);
     }
+
+    [Fact]
+    public async Task OnGetAsync_WhenStatusMessageExists_LoadsItFromTempData()
+    {
+        _lookups.Setup(l => l.GetSpeciesItemsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<SpeciesItem>)[
+                new SpeciesItem { SpeciesID = 1, Species = "Bovine", CommonName = "Cattle" },
+            ]);
+        var sut = CreateSut();
+        sut.TempData["StatusMessage"] = "Saved";
+
+        await sut.OnGetAsync();
+
+        Assert.Equal("Saved", sut.StatusMessage);
+        Assert.Single(sut.PagedEntries);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_WhenLookupReturnsNoItems_LeavesGridEmpty()
+    {
+        _lookups.Setup(l => l.GetSpeciesItemsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<SpeciesItem>());
+        var sut = CreateSut();
+
+        await sut.OnGetAsync();
+
+        Assert.Equal(0, sut.TotalCount);
+        Assert.Empty(sut.PagedEntries);
+    }
 }
