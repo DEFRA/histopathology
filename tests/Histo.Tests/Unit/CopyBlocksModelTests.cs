@@ -152,6 +152,27 @@ public class CopyBlocksModelTests
     }
 
     [Fact]
+    public async Task OnPostAsync_BlockInsertFails_ShowsAnErrorInsteadOfReportingSuccess()
+    {
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[
+                new Animal { ID = 10, SenderRef = "S1", HistologyRef = "26/60001", HistoRefSet = true },
+                new Animal { ID = 20, SenderRef = "S2" }]);
+        _blocks.Setup(b => b.CopyBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<int>(),
+                It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+
+        var sut = CreateSut();
+        sut.TargetAnimalIds = [20];
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Contains("Could not copy block '01' to sample 'S2'", sut.Error);
+        Assert.Null(sut.TempData["StatusMessage"]);
+    }
+
+    [Fact]
     public async Task OnPostAsync_CopiesTheSourceBlocksTestSelectionsOntoTheNewBlock()
     {
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))

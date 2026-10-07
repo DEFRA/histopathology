@@ -14,10 +14,12 @@ public sealed class CopiedSamplePlan
     public required IReadOnlyList<Tissue> Tissues { get; init; }
 
     /// <summary>
-    /// Histology ref drawn for the copy. Never the source's own — a ref identifies exactly one
-    /// sample, and AddAnimal silently declines an insert that duplicates one.
+    /// Histology ref type to draw for the copy, or <see langword="null"/> to leave it unset. The
+    /// ref itself is drawn inside the copy transaction — claiming it beforehand would permanently
+    /// consume counter values whenever the copy rolls back. Never the source's own ref: one ref
+    /// identifies one sample, and AddAnimal silently declines an insert that duplicates one.
     /// </summary>
-    public string? NewHistologyRef { get; init; }
+    public int? HistologyRefType { get; init; }
 
     /// <summary>The source sample's blocks, recreated against the new sample.</summary>
     public IReadOnlyList<CopiedBlockPlan> Blocks { get; init; } = [];

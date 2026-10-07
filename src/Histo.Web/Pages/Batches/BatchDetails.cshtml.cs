@@ -46,10 +46,9 @@ public class BatchDetailsModel : HistoPageModel
     private readonly ISubmissionService _submissions;
     private readonly IBlockService _blocks;
     private readonly IBlockTestService _blockTests;
-    private readonly IHistologyRefService _histologyRefs;
 
     public BatchDetailsModel(ISessionService session, IBatchService batches, ILookupService lookups, IUserService users, ISubmissionService submissions,
-        IBlockService blocks, IBlockTestService blockTests, IHistologyRefService histologyRefs)
+        IBlockService blocks, IBlockTestService blockTests)
         : base(session)
     {
         _batches = batches;
@@ -58,7 +57,6 @@ public class BatchDetailsModel : HistoPageModel
         _submissions = submissions;
         _blocks = blocks;
         _blockTests = blockTests;
-        _histologyRefs = histologyRefs;
     }
 
     // ── Query param — "create" activates the new-batch form ──
@@ -418,11 +416,19 @@ public class BatchDetailsModel : HistoPageModel
         // would collapse back down to one.
         foreach (var pending in pendingSamples)
         {
-            if (!animalsById.TryGetValue(pending.AnimalId, out var animal)) continue;
+            // Dropping an unresolvable row would commit a partial copy while telling the user every
+            // staged sample was copied, so both misses abort the whole copy instead.
+            var label = string.IsNullOrWhiteSpace(pending.SenderRef) ? pending.NewSenderRef : pending.SenderRef;
+
+            if (!animalsById.TryGetValue(pending.AnimalId, out var animal))
+                throw new InvalidOperationException(
+                    $"Could not copy sample '{label}' because it is no longer part of the submission being copied. Start the copy again. Nothing was saved.");
 
             var submission = submissions.FirstOrDefault(s =>
                 animal.BatchSubmissionID == s.ID || (animal.BatchSubmissionID == 0 && s.ID == firstSubmId));
-            if (submission is null) continue;
+            if (submission is null)
+                throw new InvalidOperationException(
+                    $"Could not copy sample '{label}' because its submission record could not be found. Start the copy again. Nothing was saved.");
 
             if (!tissuesBySubmissionId.TryGetValue(submission.ID, out var tissues))
             {
@@ -443,9 +449,10 @@ public class BatchDetailsModel : HistoPageModel
                 SourceSubmission = submission,
                 Tissues = tissues,
                 Blocks = blockPlans,
-                // Drawn per staged row, so a mouse-range copy of one source sample still gives
-                // every new sample its own reference.
-                NewHistologyRef = await SampleCopyHelper.DrawRefMatchingAsync(_histologyRefs, animal.HistologyRef),
+                // Resolved per staged row, so a mouse-range copy of one source sample still gives
+                // every new sample its own ref. The draw itself happens inside the copy
+                // transaction so a rollback doesn't consume counter values.
+                HistologyRefType = HistologyRefTypeCode.FromExistingRef(animal.HistologyRef),
             });
         }
         return plan;
@@ -747,13 +754,17 @@ public class BatchDetailsModel : HistoPageModel
         // rolls everything back on any failure instead of silently continuing past a failed
         // sample/tissue copy after the batch has already been committed. pendingCopy is only
         // non-null here when CopyToken matched the token it was staged with (TryGetValidPendingCopy)
-        // — a stale/abandoned entry was already discarded above.
-        if (pendingCopy is not null && pendingCopy.Samples.Count > 0)
+        // — a stale/abandoned entry was already discarded above. Keyed on the request alone, not on
+        // the sample count: copying an empty submission is still a copy, and falling through would
+        // redirect to the wrong summary and leave the pending entry behind.
+        if (pendingCopy is not null)
         {
-            var plan = await BuildCopyPlanAsync(pendingCopy.SourceBatchId, pendingCopy.Samples);
             int newBatchId;
             try
             {
+                // Inside the try so an unresolvable staged sample surfaces as a page error, the
+                // same way a failure inside the transaction does.
+                var plan = await BuildCopyPlanAsync(pendingCopy.SourceBatchId, pendingCopy.Samples);
                 newBatchId = await _submissions.CreateBatchWithCopiedSamplesAsync(
                     batch,
                     Create_SelectedHistologyCodes,

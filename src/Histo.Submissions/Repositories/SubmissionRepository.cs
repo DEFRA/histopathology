@@ -143,14 +143,17 @@ public sealed class SubmissionRepository : ISubmissionRepository
 
             foreach (var sample in plan)
             {
+                step = $"draw a histology ref for sample {sample.NewSenderRef}";
+                var newHistologyRef = await DrawHistologyRefAsync(conn, tx, sample.HistologyRefType);
+
                 var animal = new Animal
                 {
                     BatchSubmissionID  = 0,
                     SenderRef          = sample.NewSenderRef,
                     NextBlockRef       = sample.SourceAnimal.NextBlockRef,
                     // Never the source's own ref — AddAnimal silently declines a duplicate.
-                    HistologyRef       = sample.NewHistologyRef,
-                    HistoRefSet        = !string.IsNullOrWhiteSpace(sample.NewHistologyRef),
+                    HistologyRef       = newHistologyRef,
+                    HistoRefSet        = !string.IsNullOrWhiteSpace(newHistologyRef),
                     BookedHistologyRef = false,
                     OnHold             = sample.SourceAnimal.OnHold,
                     PMDate             = sample.SourceAnimal.PMDate,
@@ -419,6 +422,27 @@ public sealed class SubmissionRepository : ISubmissionRepository
 
         await conn.ExecuteAsync("AddBlock", parameters, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
         return parameters.Get<int?>("NewID") ?? 0;
+    }
+
+    /// <summary>
+    /// Draws the next histology ref for a type inside the copy transaction, so a rollback returns
+    /// the counter rather than permanently skipping the claimed numbers. Mirrors
+    /// <c>HistologyRefService.GetNextAvailableRefAsync</c> (SP <c>GetNextHistologyRef</c> plus the
+    /// <c>yy/NNNNN</c> format) — duplicated because this module can't reference Histo.Histology.
+    /// </summary>
+    private static async Task<string?> DrawHistologyRefAsync(IDbConnection conn, IDbTransaction tx, int? histologyType)
+    {
+        if (histologyType is not > 0) return null;
+
+        var p = new DynamicParameters();
+        p.Add("Type", histologyType.Value, dbType: System.Data.DbType.Int32);
+        p.Add("NextHistologyRef", dbType: System.Data.DbType.String, size: 5, direction: System.Data.ParameterDirection.Output);
+        p.Add("RowStamp", dbType: System.Data.DbType.Binary, size: 8, direction: System.Data.ParameterDirection.Output);
+
+        await conn.ExecuteAsync("GetNextHistologyRef", p, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
+
+        var next = p.Get<string?>("NextHistologyRef")?.Trim();
+        return string.IsNullOrEmpty(next) ? null : $"{DateTime.Now.Year % 100:D2}/{next}";
     }
 
     /// <summary>

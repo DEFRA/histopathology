@@ -122,13 +122,28 @@ public class CopyBlocksModel : HistoPageModel
             histoRefProblem = $"No histology refs were generated because the reference type could not be determined from sample {sourceAnimal?.SenderRef ?? "the source sample"}. Give that sample a histology reference first.";
 
         var skippedExisting = 0;
+        var copiedTo = 0;
         foreach (var targetAnimalId in TargetAnimalIds)
         {
             var target = animals.FirstOrDefault(a => a.ID == targetAnimalId);
             if (target is null) continue;
 
-            await SampleCopyHelper.CopyBlocksToAnimalAsync(
-                _blocks, _submissions, _blockTests, sourceBlocks, allBlocks, allTests, batchId.Value, target, userId);
+            try
+            {
+                await SampleCopyHelper.CopyBlocksToAnimalAsync(
+                    _blocks, _submissions, _blockTests, sourceBlocks, allBlocks, allTests, batchId.Value, target, userId);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Save what this sample did get (blocks already created, NextBlockRef advanced)
+                // before reporting, so the page reflects the real state of the data.
+                await _submissions.UpdateAnimalAsync(target, userId);
+                Error = copiedTo == 0
+                    ? ex.Message
+                    : $"{ex.Message} {copiedTo} other sample(s) were copied successfully.";
+                await LoadDisplayDataAsync();
+                return Page();
+            }
 
             // Legacy CopyBlocks.aspx.vb only generates for targets with no ref of their own.
             var drawRef = histologyType is not null && !target.HistoRefSet;
@@ -151,12 +166,13 @@ public class CopyBlocksModel : HistoPageModel
 
             // One save per sample — carries both the drawn ref and the advanced NextBlockRef.
             await _submissions.UpdateAnimalAsync(target, userId);
+            copiedTo++;
         }
 
         if (histoRefProblem is null && histoRefsAssigned == 0 && skippedExisting > 0)
             histoRefProblem = "No histology refs were generated because the selected samples already have one.";
 
-        TempData["StatusMessage"] = $"Copied {sourceBlocks.Count} block(s) to {TargetAnimalIds.Count} sample(s)."
+        TempData["StatusMessage"] = $"Copied {sourceBlocks.Count} block(s) to {copiedTo} sample(s)."
             + (histoRefsAssigned > 0 ? $" Assigned a histology ref to {histoRefsAssigned} sample(s)." : string.Empty)
             + (histoRefProblem is null ? string.Empty : $" {histoRefProblem}");
         return RedirectToOrigin(batchId.Value);

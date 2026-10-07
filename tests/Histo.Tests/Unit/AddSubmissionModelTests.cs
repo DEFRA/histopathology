@@ -449,6 +449,35 @@ public class AddSubmissionModelTests
     }
 
     [Fact]
+    public async Task OnPostAsync_CopySample_BlockInsertFails_ShowsAnErrorInsteadOfRedirecting()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _submissions.Setup(s => s.AddAnimalAsync(99, "S1-COPY", 7, (string?)null, false, It.IsAny<CancellationToken>())).ReturnsAsync(123);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(200);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[
+                new Animal { ID = 42, SenderRef = "S1", HistologyRef = "26/60001", HistoRefSet = true },
+                new Animal { ID = 123, SenderRef = "S1-COPY" }]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 70, BatchID = 5, AnimalID = 42, BlockRef = "01" }]);
+        _blocks.Setup(b => b.CopyBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<int>(),
+                It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SourceAnimalId = 42;
+        sut.SenderRef = "S1-COPY";
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Contains("Could not copy block '01'", sut.ModelError);
+    }
+
+    [Fact]
     public async Task OnPostAsync_CopySampleRange_CopiesBlocksAndDrawsARefForEveryNewSample()
     {
         _session.Object.BatchSubmissionID = 99;
@@ -469,8 +498,9 @@ public class AddSubmissionModelTests
             .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 70, BatchID = 5, AnimalID = 42, BlockRef = "01" }]);
         _blocks.Setup(b => b.CopyBlockAsync(It.IsAny<Block>(), 5, It.IsAny<int>(), It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(300);
-        _histologyRefs.Setup(h => h.GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()))
-            .ReturnsAsync("26/60002");
+        _histologyRefs.SetupSequence(h => h.GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()))
+            .ReturnsAsync("26/60002")
+            .ReturnsAsync("26/60003");
 
         var sut = CreateSut(returnPage: null);
         sut.BatchSubmissionId = 99;
@@ -482,8 +512,10 @@ public class AddSubmissionModelTests
 
         _blocks.Verify(b => b.CopyBlockAsync(It.IsAny<Block>(), 5, 51, It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
         _blocks.Verify(b => b.CopyBlockAsync(It.IsAny<Block>(), 5, 52, It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+        // One ref identifies one sample, so each target must get its own draw.
+        _histologyRefs.Verify(h => h.GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()), Times.Exactly(2));
         _submissions.Verify(s => s.UpdateAnimalAsync(It.Is<Animal>(a => a.ID == 51 && a.HistologyRef == "26/60002"), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
-        _submissions.Verify(s => s.UpdateAnimalAsync(It.Is<Animal>(a => a.ID == 52 && a.HistologyRef == "26/60002"), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.Is<Animal>(a => a.ID == 52 && a.HistologyRef == "26/60003"), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

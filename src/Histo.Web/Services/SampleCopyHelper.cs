@@ -19,6 +19,8 @@ public static class SampleCopyHelper
     /// block's reference and order in sequence so several copies onto the same sample don't collide.
     /// Advances <see cref="Animal.NextBlockRef"/> in memory (legacy <c>clsAnimal.UpdateAnimalNextBlock</c>,
     /// called at the end of <c>clsBlock.CopyBlock</c>) — the caller persists the animal.
+    /// Throws <see cref="InvalidOperationException"/> if a block can't be created, so the caller
+    /// reports the failure rather than leaving the sample short of blocks, tissues and test ticks.
     /// </summary>
     public static async Task CopyBlocksToAnimalAsync(
         IBlockService blocks,
@@ -38,7 +40,9 @@ public static class SampleCopyHelper
         foreach (var sourceBlock in sourceBlocks)
         {
             var newBlockId = await blocks.CopyBlockAsync(sourceBlock, batchId, target.ID, refs, orders, userId);
-            if (newBlockId <= 0) continue;
+            if (newBlockId <= 0)
+                throw new InvalidOperationException(
+                    $"Could not copy block '{sourceBlock.BlockRef}' to sample '{target.SenderRef}'. The copy is incomplete — check that sample's blocks before continuing.");
 
             refs.Add(BlockHelpers.ComputeNextBlockRef(refs));
             orders.Add(BlockHelpers.ComputeNextOrder(orders));

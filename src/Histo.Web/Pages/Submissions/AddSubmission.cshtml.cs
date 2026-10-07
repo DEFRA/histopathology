@@ -302,7 +302,16 @@ public class AddSubmissionModel : HistoPageModel
         {
             // Block-type "Copy sample": reproduce the source sample's blocks and give the copy its
             // own histology ref, so it lands complete rather than needing Copy blocks afterwards.
-            await CopySourceSampleToAsync(batchId, newAnimalId);
+            try
+            {
+                await CopySourceSampleToAsync(batchId, newAnimalId);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // The sample itself exists by now, so say so rather than implying nothing happened.
+                ModelError = $"Sample '{SenderRef}' was created, but the copy did not finish. {ex.Message}";
+                return Page();
+            }
 
             if (IsCopyBatchReturn)
             {
@@ -566,7 +575,17 @@ public class AddSubmissionModel : HistoPageModel
 
         // CreateMouseRangeAsync only copies submission tissues, so the blocks and histology refs
         // the single-sample copy performs have to be applied to each new sample here too.
-        await CopyToRangeSamplesAsync(batchId, rangeRefs);
+        try
+        {
+            await CopyToRangeSamplesAsync(batchId, rangeRefs);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // The range's samples exist by now, so report the incomplete copy rather than succeed.
+            ModelError = ex.Message;
+            MouseRangeHasError = true;
+            return Page();
+        }
 
         return RedirectToPage("/Submissions/SampleSummary", new { batchId });
     }

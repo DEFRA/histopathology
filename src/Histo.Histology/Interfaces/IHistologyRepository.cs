@@ -54,10 +54,6 @@ public interface IHistologyRepository
     Task UpdateCounterAsync(int histologyType, string newNextHistologyRef, byte[]? rowStamp, CancellationToken ct = default);
 
     /// <summary>
-    /// Atomically reads and advances a type's "next histology ref" counter in a single
-    /// <c>UPDATE ... OUTPUT</c> statement, returning the claimed (pre-increment) value, or
-    /// <see langword="null"/> if the type doesn't exist or the counter is already at/past
-    /// <summary>
     /// Reads and advances a type's "next histology ref" counter via the <c>GetNextHistologyRef</c>
     /// SP (<c>@Type</c> in, <c>@NextHistologyRef</c>/<c>@RowStamp</c> out), returning the claimed
     /// (pre-increment) 5-digit number, or <see langword="null"/> if the type has no counter row.
