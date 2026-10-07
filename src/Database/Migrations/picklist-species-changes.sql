@@ -16,7 +16,8 @@ IF COL_LENGTH('dbo.tlkpSpecies', 'ImageID') IS NOT NULL
 GO
 
 PRINT '--- picklist-species-changes: registering Species in EditableLookup ---';
-IF NOT EXISTS (SELECT 1 FROM [dbo].EditableLookup WHERE [ID] = 20)
+DECLARE @SpeciesEditableLookupId int = 20;
+IF NOT EXISTS (SELECT 1 FROM [dbo].EditableLookup WHERE [ID] = @SpeciesEditableLookupId)
 BEGIN
   insert into [dbo].EditableLookup 
 	([ID] ,
@@ -27,7 +28,7 @@ BEGIN
 	[InsertStoredProcedure],
     [DeleteStoredProcedure] 
 	)
-	 values (20, 
+	 values (@SpeciesEditableLookupId, 
 	 'tlkpSpecies', 
 	 'Species',
 	 'GettlkpSpecies',

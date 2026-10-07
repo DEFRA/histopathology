@@ -155,59 +155,19 @@ public class AddSubmissionModel : HistoPageModel
         if (batchId is null or <= 0) return RedirectToPage("/Index");
 
         if (IsAssignTissueMode)
-        {
-            var available = await GetAssignableAnimalsAsync(batchId.Value);
-            AvailableAnimals = available;
+            return await HandleAssignTissueModeAsync(batchId.Value);
 
-            // No new Animal is created here — the user is picking one of the batch's own
-            // samples that still needs blocks assigned, mirroring legacy AddSample.aspx.
-            var chosen = available.FirstOrDefault(a => string.Equals(a.SenderRef, SenderRef, StringComparison.OrdinalIgnoreCase));
-            if (chosen is null)
-            {
-                ModelError = "Select a sample from the list.";
-                return Page();
-            }
+        var inputError = ValidateSubmissionInput();
+        if (inputError is not null)
+            return inputError;
 
-            Session.SampleDetailReturnPage = BackLinkPage;
-            return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = chosen.ID });
-        }
-
-        var hasMouseRangeInput = ShowMouseRange && (!string.IsNullOrWhiteSpace(MouseNumberFrom) || !string.IsNullOrWhiteSpace(MouseNumberTo));
-        var usingMouseRange = ShowMouseRange && !string.IsNullOrWhiteSpace(MouseNumberFrom) && !string.IsNullOrWhiteSpace(MouseNumberTo);
-        var usingSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
-        if (hasMouseRangeInput && !usingMouseRange)
-        {
-            ModelError = "Enter both the from and to mouse numbers.";
-            MouseRangeHasError = true;
-            return Page();
-        }
-        if (usingSenderRef == usingMouseRange)
-        {
-            // Legacy: exactly one of Sender Ref or the mouse-number range must be filled in.
-            ModelError = ShowMouseRange ? "Enter either the Sender ref or the mouse number ranges." : "Enter the sender reference.";
-            return Page();
-        }
-
-        if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase)
-            && SourceAnimalId is > 0)
+        if (ShouldRedirectBackToCopyBatch())
         {
             PersistCopyBatchState();
             return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
         }
 
-        var submissionId = BatchSubmissionId ?? Session.BatchSubmissionID;
-        if (submissionId is null or <= 0)
-        {
-            // GET-time lookup found nothing — this is a brand-new batch with no submission
-            // record yet, so create the default one now rather than failing.
-            var existing = await _submissions.GetSubmissionsByBatchAsync(batchId.Value);
-            submissionId = existing.Count > 0
-                ? existing[0].ID
-                : await _submissions.AddSubmissionAsync(
-                    new BatchSubmission { BatchID = batchId.Value, SubmissionName = "Default", Order = 1 },
-                    Session.UserID);
-        }
-
+        var submissionId = await GetOrCreateSubmissionIdAsync(batchId.Value);
         if (submissionId is null or <= 0)
         {
             ModelError = "Could not add the sample. Please try again.";
@@ -215,10 +175,9 @@ public class AddSubmissionModel : HistoPageModel
         }
 
         Session.BatchSubmissionID = submissionId;
-
         var batch = await _batches.GetByIdAsync(batchId.Value);
 
-        if (usingMouseRange)
+        if (ShouldUseMouseRange())
             return await OnPostMouseRangeAsync(batchId.Value, submissionId.Value, batch);
 
         var (newAnimalId, createError) = await CreateAnimalForSenderAsync(batchId.Value, submissionId.Value, batch, SenderRef);
@@ -228,57 +187,82 @@ public class AddSubmissionModel : HistoPageModel
             return Page();
         }
 
-        // Legacy AddSubmission.aspx::btnNext_Click continues straight into the per-sample detail
-        // page (SubmissionDetailsBlock.aspx / SubmissionDetails.aspx) rather than back to the list.
-        var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId.Value);
+        return await CompleteSampleCreationAsync(batchId.Value, newAnimalId, submissionId.Value);
+    }
+
+    private async Task<IActionResult> HandleAssignTissueModeAsync(int batchId)
+    {
+        var available = await GetAssignableAnimalsAsync(batchId);
+        AvailableAnimals = available;
+
+        var chosen = available.FirstOrDefault(a => string.Equals(a.SenderRef, SenderRef, StringComparison.OrdinalIgnoreCase));
+        if (chosen is null)
+        {
+            ModelError = "Select a sample from the list.";
+            return Page();
+        }
+
+        Session.SampleDetailReturnPage = BackLinkPage;
+        return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = chosen.ID });
+    }
+
+    private IActionResult? ValidateSubmissionInput()
+    {
+        var hasMouseRangeInput = ShowMouseRange && (!string.IsNullOrWhiteSpace(MouseNumberFrom) || !string.IsNullOrWhiteSpace(MouseNumberTo));
+        var usingMouseRange = ShowMouseRange && !string.IsNullOrWhiteSpace(MouseNumberFrom) && !string.IsNullOrWhiteSpace(MouseNumberTo);
+        var usingSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
+
+        if (hasMouseRangeInput && !usingMouseRange)
+        {
+            ModelError = "Enter both the from and to mouse numbers.";
+            MouseRangeHasError = true;
+            return Page();
+        }
+
+        if (usingSenderRef == usingMouseRange)
+        {
+            ModelError = ShowMouseRange ? "Enter either the Sender ref or the mouse number ranges." : "Enter the sender reference.";
+            return Page();
+        }
+
+        return null;
+    }
+
+    private bool ShouldUseMouseRange() => ShowMouseRange && !string.IsNullOrWhiteSpace(MouseNumberFrom) && !string.IsNullOrWhiteSpace(MouseNumberTo);
+
+    private bool ShouldRedirectBackToCopyBatch() =>
+        string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase)
+        && SourceAnimalId is > 0;
+
+    private async Task<int?> GetOrCreateSubmissionIdAsync(int batchId)
+    {
+        var submissionId = BatchSubmissionId ?? Session.BatchSubmissionID;
+        if (submissionId is not null and > 0)
+            return submissionId;
+
+        var existing = await _submissions.GetSubmissionsByBatchAsync(batchId);
+        if (existing.Count > 0)
+            return existing[0].ID;
+
+        return await _submissions.AddSubmissionAsync(
+            new BatchSubmission { BatchID = batchId, SubmissionName = "Default", Order = 1 },
+            Session.UserID);
+    }
+
+    private async Task<IActionResult> CompleteSampleCreationAsync(int batchId, int newAnimalId, int submissionId)
+    {
+        var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId);
         var isWetTissue = await IsWetTissueCodeAsync(submittedAsCode);
 
-        // Every new animal needs its own dedicated BatchSubmission row with AnimalID set — the
-        // "GetBatchAnimal" SP (used by both SubmissionDetails and SubmissionDetailsBlock to find the
-        // sample) joins on BatchSubmission.AnimalID; it never sees the shared "Default" submission
-        // resolved above (that one only exists to satisfy AddAnimalAsync's batchSubmissionId parameter
-        // — the AddAnimal SP itself has no BatchSubmissionID column to receive it). Without this row
-        // the newly added animal is unreachable from either page, surfacing as "Sample not found"
-        // immediately after "Add sample" — previously only fixed for the Wet Tissue branch, but the
-        // link requirement is identical for block-type submissions too.
-        var siblingSubmissions = await _submissions.GetSubmissionsByBatchAsync(batchId.Value);
+        var siblingSubmissions = await _submissions.GetSubmissionsByBatchAsync(batchId);
         var nextOrder = siblingSubmissions.Count > 0 ? siblingSubmissions.Max(s => s.Order) + 1 : 1;
         var ownSubmissionId = await _submissions.AddSubmissionAsync(
-            new BatchSubmission { BatchID = batchId.Value, AnimalID = newAnimalId, SubmissionName = "Default", Order = nextOrder },
+            new BatchSubmission { BatchID = batchId, AnimalID = newAnimalId, SubmissionName = "Default", Order = nextOrder },
             Session.UserID);
         if (ownSubmissionId > 0) Session.BatchSubmissionID = ownSubmissionId;
 
         if (isWetTissue)
-        {
-            // "Copy sample" — duplicate the source sample's tissues onto the new one (Wet Tissue only;
-            // block-owned tissues on other submission types are copied via the separate Copy Blocks flow).
-            if (SourceAnimalId is > 0 && ownSubmissionId > 0)
-            {
-                var sourceSubmission = siblingSubmissions.FirstOrDefault(s => s.AnimalID == SourceAnimalId);
-                if (sourceSubmission is not null)
-                {
-                    var sourceTissues = await _submissions.GetTissuesBySubmissionAsync(batchId.Value, sourceSubmission.ID);
-                    foreach (var tissue in sourceTissues)
-                        await _submissions.CopyTissueAsync(tissue, ownSubmissionId, Session.UserID);
-                }
-
-                // Copy-submission "Change" flow must return to the batch copy list so the user can
-                // still press Finish and complete the copy. Otherwise they are stranded on the
-                // sample summary page without a final submission action.
-                if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase))
-                {
-                    PersistCopyBatchState();
-                    return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
-                }
-
-                // Copy sample started from Sample Summary — return there so it's clear the new
-                // sample was added, rather than continuing straight into its (empty) detail page.
-                return RedirectToPage("/Submissions/SampleSummary", new { batchId });
-            }
-
-            Session.SampleDetailReturnPage = BackLinkPage;
-            return RedirectToPage("/Submissions/SubmissionDetails", new { batchId, animalId = newAnimalId });
-        }
+            return await HandleWetTissueCreationAsync(batchId, newAnimalId, siblingSubmissions, ownSubmissionId);
 
         if (SourceAnimalId is > 0)
         {
@@ -292,6 +276,31 @@ public class AddSubmissionModel : HistoPageModel
 
         Session.SampleDetailReturnPage = BackLinkPage;
         return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = newAnimalId });
+    }
+
+    private async Task<IActionResult> HandleWetTissueCreationAsync(int batchId, int newAnimalId, IReadOnlyList<BatchSubmission> siblingSubmissions, int ownSubmissionId)
+    {
+        if (SourceAnimalId is > 0 && ownSubmissionId > 0)
+        {
+            var sourceSubmission = siblingSubmissions.FirstOrDefault(s => s.AnimalID == SourceAnimalId);
+            if (sourceSubmission is not null)
+            {
+                var sourceTissues = await _submissions.GetTissuesBySubmissionAsync(batchId, sourceSubmission.ID);
+                foreach (var tissue in sourceTissues)
+                    await _submissions.CopyTissueAsync(tissue, ownSubmissionId, Session.UserID);
+            }
+
+            if (string.Equals(ReturnPage, "/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase))
+            {
+                PersistCopyBatchState();
+                return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
+            }
+
+            return RedirectToPage("/Submissions/SampleSummary", new { batchId });
+        }
+
+        Session.SampleDetailReturnPage = BackLinkPage;
+        return RedirectToPage("/Submissions/SubmissionDetails", new { batchId, animalId = newAnimalId });
     }
 
     private void PersistCopyBatchState()

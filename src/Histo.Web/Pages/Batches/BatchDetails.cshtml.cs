@@ -335,7 +335,7 @@ public class BatchDetailsModel : HistoPageModel
         {
             Batch = await _batches.GetByIdAsync(effectiveBatchId.Value);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             LoadError = "Failed to load the submission details. Please go back and try again.";
             return Page();

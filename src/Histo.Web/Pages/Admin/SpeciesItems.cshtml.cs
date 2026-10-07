@@ -24,19 +24,18 @@ public class SpeciesItemsModel : GridPageModel
 
     public int TotalCount => Items.Count;
 
-    public IReadOnlyList<SpeciesItem> PagedEntries
+    public IReadOnlyList<SpeciesItem> PagedEntries => GetPagedEntries();
+
+    public IReadOnlyList<SpeciesItem> GetPagedEntries()
     {
-        get
+        IOrderedEnumerable<SpeciesItem> sorted = SortColumn switch
         {
-            IOrderedEnumerable<SpeciesItem> sorted = SortColumn switch
-            {
-                "SpeciesID" => SortDesc ? Items.OrderByDescending(i => i.SpeciesID) : Items.OrderBy(i => i.SpeciesID),
-                "CommonName" => SortDesc ? Items.OrderByDescending(i => i.CommonName) : Items.OrderBy(i => i.CommonName),
-                "Species" => SortDesc ? Items.OrderByDescending(i => i.Species) : Items.OrderBy(i => i.Species),
-                _ => Items.OrderBy(i => i.Species),
-            };
-            return sorted.Skip((PageNumber - 1) * PageSize).Take(PageSize).ToList();
-        }
+            "SpeciesID" => SortDesc ? Items.OrderByDescending(i => i.SpeciesID) : Items.OrderBy(i => i.SpeciesID),
+            "CommonName" => SortDesc ? Items.OrderByDescending(i => i.CommonName) : Items.OrderBy(i => i.CommonName),
+            "Species" => SortDesc ? Items.OrderByDescending(i => i.Species) : Items.OrderBy(i => i.Species),
+            _ => Items.OrderBy(i => i.Species),
+        };
+        return sorted.Skip((PageNumber - 1) * PageSize).Take(PageSize).ToList();
     }
 
     public async Task OnGetAsync()
