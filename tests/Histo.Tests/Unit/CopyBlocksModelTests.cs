@@ -33,6 +33,8 @@ public class CopyBlocksModelTests
             .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 1, BatchID = 5, AnimalID = 10, BlockRef = "01" }]);
         _submissions.Setup(s => s.GetTissuesByBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
         _blocks.Setup(b => b.CopyBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<int>(),
                 It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>()))
             .ReturnsAsync(99);
@@ -105,4 +107,31 @@ public class CopyBlocksModelTests
 
         _histologyRefs.Verify(h => h.GetNextAvailableRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    [Fact]
+    public async Task OnPostAsync_CassettedBatch_SourceOnlyInBlockAnimals_StillAssignsRef()
+    {
+        // Regression: for a cassetted batch, GetAnimalsByBatchAsync alone is missing the source
+        // sample (it only exists via BATCH_BLOCK_ANIMAL), which made the source's histology ref
+        // type unresolvable and silently assigned nothing even with the checkbox ticked.
+        var target = new Animal { ID = 20, SenderRef = "S2", HistoRefSet = false };
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 10, SenderRef = "S1", HistologyRef = "26/60001", HistoRefSet = true }]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[target]);
+        _histologyRefs.Setup(h => h.GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()))
+            .ReturnsAsync("26/60002");
+        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        var sut = CreateSut();
+        sut.TargetAnimalIds = [20];
+        sut.AutoGenerateHistologyRefs = true;
+
+        await sut.OnPostAsync();
+
+        _histologyRefs.Verify(h => h.GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()), Times.Once);
+        _submissions.Verify(s => s.UpdateAnimalAsync(
+            It.Is<Animal>(a => a.ID == 20 && a.HistologyRef == "26/60002" && a.HistoRefSet), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
 }
+

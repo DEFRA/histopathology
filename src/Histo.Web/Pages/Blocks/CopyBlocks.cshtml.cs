@@ -125,7 +125,7 @@ public class CopyBlocksModel : HistoPageModel
     /// </summary>
     private async Task<int> AssignHistologyRefsAsync(int batchId, int sourceAnimalId, int userId)
     {
-        var animals = await _submissions.GetAnimalsByBatchAsync(batchId);
+        var animals = await GetAllAnimalsAsync(batchId);
         var sourceAnimal = animals.FirstOrDefault(a => a.ID == sourceAnimalId);
         var histologyType = HistologyRefTypeCode.FromExistingRef(sourceAnimal?.HistologyRef);
         if (histologyType is null) return 0;
@@ -190,9 +190,28 @@ public class CopyBlocksModel : HistoPageModel
         if (SourceBlocks.Count == 0) return false;
 
         var sourceAnimalId = SourceBlocks[0].AnimalID;
-        var animals = await _submissions.GetAnimalsByBatchAsync(batchId);
+        var animals = await GetAllAnimalsAsync(batchId);
         TargetAnimals = animals.Where(a => a.ID != sourceAnimalId).OrderBy(a => a.SenderRef).ToList();
         return true;
+    }
+
+    /// <summary>
+    /// Loads every animal in the batch, merging <c>GetBlockAnimalsByBatchAsync</c> (the only
+    /// source that knows about samples already assigned to a block in a cassetted batch) with
+    /// the plain animal list — mirrors <see cref="Histo.Web.Pages.Batches.BatchBlocksModel"/>'s
+    /// identical merge. Without this, the source sample of a cassetted-batch block copy isn't
+    /// found by <see cref="AssignHistologyRefsAsync"/>, so "Auto generate histology refs" silently
+    /// assigned nothing.
+    /// </summary>
+    private async Task<IReadOnlyList<Animal>> GetAllAnimalsAsync(int batchId)
+    {
+        var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(batchId);
+        var allAnimals = await _submissions.GetAnimalsByBatchAsync(batchId);
+        if (blockAnimals.Count == 0) return allAnimals;
+
+        var seenIds = blockAnimals.Select(a => a.ID).ToHashSet();
+        var missing = allAnimals.Where(a => !seenIds.Contains(a.ID));
+        return [.. blockAnimals, .. missing];
     }
 
     private static List<int> ParseIds(string csv) =>
