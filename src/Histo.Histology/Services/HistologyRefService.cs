@@ -181,6 +181,17 @@ public sealed class HistologyRefService : IHistologyRefService
             var counter = counters.FirstOrDefault(c => c.Type == histologyType);
             if (counter is null || !int.TryParse(counter.NextHistologyRef, out var current)) return null;
 
+            var upperBound = histologyType switch
+            {
+                HistologyRefTypeCode.Neuropath => 20000,
+                HistologyRefTypeCode.AbattoirSurvey => 30000,
+                HistologyRefTypeCode.TBDiagnostic => 40000,
+                HistologyRefTypeCode.GeneralPool => 60000,
+                HistologyRefTypeCode.MouseProjects => 90000,
+                _ => 0,
+            };
+            if (upperBound == 0 || current >= upperBound) return null;
+
             var advanced = await SetCounterAsync(histologyType, (current + 1).ToString(), ct);
             if (!advanced) return null;
 
