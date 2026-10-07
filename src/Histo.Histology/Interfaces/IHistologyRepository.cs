@@ -64,4 +64,13 @@ public interface IHistologyRepository
     /// (<see cref="UpdateCounterAsync"/>), which races.
     /// </summary>
     Task<string?> ClaimNextCounterAsync(int histologyType, int upperBoundExclusive, CancellationToken ct = default);
+
+    /// <summary>
+    /// Atomically claims (marks used) and returns one pre-booked-but-unused ref of the given
+    /// type, or <see langword="null"/> if none remain. Uses <c>UPDLOCK, ROWLOCK, READPAST</c> so
+    /// concurrent callers each claim a different row instead of racing to read-then-update the
+    /// same one — unlike <see cref="GetUnusedRefsAsync"/> followed by a separate "mark used" write,
+    /// which two callers could both read before either write landed.
+    /// </summary>
+    Task<string?> ClaimUnusedRefAsync(int histologyType, CancellationToken ct = default);
 }

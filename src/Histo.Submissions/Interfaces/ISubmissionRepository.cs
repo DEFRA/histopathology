@@ -26,6 +26,23 @@ public interface ISubmissionRepository
     /// <summary>Creates a complete mouse-number range in one transaction so the whole operation rolls back if any animal, submission, or tissue copy fails.</summary>
     Task<bool> CreateMouseRangeAsync(int batchId, int? sourceAnimalId, string mouseNumberFrom, string mouseNumberTo, int userId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Creates a new batch (header, test-type selections, submitted-as) and every sample/tissue
+    /// in <paramref name="plan"/> in a single transaction — used by the "Copy submission" journey
+    /// so a failure partway through (e.g. one sample's tissue copy) rolls back the whole operation
+    /// instead of leaving a partially-created batch or an orphan animal behind. Returns the new
+    /// batch ID, or 0 if any step failed (the transaction is rolled back in that case).
+    /// </summary>
+    Task<int> CreateBatchWithCopiedSamplesAsync(
+        Batch batch,
+        IReadOnlyList<string> histologyCodes,
+        IReadOnlyList<string> antibodyCodes,
+        IReadOnlyList<string> stainCodes,
+        string? submittedAsCode,
+        IReadOnlyList<CopiedSamplePlan> plan,
+        int userId,
+        CancellationToken ct = default);
+
     /// <summary>Updates a batch submission. Maps to <c>EditBatchSubmission</c>.</summary>
     Task UpdateSubmissionAsync(BatchSubmission submission, int userId, CancellationToken ct = default);
 

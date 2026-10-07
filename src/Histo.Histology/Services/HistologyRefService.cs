@@ -173,8 +173,10 @@ public sealed class HistologyRefService : IHistologyRefService
     {
         try
         {
-            var unused = await GetUnusedRefsAsync(histologyType, ct);
-            var fromPool = unused.FirstOrDefault(r => !string.IsNullOrWhiteSpace(r.Ref))?.Ref;
+            // Atomically claims (marks used) one pool row instead of a plain read + separate
+            // "mark used" write — the old read-only GetUnusedRefsAsync().FirstOrDefault() let two
+            // concurrent callers both pick the same unused ref before either assignment landed.
+            var fromPool = await _repo.ClaimUnusedRefAsync(histologyType, ct);
             if (fromPool is not null) return fromPool;
 
             var upperBound = histologyType switch

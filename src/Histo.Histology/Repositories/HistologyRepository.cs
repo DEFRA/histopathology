@@ -107,4 +107,25 @@ public sealed class HistologyRepository : IHistologyRepository
               WHERE Type = @Type AND CAST(NextHistologyRef AS INT) < @UpperBound",
             new { Type = histologyType, UpperBound = upperBoundExclusive });
     }
+
+    /// <inheritdoc/>
+    public async Task<string?> ClaimUnusedRefAsync(int histologyType, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        // READPAST skips rows another concurrent claim already has locked (rather than blocking
+        // on/re-reading them), so two simultaneous callers each land on a different unused row
+        // instead of both selecting the same one before either UPDATE commits.
+        return await conn.ExecuteScalarAsync<string?>(
+            @"UPDATE UnUsedHistologyRefs
+              SET Used = 1
+              OUTPUT DELETED.HistologyRef
+              WHERE HistologyType = @HistologyType AND Used = 0
+                AND HistologyRef = (
+                    SELECT TOP (1) HistologyRef
+                    FROM UnUsedHistologyRefs WITH (UPDLOCK, ROWLOCK, READPAST)
+                    WHERE HistologyType = @HistologyType AND Used = 0
+                      AND HistologyRef IS NOT NULL AND HistologyRef <> ''
+                    ORDER BY HistologyRef)",
+            new { HistologyType = histologyType });
+    }
 }

@@ -140,6 +140,113 @@ public sealed class SubmissionRepository : ISubmissionRepository
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<int> CreateBatchWithCopiedSamplesAsync(
+        Batch batch,
+        IReadOnlyList<string> histologyCodes,
+        IReadOnlyList<string> antibodyCodes,
+        IReadOnlyList<string> stainCodes,
+        string? submittedAsCode,
+        IReadOnlyList<CopiedSamplePlan> plan,
+        int userId,
+        CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        await conn.OpenAsync(ct);
+        using var tx = conn.BeginTransaction();
+
+        try
+        {
+            var newBatchId = await AddBatchAsync(conn, tx, batch, userId);
+            if (newBatchId <= 0)
+                throw new InvalidOperationException("Failed to create the new submission header.");
+
+            foreach (var code in histologyCodes.Distinct(StringComparer.OrdinalIgnoreCase))
+                await conn.ExecuteAsync("AddHistology", new { BatchID = newBatchId, Code = code, UserID = userId }, tx, commandType: System.Data.CommandType.StoredProcedure);
+            foreach (var code in antibodyCodes.Distinct(StringComparer.OrdinalIgnoreCase))
+                await conn.ExecuteAsync("AddAntibodies", new { BatchID = newBatchId, Code = code, UserID = userId }, tx, commandType: System.Data.CommandType.StoredProcedure);
+            foreach (var code in stainCodes.Distinct(StringComparer.OrdinalIgnoreCase))
+                await conn.ExecuteAsync("AddSpecialStain", new { BatchID = newBatchId, Code = code, UserID = userId }, tx, commandType: System.Data.CommandType.StoredProcedure);
+            if (!string.IsNullOrWhiteSpace(submittedAsCode))
+                await conn.ExecuteAsync("AddSubmittedAs", new { BatchID = newBatchId, Code = submittedAsCode, UserID = userId }, tx, commandType: System.Data.CommandType.StoredProcedure);
+
+            foreach (var sample in plan)
+            {
+                var animal = new Animal
+                {
+                    BatchSubmissionID  = 0,
+                    SenderRef          = sample.NewSenderRef,
+                    NextBlockRef       = sample.SourceAnimal.NextBlockRef,
+                    HistoRefSet        = sample.SourceAnimal.HistoRefSet,
+                    HistologyRef       = sample.SourceAnimal.HistologyRef,
+                    OnHold             = sample.SourceAnimal.OnHold,
+                    PMDate             = sample.SourceAnimal.PMDate,
+                    PMDateSet          = sample.SourceAnimal.PMDateSet,
+                    IsPGNumber         = sample.SourceAnimal.IsPGNumber,
+                    BookedHistologyRef = sample.SourceAnimal.BookedHistologyRef,
+                };
+
+                var newAnimalId = await AddAnimalAsync(conn, tx, animal, userId);
+                if (newAnimalId <= 0)
+                    throw new InvalidOperationException($"Failed to copy sample {sample.SourceAnimal.SenderRef}.");
+
+                var submission = new BatchSubmission
+                {
+                    BatchID        = newBatchId,
+                    AnimalID       = newAnimalId,
+                    SubmissionName = sample.SourceSubmission.SubmissionName,
+                    Order          = sample.SourceSubmission.Order,
+                };
+
+                var newSubmissionId = await AddSubmissionAsync(conn, tx, submission, userId);
+                if (newSubmissionId <= 0)
+                    throw new InvalidOperationException($"Failed to create the submission record for {sample.NewSenderRef}.");
+
+                foreach (var tissue in sample.Tissues)
+                {
+                    var newTissueId = await CopyTissueAsync(conn, tx, tissue, newSubmissionId, userId);
+                    if (newTissueId <= 0)
+                        throw new InvalidOperationException($"Failed to copy tissues for {sample.NewSenderRef}.");
+                }
+            }
+
+            tx.Commit();
+            return newBatchId;
+        }
+        catch
+        {
+            tx.Rollback();
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Calls the <c>AddBatch</c> SP within an existing transaction, including the OUTPUT-param/
+    /// RETURN_VALUE fallback already needed by <see cref="Histo.Submissions.Repositories.BatchRepository.AddAsync"/>
+    /// for the same SP (deployment-dependent shape).
+    /// </summary>
+    private static async Task<int> AddBatchAsync(IDbConnection conn, IDbTransaction tx, Batch batch, int userId)
+    {
+        var p = BatchRepository.BuildAddBatchParams(batch, userId);
+        p.Add("BatchID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+
+        try
+        {
+            await conn.ExecuteAsync("AddBatch", p, tx, commandType: System.Data.CommandType.StoredProcedure);
+            var batchId = p.Get<int>("BatchID");
+            if (batchId > 0) return batchId;
+        }
+        catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 8144)
+        {
+            var p2 = BatchRepository.BuildAddBatchParams(batch, userId);
+            p2.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
+            await conn.ExecuteAsync("AddBatch", p2, tx, commandType: System.Data.CommandType.StoredProcedure);
+            return p2.Get<int>("RETURN_VALUE");
+        }
+
+        return 0;
+    }
+
     private static async Task<IReadOnlyList<BatchSubmission>> GetSubmissionsByBatchAsync(IDbConnection conn, IDbTransaction tx, int batchId)
     {
         using var multi = await conn.QueryMultipleAsync(

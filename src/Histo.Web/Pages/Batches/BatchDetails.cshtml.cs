@@ -349,11 +349,12 @@ public class BatchDetailsModel : HistoPageModel
     }
 
     /// <summary>
-    /// Copies the samples staged by <see cref="CopyBatchModel"/> onto the newly created batch —
-    /// same copy logic that previously lived in <c>CopyBatchModel.OnPostAsync</c>, now only run
-    /// once the Create Submission form this page hosts is actually submitted.
+    /// Resolves the samples staged by <see cref="CopyBatchModel"/> into a fully-formed copy plan
+    /// (source animal + its submission + its tissues, matched the same way the old
+    /// <c>CopyStagedSamplesAsync</c> did) — read-only; the actual writes happen in
+    /// <see cref="ISubmissionService.CreateBatchWithCopiedSamplesAsync"/>, all in one transaction.
     /// </summary>
-    private async Task CopyStagedSamplesAsync(int sourceBatchId, int newBatchId, List<CopyBatchModel.AnimalRow> pendingSamples, int userId)
+    private async Task<List<CopiedSamplePlan>> BuildCopyPlanAsync(int sourceBatchId, List<CopyBatchModel.AnimalRow> pendingSamples)
     {
         var submissions = await _submissions.GetSubmissionsByBatchAsync(sourceBatchId);
         var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(sourceBatchId);
@@ -362,6 +363,7 @@ public class BatchDetailsModel : HistoPageModel
         var selectedAnimalIds = newSenderRefs.Keys.ToHashSet();
         var firstSubmId = submissions.Count > 0 ? submissions[0].ID : 0;
 
+        var plan = new List<CopiedSamplePlan>();
         foreach (var submission in submissions)
         {
             var tissues = await _submissions.GetTissuesBySubmissionAsync(sourceBatchId, submission.ID);
@@ -375,16 +377,16 @@ public class BatchDetailsModel : HistoPageModel
                 var newSenderRef = newSenderRefs.GetValueOrDefault(animal.ID, animal.SenderRef);
                 if (string.IsNullOrWhiteSpace(newSenderRef)) newSenderRef = animal.SenderRef;
 
-                var newAnimalId = await _submissions.CopyAnimalAsync(animal, newBatchSubmissionId: 0, newSenderRef, userId);
-                if (newAnimalId <= 0) continue;
-
-                var newSubmissionId = await _submissions.CopySubmissionAsync(submission, newBatchId, userId, newAnimalId);
-                if (newSubmissionId <= 0) continue;
-
-                foreach (var tissue in tissues)
-                    await _submissions.CopyTissueAsync(tissue, newSubmissionId, userId);
+                plan.Add(new CopiedSamplePlan
+                {
+                    SourceAnimal = animal,
+                    NewSenderRef = newSenderRef,
+                    SourceSubmission = submission,
+                    Tissues = tissues,
+                });
             }
         }
+        return plan;
     }
 
     public async Task<IActionResult> OnGetAsync()
@@ -650,6 +652,42 @@ public class BatchDetailsModel : HistoPageModel
             Comments            = Create_Comments,
         };
 
+        // "Copy submission" journey: create the batch header, test-type selections, submitted-as,
+        // and every staged sample/tissue in ONE DB transaction — CreateBatchWithCopiedSamplesAsync
+        // rolls everything back on any failure instead of silently continuing past a failed
+        // sample/tissue copy after the batch has already been committed (reading, not peeking,
+        // consumes the TempData entry).
+        if (TempData[PendingCopyKey] is string pendingJson)
+        {
+            CopyBatchModel.PendingCopy? pending;
+            try { pending = System.Text.Json.JsonSerializer.Deserialize<CopyBatchModel.PendingCopy>(pendingJson); }
+            catch (System.Text.Json.JsonException) { pending = null; }
+
+            if (pending is not null && pending.Samples.Count > 0)
+            {
+                var plan = await BuildCopyPlanAsync(pending.SourceBatchId, pending.Samples);
+                var newBatchId = await _submissions.CreateBatchWithCopiedSamplesAsync(
+                    batch,
+                    Create_SelectedHistologyCodes,
+                    needsAntibodies ? Create_SelectedAntibodyCodes : new List<string>(),
+                    needsStains     ? Create_SelectedStainCodes    : new List<string>(),
+                    submittedAsCode,
+                    plan,
+                    Session.UserID);
+
+                if (newBatchId <= 0)
+                {
+                    Errors = new Dictionary<string, string> { ["Create_Save"] = "Failed to create the submission. Please try again." };
+                    Mode = "create";
+                    return Page();
+                }
+
+                Session.BatchID = newBatchId;
+                Session.SampleSummaryReturnPage = null;
+                return RedirectToPage("/Batches/CopyBatchSummary", new { newBatchId });
+            }
+        }
+
         int batchId;
         try { batchId = await _batches.AddAsync(batch, Session.UserID); }
         catch
@@ -690,22 +728,6 @@ public class BatchDetailsModel : HistoPageModel
         // incorrectly redirects back to that old page instead of Print Submission, since
         // SampleSummary.OnPostFinishAsync trusts this value unconditionally once set.
         Session.SampleSummaryReturnPage = null;
-
-        // "Copy submission" journey: the samples staged by CopyBatchModel are only actually
-        // copied now that this form has been submitted — see PrefillFromCopySourceAsync/
-        // CopyStagedSamplesAsync. Reading (not peeking) consumes the TempData entry.
-        if (TempData[PendingCopyKey] is string pendingJson)
-        {
-            CopyBatchModel.PendingCopy? pending;
-            try { pending = System.Text.Json.JsonSerializer.Deserialize<CopyBatchModel.PendingCopy>(pendingJson); }
-            catch (System.Text.Json.JsonException) { pending = null; }
-
-            if (pending is not null && pending.Samples.Count > 0)
-            {
-                await CopyStagedSamplesAsync(pending.SourceBatchId, batchId, pending.Samples, Session.UserID);
-                return RedirectToPage("/Batches/CopyBatchSummary", new { newBatchId = batchId });
-            }
-        }
 
         return RedirectToPage("/Submissions/SampleSummary", new { batchId });
     }

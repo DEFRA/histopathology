@@ -46,6 +46,21 @@ public sealed class SubmissionService : ISubmissionService
         catch (Exception ex) { _logger.LogError("Failed to create mouse range for batch {BatchId}.", ex, batchId); return false; }
     }
 
+    /// <inheritdoc/>
+    public async Task<int> CreateBatchWithCopiedSamplesAsync(
+        Batch batch,
+        IReadOnlyList<string> histologyCodes,
+        IReadOnlyList<string> antibodyCodes,
+        IReadOnlyList<string> stainCodes,
+        string? submittedAsCode,
+        IReadOnlyList<CopiedSamplePlan> plan,
+        int userId,
+        CancellationToken ct = default)
+    {
+        try { return await _repo.CreateBatchWithCopiedSamplesAsync(batch, histologyCodes, antibodyCodes, stainCodes, submittedAsCode, plan, userId, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to create batch copy with {SampleCount} staged sample(s).", ex, plan.Count); return 0; }
+    }
+
     /// <summary>
     /// Creates a copy of an existing batch submission (sample group) under a new
     /// batch. Used by the "Copy batch" workflow.

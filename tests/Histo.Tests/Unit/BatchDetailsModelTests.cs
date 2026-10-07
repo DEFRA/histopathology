@@ -153,16 +153,14 @@ public class BatchDetailsModelTests
 
     /// <summary>
     /// Verifies the "Copy submission" consuming path: once the pre-filled Create Submission form
-    /// is actually submitted, the samples staged by CopyBatchModel are copied onto the newly
-    /// created batch (and ONLY those staged — an animal in the source batch that was never part
-    /// of the pending list is left untouched) and the user lands on CopyBatchSummary instead of
-    /// the normal SampleSummary redirect.
+    /// is actually submitted, the whole copy (batch header + staged samples/tissues) is delegated
+    /// to <see cref="ISubmissionService.CreateBatchWithCopiedSamplesAsync"/> as a single operation
+    /// — <see cref="IBatchService.AddAsync"/> is never called directly for this journey — and the
+    /// user lands on CopyBatchSummary instead of the normal SampleSummary redirect.
     /// </summary>
     [Fact]
-    public async Task OnPostCreateAsync_PendingCopyStaged_CopiesStagedSamplesAndRedirectsToCopyBatchSummary()
+    public async Task OnPostCreateAsync_PendingCopyStaged_DelegatesWholeCopyToOneTransactionalCallAndRedirectsToCopyBatchSummary()
     {
-        _batches.Setup(b => b.AddAsync(It.IsAny<Batch>(), 7, It.IsAny<CancellationToken>())).ReturnsAsync(100);
-
         var stagedAnimal = new Animal { ID = 1, SenderRef = "S1", BatchSubmissionID = 50 };
         var otherAnimal = new Animal { ID = 2, SenderRef = "S2", BatchSubmissionID = 51 };
         var sourceSubmission = new BatchSubmission { ID = 50, BatchID = 10, AnimalID = 1, Order = 1 };
@@ -177,9 +175,10 @@ public class BatchDetailsModelTests
             .ReturnsAsync((IReadOnlyList<Animal>)[stagedAnimal, otherAnimal]);
         _submissions.Setup(s => s.GetTissuesBySubmissionAsync(10, 50, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Tissue>)[tissue]);
-        _submissions.Setup(s => s.CopyAnimalAsync(stagedAnimal, 0, "S1-NEW", 7, It.IsAny<CancellationToken>())).ReturnsAsync(201);
-        _submissions.Setup(s => s.CopySubmissionAsync(sourceSubmission, 100, 7, 201, It.IsAny<CancellationToken>())).ReturnsAsync(301);
-        _submissions.Setup(s => s.CopyTissueAsync(tissue, 301, 7, It.IsAny<CancellationToken>())).ReturnsAsync(401);
+        _submissions.Setup(s => s.CreateBatchWithCopiedSamplesAsync(
+                It.IsAny<Batch>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<string?>(), It.Is<IReadOnlyList<CopiedSamplePlan>>(p => p.Count == 1 && p[0].SourceAnimal.ID == 1), 7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(100);
 
         var sut = CreateSut();
         sut.Create_SelectedHistologyCodes = [HistologyCode.EO];
@@ -191,7 +190,36 @@ public class BatchDetailsModelTests
         var redirect = Assert.IsType<RedirectToPageResult>(result);
         Assert.Equal("/Batches/CopyBatchSummary", redirect.PageName);
         Assert.Equal(100, redirect.RouteValues!["newBatchId"]);
-        _submissions.Verify(s => s.CopyAnimalAsync(stagedAnimal, 0, "S1-NEW", 7, It.IsAny<CancellationToken>()), Times.Once);
-        _submissions.Verify(s => s.CopyAnimalAsync(otherAnimal, It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _batches.Verify(b => b.AddAsync(It.IsAny<Batch>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Regression: a failure anywhere in the transactional copy (e.g. a mid-copy sample/tissue
+    /// error) must surface as a page error, not be silently swallowed after a batch has already
+    /// been committed — <see cref="ISubmissionService.CreateBatchWithCopiedSamplesAsync"/> returns
+    /// 0 when its internal transaction rolled back, and nothing should be left behind.
+    /// </summary>
+    [Fact]
+    public async Task OnPostCreateAsync_PendingCopyStaged_TransactionFails_ShowsErrorWithoutRedirecting()
+    {
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.CreateBatchWithCopiedSamplesAsync(
+                It.IsAny<Batch>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<string?>(), It.IsAny<IReadOnlyList<CopiedSamplePlan>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+
+        var sut = CreateSut();
+        sut.Create_SelectedHistologyCodes = [HistologyCode.EO];
+        var pending = new CopyBatchModel.PendingCopy(10, [new CopyBatchModel.AnimalRow { AnimalId = 1, SenderRef = "S1", NewSenderRef = "S1-NEW" }]);
+        sut.TempData["CopyBatch_PendingCopy"] = System.Text.Json.JsonSerializer.Serialize(pending);
+
+        var result = await sut.OnPostCreateAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("Failed to create the submission. Please try again.", sut.Errors?["Create_Save"]);
+        _batches.Verify(b => b.AddAsync(It.IsAny<Batch>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }
