@@ -30,6 +30,12 @@ public interface ISubmissionService
     /// </summary>
     Task<IReadOnlyList<SenderSearchResult>> GetAnimalBySenderAsync(string senderRef, CancellationToken ct = default);
 
+    /// <summary>
+    /// Returns the subset of <paramref name="senderRefs"/> that already exist on ANY animal in the
+    /// database (not scoped to a batch) — used to validate a whole mouse-number range up front.
+    /// </summary>
+    Task<IReadOnlyList<string>> GetExistingSenderRefsAsync(IEnumerable<string> senderRefs, CancellationToken ct = default);
+
     /// <summary>Renames the Sender Ref. Throws <see cref="AnimalRefUpdateException"/> on conflict.</summary>
     Task UpdateAnimalSenderRefAsync(string senderRef, string newSenderRef, int userId, CancellationToken ct = default);
 

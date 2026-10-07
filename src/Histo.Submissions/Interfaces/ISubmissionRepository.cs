@@ -74,6 +74,13 @@ public interface ISubmissionRepository
     Task<IReadOnlyList<SenderSearchResult>> GetAnimalBySenderAsync(string senderRef, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns the subset of <paramref name="senderRefs"/> that already exist on ANY animal in the
+    /// database (not scoped to a batch) — used to check a whole mouse-number range for collisions
+    /// in a single query instead of one round trip per candidate.
+    /// </summary>
+    Task<IReadOnlyList<string>> GetExistingSenderRefsAsync(IEnumerable<string> senderRefs, CancellationToken ct = default);
+
+    /// <summary>
     /// Renames the Sender Ref of an existing animal/sample record, cascading to
     /// every submission that references it. Maps to <c>EditAnimalSenderRef</c>.
     ///

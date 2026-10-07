@@ -273,6 +273,13 @@ public sealed class SubmissionService : ISubmissionService
         catch (Exception ex) { _logger.LogError("Failed to look up animal by exact sender ref {SenderRef}.", ex, senderRef); return []; }
     }
 
+    /// <summary>Returns the subset of <paramref name="senderRefs"/> that already exist on any animal.</summary>
+    public async Task<IReadOnlyList<string>> GetExistingSenderRefsAsync(IEnumerable<string> senderRefs, CancellationToken ct = default)
+    {
+        try { return await _repo.GetExistingSenderRefsAsync(senderRefs, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to check existing sender refs.", ex); return []; }
+    }
+
     /// <summary>Returns archived tissue records matching the given (optional) filters.</summary>
     public async Task<IReadOnlyList<TissueArchiveInfo>> GetTissueArchiveAsync(
         string? senderRef, string? histologyRef, string? archiveLocation, string? tissueCode, CancellationToken ct = default)

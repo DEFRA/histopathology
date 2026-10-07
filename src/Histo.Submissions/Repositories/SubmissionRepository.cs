@@ -638,6 +638,21 @@ public sealed class SubmissionRepository : ISubmissionRepository
     }
 
     /// <inheritdoc/>
+    public async Task<IReadOnlyList<string>> GetExistingSenderRefsAsync(IEnumerable<string> senderRefs, CancellationToken ct = default)
+    {
+        var refs = senderRefs.ToList();
+        if (refs.Count == 0) return [];
+
+        // No legacy SP covers a bulk existence check — direct query, same pattern as
+        // GetAllUnusedRefsAsync (HistologyRepository) where the SP shape doesn't fit.
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<string>(
+            "SELECT SenderRef FROM Animal WHERE SenderRef IN @SenderRefs",
+            new { SenderRefs = refs });
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<TissueArchiveInfo>> GetTissueArchiveAsync(
         string? senderRef, string? histologyRef, string? archiveLocation, string? tissueCode, CancellationToken ct = default)
     {

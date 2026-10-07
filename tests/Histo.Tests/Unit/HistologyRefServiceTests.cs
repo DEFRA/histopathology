@@ -30,7 +30,7 @@ public class HistologyRefServiceTests
         var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects);
 
         Assert.Equal("26/60010", result);
-        _repo.Verify(r => r.ClaimNextCounterAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repo.Verify(r => r.ClaimNextCounterAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public class HistologyRefServiceTests
     {
         _repo.Setup(r => r.GetUnusedRefsAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<HistologyRef>)[]);
-        _repo.Setup(r => r.ClaimNextCounterAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()))
+        _repo.Setup(r => r.ClaimNextCounterAsync(HistologyRefTypeCode.MouseProjects, 90000, It.IsAny<CancellationToken>()))
             .ReturnsAsync("60002");
 
         var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects);
@@ -53,8 +53,6 @@ public class HistologyRefServiceTests
     {
         _repo.Setup(r => r.GetUnusedRefsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<HistologyRef>)[]);
-        _repo.Setup(r => r.ClaimNextCounterAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string?)null);
 
         var result = await CreateSut().GetNextAvailableRefAsync(999);
 

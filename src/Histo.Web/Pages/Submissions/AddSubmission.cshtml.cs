@@ -419,23 +419,15 @@ public class AddSubmissionModel : HistoPageModel
             return Page();
         }
 
-        // Validate the whole range against samples already in this batch before creating anything —
-        // this keeps the duplicate check bounded without materialising a million-item list in memory.
-        var existingInBatch = await _submissions.GetAnimalsByBatchAsync(batchId);
-        string? duplicate = null;
-        for (var current = fromId; current <= toId; current++)
-        {
-            var candidate = SenderRefHelpers.FormatMouseNumber(current);
-            if (existingInBatch.Any(a => string.Equals(a.SenderRef, candidate, StringComparison.OrdinalIgnoreCase)))
-            {
-                duplicate = candidate;
-                break;
-            }
-        }
+        // Validate the whole range against EVERY animal in the database (not just this batch) —
+        // SenderRef collisions from a different batch (e.g. leftover test/fixture data) still
+        // cause the tissue-copy step inside CreateMouseRangeAsync to fail deep in a DB transaction.
+        var candidates = Enumerable.Range(fromId, rangeSize).Select(SenderRefHelpers.FormatMouseNumber).ToList();
+        var duplicate = (await _submissions.GetExistingSenderRefsAsync(candidates)).FirstOrDefault();
 
         if (duplicate is not null)
         {
-            ModelError = $"Mouse number {duplicate} already exists on the submission. Alter the range and try again.";
+            ModelError = $"Mouse number {duplicate} already exists. Alter the range and try again.";
             MouseRangeHasError = true;
             return Page();
         }

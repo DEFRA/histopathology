@@ -97,14 +97,14 @@ public sealed class HistologyRepository : IHistologyRepository
     }
 
     /// <inheritdoc/>
-    public async Task<string?> ClaimNextCounterAsync(int histologyType, CancellationToken ct = default)
+    public async Task<string?> ClaimNextCounterAsync(int histologyType, int upperBoundExclusive, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
         return await conn.ExecuteScalarAsync<string?>(
             @"UPDATE HistologyRef
               SET NextHistologyRef = CAST(CAST(NextHistologyRef AS INT) + 1 AS VARCHAR(10))
               OUTPUT DELETED.NextHistologyRef
-              WHERE Type = @Type",
-            new { Type = histologyType });
+              WHERE Type = @Type AND CAST(NextHistologyRef AS INT) < @UpperBound",
+            new { Type = histologyType, UpperBound = upperBoundExclusive });
     }
 }

@@ -56,10 +56,12 @@ public interface IHistologyRepository
     /// <summary>
     /// Atomically reads and advances a type's "next histology ref" counter in a single
     /// <c>UPDATE ... OUTPUT</c> statement, returning the claimed (pre-increment) value, or
-    /// <see langword="null"/> if the type doesn't exist. The row lock SQL Server holds for the
-    /// statement's duration means two concurrent callers can never claim the same value — unlike
+    /// <see langword="null"/> if the type doesn't exist or the counter is already at/past
+    /// <paramref name="upperBoundExclusive"/> (checked in the same statement, so a blocked claim
+    /// never advances the counter). The row lock SQL Server holds for the statement's duration
+    /// means two concurrent callers can never claim the same value — unlike
     /// a separate read (<see cref="GetCountersAsync"/>) followed by a write
     /// (<see cref="UpdateCounterAsync"/>), which races.
     /// </summary>
-    Task<string?> ClaimNextCounterAsync(int histologyType, CancellationToken ct = default);
+    Task<string?> ClaimNextCounterAsync(int histologyType, int upperBoundExclusive, CancellationToken ct = default);
 }
