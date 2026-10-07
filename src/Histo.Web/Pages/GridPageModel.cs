@@ -41,7 +41,11 @@ public abstract class GridPageModel : HistoPageModel
         string.Join("&", Request.Query
             .Where(kv => !string.Equals(kv.Key, nameof(SortColumn), StringComparison.OrdinalIgnoreCase)
                       && !string.Equals(kv.Key, nameof(SortDesc), StringComparison.OrdinalIgnoreCase)
-                      && !string.Equals(kv.Key, nameof(PageNumber), StringComparison.OrdinalIgnoreCase))
+                      && !string.Equals(kv.Key, nameof(PageNumber), StringComparison.OrdinalIgnoreCase)
+                      // "handler" is present only on the AJAX grid-refresh request; keeping it would
+                      // bake handler=Grid into every link, duplicating it on the next refresh and
+                      // leaving it in the browser's address bar.
+                      && !string.Equals(kv.Key, "handler", StringComparison.OrdinalIgnoreCase))
             .SelectMany(kv => kv.Value.Select(v => $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(v ?? string.Empty)}")));
 
     protected static int CalculateTotalPages(int totalCount) =>

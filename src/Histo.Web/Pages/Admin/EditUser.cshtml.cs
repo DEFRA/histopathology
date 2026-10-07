@@ -33,6 +33,12 @@ public class EditUserModel : HistoPageModel
     /// <summary>Submission page to resume after the detour into user maintenance.</summary>
     [BindProperty(SupportsGet = true)] public string? ReturnUrl { get; set; }
 
+    // Grid state carried through from the User maintenance list so saving can return to the same
+    // ordering/filter, and the page the saved row falls on can be worked out under that ordering.
+    [BindProperty(SupportsGet = true)] public string? SortColumn { get; set; }
+    [BindProperty(SupportsGet = true)] public bool SortDesc { get; set; }
+    [BindProperty(SupportsGet = true)] public bool ShowDeactivated { get; set; } = true;
+
     /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
     public string? SafeReturnUrl => !string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : null;
 
@@ -69,7 +75,7 @@ public class EditUserModel : HistoPageModel
         await LoadLookupsAsync();
 
         var user = (await _users.GetAllUsersAsync()).FirstOrDefault(u => u.UserID == UserId);
-        if (user is null) return RedirectToPage("/Admin/UserMaintenance", new { returnUrl = SafeReturnUrl });
+        if (user is null) return RedirectToPage("/Admin/UserMaintenance", new { returnUrl = SafeReturnUrl, SortColumn, SortDesc, ShowDeactivated });
 
         Name = user.Name;
         Email = user.Email;
@@ -116,7 +122,8 @@ public class EditUserModel : HistoPageModel
         }
 
         TempData["StatusMessage"] = $"User '{user.Name}' was updated.";
-        return RedirectToPage("/Admin/UserMaintenance", new { returnUrl = SafeReturnUrl });
+        TempData["FocusUserId"] = UserId;
+        return RedirectToPage("/Admin/UserMaintenance", new { returnUrl = SafeReturnUrl, SortColumn, SortDesc, ShowDeactivated });
     }
 
     private void Validate()
