@@ -257,7 +257,7 @@ public class BatchDetailsModel : HistoPageModel
             Create_SelectedAntibodyCodes,
             Create_SelectedStainCodes));
 
-        var returnUrl = Url.Page("/Batches/BatchDetails", new { mode = "create" });
+        var returnUrl = Url.Page("/Batches/BatchDetails", new { mode = "create", copyToken = CopyToken });
 
         return field switch
         {
@@ -301,21 +301,48 @@ public class BatchDetailsModel : HistoPageModel
     private const string PendingCopyKey = "CopyBatch_PendingCopy";
 
     /// <summary>
-    /// Pre-fills the Create Submission form from the source batch of a pending "Copy submission"
-    /// request, and records its "Submitted As"/cassetted-ness the same way <c>Cassetted.cshtml</c>
-    /// normally would, so <see cref="OnPostCreateAsync"/>'s existing logic for those fields needs
-    /// no changes. Does not consume <see cref="PendingCopyKey"/> — that happens once the form is
-    /// actually submitted.
+    /// One-time token minted by <see cref="CopyBatchModel"/> when it stages a pending copy, carried
+    /// via the query string (GET) and the form's own action URL (POST, same mechanism as
+    /// <see cref="Mode"/> — no hidden field needed). Required to tell "the user is continuing THIS
+    /// copy" apart from "the user abandoned it (Cancel/navigated away) and later made an unrelated
+    /// Create Submission visit" — without it, <c>TempData.Keep()</c> alone has no way to
+    /// distinguish the two, so an abandoned pending copy would resurface and get applied to an
+    /// unrelated submission.
     /// </summary>
-    private async Task PrefillFromCopySourceAsync()
+    [BindProperty(SupportsGet = true)] public string? CopyToken { get; set; }
+
+    /// <summary>
+    /// Returns the staged pending copy only if <see cref="CopyToken"/> matches the token it was
+    /// minted with. A missing/mismatched token means this request did not arrive via the copy
+    /// journey that staged it — the entry is explicitly removed (not just left to expire) so it
+    /// can never be picked up by a later request either.
+    /// </summary>
+    private CopyBatchModel.PendingCopy? TryGetValidPendingCopy()
     {
-        if (TempData.Peek(PendingCopyKey) is not string json) return;
+        if (TempData.Peek(PendingCopyKey) is not string json) return null;
 
         CopyBatchModel.PendingCopy? pending;
         try { pending = System.Text.Json.JsonSerializer.Deserialize<CopyBatchModel.PendingCopy>(json); }
-        catch (System.Text.Json.JsonException) { return; }
-        if (pending is null) return;
+        catch (System.Text.Json.JsonException) { pending = null; }
 
+        if (pending is null || string.IsNullOrEmpty(CopyToken) || !string.Equals(pending.Token, CopyToken, StringComparison.Ordinal))
+        {
+            TempData.Remove(PendingCopyKey);
+            return null;
+        }
+
+        TempData.Keep(PendingCopyKey);
+        return pending;
+    }
+
+    /// <summary>
+    /// Pre-fills the Create Submission form from the source batch of a validated pending "Copy
+    /// submission" request, and records its "Submitted As"/cassetted-ness the same way
+    /// <c>Cassetted.cshtml</c> normally would, so <see cref="OnPostCreateAsync"/>'s existing logic
+    /// for those fields needs no changes.
+    /// </summary>
+    private async Task PrefillFromCopySourceAsync(CopyBatchModel.PendingCopy pending)
+    {
         var sourceBatch = await _batches.GetByIdAsync(pending.SourceBatchId);
         if (sourceBatch is null) return;
 
@@ -397,14 +424,13 @@ public class BatchDetailsModel : HistoPageModel
         if (IsCreateMode)
         {
             await LoadCreateLookupsAsync();
-            var hasPendingCopy = TempData.Peek(PendingCopyKey) is string;
-            if (hasPendingCopy) TempData.Keep(PendingCopyKey);
+            var pendingCopy = TryGetValidPendingCopy();
 
             if (!RestoreCreateDraft())
             {
-                if (hasPendingCopy)
+                if (pendingCopy is not null)
                 {
-                    await PrefillFromCopySourceAsync();
+                    await PrefillFromCopySourceAsync(pendingCopy);
                 }
                 else
                 {
@@ -573,7 +599,7 @@ public class BatchDetailsModel : HistoPageModel
         TempData.Keep("CreateSubmittedAsId");
         TempData.Keep("CreateSubmittedAsCode");
         TempData.Keep("CreateIsPreCassetted");
-        TempData.Keep(PendingCopyKey);
+        var pendingCopy = TryGetValidPendingCopy();
 
         // Resolve SubmittedAs name for redisplay
         if (TempData.TryGetValue("CreateSubmittedAsId", out var saId))
@@ -655,37 +681,32 @@ public class BatchDetailsModel : HistoPageModel
         // "Copy submission" journey: create the batch header, test-type selections, submitted-as,
         // and every staged sample/tissue in ONE DB transaction — CreateBatchWithCopiedSamplesAsync
         // rolls everything back on any failure instead of silently continuing past a failed
-        // sample/tissue copy after the batch has already been committed (reading, not peeking,
-        // consumes the TempData entry).
-        if (TempData[PendingCopyKey] is string pendingJson)
+        // sample/tissue copy after the batch has already been committed. pendingCopy is only
+        // non-null here when CopyToken matched the token it was staged with (TryGetValidPendingCopy)
+        // — a stale/abandoned entry was already discarded above.
+        if (pendingCopy is not null && pendingCopy.Samples.Count > 0)
         {
-            CopyBatchModel.PendingCopy? pending;
-            try { pending = System.Text.Json.JsonSerializer.Deserialize<CopyBatchModel.PendingCopy>(pendingJson); }
-            catch (System.Text.Json.JsonException) { pending = null; }
+            var plan = await BuildCopyPlanAsync(pendingCopy.SourceBatchId, pendingCopy.Samples);
+            var newBatchId = await _submissions.CreateBatchWithCopiedSamplesAsync(
+                batch,
+                Create_SelectedHistologyCodes,
+                needsAntibodies ? Create_SelectedAntibodyCodes : new List<string>(),
+                needsStains     ? Create_SelectedStainCodes    : new List<string>(),
+                submittedAsCode,
+                plan,
+                Session.UserID);
 
-            if (pending is not null && pending.Samples.Count > 0)
+            if (newBatchId <= 0)
             {
-                var plan = await BuildCopyPlanAsync(pending.SourceBatchId, pending.Samples);
-                var newBatchId = await _submissions.CreateBatchWithCopiedSamplesAsync(
-                    batch,
-                    Create_SelectedHistologyCodes,
-                    needsAntibodies ? Create_SelectedAntibodyCodes : new List<string>(),
-                    needsStains     ? Create_SelectedStainCodes    : new List<string>(),
-                    submittedAsCode,
-                    plan,
-                    Session.UserID);
-
-                if (newBatchId <= 0)
-                {
-                    Errors = new Dictionary<string, string> { ["Create_Save"] = "Failed to create the submission. Please try again." };
-                    Mode = "create";
-                    return Page();
-                }
-
-                Session.BatchID = newBatchId;
-                Session.SampleSummaryReturnPage = null;
-                return RedirectToPage("/Batches/CopyBatchSummary", new { newBatchId });
+                Errors = new Dictionary<string, string> { ["Create_Save"] = "Failed to create the submission. Please try again." };
+                Mode = "create";
+                return Page();
             }
+
+            TempData.Remove(PendingCopyKey);
+            Session.BatchID = newBatchId;
+            Session.SampleSummaryReturnPage = null;
+            return RedirectToPage("/Batches/CopyBatchSummary", new { newBatchId });
         }
 
         int batchId;

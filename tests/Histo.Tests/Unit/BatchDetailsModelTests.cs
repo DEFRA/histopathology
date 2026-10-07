@@ -138,7 +138,8 @@ public class BatchDetailsModelTests
 
         var sut = CreateSut();
         sut.Mode = "create";
-        var pending = new CopyBatchModel.PendingCopy(10, [new CopyBatchModel.AnimalRow { AnimalId = 1, SenderRef = "S1" }]);
+        sut.CopyToken = "tok-1";
+        var pending = new CopyBatchModel.PendingCopy(10, [new CopyBatchModel.AnimalRow { AnimalId = 1, SenderRef = "S1" }], "tok-1");
         sut.TempData["CopyBatch_PendingCopy"] = System.Text.Json.JsonSerializer.Serialize(pending);
 
         await sut.OnGetAsync();
@@ -149,6 +150,26 @@ public class BatchDetailsModelTests
         Assert.Equal(["2"], sut.Create_SelectedHistologyCodes);
         Assert.Equal("99", sut.TempData["CreateSubmittedAsId"]);
         Assert.Equal("True", sut.TempData["CreateIsPreCassetted"]);
+    }
+
+    /// <summary>
+    /// Regression: an abandoned pending copy (Cancel/navigate away before submitting the
+    /// pre-filled form) must not resurface on a later, unrelated Create Submission visit that
+    /// doesn't carry the matching token — it must be discarded, not applied.
+    /// </summary>
+    [Fact]
+    public async Task OnGetAsync_PendingCopyStagedButNoMatchingToken_IsDiscardedAndFormUsesNormalDefaults()
+    {
+        var sut = CreateSut();
+        sut.Mode = "create";
+        sut.CopyToken = null; // ordinary visit — no token in the query string
+        var pending = new CopyBatchModel.PendingCopy(10, [new CopyBatchModel.AnimalRow { AnimalId = 1, SenderRef = "S1" }], "tok-1");
+        sut.TempData["CopyBatch_PendingCopy"] = System.Text.Json.JsonSerializer.Serialize(pending);
+
+        await sut.OnGetAsync();
+
+        Assert.False(sut.TempData.ContainsKey("CopyBatch_PendingCopy"));
+        _batches.Verify(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>
@@ -182,7 +203,8 @@ public class BatchDetailsModelTests
 
         var sut = CreateSut();
         sut.Create_SelectedHistologyCodes = [HistologyCode.EO];
-        var pending = new CopyBatchModel.PendingCopy(10, [new CopyBatchModel.AnimalRow { AnimalId = 1, SenderRef = "S1", NewSenderRef = "S1-NEW" }]);
+        sut.CopyToken = "tok-1";
+        var pending = new CopyBatchModel.PendingCopy(10, [new CopyBatchModel.AnimalRow { AnimalId = 1, SenderRef = "S1", NewSenderRef = "S1-NEW" }], "tok-1");
         sut.TempData["CopyBatch_PendingCopy"] = System.Text.Json.JsonSerializer.Serialize(pending);
 
         var result = await sut.OnPostCreateAsync();
@@ -191,6 +213,32 @@ public class BatchDetailsModelTests
         Assert.Equal("/Batches/CopyBatchSummary", redirect.PageName);
         Assert.Equal(100, redirect.RouteValues!["newBatchId"]);
         _batches.Verify(b => b.AddAsync(It.IsAny<Batch>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.False(sut.TempData.ContainsKey("CopyBatch_PendingCopy"));
+    }
+
+    /// <summary>
+    /// Regression: an abandoned pending copy must not be applied to a later, unrelated Create
+    /// Submission POST that lacks the matching token — it must fall through to the ordinary
+    /// create-a-new-batch path (<see cref="IBatchService.AddAsync"/>), not the copy path.
+    /// </summary>
+    [Fact]
+    public async Task OnPostCreateAsync_PendingCopyStagedButNoMatchingToken_FallsThroughToNormalCreate()
+    {
+        _batches.Setup(b => b.AddAsync(It.IsAny<Batch>(), 7, It.IsAny<CancellationToken>())).ReturnsAsync(100);
+
+        var sut = CreateSut();
+        sut.Create_SelectedHistologyCodes = [HistologyCode.EO];
+        sut.CopyToken = null;
+        var pending = new CopyBatchModel.PendingCopy(10, [new CopyBatchModel.AnimalRow { AnimalId = 1, SenderRef = "S1", NewSenderRef = "S1-NEW" }], "tok-1");
+        sut.TempData["CopyBatch_PendingCopy"] = System.Text.Json.JsonSerializer.Serialize(pending);
+
+        var result = await sut.OnPostCreateAsync();
+
+        Assert.IsType<RedirectToPageResult>(result);
+        _batches.Verify(b => b.AddAsync(It.IsAny<Batch>(), 7, It.IsAny<CancellationToken>()), Times.Once);
+        _submissions.Verify(s => s.CreateBatchWithCopiedSamplesAsync(
+            It.IsAny<Batch>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+            It.IsAny<string?>(), It.IsAny<IReadOnlyList<CopiedSamplePlan>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>
@@ -213,7 +261,8 @@ public class BatchDetailsModelTests
 
         var sut = CreateSut();
         sut.Create_SelectedHistologyCodes = [HistologyCode.EO];
-        var pending = new CopyBatchModel.PendingCopy(10, [new CopyBatchModel.AnimalRow { AnimalId = 1, SenderRef = "S1", NewSenderRef = "S1-NEW" }]);
+        sut.CopyToken = "tok-1";
+        var pending = new CopyBatchModel.PendingCopy(10, [new CopyBatchModel.AnimalRow { AnimalId = 1, SenderRef = "S1", NewSenderRef = "S1-NEW" }], "tok-1");
         sut.TempData["CopyBatch_PendingCopy"] = System.Text.Json.JsonSerializer.Serialize(pending);
 
         var result = await sut.OnPostCreateAsync();

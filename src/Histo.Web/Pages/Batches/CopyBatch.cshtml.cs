@@ -154,9 +154,14 @@ public class CopyBatchModel : HistoPageModel
         // Nothing is written to the database here — the samples are staged and the user is sent
         // to the normal Create Submission form, pre-filled from this source batch, so the new
         // batch (and these samples) are only created once that form is actually submitted.
-        TempData["CopyBatch_PendingCopy"] = JsonSerializer.Serialize(new PendingCopy(SourceBatchId, Animals));
+        // The token lets BatchDetailsModel tell "the user is continuing THIS copy" apart from
+        // "the user abandoned it and later made an unrelated Create Submission visit" — a plain
+        // TempData.Keep() has no such distinction, so a stale entry would otherwise resurface and
+        // get applied to a completely unrelated submission.
+        var token = Guid.NewGuid().ToString("N");
+        TempData["CopyBatch_PendingCopy"] = JsonSerializer.Serialize(new PendingCopy(SourceBatchId, Animals, token));
 
-        return RedirectToPage("/Batches/BatchDetails", new { mode = "create" });
+        return RedirectToPage("/Batches/BatchDetails", new { mode = "create", copyToken = token });
     }
 
     /// <summary>
@@ -193,6 +198,11 @@ public class CopyBatchModel : HistoPageModel
         public List<string> TissueDetails { get; set; } = [];
     }
 
-    /// <summary>Staged copy request read by <see cref="Histo.Web.Pages.Batches.BatchDetailsModel"/> once the Create Submission form is submitted.</summary>
-    public sealed record PendingCopy(int SourceBatchId, List<AnimalRow> Samples);
+    /// <summary>
+    /// Staged copy request read by <see cref="Histo.Web.Pages.Batches.BatchDetailsModel"/> once
+    /// the Create Submission form is submitted. <paramref name="Token"/> must match the
+    /// <c>copyToken</c> query/form value on that page for the entry to be treated as current —
+    /// see <c>BatchDetailsModel.TryGetValidPendingCopyAsync</c>.
+    /// </summary>
+    public sealed record PendingCopy(int SourceBatchId, List<AnimalRow> Samples, string Token);
 }

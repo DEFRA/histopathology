@@ -103,6 +103,8 @@ public class CopyBatchModelTests
         Assert.NotNull(pending);
         Assert.Equal(10, pending!.SourceBatchId);
         Assert.Equal(2, pending.Samples.Count);
+        Assert.False(string.IsNullOrEmpty(pending.Token));
+        Assert.Equal(pending.Token, redirect.RouteValues["copyToken"]);
     }
 
     [Fact]
