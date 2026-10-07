@@ -42,6 +42,10 @@
            href="@(currentPage == 1 ? "#" : BuildHref(1))" aria-label="First page" title="First page">&laquo;</a>
         <a class="app-pagination-window__nav-link @(currentPage == 1 ? "app-pagination-window__nav-link--disabled" : "")"
            href="@(currentPage == 1 ? "#" : BuildHref(currentPage - 1))" aria-label="Previous page" title="Previous page">&lsaquo;</a>
+        <a class="app-pagination-window__nav-link @(currentPage == totalPages ? "app-pagination-window__nav-link--disabled" : "")"
+           href="@(currentPage == totalPages ? "#" : BuildHref(currentPage + 1))" aria-label="Next page" title="Next page">&rsaquo;</a>
+        <a class="app-pagination-window__nav-link @(currentPage == totalPages ? "app-pagination-window__nav-link--disabled" : "")"
+           href="@(currentPage == totalPages ? "#" : BuildHref(totalPages))" aria-label="Last page" title="Last page">&raquo;</a>
 
         <ul class="app-pagination-window__list">
             @foreach (var pageNum in PaginationHelpers.BuildSlidingWindow(currentPage, totalPages))
@@ -60,11 +64,6 @@
                 }
             }
         </ul>
-
-        <a class="app-pagination-window__nav-link @(currentPage == totalPages ? "app-pagination-window__nav-link--disabled" : "")"
-           href="@(currentPage == totalPages ? "#" : BuildHref(currentPage + 1))" aria-label="Next page" title="Next page">&rsaquo;</a>
-        <a class="app-pagination-window__nav-link @(currentPage == totalPages ? "app-pagination-window__nav-link--disabled" : "")"
-           href="@(currentPage == totalPages ? "#" : BuildHref(totalPages))" aria-label="Last page" title="Last page">&raquo;</a>
 
         <p class="app-pagination-window__summary">Page @currentPage of @totalPages</p>
     </nav>

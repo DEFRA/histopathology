@@ -40,6 +40,10 @@
                 aria-label="First page" title="First page" disabled="@(currentPage == 1)">&laquo;</button>
         <button type="submit" form="@formId" formaction="@BuildAction(currentPage - 1)" class="app-pagination-window__nav-link"
                 aria-label="Previous page" title="Previous page" disabled="@(currentPage == 1)">&lsaquo;</button>
+        <button type="submit" form="@formId" formaction="@BuildAction(currentPage + 1)" class="app-pagination-window__nav-link"
+                aria-label="Next page" title="Next page" disabled="@(currentPage == totalPages)">&rsaquo;</button>
+        <button type="submit" form="@formId" formaction="@BuildAction(totalPages)" class="app-pagination-window__nav-link"
+                aria-label="Last page" title="Last page" disabled="@(currentPage == totalPages)">&raquo;</button>
 
         <ul class="app-pagination-window__list">
             @foreach (var pageNum in PaginationHelpers.BuildSlidingWindow(currentPage, totalPages))
@@ -58,11 +62,6 @@
                 }
             }
         </ul>
-
-        <button type="submit" form="@formId" formaction="@BuildAction(currentPage + 1)" class="app-pagination-window__nav-link"
-                aria-label="Next page" title="Next page" disabled="@(currentPage == totalPages)">&rsaquo;</button>
-        <button type="submit" form="@formId" formaction="@BuildAction(totalPages)" class="app-pagination-window__nav-link"
-                aria-label="Last page" title="Last page" disabled="@(currentPage == totalPages)">&raquo;</button>
 
         <p class="app-pagination-window__summary">Page @currentPage of @totalPages</p>
     </nav>

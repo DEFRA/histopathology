@@ -37,6 +37,11 @@ parameters:
     type: boolean
     default: false
 
+  - name: runDatabaseScripts
+    displayName: Run database deployment scripts (even when no scripts changed)
+    type: boolean
+    default: false
+
   - name: sonarServiceConnection
     type: string
     default: 'SonarCloud-Histo'
@@ -221,16 +226,36 @@ stages:
                   artifact: drop
 
                 - script: |
+                    set -euo pipefail
+
+                    LOG_DIR="$(Agent.TempDirectory)/db-deploy-log"
+                    mkdir -p "$LOG_DIR"
+                    LOG_FILE="$LOG_DIR/db-deploy-DEV.log"
+
                     if [ "$(dbScriptsChanged)" = "true" ]; then
-                      echo "Database script changes detected — database deployment WILL be applied for DEV."
+                      DECISION="Database script changes detected in this build - database deployment WILL be applied for DEV."
+                    elif [ "${{ parameters.runDatabaseScripts }}" = "True" ] || [ "${{ parameters.runDatabaseScripts }}" = "true" ]; then
+                      DECISION="'Run database deployment scripts' was selected (fresh / DR deployment) - database deployment WILL be applied for DEV."
                     else
-                      echo "No database script changes detected — database deployment WILL BE SKIPPED for DEV."
+                      DECISION="No database script changes and no manual request - database deployment WILL BE SKIPPED for DEV."
                     fi
+
+                    {
+                      echo "============================================================"
+                      echo " Database deployment - DEV"
+                      echo "============================================================"
+                      printf 'Decided at : %(%Y-%m-%dT%H:%M:%SZ)T\n' -1
+                      echo "Server     : $(sqlServerHost)"
+                      echo "Database   : $(dbName)"
+                      echo "Build      : $(Build.BuildNumber)"
+                      echo "Commit     : $(Build.SourceVersion)"
+                      echo "Decision   : $DECISION"
+                    } | tee "$LOG_FILE"
                   displayName: 'Log database deployment decision'
 
                 - task: AzureCLI@2
                   displayName: 'Apply database scripts'
-                  condition: eq(variables['dbScriptsChanged'], 'true')
+                  condition: or(eq(variables['dbScriptsChanged'], 'true'), eq('${{ parameters.runDatabaseScripts }}', true))
                   inputs:
                     azureSubscription: 'AZR-CDE-DEV1'
                     scriptType: bash
@@ -244,11 +269,44 @@ stages:
                         https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.2/sqlcmd-linux-amd64.tar.bz2
                       tar -xjf "$TOOLS/sqlcmd.tar.bz2" -C "$TOOLS"
 
+                      LOG_FILE="$(Agent.TempDirectory)/db-deploy-log/db-deploy-DEV.log"
                       cd "$(Pipeline.Workspace)/drop/sql/Deploy"
-                      echo "Applying Deploy.sql"
+
+                      if [ "$(dbScriptsChanged)" = "true" ]; then
+                        TRIGGER="database script changes detected in this build"
+                      else
+                        TRIGGER="manually requested - fresh / DR deployment"
+                      fi
+
+                      # Deploy.sql is only a manifest of :r includes, so list them to log every script
+                      # that ran. '|| true' because pipefail would abort the step if grep matched nothing.
+                      {
+                        echo
+                        printf 'Started    : %(%Y-%m-%dT%H:%M:%SZ)T\n' -1
+                        echo "Triggered  : $TRIGGER"
+                        echo
+                        echo "The following scripts will be applied, in order, to database '$(dbName)' on '$(sqlServerHost)':"
+                        grep -E '^[[:space:]]*:r[[:space:]]' Deploy.sql | sed -E 's#^[[:space:]]*:r[[:space:]]*(\.\./)*#  - #' || true
+                        echo
+                        echo "--- sqlcmd output ---"
+                      } | tee -a "$LOG_FILE"
+
                       "$TOOLS/sqlcmd" -S "$(sqlServerHost)" -d "$(dbName)" \
                         --authentication-method ActiveDirectoryAzCli \
-                        -i "Deploy.sql" -b -t 0
+                        -i "Deploy.sql" -b -t 0 2>&1 | tee -a "$LOG_FILE"
+
+                      {
+                        echo
+                        printf 'Completed  : %(%Y-%m-%dT%H:%M:%SZ)T\n' -1
+                        echo "The scripts listed above ran successfully against database '$(dbName)' on server '$(sqlServerHost)'."
+                      } | tee -a "$LOG_FILE"
+
+                - task: PublishPipelineArtifact@1
+                  displayName: 'Publish database deployment log'
+                  condition: and(succeededOrFailed(), or(eq(variables['dbScriptsChanged'], 'true'), eq('${{ parameters.runDatabaseScripts }}', true)))
+                  inputs:
+                    targetPath: '$(Agent.TempDirectory)/db-deploy-log'
+                    artifactName: 'db-deploy-log-DEV'
 
                 - task: AzureWebApp@1
                   inputs:
@@ -302,16 +360,36 @@ stages:
                   artifact: drop
 
                 - script: |
+                    set -euo pipefail
+
+                    LOG_DIR="$(Agent.TempDirectory)/db-deploy-log"
+                    mkdir -p "$LOG_DIR"
+                    LOG_FILE="$LOG_DIR/db-deploy-TST.log"
+
                     if [ "$(dbScriptsChanged)" = "true" ]; then
-                      echo "Database script changes detected — database deployment WILL be applied for TST."
+                      DECISION="Database script changes detected in this build - database deployment WILL be applied for TST."
+                    elif [ "${{ parameters.runDatabaseScripts }}" = "True" ] || [ "${{ parameters.runDatabaseScripts }}" = "true" ]; then
+                      DECISION="'Run database deployment scripts' was selected (fresh / DR deployment) - database deployment WILL be applied for TST."
                     else
-                      echo "No database script changes detected — database deployment WILL BE SKIPPED for TST."
+                      DECISION="No database script changes and no manual request - database deployment WILL BE SKIPPED for TST."
                     fi
+
+                    {
+                      echo "============================================================"
+                      echo " Database deployment - TST"
+                      echo "============================================================"
+                      printf 'Decided at : %(%Y-%m-%dT%H:%M:%SZ)T\n' -1
+                      echo "Server     : $(sqlServerHost)"
+                      echo "Database   : $(dbName)"
+                      echo "Build      : $(Build.BuildNumber)"
+                      echo "Commit     : $(Build.SourceVersion)"
+                      echo "Decision   : $DECISION"
+                    } | tee "$LOG_FILE"
                   displayName: 'Log database deployment decision'
 
                 - task: AzureCLI@2
                   displayName: 'Apply database scripts'
-                  condition: eq(variables['dbScriptsChanged'], 'true')
+                  condition: or(eq(variables['dbScriptsChanged'], 'true'), eq('${{ parameters.runDatabaseScripts }}', true))
                   inputs:
                     azureSubscription: 'AZR-CDE-TST1'
                     scriptType: bash
@@ -325,11 +403,44 @@ stages:
                         https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.2/sqlcmd-linux-amd64.tar.bz2
                       tar -xjf "$TOOLS/sqlcmd.tar.bz2" -C "$TOOLS"
 
+                      LOG_FILE="$(Agent.TempDirectory)/db-deploy-log/db-deploy-TST.log"
                       cd "$(Pipeline.Workspace)/drop/sql/Deploy"
-                      echo "Applying Deploy.sql"
+
+                      if [ "$(dbScriptsChanged)" = "true" ]; then
+                        TRIGGER="database script changes detected in this build"
+                      else
+                        TRIGGER="manually requested - fresh / DR deployment"
+                      fi
+
+                      # Deploy.sql is only a manifest of :r includes, so list them to log every script
+                      # that ran. '|| true' because pipefail would abort the step if grep matched nothing.
+                      {
+                        echo
+                        printf 'Started    : %(%Y-%m-%dT%H:%M:%SZ)T\n' -1
+                        echo "Triggered  : $TRIGGER"
+                        echo
+                        echo "The following scripts will be applied, in order, to database '$(dbName)' on '$(sqlServerHost)':"
+                        grep -E '^[[:space:]]*:r[[:space:]]' Deploy.sql | sed -E 's#^[[:space:]]*:r[[:space:]]*(\.\./)*#  - #' || true
+                        echo
+                        echo "--- sqlcmd output ---"
+                      } | tee -a "$LOG_FILE"
+
                       "$TOOLS/sqlcmd" -S "$(sqlServerHost)" -d "$(dbName)" \
                         --authentication-method ActiveDirectoryAzCli \
-                        -i "Deploy.sql" -b -t 0
+                        -i "Deploy.sql" -b -t 0 2>&1 | tee -a "$LOG_FILE"
+
+                      {
+                        echo
+                        printf 'Completed  : %(%Y-%m-%dT%H:%M:%SZ)T\n' -1
+                        echo "The scripts listed above ran successfully against database '$(dbName)' on server '$(sqlServerHost)'."
+                      } | tee -a "$LOG_FILE"
+
+                - task: PublishPipelineArtifact@1
+                  displayName: 'Publish database deployment log'
+                  condition: and(succeededOrFailed(), or(eq(variables['dbScriptsChanged'], 'true'), eq('${{ parameters.runDatabaseScripts }}', true)))
+                  inputs:
+                    targetPath: '$(Agent.TempDirectory)/db-deploy-log'
+                    artifactName: 'db-deploy-log-TST'
 
                 - task: AzureWebApp@1
                   inputs:
@@ -382,16 +493,36 @@ stages:
                   artifact: drop
 
                 - script: |
+                    set -euo pipefail
+
+                    LOG_DIR="$(Agent.TempDirectory)/db-deploy-log"
+                    mkdir -p "$LOG_DIR"
+                    LOG_FILE="$LOG_DIR/db-deploy-PreProd.log"
+
                     if [ "$(dbScriptsChanged)" = "true" ]; then
-                      echo "Database script changes detected — database deployment WILL be applied for Pre-Prod."
+                      DECISION="Database script changes detected in this build - database deployment WILL be applied for Pre-Prod."
+                    elif [ "${{ parameters.runDatabaseScripts }}" = "True" ] || [ "${{ parameters.runDatabaseScripts }}" = "true" ]; then
+                      DECISION="'Run database deployment scripts' was selected (fresh / DR deployment) - database deployment WILL be applied for Pre-Prod."
                     else
-                      echo "No database script changes detected — database deployment WILL BE SKIPPED for Pre-Prod."
+                      DECISION="No database script changes and no manual request - database deployment WILL BE SKIPPED for Pre-Prod."
                     fi
+
+                    {
+                      echo "============================================================"
+                      echo " Database deployment - Pre-Prod"
+                      echo "============================================================"
+                      printf 'Decided at : %(%Y-%m-%dT%H:%M:%SZ)T\n' -1
+                      echo "Server     : $(sqlServerHost)"
+                      echo "Database   : $(dbName)"
+                      echo "Build      : $(Build.BuildNumber)"
+                      echo "Commit     : $(Build.SourceVersion)"
+                      echo "Decision   : $DECISION"
+                    } | tee "$LOG_FILE"
                   displayName: 'Log database deployment decision'
 
                 - task: AzureCLI@2
                   displayName: 'Apply database scripts'
-                  condition: eq(variables['dbScriptsChanged'], 'true')
+                  condition: or(eq(variables['dbScriptsChanged'], 'true'), eq('${{ parameters.runDatabaseScripts }}', true))
                   inputs:
                     azureSubscription: 'AZR-CDE-PRE1'
                     scriptType: bash
@@ -405,11 +536,44 @@ stages:
                         https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.2/sqlcmd-linux-amd64.tar.bz2
                       tar -xjf "$TOOLS/sqlcmd.tar.bz2" -C "$TOOLS"
 
+                      LOG_FILE="$(Agent.TempDirectory)/db-deploy-log/db-deploy-PreProd.log"
                       cd "$(Pipeline.Workspace)/drop/sql/Deploy"
-                      echo "Applying Deploy.sql"
+
+                      if [ "$(dbScriptsChanged)" = "true" ]; then
+                        TRIGGER="database script changes detected in this build"
+                      else
+                        TRIGGER="manually requested - fresh / DR deployment"
+                      fi
+
+                      # Deploy.sql is only a manifest of :r includes, so list them to log every script
+                      # that ran. '|| true' because pipefail would abort the step if grep matched nothing.
+                      {
+                        echo
+                        printf 'Started    : %(%Y-%m-%dT%H:%M:%SZ)T\n' -1
+                        echo "Triggered  : $TRIGGER"
+                        echo
+                        echo "The following scripts will be applied, in order, to database '$(dbName)' on '$(sqlServerHost)':"
+                        grep -E '^[[:space:]]*:r[[:space:]]' Deploy.sql | sed -E 's#^[[:space:]]*:r[[:space:]]*(\.\./)*#  - #' || true
+                        echo
+                        echo "--- sqlcmd output ---"
+                      } | tee -a "$LOG_FILE"
+
                       "$TOOLS/sqlcmd" -S "$(sqlServerHost)" -d "$(dbName)" \
                         --authentication-method ActiveDirectoryAzCli \
-                        -i "Deploy.sql" -b -t 0
+                        -i "Deploy.sql" -b -t 0 2>&1 | tee -a "$LOG_FILE"
+
+                      {
+                        echo
+                        printf 'Completed  : %(%Y-%m-%dT%H:%M:%SZ)T\n' -1
+                        echo "The scripts listed above ran successfully against database '$(dbName)' on server '$(sqlServerHost)'."
+                      } | tee -a "$LOG_FILE"
+
+                - task: PublishPipelineArtifact@1
+                  displayName: 'Publish database deployment log'
+                  condition: and(succeededOrFailed(), or(eq(variables['dbScriptsChanged'], 'true'), eq('${{ parameters.runDatabaseScripts }}', true)))
+                  inputs:
+                    targetPath: '$(Agent.TempDirectory)/db-deploy-log'
+                    artifactName: 'db-deploy-log-PreProd'
 
                 - task: AzureWebApp@1
                   inputs:
@@ -460,16 +624,28 @@ stages:
   #                 artifact: drop
   #
   #               - script: |
+  #                   set -euo pipefail
+  #                   LOG_DIR="$(Agent.TempDirectory)/db-deploy-log"
+  #                   mkdir -p "$LOG_DIR"
+  #                   LOG_FILE="$LOG_DIR/db-deploy-PROD.log"
   #                   if [ "$(dbScriptsChanged)" = "true" ]; then
-  #                     echo "Database script changes detected — database deployment WILL be applied for PROD."
+  #                     DECISION="Database script changes detected in this build - database deployment WILL be applied for PROD."
+  #                   elif [ "${{ parameters.runDatabaseScripts }}" = "True" ] || [ "${{ parameters.runDatabaseScripts }}" = "true" ]; then
+  #                     DECISION="'Run database deployment scripts' was selected (fresh / DR deployment) - database deployment WILL be applied for PROD."
   #                   else
-  #                     echo "No database script changes detected — database deployment WILL BE SKIPPED for PROD."
+  #                     DECISION="No database script changes and no manual request - database deployment WILL BE SKIPPED for PROD."
   #                   fi
+  #                   {
+  #                     echo " Database deployment - PROD"
+  #                     echo "Server     : $(sqlServerHost)"
+  #                     echo "Database   : $(dbName)"
+  #                     echo "Decision   : $DECISION"
+  #                   } | tee "$LOG_FILE"
   #                 displayName: 'Log database deployment decision'
   #
   #               - task: AzureCLI@2
   #                 displayName: 'Apply database scripts'
-  #                 condition: eq(variables['dbScriptsChanged'], 'true')
+  #                 condition: or(eq(variables['dbScriptsChanged'], 'true'), eq('${{ parameters.runDatabaseScripts }}', true))
   #                 inputs:
   #                   azureSubscription: 'AZR-CDE-PRD1'
   #                   scriptType: bash
@@ -483,11 +659,26 @@ stages:
   #                       https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.2/sqlcmd-linux-amd64.tar.bz2
   #                     tar -xjf "$TOOLS/sqlcmd.tar.bz2" -C "$TOOLS"
   #
+  #                     LOG_FILE="$(Agent.TempDirectory)/db-deploy-log/db-deploy-PROD.log"
   #                     cd "$(Pipeline.Workspace)/drop/sql/Deploy"
-  #                     echo "Applying Deploy.sql"
+  #
+  #                     {
+  #                       echo "The following scripts will be applied, in order, to database '$(dbName)' on '$(sqlServerHost)':"
+  #                       grep -E '^[[:space:]]*:r[[:space:]]' Deploy.sql | sed -E 's#^[[:space:]]*:r[[:space:]]*(\.\./)*#  - #' || true
+  #                     } | tee -a "$LOG_FILE"
+  #
   #                     "$TOOLS/sqlcmd" -S "$(sqlServerHost)" -d "$(dbName)" \
   #                       --authentication-method ActiveDirectoryAzCli \
-  #                       -i "Deploy.sql" -b -t 0
+  #                       -i "Deploy.sql" -b -t 0 2>&1 | tee -a "$LOG_FILE"
+  #
+  #                     echo "The scripts listed above ran successfully against database '$(dbName)' on server '$(sqlServerHost)'." | tee -a "$LOG_FILE"
+  #
+  #               - task: PublishPipelineArtifact@1
+  #                 displayName: 'Publish database deployment log'
+  #                 condition: and(succeededOrFailed(), or(eq(variables['dbScriptsChanged'], 'true'), eq('${{ parameters.runDatabaseScripts }}', true)))
+  #                 inputs:
+  #                   targetPath: '$(Agent.TempDirectory)/db-deploy-log'
+  #                   artifactName: 'db-deploy-log-PROD'
   #
   #               - task: AzureWebApp@1
   #                 inputs:
