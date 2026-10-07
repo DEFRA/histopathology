@@ -80,7 +80,7 @@
     </header>
 
     <div class="govuk-width-container">
-        <main class="govuk-main-wrapper" id="main-content" role="main">
+        <main class="govuk-main-wrapper @(ViewData["MainClass"])" id="main-content" role="main">
             @RenderSection("BeforeHeading", required: false)
             @if (ViewData["PageTitle"] is string pt)
             {

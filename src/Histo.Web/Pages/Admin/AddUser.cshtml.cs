@@ -31,6 +31,12 @@ public class AddUserModel : HistoPageModel
     /// <summary>Submission page to resume after the detour into user maintenance.</summary>
     [BindProperty(SupportsGet = true)] public string? ReturnUrl { get; set; }
 
+    // Grid state carried through from the User maintenance list so saving can return to the same
+    // ordering/filter, and the page the new row falls on can be worked out under that ordering.
+    [BindProperty(SupportsGet = true)] public string? SortColumn { get; set; }
+    [BindProperty(SupportsGet = true)] public bool SortDesc { get; set; }
+    [BindProperty(SupportsGet = true)] public bool ShowDeactivated { get; set; } = true;
+
     /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
     public string? SafeReturnUrl => !string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : null;
 
@@ -85,7 +91,11 @@ public class AddUserModel : HistoPageModel
         }
 
         TempData["StatusMessage"] = $"User '{user.Name}' was added.";
-        return RedirectToPage("/Admin/UserMaintenance", new { returnUrl = SafeReturnUrl });
+        // AddUser SP returns no identity, so re-read the row to tell the grid which page to open on.
+        var created = (await _users.GetAllUsersAsync())
+            .FirstOrDefault(u => string.Equals(u.Email, user.Email, StringComparison.OrdinalIgnoreCase));
+        if (created is not null) TempData["FocusUserId"] = created.UserID;
+        return RedirectToPage("/Admin/UserMaintenance", new { returnUrl = SafeReturnUrl, SortColumn, SortDesc, ShowDeactivated });
     }
 
     private void Validate()

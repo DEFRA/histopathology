@@ -109,16 +109,6 @@
     text-decoration: none;
 }
 
-/* The "current page" pagination item has a blue background (.govuk-pagination__item--current);
- * real <a> links get white text there via the :link/:visited pseudo-classes, which never match
- * a <button> — restated here so the POST-based pagination's current-page number is legible
- * instead of rendering in the same blue as the background. */
-.govuk-pagination__item--current .app-link-button,
-.govuk-pagination__item--current .app-link-button:hover {
-    color: #fff;
-    text-decoration: none;
-}
-
 /* Resets native <button> chrome so a Back link that must POST (discard/cancel) instead of
  * navigate via <a href> renders identically to govuk-back-link's <a> variant. Must NOT reset
  * margin or font — this element also carries the real govuk-back-link class, and resetting
@@ -165,6 +155,49 @@
     overflow-x: auto;
 }
 
+/* Keeps each cell on a single line so names, emails and lookup descriptions stay readable and the
+ * rows keep a uniform height; the .app-table-responsive wrapper scrolls instead of wrapping.
+ * govuk-table is width:100%, which with nowrap forces columns narrower than their content and makes
+ * adjacent cells visually collide — min-width lets the table grow past the container instead. */
+.app-table--nowrap {
+    width: auto;
+    min-width: 100%;
+}
+
+.app-table--nowrap .govuk-table__header,
+.app-table--nowrap .govuk-table__cell {
+    white-space: nowrap;
+}
+
+/* govuk-table's 20px inter-column gutter is what tips the non-wrapping row past the page width and
+ * puts a horizontal scrollbar under the grid; 12px still separates the columns clearly. */
+.app-table--nowrap .govuk-table__header:not(:last-child),
+.app-table--nowrap .govuk-table__cell:not(:last-child) {
+    padding-right: 12px;
+}
+
+/* Opt-in compact spacing for list/grid pages (set ViewData["MainClass"]). The GDS 50px gap below
+ * the h1 and below a notification banner is sized for narrow content pages; stacked above a grid
+ * it pushes the first row well below the fold. One 20px row of separation is enough. */
+.app-page--compact > .govuk-heading-xl,
+.app-page--compact > .govuk-notification-banner,
+.app-page--compact > .govuk-error-summary {
+    margin-bottom: 20px;
+}
+
+.app-page--compact > .govuk-form-group {
+    margin-bottom: 15px;
+}
+
+/* Marks the row just added/updated, so landing mid-list after a save is self-explanatory. The tint
+ * is applied per cell (a <tr> background is painted under the cells and would not show) and must
+ * stay background-only — a left accent bar drawn per cell appears between every column, and drawn
+ * on the first cell alone it sits over the text, since govuk-table gives it no left padding. */
+.app-table__row--saved > .govuk-table__cell {
+    background-color: #e8f2ea;
+    border-bottom: 2px solid #00703c;
+}
+
 /* A long, unbroken Comment paragraph (SubmissionDetails/BlockDetails tissue tables) otherwise grows
  * the column with no limit, squeezing the adjacent Actions column until its Edit/Delete
  * govuk-button-group runs out of room and wraps the buttons onto separate lines. */
@@ -192,38 +225,110 @@
 
 /* User Maintenance table columns were sized purely by the longest value on the current page, so
  * paging/sorting to a row with a much longer/shorter name or email visibly widened or shrank the
- * whole table. Fixed explicit column widths keep the layout stable across pages. Long values WRAP
- * onto multiple lines rather than being clipped with an ellipsis — truncating a user's actual
- * name/email and relying on a title="" tooltip to reveal the rest fails WCAG 1.4.13 (Content on
- * Hover or Focus: not touch/keyboard/screen-reader accessible) and isn't a pattern GDS tables use. */
-#user-maintenance-table {
-    table-layout: fixed;
-    width: 100%;
-}
-
-#user-maintenance-table th,
-#user-maintenance-table td {
-    overflow-wrap: break-word;
-    word-break: break-word;
-}
-
+ * whole table. Per-column min-widths keep the layout broadly stable across pages while still
+ * letting a column grow for an unusually long value — table-layout:fixed cannot be used here
+ * because cells must not wrap, and fixed columns make non-wrapping text spill into the next
+ * column. The .app-table-responsive wrapper scrolls when the total exceeds the page width. */
 #user-maintenance-table th:nth-child(1),
-#user-maintenance-table td:nth-child(1) { width: 22%; }
+#user-maintenance-table td:nth-child(1) { min-width: 180px; }
 
 #user-maintenance-table th:nth-child(2),
-#user-maintenance-table td:nth-child(2) { width: 28%; }
+#user-maintenance-table td:nth-child(2) { min-width: 200px; }
 
 #user-maintenance-table th:nth-child(3),
-#user-maintenance-table td:nth-child(3) { width: 18%; }
+#user-maintenance-table td:nth-child(3) { min-width: 140px; }
 
 #user-maintenance-table th:nth-child(4),
-#user-maintenance-table td:nth-child(4) { width: 16%; }
+#user-maintenance-table td:nth-child(4) { min-width: 140px; }
 
 #user-maintenance-table th:nth-child(5),
-#user-maintenance-table td:nth-child(5) { width: 8%; }
+#user-maintenance-table td:nth-child(5) { min-width: 70px; }
 
 #user-maintenance-table th:nth-child(6),
-#user-maintenance-table td:nth-child(6) { width: 8%; }
+#user-maintenance-table td:nth-child(6) { min-width: 80px; }
+
+/* Legacy BSE-style sliding-window pagination: << < [1 2 3 ... 10] > >> plus a
+ * "Page X of Y" summary, used by both _Pagination (links) and _PaginationPost (form-
+ * submitting buttons), so every selector below has to cover <a> and <button> alike. */
+.app-pagination-window {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: inherit;
+}
+
+.app-pagination-window button {
+    background: none;
+    border: 0;
+    margin: 0;
+    font: inherit;
+    cursor: pointer;
+}
+
+.app-pagination-window button:disabled {
+    cursor: default;
+}
+
+.app-pagination-window a:focus,
+.app-pagination-window button:focus {
+    outline: 3px solid transparent;
+    color: #0b0c0c;
+    background-color: #ffdd00;
+    box-shadow: 0 -2px #ffdd00, 0 4px #0b0c0c;
+    text-decoration: none;
+}
+
+.app-pagination-window__nav-link {
+    color: #1d70b8;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 1.1em;
+    padding: 2px 4px;
+}
+
+.app-pagination-window__nav-link:hover {
+    color: #003078;
+    text-decoration: underline;
+}
+
+.app-pagination-window__nav-link--disabled,
+.app-pagination-window__nav-link:disabled {
+    color: #b1b4b6;
+    pointer-events: none;
+}
+
+.app-pagination-window__list {
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    gap: 10px;
+}
+
+.app-pagination-window__item a,
+.app-pagination-window__item button {
+    color: #1d70b8;
+    text-decoration: underline;
+    padding: 0;
+}
+
+.app-pagination-window__item a:hover,
+.app-pagination-window__item button:hover {
+    color: #003078;
+}
+
+.app-pagination-window__item--current span {
+    font-weight: bold;
+    color: #0b0c0c;
+}
+
+.app-pagination-window__summary {
+    margin: 0 0 0 15px;
+    color: #1d70b8;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
 
 
 

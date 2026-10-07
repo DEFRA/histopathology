@@ -6,7 +6,7 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Admin/UserMaintenance" asp-route-returnUrl="@Model.SafeReturnUrl" class="govuk-back-link">Back</a>
+    <a asp-page="/Admin/UserMaintenance" asp-route-returnUrl="@Model.SafeReturnUrl" asp-route-sortColumn="@Model.SortColumn" asp-route-sortDesc="@Model.SortDesc" asp-route-showDeactivated="@Model.ShowDeactivated" class="govuk-back-link">Back</a>
 }
 
 <partial name="_ErrorSummary" model="Model.Errors" />
@@ -27,6 +27,9 @@
 
 <form method="post" asp-antiforgery="true">
     <input type="hidden" asp-for="ReturnUrl" />
+    <input type="hidden" asp-for="SortColumn" />
+    <input type="hidden" asp-for="SortDesc" />
+    <input type="hidden" asp-for="ShowDeactivated" />
     <div class="govuk-form-group @(Model.Errors.ContainsKey("Name") ? "govuk-form-group--error" : "")">
         <label class="govuk-label" for="Name">Name</label>
         @if (Model.Errors.TryGetValue("Name", out var nameError))
@@ -82,6 +85,6 @@
     </div>
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Save changes</button>
-        <a asp-page="/Admin/UserMaintenance" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+        <a asp-page="/Admin/UserMaintenance" asp-route-returnUrl="@Model.SafeReturnUrl" asp-route-sortColumn="@Model.SortColumn" asp-route-sortDesc="@Model.SortDesc" asp-route-showDeactivated="@Model.ShowDeactivated" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
     </div>
 </form>
