@@ -29,8 +29,20 @@
         </div>
     </dl>
 
-    <form method="post" asp-page-handler="View">
-        <input type="hidden" name="newBatchId" value="@Model.NewBatchId" />
-        <button type="submit" class="govuk-button" data-module="govuk-button">View submission</button>
-    </form>
+    <div class="govuk-button-group">
+        <form method="post" asp-page-handler="View">
+            <input type="hidden" name="newBatchId" value="@Model.NewBatchId" />
+            <button type="submit" class="govuk-button" data-module="govuk-button">View submission</button>
+        </form>
+
+        <form method="post" asp-page-handler="Samples">
+            <input type="hidden" name="newBatchId" value="@Model.NewBatchId" />
+            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples</button>
+        </form>
+
+        <form method="post" asp-page-handler="Edit">
+            <input type="hidden" name="newBatchId" value="@Model.NewBatchId" />
+            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Edit submission</button>
+        </form>
+    </div>
 }

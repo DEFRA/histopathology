@@ -19,9 +19,10 @@ namespace Histo.Web.Pages.Submissions;
 /// (Print Submission, Print Submission Notes, Copy Submission, Edit Submission,
 /// View Submission, Date Returned) on row click, with availability gated by
 /// batch status (<c>grdviewResults_SelectedIndexChanged</c>).
-/// <see cref="OnPostSelectAsync"/> reproduces this behaviour — it stores
-/// <see cref="ISessionService.BatchID"/>, re-runs the search and returns
-/// <c>Page()</c> so the action panel renders below the results table.
+/// <see cref="OnPostSelect"/> reproduces this behaviour — it stores
+/// <see cref="ISessionService.BatchID"/> and redirects back here with the selection
+/// in the query string, so the action panel renders below the results table and the
+/// browser's Back button never has a POST to replay.
 /// </summary>
 public class ViewSubmissionsModel : HistoPageModel
 {
@@ -130,10 +131,13 @@ public class ViewSubmissionsModel : HistoPageModel
 
     /// <summary>
     /// ID of the currently selected result row.
-    /// Bound from the per-row Select button value via <see cref="OnPostSelectAsync"/>.
+    /// Bound from the per-row Select button value via <see cref="OnPostSelect"/>.
     /// Mirrors legacy <c>grdviewResults.DataKeys(SelectedIndex)</c>.
     /// </summary>
-    [BindProperty] public int SelectedBatchId { get; set; }
+    [BindProperty(SupportsGet = true)] public int SelectedBatchId { get; set; }
+
+    /// <summary>Survives the Select redirect so the filtered grid can be rebuilt on the follow-up GET.</summary>
+    private const string CriteriaKey = "ViewSubmissions_Criteria";
 
     public IReadOnlyList<User>              Users       { get; private set; } = [];
     public IReadOnlyList<LookupItem>        Projects    { get; private set; } = [];
@@ -145,7 +149,7 @@ public class ViewSubmissionsModel : HistoPageModel
 
     /// <summary>
     /// <see cref="BatchStatus"/> code of the selected row, or <c>null</c> when no row selected.
-    /// Evaluated after search re-runs in <see cref="OnPostSelectAsync"/>.
+    /// Evaluated after the search re-runs on the GET that follows <see cref="OnPostSelect"/>.
     /// </summary>
     public string? SelectedBatchStatus => Results.FirstOrDefault(r => r.ID == SelectedBatchId)?.Status;
 
@@ -184,6 +188,7 @@ public class ViewSubmissionsModel : HistoPageModel
     {
         ViewData["Title"] = "View submissions";
         ViewData["PageTitle"] = "View submissions";
+        RestoreCriteria();
         var lookupsTask = LoadLookupsAsync();
         // Show the unfiltered list on first load, matching legacy — a search isn't mandatory
         // before the user sees any submissions.
@@ -191,6 +196,10 @@ public class ViewSubmissionsModel : HistoPageModel
         await Task.WhenAll(lookupsTask, resultsTask);
         Results  = await resultsTask;
         Searched = true;
+
+        if (SelectedBatchId > 0)
+            HasNotes = await SubmissionNotesHelper.HasAnyNotesAsync(SelectedBatchId, _batches, _blocks, _submissions, _tests);
+
         PopulateGridViewData();
     }
 
@@ -211,32 +220,53 @@ public class ViewSubmissionsModel : HistoPageModel
     /// <summary>
     /// Row selection handler. Stores the selected batch ID in session so that
     /// downstream pages (BatchDetails, EditBatch, CopyBatch, ReceiveBatch) load
-    /// the correct batch on their next GET. Re-runs the search so the results
-    /// table and action panel render together in the same response, matching
-    /// the legacy <c>grdviewResults_SelectedIndexChanged</c> postback behaviour.
+    /// the correct batch on their next GET, then redirects so the history entry is a GET —
+    /// returning here with the browser's Back button previously landed on an unreplayable POST.
     /// </summary>
-    public async Task<IActionResult> OnPostSelectAsync()
+    public IActionResult OnPostSelect()
     {
-        ViewData["Title"] = "View submissions";
-        ViewData["PageTitle"] = "View submissions";
-        var lookupsTask = LoadLookupsAsync();
-        var resultsTask = _batches.SearchAsync(BuildCriteria());
-        await Task.WhenAll(lookupsTask, resultsTask);
-
         if (SelectedBatchId > 0)
         {
             Session.BatchID     = SelectedBatchId;
             Session.ReturnPage  = "/Submissions/ViewSubmissions";  // GAP-3: context-aware back link on BatchDetails
             Session.EditBatchReturnPage = null; // this entry point owns EditBatch's return target, not any stale Edit Submission Status detour
             Session.IsViewSubmissionMode = true;
-
-            HasNotes = await SubmissionNotesHelper.HasAnyNotesAsync(SelectedBatchId, _batches, _blocks, _submissions, _tests);
         }
 
-        Results  = await resultsTask;
-        Searched = true;
-        PopulateGridViewData();
-        return Page();
+        StashCriteria();
+        return RedirectToPage(new { SelectedBatchId, SortColumn, SortDesc, PageNumber });
+    }
+
+    /// <summary>Keeps the posted filters for the redirect that follows a Select.</summary>
+    private void StashCriteria()
+    {
+        TempData[CriteriaKey] = System.Text.Json.JsonSerializer.Serialize(BuildCriteria());
+    }
+
+    private void RestoreCriteria()
+    {
+        if (TempData.Peek(CriteriaKey) is not string json) return;
+        TempData.Keep(CriteriaKey); // survives Back/Forward returning to this same URL
+
+        BatchSearchCriteria? criteria;
+        try { criteria = System.Text.Json.JsonSerializer.Deserialize<BatchSearchCriteria>(json); }
+        catch (System.Text.Json.JsonException) { TempData.Remove(CriteriaKey); return; }
+        if (criteria is null) return;
+
+        SubmissionNumber    = criteria.SubmissionNumber;
+        Status              = criteria.Status;
+        ProjectContractCode = criteria.ProjectContractCode;
+        ContactName         = criteria.ContactName;
+        Species             = criteria.Species;
+        Fixation            = criteria.Fixation;
+        SubmittedBy         = criteria.SubmittedBy;
+        EnteredBy           = criteria.EnteredBy;
+        HistologyRef        = criteria.HistologyRef;
+        SenderRef           = criteria.SenderRef;
+        SubmittedDateFrom   = criteria.SubmittedDateFrom;
+        SubmittedDateTo     = criteria.SubmittedDateTo;
+        ReceivedDateFrom    = criteria.ReceivedDateFrom;
+        ReceivedDateTo      = criteria.ReceivedDateTo;
     }
 
     /// <summary>

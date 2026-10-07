@@ -484,6 +484,9 @@ public sealed class SubmissionRepository : ISubmissionRepository
             TissueCode = source.TissueCode,
             NoPieces = source.NoPieces,
             Comment = source.Comment,
+            ArchiveLocation = source.ArchiveLocation,
+            ArchivedDate = source.ArchivedDate,
+            ArchiveComment = source.ArchiveComment,
         };
 
         return await AddTissueAsync(conn, tx, tissue);
@@ -500,6 +503,13 @@ public sealed class SubmissionRepository : ISubmissionRepository
         parameters.Add("TissueCode", tissue.TissueCode);
         parameters.Add("NoPieces", tissue.NoPieces);
         parameters.Add("Comment", (object?)tissue.Comment ?? DBNull.Value, dbType: System.Data.DbType.String);
+
+        if (tissue.Owner == TissueOwner.Submission)
+        {
+            parameters.Add("ArchiveLocation", (object?)tissue.ArchiveLocation ?? DBNull.Value, dbType: System.Data.DbType.String);
+            parameters.Add("ArchivedDate", (object?)tissue.ArchivedDate ?? DBNull.Value, dbType: System.Data.DbType.DateTime);
+            parameters.Add("ArchiveComment", (object?)tissue.ArchiveComment ?? DBNull.Value, dbType: System.Data.DbType.String);
+        }
 
         await conn.ExecuteAsync(procName, parameters, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
         return parameters.Get<int>("RETURN_VALUE");
@@ -786,9 +796,13 @@ public sealed class SubmissionRepository : ISubmissionRepository
         parameters.Add("TissueCode", tissue.TissueCode);
         parameters.Add("NoPieces", tissue.NoPieces);
         parameters.Add("Comment", (object?)tissue.Comment ?? DBNull.Value, dbType: System.Data.DbType.String);
-        // Legacy source: clsTissue.vb::UpdateTissueDetails — AddInsertParam list is
-        // {keyField, TissueCode, NoPieces, Comment} only. No @UserID parameter on
-        // AddTissue/AddBlockTissue (UserID is only an AddUpdateParam, used by Edit/Delete).
+
+        if (tissue.Owner == TissueOwner.Submission)
+        {
+            parameters.Add("ArchiveLocation", (object?)tissue.ArchiveLocation ?? DBNull.Value, dbType: System.Data.DbType.String);
+            parameters.Add("ArchivedDate", (object?)tissue.ArchivedDate ?? DBNull.Value, dbType: System.Data.DbType.DateTime);
+            parameters.Add("ArchiveComment", (object?)tissue.ArchiveComment ?? DBNull.Value, dbType: System.Data.DbType.String);
+        }
 
         await conn.ExecuteAsync(procName, parameters,
             commandType: System.Data.CommandType.StoredProcedure);
