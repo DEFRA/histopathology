@@ -149,16 +149,10 @@
     width: 100%;
 }
 
-/* Wraps a wide table (many columns/long content) in a horizontally scrollable container instead
- * of letting it overflow past the page width — govuk-table has no built-in responsive behaviour. */
-.app-table-responsive {
-    overflow-x: auto;
-}
-
 /* Keeps each cell on a single line so names, emails and lookup descriptions stay readable and the
- * rows keep a uniform height; the .app-table-responsive wrapper scrolls instead of wrapping.
- * govuk-table is width:100%, which with nowrap forces columns narrower than their content and makes
- * adjacent cells visually collide — min-width lets the table grow past the container instead. */
+ * rows keep a uniform height. Columns size to their content; when the total exceeds the page width
+ * the table simply extends and the browser's own page scrollbar handles it, rather than putting a
+ * second scroller inside the page directly beneath the table. */
 .app-table--nowrap {
     width: auto;
     min-width: 100%;
@@ -176,16 +170,25 @@
     padding-right: 12px;
 }
 
-/* Opt-in compact spacing for list/grid pages (set ViewData["MainClass"]). The GDS 50px gap below
- * the h1 and below a notification banner is sized for narrow content pages; stacked above a grid
- * it pushes the first row well below the fold. One 20px row of separation is enough. */
-.app-page--compact > .govuk-heading-xl,
-.app-page--compact > .govuk-notification-banner,
-.app-page--compact > .govuk-error-summary {
+/* Opt-in layout for list/grid pages (set ViewData["PageClass"]).
+ *
+ * Width: govuk-width-container caps content at 960px, which suits prose but not a grid — a row at
+ * the column maxima (35-char Name, 60-char Email) needs ~1217px on one line, so the cap guarantees
+ * a scrollbar no matter how the columns are sized. Grid pages use the full browser width instead.
+ *
+ * Spacing: the GDS 50px gap below the h1 and below a notification banner pushes the first row well
+ * below the fold when stacked above a grid. One 20px row of separation is enough. */
+.app-page--grid {
+    max-width: none;
+}
+
+.app-page--grid > .govuk-main-wrapper > .govuk-heading-xl,
+.app-page--grid > .govuk-main-wrapper > .govuk-notification-banner,
+.app-page--grid > .govuk-main-wrapper > .govuk-error-summary {
     margin-bottom: 20px;
 }
 
-.app-page--compact > .govuk-form-group {
+.app-page--grid > .govuk-main-wrapper > .govuk-form-group {
     margin-bottom: 15px;
 }
 
