@@ -151,80 +151,12 @@ public class CopyBatchModel : HistoPageModel
             return Page();
         }
 
-        var userId = Session.UserID;
-        var batchToCopy = new Batch
-        {
-            // A copy always starts a fresh receipt cycle, regardless of the source's status.
-            Status              = BatchStatus.Submitted,
-            Comments            = SourceBatch.Comments,
-            SubmittedByUserID   = SourceBatch.SubmittedByUserID,
-            UserAreaCode        = SourceBatch.UserAreaCode,
-            IsPreCassetted      = SourceBatch.IsPreCassetted,
-            BatchType           = SourceBatch.BatchType,
-            ProjectContractCode = SourceBatch.ProjectContractCode,
-            ContactName         = SourceBatch.ContactName,
-            Species             = SourceBatch.Species,
-            BatchDate           = SourceBatch.BatchDate,
-            Fixation            = SourceBatch.Fixation,
-            SafeToHandle        = SourceBatch.SafeToHandle,
-            OtherSubmittedBy    = SourceBatch.OtherSubmittedBy,
-            OtherSubmittedArea  = SourceBatch.OtherSubmittedArea ?? "",
-        };
-        var newBatchId = await _batches.CopyBatchHeaderAsync(batchToCopy, userId);
-        if (newBatchId <= 0)
-        {
-            Error = "Failed to create the new submission.";
-            return Page();
-        }
+        // Nothing is written to the database here — the samples are staged and the user is sent
+        // to the normal Create Submission form, pre-filled from this source batch, so the new
+        // batch (and these samples) are only created once that form is actually submitted.
+        TempData["CopyBatch_PendingCopy"] = JsonSerializer.Serialize(new PendingCopy(SourceBatchId, Animals));
 
-        // Copy batch-level Histology/Antibody/Special Stain test selections onto the new
-        // batch — legacy's CopyBatch() (clsBatch.vb) always copies these tables alongside
-        // the batch header; the new batch acts as a template for its blocks/samples the
-        // same way the original does.
-        var sourceSelections = await _batches.GetBatchTestSelectionsAsync(SourceBatchId);
-        await _batches.SaveBatchTestSelectionsAsync(
-            newBatchId,
-            sourceSelections.Histology.Select(h => h.Code).ToList(),
-            sourceSelections.Antibodies.Select(a => a.Code).ToList(),
-            sourceSelections.Stains.Select(s => s.Code).ToList(),
-            userId);
-
-        var submissions = await _submissions.GetSubmissionsByBatchAsync(SourceBatchId);
-        var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(SourceBatchId);
-        var animals = blockAnimals.Count > 0 ? blockAnimals : await _submissions.GetAnimalsByBatchAsync(SourceBatchId);
-        var newSenderRefs = Animals.ToDictionary(a => a.AnimalId, a => a.NewSenderRef);
-        // When BatchSubmissionID is absent on the animal, assign to the first submission.
-        var firstSubmId = submissions.Count > 0 ? submissions[0].ID : 0;
-
-        foreach (var submission in submissions)
-        {
-            var tissues = await _submissions.GetTissuesBySubmissionAsync(SourceBatchId, submission.ID);
-
-            var matchedAnimals = animals.Where(a =>
-                a.BatchSubmissionID == submission.ID ||
-                (a.BatchSubmissionID == 0 && submission.ID == firstSubmId));
-
-            // Copy the animal BEFORE creating its destination submission and link the two via
-            // AnimalID — a submission whose AnimalID is never set can't be resolved later by
-            // SubmissionDetailsModel.LoadAnimalAsync, silently breaking Tissue Details on the
-            // copied batch (same root cause fixed in AddSubmissionModel.OnPostAsync).
-            foreach (var animal in matchedAnimals)
-            {
-                var newSenderRef = newSenderRefs.GetValueOrDefault(animal.ID, animal.SenderRef);
-                if (string.IsNullOrWhiteSpace(newSenderRef)) newSenderRef = animal.SenderRef;
-
-                var newAnimalId = await _submissions.CopyAnimalAsync(animal, newBatchSubmissionId: 0, newSenderRef, userId);
-                if (newAnimalId <= 0) continue;
-
-                var newSubmissionId = await _submissions.CopySubmissionAsync(submission, newBatchId, userId, newAnimalId);
-                if (newSubmissionId <= 0) continue;
-
-                foreach (var tissue in tissues)
-                    await _submissions.CopyTissueAsync(tissue, newSubmissionId, userId);
-            }
-        }
-
-        return RedirectToPage("/Batches/CopyBatchSummary", new { newBatchId });
+        return RedirectToPage("/Batches/BatchDetails", new { mode = "create" });
     }
 
     /// <summary>
@@ -260,4 +192,7 @@ public class CopyBatchModel : HistoPageModel
         /// <summary>Tissue detail strings for Scenario 2 (non-cassetted). Empty for Scenario 1.</summary>
         public List<string> TissueDetails { get; set; } = [];
     }
+
+    /// <summary>Staged copy request read by <see cref="Histo.Web.Pages.Batches.BatchDetailsModel"/> once the Create Submission form is submitted.</summary>
+    public sealed record PendingCopy(int SourceBatchId, List<AnimalRow> Samples);
 }

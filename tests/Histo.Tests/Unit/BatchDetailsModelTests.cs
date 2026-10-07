@@ -104,4 +104,94 @@ public class BatchDetailsModelTests
         Assert.Equal("Archive cannot be combined with other histology types.", sut.Errors?["Create_Histology"]);
         _batches.Verify(b => b.AddAsync(It.IsAny<Batch>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    private static Batch MakeSourceBatchForCopy() => new()
+    {
+        ID = 10,
+        ProjectContractCode = "PROJ1",
+        ContactName = "A Contact",
+        Species = "Mouse",
+        Fixation = "Formalin",
+        SafeToHandle = true,
+        OtherSubmittedBy = 3,
+        OtherSubmittedArea = "5",
+        Comments = "source comments",
+        IsPreCassetted = true,
+    };
+
+    /// <summary>
+    /// Verifies the "Copy submission" prefill path: a <see cref="CopyBatchModel.PendingCopy"/>
+    /// staged in TempData by CopyBatchModel.OnPostAsync populates the Create Submission form
+    /// from the source batch instead of the normal blank-form defaults.
+    /// </summary>
+    [Fact]
+    public async Task OnGetAsync_PendingCopyStaged_PrefillsFormFromSourceBatch()
+    {
+        _batches.Setup(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(MakeSourceBatchForCopy());
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(new BatchTestSelections
+        {
+            Histology = [new BatchTestSelectionRow { ID = 1, BatchID = 10, Code = "2" }],
+        });
+        _batches.Setup(b => b.GetSubmittedAsCodeAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync("WT");
+        _lookups.Setup(l => l.GetLookupDataAsync(11, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 99, Code = "WT", Name = "Wet Tissue" }]);
+
+        var sut = CreateSut();
+        sut.Mode = "create";
+        var pending = new CopyBatchModel.PendingCopy(10, [new CopyBatchModel.AnimalRow { AnimalId = 1, SenderRef = "S1" }]);
+        sut.TempData["CopyBatch_PendingCopy"] = System.Text.Json.JsonSerializer.Serialize(pending);
+
+        await sut.OnGetAsync();
+
+        Assert.Equal("PROJ1", sut.Create_ProjectContractCode);
+        Assert.Equal("A Contact", sut.Create_ContactName);
+        Assert.Equal("Mouse", sut.Create_SpeciesId);
+        Assert.Equal(["2"], sut.Create_SelectedHistologyCodes);
+        Assert.Equal("99", sut.TempData["CreateSubmittedAsId"]);
+        Assert.Equal("True", sut.TempData["CreateIsPreCassetted"]);
+    }
+
+    /// <summary>
+    /// Verifies the "Copy submission" consuming path: once the pre-filled Create Submission form
+    /// is actually submitted, the samples staged by CopyBatchModel are copied onto the newly
+    /// created batch (and ONLY those staged — an animal in the source batch that was never part
+    /// of the pending list is left untouched) and the user lands on CopyBatchSummary instead of
+    /// the normal SampleSummary redirect.
+    /// </summary>
+    [Fact]
+    public async Task OnPostCreateAsync_PendingCopyStaged_CopiesStagedSamplesAndRedirectsToCopyBatchSummary()
+    {
+        _batches.Setup(b => b.AddAsync(It.IsAny<Batch>(), 7, It.IsAny<CancellationToken>())).ReturnsAsync(100);
+
+        var stagedAnimal = new Animal { ID = 1, SenderRef = "S1", BatchSubmissionID = 50 };
+        var otherAnimal = new Animal { ID = 2, SenderRef = "S2", BatchSubmissionID = 51 };
+        var sourceSubmission = new BatchSubmission { ID = 50, BatchID = 10, AnimalID = 1, Order = 1 };
+        var otherSubmission = new BatchSubmission { ID = 51, BatchID = 10, AnimalID = 2, Order = 2 };
+        var tissue = new Tissue { ID = 1, OwnerID = 50, TissueCode = "T1" };
+
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[sourceSubmission, otherSubmission]);
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[stagedAnimal, otherAnimal]);
+        _submissions.Setup(s => s.GetTissuesBySubmissionAsync(10, 50, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Tissue>)[tissue]);
+        _submissions.Setup(s => s.CopyAnimalAsync(stagedAnimal, 0, "S1-NEW", 7, It.IsAny<CancellationToken>())).ReturnsAsync(201);
+        _submissions.Setup(s => s.CopySubmissionAsync(sourceSubmission, 100, 7, 201, It.IsAny<CancellationToken>())).ReturnsAsync(301);
+        _submissions.Setup(s => s.CopyTissueAsync(tissue, 301, 7, It.IsAny<CancellationToken>())).ReturnsAsync(401);
+
+        var sut = CreateSut();
+        sut.Create_SelectedHistologyCodes = [HistologyCode.EO];
+        var pending = new CopyBatchModel.PendingCopy(10, [new CopyBatchModel.AnimalRow { AnimalId = 1, SenderRef = "S1", NewSenderRef = "S1-NEW" }]);
+        sut.TempData["CopyBatch_PendingCopy"] = System.Text.Json.JsonSerializer.Serialize(pending);
+
+        var result = await sut.OnPostCreateAsync();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Batches/CopyBatchSummary", redirect.PageName);
+        Assert.Equal(100, redirect.RouteValues!["newBatchId"]);
+        _submissions.Verify(s => s.CopyAnimalAsync(stagedAnimal, 0, "S1-NEW", 7, It.IsAny<CancellationToken>()), Times.Once);
+        _submissions.Verify(s => s.CopyAnimalAsync(otherAnimal, It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 }
