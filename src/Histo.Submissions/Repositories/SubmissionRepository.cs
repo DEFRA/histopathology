@@ -685,7 +685,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
 
         try
         {
-            await conn.ExecuteAsync(
+            await conn.ExecuteAsync(new CommandDefinition(
                 """
                 DELETE bt FROM BlockTissues    bt INNER JOIN BatchBlock b ON b.ID = bt.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
                 DELETE bh FROM BlockHistology  bh INNER JOIN BatchBlock b ON b.ID = bh.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
@@ -711,13 +711,15 @@ public sealed class SubmissionRepository : ISubmissionRepository
                     PreBookedStatus = BlockStatusPreBooked,
                     PreBookedUsedStatus = BlockStatusPreBookedUsed,
                 },
-                tx);
+                transaction: tx,
+                cancellationToken: ct));
 
             await tx.CommitAsync(ct);
         }
         catch
         {
-            await tx.RollbackAsync(ct);
+            // Not ct — a cancelled token must not stop the rollback from running.
+            await tx.RollbackAsync(CancellationToken.None);
             throw;
         }
     }
