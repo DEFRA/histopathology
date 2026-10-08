@@ -17,12 +17,14 @@ public class SubmissionDetailsModel : HistoPageModel
     private const int LookupTissueCode = 9;
 
     private readonly ISubmissionService _submissions;
+    private readonly IBatchService _batches;
     private readonly ILookupService _lookups;
 
-    public SubmissionDetailsModel(ISessionService session, ISubmissionService submissions, ILookupService lookups)
+    public SubmissionDetailsModel(ISessionService session, ISubmissionService submissions, IBatchService batches, ILookupService lookups)
         : base(session)
     {
         _submissions = submissions;
+        _batches = batches;
         _lookups = lookups;
     }
 
@@ -144,6 +146,7 @@ public class SubmissionDetailsModel : HistoPageModel
                 Comment = Comment,
             };
             await _submissions.AddTissueAsync(tissue, Session.UserID);
+            await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
         }
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
     }
@@ -173,6 +176,7 @@ public class SubmissionDetailsModel : HistoPageModel
             RowStamp = existing.RowStamp,
         };
         await _submissions.UpdateTissueAsync(updated, Session.UserID);
+        await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
     }
 
@@ -182,6 +186,7 @@ public class SubmissionDetailsModel : HistoPageModel
         if (redirect is not null) return redirect;
 
         await _submissions.DeleteTissueAsync(tissueId, TissueOwner.Submission, Session.UserID);
+        await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
     }
 

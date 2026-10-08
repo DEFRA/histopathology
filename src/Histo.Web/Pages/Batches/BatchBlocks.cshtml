@@ -128,7 +128,13 @@
                             <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">Select block @b.BlockRef</span></label>
                         </div>
                     </td>
-                    <td class="govuk-table__cell">@Model.SenderRefsByAnimalId.GetValueOrDefault(b.AnimalID, "—")</td>
+                    <td class="govuk-table__cell">
+                        @Model.SenderRefsByAnimalId.GetValueOrDefault(b.AnimalID, "—")
+                        @if (Model.AnimalsWithUnassignedTissues.Contains(b.AnimalID))
+                        {
+                            <strong class="govuk-tag govuk-tag--yellow">Tissues unassigned</strong>
+                        }
+                    </td>
                     <td class="govuk-table__cell">@(Model.HistologyRefsByAnimalId.GetValueOrDefault(b.AnimalID) ?? "—")</td>
                     <td class="govuk-table__cell">@b.BlockRef</td>
                     <td class="govuk-table__cell">

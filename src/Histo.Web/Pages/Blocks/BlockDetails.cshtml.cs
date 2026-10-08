@@ -508,6 +508,7 @@ public class BlockDetailsModel : HistoPageModel
                 Comment = NewTissueComment,
             };
             await _submissions.AddTissueAsync(tissue, Session.UserID);
+            await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
         }
 
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
@@ -516,6 +517,7 @@ public class BlockDetailsModel : HistoPageModel
     public async Task<IActionResult> OnPostDeleteTissueAsync(int tissueId)
     {
         await _submissions.DeleteTissueAsync(tissueId, TissueOwner.Block, Session.UserID);
+        await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
     }
 
@@ -542,6 +544,7 @@ public class BlockDetailsModel : HistoPageModel
             RowStamp = existing.RowStamp,
         };
         await _submissions.UpdateTissueAsync(updated, Session.UserID);
+        await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
     }
 

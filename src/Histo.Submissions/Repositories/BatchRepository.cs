@@ -343,6 +343,122 @@ public sealed class BatchRepository : IBatchRepository
     }
 
     /// <inheritdoc/>
+    public async Task<IReadOnlyCollection<int>> GetAnimalsWithUnassignedTissuesAsync(int batchId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+
+        // GetBatchBlockDetails returns one row per block, so it answers "which animals have a
+        // block", never "which tissues are in a block" — the comparison has to be made against
+        // BlockTissues, mapped back to the owning animal via the block.
+        var blockToAnimal = (await conn.QueryAsync<dynamic>(
+                "GetBatchBlockDetails",
+                new { ID = batchId },
+                commandType: System.Data.CommandType.StoredProcedure))
+            .Select(r => (IDictionary<string, object>)r)
+            .Select(d => (
+                BlockId: d.TryGetValue("ID", out var bid) && bid is not DBNull ? Convert.ToInt32(bid) : 0,
+                AnimalId: d.TryGetValue("AnimalID", out var aid) && aid is not DBNull ? Convert.ToInt32(aid) : 0))
+            .Where(x => x.BlockId > 0 && x.AnimalId > 0)
+            .GroupBy(x => x.BlockId)
+            .ToDictionary(g => g.Key, g => g.First().AnimalId);
+
+        var assignedByAnimal = new Dictionary<int, HashSet<string>>();
+        foreach (var d in (await conn.QueryAsync<dynamic>(
+                "GetBatchBlockTissues",
+                new { ID = batchId },
+                commandType: System.Data.CommandType.StoredProcedure))
+            .Select(r => (IDictionary<string, object>)r))
+        {
+            var blockId = d.TryGetValue("BlockID", out var bid) && bid is not DBNull ? Convert.ToInt32(bid) : 0;
+            if (!blockToAnimal.TryGetValue(blockId, out var animalId)) continue;
+
+            var code = d.TryGetValue("TissueCode", out var tc) && tc is not DBNull ? Convert.ToString(tc)?.Trim() : null;
+            if (string.IsNullOrEmpty(code)) continue;
+
+            if (!assignedByAnimal.TryGetValue(animalId, out var codes))
+                assignedByAnimal[animalId] = codes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            codes.Add(code);
+        }
+
+        var unassigned = new HashSet<int>();
+        foreach (var d in (await conn.QueryAsync<dynamic>(
+                "GetBatchTissues",
+                new { ID = batchId },
+                commandType: System.Data.CommandType.StoredProcedure))
+            .Select(r => (IDictionary<string, object>)r))
+        {
+            var animalId = d.TryGetValue("AnimalID", out var aid) && aid is not DBNull ? Convert.ToInt32(aid) : 0;
+            if (animalId <= 0) continue;
+
+            var code = d.TryGetValue("TissueCode", out var tc) && tc is not DBNull ? Convert.ToString(tc)?.Trim() : null;
+            if (string.IsNullOrEmpty(code)) continue;
+
+            if (!assignedByAnimal.TryGetValue(animalId, out var codes) || !codes.Contains(code))
+                unassigned.Add(animalId);
+        }
+
+        return unassigned;
+    }
+
+    /// <inheritdoc/>
+    public async Task RefreshAllTissuesAssignedAsync(int batchId, int userId, CancellationToken ct = default)
+    {
+        var existing = await GetByIdAsync(batchId, ct);
+        if (existing is null) return;
+
+        using var conn = _db.CreateConnection();
+        var animals = (await conn.QueryAsync<dynamic>(
+                "GetBatchAnimal",
+                new { ID = batchId },
+                commandType: System.Data.CommandType.StoredProcedure))
+            .Select(r => (IDictionary<string, object>)r)
+            .Select(d => d.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0)
+            .Where(id => id > 0)
+            .Distinct()
+            .ToList();
+
+        var unassignedAnimals = await GetAnimalsWithUnassignedTissuesAsync(batchId, ct);
+
+        var allTissuesAssigned = animals.Count > 0 && unassignedAnimals.Count == 0;
+        if (allTissuesAssigned == existing.AllTissuesAssigned) return;
+
+        var updated = new Batch
+        {
+            ID = existing.ID,
+            Status = existing.Status,
+            Comments = existing.Comments,
+            StatusComments = existing.StatusComments,
+            BatchDate = existing.BatchDate,
+            ReceivedDate = existing.ReceivedDate,
+            CompletedDate = existing.CompletedDate,
+            SubmittedByUserID = existing.SubmittedByUserID,
+            UserAreaCode = existing.UserAreaCode,
+            IsPreCassetted = existing.IsPreCassetted,
+            ByPassSort = existing.ByPassSort,
+            RowStamp = existing.RowStamp,
+            BatchType = existing.BatchType,
+            ProjectContractCode = existing.ProjectContractCode,
+            ContactName = existing.ContactName,
+            Species = existing.Species,
+            Fixation = existing.Fixation,
+            CustomerReceivedDate = existing.CustomerReceivedDate,
+            SubmittedBy = existing.SubmittedBy,
+            SubmittedArea = existing.SubmittedArea,
+            OtherSubmittedBy = existing.OtherSubmittedBy,
+            OtherSubmittedArea = existing.OtherSubmittedArea,
+            SafeToHandle = existing.SafeToHandle,
+            IsBlocked = existing.IsBlocked,
+            SampleSameProjects = existing.SampleSameProjects,
+            AllTissuesAssigned = allTissuesAssigned,
+            TimeReceived = existing.TimeReceived,
+            ReceivedBy = existing.ReceivedBy,
+            PostFixationOther = existing.PostFixationOther,
+        };
+
+        await UpdateAsync(updated, userId, ct);
+    }
+
+    /// <inheritdoc/>
     public async Task SetCompletedAsync(int batchId, DateTime completedDate, int userId, CancellationToken ct = default)
     {
         var existing = await GetByIdAsync(batchId, ct);
