@@ -168,6 +168,8 @@ public class BatchBlocksModel : HistoPageModel
     /// </summary>
     public async Task<IActionResult> OnPostDeleteSampleAsync(int animalId)
     {
+        if (IsViewMode) return Forbid();
+
         var redirect = await ResolveBatchAsync();
         if (redirect is not null) return redirect;
 
