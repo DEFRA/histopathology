@@ -146,6 +146,18 @@ public sealed class BatchService : IBatchService
         catch (Exception ex) { _logger.LogError("Failed to set ByPassSort for batch {BatchId}.", ex, batchId); return false; }
     }
 
+    public async Task<IReadOnlyCollection<int>> GetAnimalsWithUnassignedTissuesAsync(int batchId, CancellationToken ct = default)
+    {
+        try { return await _batches.GetAnimalsWithUnassignedTissuesAsync(batchId, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to resolve animals with unassigned tissues for batch {BatchId}.", ex, batchId); return []; }
+    }
+
+    public async Task RefreshAllTissuesAssignedAsync(int batchId, int userId, CancellationToken ct = default)
+    {
+        try { await _batches.RefreshAllTissuesAssignedAsync(batchId, userId, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to refresh all-tissues-assigned flag for batch {BatchId}.", ex, batchId); }
+    }
+
     /// <summary>
     /// Creates a new batch header copied from an existing one — the starting point
     /// for the "Copy batch" workflow. The new batch always starts in Submitted

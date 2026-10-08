@@ -91,6 +91,10 @@ public class BatchBlocksModel : HistoPageModel
     /// <summary>Histology ref keyed by AnimalID, matching legacy's grdBlockSummary "Histology Ref" column.</summary>
     public IReadOnlyDictionary<int, string?> HistologyRefsByAnimalId { get; private set; } = new Dictionary<int, string?>();
 
+    /// <summary>Animals with at least one submission tissue not yet in any of their blocks —
+    /// legacy marked these sender refs with a green asterisk in grdBlockSummary_ItemDataBound.</summary>
+    public IReadOnlyCollection<int> AnimalsWithUnassignedTissues { get; private set; } = [];
+
     public string? ErrorMessage { get; private set; }
 
     /// <summary>Page path for the back link, populated from <see cref="ISessionService.ReturnPage"/>.
@@ -164,14 +168,14 @@ public class BatchBlocksModel : HistoPageModel
     public async Task<IActionResult> OnPostDeleteSampleAsync(int animalId)
     {
         await _submissions.DeleteAnimalAsync(animalId, Session.UserID);
+        await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
         return RedirectToPage(new { batchId = BatchId });
     }
 
     /// <summary>
     /// "Done" — legacy source: <c>BatchBlocks.aspx.vb::btSubmit_Click</c>. Marks the batch blocked,
-    /// transitions status to In progress, and records whether every sample has at least one block
-    /// (a simplified stand-in for legacy's per-tissue "green star" indicator, which tracked at
-    /// individual tissue-piece granularity). Legacy then redirects to <c>FinalPrintBatch.aspx</c>,
+    /// transitions status to In progress, and records whether every sample's tissues have all been
+    /// assigned to a block. Legacy then redirects to <c>FinalPrintBatch.aspx</c>,
     /// now <see cref="Histo.Web.Pages.Batches.PrintSubmissionModel"/>; <see cref="ISessionService.ReturnPage"/>
     /// is set so that page's "Continue" button returns here, matching legacy's <c>SV_RedirectAfterPrint</c>.
     /// </summary>
@@ -180,9 +184,9 @@ public class BatchBlocksModel : HistoPageModel
         var redirect = await ResolveBatchAsync();
         if (redirect is not null) return redirect;
 
-        var blocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
         var animals = await GetAllAnimalsAsync();
-        var allTissuesAssigned = animals.Count > 0 && animals.All(a => blocks.Any(b => b.AnimalID == a.ID));
+        var unassigned = await _batches.GetAnimalsWithUnassignedTissuesAsync(BatchId ?? 0);
+        var allTissuesAssigned = animals.Count > 0 && unassigned.Count == 0;
 
         await _batches.CompleteBlockAssignmentAsync(BatchId ?? 0, allTissuesAssigned, Session.UserID);
         Session.ReturnPage = "/Batches/BatchesReceived";
@@ -196,6 +200,7 @@ public class BatchBlocksModel : HistoPageModel
         var animals = await GetAllAnimalsAsync();
         SenderRefsByAnimalId = animals.ToDictionary(a => a.ID, a => a.SenderRef);
         HistologyRefsByAnimalId = animals.ToDictionary(a => a.ID, a => a.HistologyRef);
+        AnimalsWithUnassignedTissues = await _batches.GetAnimalsWithUnassignedTissuesAsync(BatchId ?? 0);
         await LoadSupportingDataAsync();
     }
 

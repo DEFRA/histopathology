@@ -226,6 +226,20 @@ public interface IBatchRepository
     Task SavePostFixationCodesAsync(int batchId, IReadOnlyList<string> codes, int userId, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns the IDs of every animal in the batch that still has at least one submission-level
+    /// tissue with no matching tissue in any of that animal's blocks.
+    /// Legacy source: <c>BatchBlocks.aspx.vb::grdBlockSummary_ItemDataBound</c> — the per-tissue
+    /// scan that drives the green-star indicator and the <c>AllTissuesAssigned</c> flag.
+    /// </summary>
+    Task<IReadOnlyCollection<int>> GetAnimalsWithUnassignedTissuesAsync(int batchId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Recomputes the batch's <c>AllTissuesAssigned</c> flag from the current block/animal state
+    /// and persists it back to the batch header without changing status.
+    /// </summary>
+    Task RefreshAllTissuesAssignedAsync(int batchId, int userId, CancellationToken ct = default);
+
+    /// <summary>
     /// Marks a batch as having all tissues assigned and transitions status to InProgress.
     /// Updates the AllTissuesAssigned flag and batch status.
     /// Legacy source: <c>BatchSummary.aspx.vb::btSubmit_Click</c>.
