@@ -126,6 +126,40 @@ public sealed class BlockService : IBlockService
     }
 
     /// <summary>
+    /// Claims a pre-booked placeholder (BatchID NULL, Status PreBooked) into a real block for
+    /// <paramref name="batchId"/>, updating the existing row rather than inserting a new one —
+    /// so the ref is retired and <see cref="GetPreBookedByAnimalAsync"/> never returns it again.
+    /// </summary>
+    public async Task<bool> ClaimPreBookedBlockAsync(Block preBooked, int batchId, IEnumerable<int> existingOrders, int userId,
+        string? customerRef = null, string? comment = null, bool repeatBlock = false, CancellationToken ct = default)
+    {
+        var order = BlockHelpers.ComputeNextOrder(existingOrders);
+        var block = new Block
+        {
+            ID          = preBooked.ID,
+            BatchID     = batchId,
+            AnimalID    = preBooked.AnimalID,
+            BlockRef    = preBooked.BlockRef,
+            CustomerRef = customerRef,
+            Comment     = comment,
+            RepeatBlock = repeatBlock,
+            Status      = BlockStatus.PreBookedUsed,
+            Order       = order,
+        };
+
+        try
+        {
+            await _repo.SaveAsync(block, userId, ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to claim pre-booked block {BlockRef} for animal {AnimalId}.", ex, preBooked.BlockRef, preBooked.AnimalID);
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Creates a copy of an existing block on a target animal, computing the next
     /// free block reference for that animal from <paramref name="existingBlockRefs"/>.
     /// Used by the "Copy blocks" and "Copy samples" workflows.
