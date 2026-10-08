@@ -116,4 +116,21 @@ public interface ILookupRepository
     /// <c>SubmissionDetailsBlock.aspx.vb::LoadLookupLists</c>'s <c>ddlHistologyType</c>.
     /// </summary>
     Task<IReadOnlyList<LookupItem>> GetHistologyRefTypesAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns all rows from the Species pick-list admin screen's <c>GettlkpSpecies</c>
+    /// stored procedure (<c>SpeciesID</c>/<c>Species</c>/<c>CommonName</c>). Distinct from
+    /// <see cref="GetSpeciesLookupAsync"/>, which reads <c>GetluSpecies</c> for general
+    /// app-wide dropdown use and doesn't carry <c>CommonName</c>.
+    /// </summary>
+    Task<IReadOnlyList<SpeciesItem>> GetSpeciesItemsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Inserts a new row via <c>AddtlkpSpecies</c>. <paramref name="speciesId"/> is a plain
+    /// (non-identity) primary key — the SP requires the caller to supply the next available ID.
+    /// </summary>
+    Task AddSpeciesItemAsync(int speciesId, string species, string? commonName, CancellationToken ct = default);
+
+    /// <summary>Updates an existing row via <c>EdittlkpSpecies</c>, which also writes AuditLog entries.</summary>
+    Task UpdateSpeciesItemAsync(int speciesId, string species, string? commonName, int userId, CancellationToken ct = default);
 }

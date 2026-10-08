@@ -1,6 +1,8 @@
 @using Histo.Core.Domain
 @*
-    Shared GOV.UK Design System pagination component.
+    Shared pagination component: « (First) ‹ (Previous) [sliding block of page numbers,
+    e.g. 1-10 then 11-20] › (Next) » (Last), with a "Page X of Y" summary — the legacy
+    BSE/DataGridPager numbering style used across every grid in this application.
 
     Usage (render immediately after </table>):
         <partial name="_Pagination" />
@@ -8,6 +10,9 @@
     Requires ViewData["CurrentPage"], ViewData["TotalPages"] and ViewData["SortBase"]
     (plus ViewData["SortColumn"]/["SortDesc"] if the grid is sortable) to have been
     set on the page before the table (see GridPageModel.PopulateGridViewData).
+
+    For grids whose filters are POST-bound rather than query-string bound, use
+    _PaginationPost instead — it renders the same control as form-submitting buttons.
 *@
 @{
     var currentPage = ViewData["CurrentPage"] as int? ?? 1;
@@ -32,49 +37,34 @@
 }
 @if (totalPages > 1)
 {
-    <nav class="govuk-pagination" aria-label="Pagination">
-        @if (currentPage > 1)
-        {
-            <div class="govuk-pagination__prev">
-                <a class="govuk-link govuk-pagination__link" href="@BuildHref(currentPage - 1)" rel="prev">
-                    <svg class="govuk-pagination__icon govuk-pagination__icon--prev" xmlns="http://www.w3.org/2000/svg" height="13" width="15" aria-hidden="true" focusable="false" viewBox="0 0 15 13">
-                        <path d="m6.5938-0.0078125-6.6157 6.5947 6.6157 6.6183 1.4142-1.4142-4.2005-4.2021 4.2005-4.2005-1.4142-1.4142z"></path>
-                    </svg>
-                    <span class="govuk-pagination__link-title">Previous</span>
-                </a>
-            </div>
-        }
-        <ul class="govuk-pagination__list">
-            @foreach (var item in PaginationHelpers.BuildPageItems(currentPage, totalPages))
+    <nav class="app-pagination-window" aria-label="Pagination">
+        <a class="app-pagination-window__nav-link @(currentPage == 1 ? "app-pagination-window__nav-link--disabled" : "")"
+           href="@(currentPage == 1 ? "#" : BuildHref(1))" aria-label="First page" title="First page">&laquo;</a>
+        <a class="app-pagination-window__nav-link @(currentPage == 1 ? "app-pagination-window__nav-link--disabled" : "")"
+           href="@(currentPage == 1 ? "#" : BuildHref(currentPage - 1))" aria-label="Previous page" title="Previous page">&lsaquo;</a>
+        <a class="app-pagination-window__nav-link @(currentPage == totalPages ? "app-pagination-window__nav-link--disabled" : "")"
+           href="@(currentPage == totalPages ? "#" : BuildHref(currentPage + 1))" aria-label="Next page" title="Next page">&rsaquo;</a>
+        <a class="app-pagination-window__nav-link @(currentPage == totalPages ? "app-pagination-window__nav-link--disabled" : "")"
+           href="@(currentPage == totalPages ? "#" : BuildHref(totalPages))" aria-label="Last page" title="Last page">&raquo;</a>
+
+        <ul class="app-pagination-window__list">
+            @foreach (var pageNum in PaginationHelpers.BuildSlidingWindow(currentPage, totalPages))
             {
-                if (item.IsEllipsis)
+                if (pageNum == currentPage)
                 {
-                    <li class="govuk-pagination__item govuk-pagination__item--ellipses">&ctdot;</li>
-                }
-                else if (item.Page == currentPage)
-                {
-                    <li class="govuk-pagination__item govuk-pagination__item--current">
-                        <a class="govuk-link govuk-pagination__link" href="@BuildHref(item.Page.Value)" aria-label="Page @item.Page" aria-current="page">@item.Page</a>
+                    <li class="app-pagination-window__item app-pagination-window__item--current">
+                        <span aria-current="page">@pageNum</span>
                     </li>
                 }
                 else
                 {
-                    <li class="govuk-pagination__item">
-                        <a class="govuk-link govuk-pagination__link" href="@BuildHref(item.Page!.Value)" aria-label="Page @item.Page">@item.Page</a>
+                    <li class="app-pagination-window__item">
+                        <a href="@BuildHref(pageNum)" aria-label="Page @(pageNum)">@pageNum</a>
                     </li>
                 }
             }
         </ul>
-        @if (currentPage < totalPages)
-        {
-            <div class="govuk-pagination__next">
-                <a class="govuk-link govuk-pagination__link" href="@BuildHref(currentPage + 1)" rel="next">
-                    <span class="govuk-pagination__link-title">Next</span>
-                    <svg class="govuk-pagination__icon govuk-pagination__icon--next" xmlns="http://www.w3.org/2000/svg" height="13" width="15" aria-hidden="true" focusable="false" viewBox="0 0 15 13">
-                        <path d="m8.107-0.0078125-1.4142 1.4142 4.2005 4.2005-4.2005 4.2021 1.4142 1.4142 6.6157-6.6183-6.6157-6.5947z"></path>
-                    </svg>
-                </a>
-            </div>
-        }
+
+        <p class="app-pagination-window__summary">Page @currentPage of @totalPages</p>
     </nav>
 }

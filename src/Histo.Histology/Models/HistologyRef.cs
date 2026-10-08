@@ -76,4 +76,46 @@ public static class HistologyRefTypeCode
     public const int GeneralPool = 4;
     public const int MouseProjects = 5;
     public const int UsePgNumber = 6;
+
+    /// <summary>
+    /// Classifies an existing histology ref (e.g. "23/01234") by the number range of its last 5
+    /// digits. Returns <see langword="null"/> when the ref is blank or outside all known ranges
+    /// (e.g. an "HP" ref). Legacy source: CopyBlocks.aspx.vb::GetNextHistoNumber.
+    /// </summary>
+    public static int? FromExistingRef(string? histologyRef)
+    {
+        // Trimmed: the column is varchar and some rows carry trailing spaces, which otherwise
+        // shift the last-5-character window and fail to parse.
+        var trimmed = histologyRef?.Trim();
+        if (string.IsNullOrEmpty(trimmed) || trimmed.Length < 5) return null;
+        if (!int.TryParse(trimmed[^5..], out var number)) return null;
+
+        return number switch
+        {
+            >= 10000 and < 20000 => Neuropath,
+            >= 20000 and < 30000 => AbattoirSurvey,
+            >= 30000 and < 40000 => TBDiagnostic,
+            >= 40000 and < 60000 => GeneralPool,
+            >= 60000 and < 90000 => MouseProjects,
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// The inclusive lower and exclusive upper number bound for a type. Returns <see langword="false"/>
+    /// for types with no range of their own (e.g. <see cref="UsePgNumber"/>).
+    /// </summary>
+    public static bool TryGetRange(int histologyType, out int lowerInclusive, out int upperExclusive)
+    {
+        (lowerInclusive, upperExclusive) = histologyType switch
+        {
+            Neuropath      => (10000, 20000),
+            AbattoirSurvey => (20000, 30000),
+            TBDiagnostic   => (30000, 40000),
+            GeneralPool    => (40000, 60000),
+            MouseProjects  => (60000, 90000),
+            _              => (0, 0),
+        };
+        return upperExclusive > 0;
+    }
 }

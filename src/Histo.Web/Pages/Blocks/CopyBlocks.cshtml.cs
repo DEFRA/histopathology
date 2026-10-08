@@ -14,26 +14,30 @@ namespace Histo.Web.Pages.Blocks;
 /// <see cref="Histo.Web.Pages.Batches.BatchBlocksModel"/> (batch-wide) onto one
 /// or more other samples in the same batch, duplicating each block's tissues.
 ///
-/// SIMPLIFIED: the legacy page also offered an "auto-generate histology ref"
-/// option for the target samples (<c>cbAutoGenerateHisto</c>, PG-number reversal,
-/// neuropath range lookups). That histology-ref generation is not reproduced —
-/// target samples keep whatever histology reference they already have. See
-/// <see cref="Histo.Submissions.Services.SubmissionService.CopyAnimalAsync"/> and
-/// <c>AnimalHelpers.ComputePgAutoHistologyRef</c> for the equivalent logic used
-/// elsewhere, which could be wired in here in a follow-on phase if required.
+/// Also reproduces legacy's <c>cbAutoGenerateHisto</c> "Auto Generate Histology Refs" option:
+/// when ticked, every target sample that doesn't already have a histology ref is assigned the
+/// next available ref of the same type as the source sample's own ref. The PG-number-reversal
+/// fallback (<c>DefaultHistoRefPGReverse</c>) is NOT reproduced — that path was deliberately
+/// removed app-wide with the Neuropath/Mouse Bioassay area (see
+/// docs/Mouse-Bioassay-Neuropath-Removal-Analysis.md); only the counter-draw path applies here.
 /// </summary>
 public class CopyBlocksModel : HistoPageModel
 {
     private readonly IBlockService _blocks;
     private readonly ISubmissionService _submissions;
     private readonly IBatchService _batches;
+    private readonly IHistologyRefService _histologyRefs;
+    private readonly IBlockTestService _blockTests;
 
-    public CopyBlocksModel(ISessionService session, IBlockService blocks, ISubmissionService submissions, IBatchService batches)
+    public CopyBlocksModel(ISessionService session, IBlockService blocks, ISubmissionService submissions,
+        IBatchService batches, IHistologyRefService histologyRefs, IBlockTestService blockTests)
         : base(session)
     {
         _blocks = blocks;
         _submissions = submissions;
         _batches = batches;
+        _histologyRefs = histologyRefs;
+        _blockTests = blockTests;
     }
 
     [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
@@ -47,6 +51,9 @@ public class CopyBlocksModel : HistoPageModel
 
     [BindProperty] public List<int> BlockIds { get; set; } = [];
     [BindProperty] public List<int> TargetAnimalIds { get; set; } = [];
+
+    /// <summary>Legacy <c>cbAutoGenerateHisto</c> — "Auto Generate Histology Refs".</summary>
+    [BindProperty] public bool AutoGenerateHistologyRefs { get; set; }
 
     public IReadOnlyList<Block> SourceBlocks { get; private set; } = [];
     public IReadOnlyList<Animal> TargetAnimals { get; private set; } = [];
@@ -100,44 +107,80 @@ public class CopyBlocksModel : HistoPageModel
         var userId = Session.UserID;
         var allBlocks = await _blocks.GetByBatchAsync(batchId.Value);
         var sourceBlocks = allBlocks.Where(b => BlockIds.Contains(b.ID)).ToList();
+        var allTests = await _blockTests.GetAllSelectionsByBatchAsync(batchId.Value);
+        var animals = await GetAllAnimalsAsync(batchId.Value);
+        var sourceAnimal = sourceBlocks.Count > 0
+            ? animals.FirstOrDefault(a => a.ID == sourceBlocks[0].AnimalID)
+            : null;
 
+        var histoRefsAssigned = 0;
+        string? histoRefProblem = null;
+        var histologyType = AutoGenerateHistologyRefs && sourceBlocks.Count > 0
+            ? HistologyRefTypeCode.FromExistingRef(sourceAnimal?.HistologyRef)
+            : null;
+        if (AutoGenerateHistologyRefs && sourceBlocks.Count > 0 && histologyType is null)
+            histoRefProblem = $"No histology refs were generated because the reference type could not be determined from sample {sourceAnimal?.SenderRef ?? "the source sample"}. Give that sample a histology reference first.";
+
+        var skippedExisting = 0;
+        var copiedTo = 0;
         foreach (var targetAnimalId in TargetAnimalIds)
-            await CopyBlocksToAnimalAsync(sourceBlocks, allBlocks, batchId.Value, targetAnimalId, userId);
+        {
+            var target = animals.FirstOrDefault(a => a.ID == targetAnimalId);
+            if (target is null) continue;
 
-        TempData["StatusMessage"] = $"Copied {sourceBlocks.Count} block(s) to {TargetAnimalIds.Count} sample(s).";
+            try
+            {
+                await SampleCopyHelper.CopyBlocksToAnimalAsync(
+                    _blocks, _submissions, _blockTests, sourceBlocks, allBlocks, allTests, batchId.Value, target, userId);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Save what this sample did get (blocks already created, NextBlockRef advanced)
+                // before reporting, so the page reflects the real state of the data.
+                await _submissions.UpdateAnimalAsync(target, userId);
+                Error = copiedTo == 0
+                    ? ex.Message
+                    : $"{ex.Message} {copiedTo} other sample(s) were copied successfully.";
+                await LoadDisplayDataAsync();
+                return Page();
+            }
+
+            // Legacy CopyBlocks.aspx.vb only generates for targets with no ref of their own.
+            var drawRef = histologyType is not null && !target.HistoRefSet;
+            if (histologyType is not null && target.HistoRefSet) skippedExisting++;
+
+            if (drawRef)
+            {
+                var nextRef = await SampleCopyHelper.DrawRefMatchingAsync(_histologyRefs, sourceAnimal?.HistologyRef);
+                if (nextRef is null)
+                {
+                    histoRefProblem = "No more histology references are available for that reference type.";
+                }
+                else
+                {
+                    target.HistologyRef = nextRef;
+                    target.HistoRefSet = true;
+                    histoRefsAssigned++;
+                }
+            }
+
+            // One save per sample — carries both the drawn ref and the advanced NextBlockRef.
+            await _submissions.UpdateAnimalAsync(target, userId);
+            copiedTo++;
+        }
+
+        if (histoRefProblem is null && histoRefsAssigned == 0 && skippedExisting > 0)
+            histoRefProblem = "No histology refs were generated because the selected samples already have one.";
+
+        TempData["StatusMessage"] = $"Copied {sourceBlocks.Count} block(s) to {copiedTo} sample(s)."
+            + (histoRefsAssigned > 0 ? $" Assigned a histology ref to {histoRefsAssigned} sample(s)." : string.Empty)
+            + (histoRefProblem is null ? string.Empty : $" {histoRefProblem}");
         return RedirectToOrigin(batchId.Value);
     }
 
     private IActionResult RedirectToOrigin(int? batchId) => AnimalId is > 0
         ? RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = AnimalId })
         : RedirectToPage("/Batches/BatchBlocks", new { batchId });
-
-    /// <summary>
-    /// Copies each source block (and its tissues) onto the target animal,
-    /// computing each new block's reference and order in sequence so multiple
-    /// copies onto the same animal do not collide.
-    /// </summary>
-    private async Task CopyBlocksToAnimalAsync(
-        IReadOnlyList<Block> sourceBlocks, IReadOnlyList<Block> allBlocks,
-        int batchId, int targetAnimalId, int userId)
-    {
-        var animalBlocks = allBlocks.Where(b => b.AnimalID == targetAnimalId).ToList();
-        var refs = animalBlocks.Select(b => b.BlockRef).ToList();
-        var orders = animalBlocks.Select(b => b.Order).ToList();
-
-        foreach (var sourceBlock in sourceBlocks)
-        {
-            var newBlockId = await _blocks.CopyBlockAsync(sourceBlock, batchId, targetAnimalId, refs, orders, userId);
-            if (newBlockId <= 0) continue;
-
-            refs.Add(BlockHelpers.ComputeNextBlockRef(refs));
-            orders.Add(BlockHelpers.ComputeNextOrder(orders));
-
-            var tissues = await _submissions.GetTissuesByBlockAsync(sourceBlock.BatchID, sourceBlock.ID);
-            foreach (var tissue in tissues)
-                await _submissions.CopyTissueAsync(tissue, newBlockId, userId);
-        }
-    }
 
     /// <summary>Loads <see cref="SourceBlocks"/> and <see cref="TargetAnimals"/>. Returns false if nothing to copy.</summary>
     private async Task<bool> LoadDisplayDataAsync()
@@ -150,9 +193,37 @@ public class CopyBlocksModel : HistoPageModel
         if (SourceBlocks.Count == 0) return false;
 
         var sourceAnimalId = SourceBlocks[0].AnimalID;
-        var animals = await _submissions.GetAnimalsByBatchAsync(batchId);
+        var animals = await GetAllAnimalsAsync(batchId);
         TargetAnimals = animals.Where(a => a.ID != sourceAnimalId).OrderBy(a => a.SenderRef).ToList();
         return true;
+    }
+
+    /// <summary>
+    /// Loads every animal in the batch, merging <c>GetBlockAnimalsByBatchAsync</c> (the only
+    /// source that knows about samples already assigned to a block in a cassetted batch) with
+    /// the plain animal list — mirrors <see cref="Histo.Web.Pages.Batches.BatchBlocksModel"/>'s
+    /// identical merge. Without this, the source sample of a cassetted-batch block copy isn't
+    /// found by <see cref="AssignHistologyRefsAsync"/>, so "Auto generate histology refs" silently
+    /// assigned nothing.
+    /// </summary>
+    private async Task<IReadOnlyList<Animal>> GetAllAnimalsAsync(int batchId)
+    {
+        var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(batchId);
+        var allAnimals = await _submissions.GetAnimalsByBatchAsync(batchId);
+        if (blockAnimals.Count == 0) return allAnimals;
+
+        var seenIds = blockAnimals.Select(a => a.ID).ToHashSet();
+        var missing = allAnimals.Where(a => !seenIds.Contains(a.ID));
+        var merged = (IReadOnlyList<Animal>)[.. blockAnimals, .. missing];
+
+        // GetBlockAnimalsByBatchAsync doesn't carry RowStamp, and EditAnimal's concurrency check
+        // then matches no rows — the histology ref save succeeded silently without saving anything.
+        var plainById = allAnimals.ToDictionary(a => a.ID, a => a);
+        foreach (var animal in merged)
+            if (plainById.TryGetValue(animal.ID, out var plain))
+                animal.RowStamp = plain.RowStamp;
+
+        return merged;
     }
 
     private static List<int> ParseIds(string csv) =>

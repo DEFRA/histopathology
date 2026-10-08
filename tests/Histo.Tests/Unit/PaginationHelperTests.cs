@@ -56,4 +56,49 @@ public class PaginationHelperTests
         var items = PaginationHelpers.BuildPageItems(currentPage: 999, totalPages: 5);
         Assert.Equal([1, null, 4, 5], items.Select(i => i.Page));
     }
+
+    [Fact]
+    public void BuildSlidingWindow_SinglePage_ReturnsJustPageOne()
+    {
+        var window = PaginationHelpers.BuildSlidingWindow(1, 1);
+        Assert.Equal([1], window);
+    }
+
+    [Theory]
+    // Current page keeps 3 pages visible ahead of it, so the window slides one step per page...
+    [InlineData(10, 23, 4)]
+    [InlineData(11, 23, 5)]
+    [InlineData(15, 23, 9)]
+    // ...until it hits either end, where it clamps instead of running past the page count.
+    [InlineData(1, 23, 1)]
+    [InlineData(7, 23, 1)]
+    [InlineData(8, 23, 2)]
+    [InlineData(20, 23, 14)]
+    [InlineData(23, 23, 14)]
+    public void BuildSlidingWindow_PositionsCurrentPageWithThreeAhead(int currentPage, int totalPages, int expectedFirst)
+    {
+        var window = PaginationHelpers.BuildSlidingWindow(currentPage, totalPages);
+        Assert.Equal(Enumerable.Range(expectedFirst, 10), window);
+    }
+
+    [Fact]
+    public void BuildSlidingWindow_FewerPagesThanWindow_ReturnsEveryPage()
+    {
+        var window = PaginationHelpers.BuildSlidingWindow(currentPage: 3, totalPages: 4);
+        Assert.Equal(Enumerable.Range(1, 4), window);
+    }
+
+    [Fact]
+    public void BuildSlidingWindow_OutOfRangePage_ClampsToLastWindow()
+    {
+        var window = PaginationHelpers.BuildSlidingWindow(currentPage: 999, totalPages: 23);
+        Assert.Equal(Enumerable.Range(14, 10), window);
+    }
+
+    [Fact]
+    public void BuildSlidingWindow_CustomWindowSize_RespectsSize()
+    {
+        var window = PaginationHelpers.BuildSlidingWindow(currentPage: 1, totalPages: 10, windowSize: 5);
+        Assert.Equal(Enumerable.Range(1, 5), window);
+    }
 }

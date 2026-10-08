@@ -17,12 +17,33 @@ public sealed class HistologyRepository : IHistologyRepository
     /// <inheritdoc/>
     public async Task<IReadOnlyList<HistologyRef>> GetUnusedRefsAsync(int histologyType, CancellationToken ct = default)
     {
+        // GetUnusedHistologyRefs takes NO parameters and returns the whole pool — passing
+        // @HistologyType made SQL Server reject every call with "too many arguments specified".
+        // The pool table has no type column either; a ref's type is its number range.
+        // It also returns an unaliased "HistologyRef" column, which doesn't match the
+        // HistologyRef.Ref property name, so Dapper's implicit binding leaves Ref blank —
+        // map explicitly instead (same defensive-read pattern as BlockTestRepository's Map()).
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<HistologyRef>(
+        var rows = await conn.QueryAsync(
             "GetUnusedHistologyRefs",
-            new { HistologyType = histologyType },
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+
+        return rows.Select(r =>
+        {
+            var row = (IDictionary<string, object>)r;
+            return new HistologyRef
+            {
+                Ref = row.TryGetValue("HistologyRef", out var refVal) && refVal is not DBNull
+                    ? Convert.ToString(refVal)?.Trim() ?? string.Empty
+                    : string.Empty,
+                HistologyType = histologyType,
+                SenderRef = row.TryGetValue("SenderRef", out var senderVal) && senderVal is not DBNull
+                    ? Convert.ToString(senderVal)
+                    : null,
+            };
+        })
+        .Where(r => HistologyRefTypeCode.FromExistingRef(r.Ref) == histologyType)
+        .ToList();
     }
 
     /// <inheritdoc/>
@@ -77,5 +98,20 @@ public sealed class HistologyRepository : IHistologyRepository
             "EditHistologyRef",
             new { Type = histologyType, NextHistologyRef = newNextHistologyRef, RowStamp = rowStamp },
             commandType: System.Data.CommandType.StoredProcedure);
+    }
+
+    /// <inheritdoc/>
+    public async Task<string?> DrawNextRefAsync(int histologyType, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var p = new DynamicParameters();
+        p.Add("Type", histologyType, dbType: System.Data.DbType.Int32);
+        p.Add("NextHistologyRef", dbType: System.Data.DbType.String, size: 5, direction: System.Data.ParameterDirection.Output);
+        p.Add("RowStamp", dbType: System.Data.DbType.Binary, size: 8, direction: System.Data.ParameterDirection.Output);
+
+        await conn.ExecuteAsync("GetNextHistologyRef", p, commandType: System.Data.CommandType.StoredProcedure);
+
+        var next = p.Get<string?>("NextHistologyRef");
+        return string.IsNullOrWhiteSpace(next) ? null : next.Trim();
     }
 }

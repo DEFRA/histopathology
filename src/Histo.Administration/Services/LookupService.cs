@@ -248,4 +248,48 @@ public sealed class LookupService : ILookupService
             return false;
         }
     }
+
+    /// <summary>Returns all rows from the Species pick-list admin screen (<c>GettlkpSpecies</c>).</summary>
+    public async Task<IReadOnlyList<SpeciesItem>> GetSpeciesItemsAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _lookups.GetSpeciesItemsAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get species items.", ex);
+            return [];
+        }
+    }
+
+    /// <summary>Creates a new Species row via <c>AddtlkpSpecies</c>.</summary>
+    public async Task<bool> AddSpeciesItemAsync(int speciesId, string species, string? commonName, CancellationToken ct = default)
+    {
+        try
+        {
+            await _lookups.AddSpeciesItemAsync(speciesId, species, commonName, ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to add species item {SpeciesId}.", ex, speciesId);
+            return false;
+        }
+    }
+
+    /// <summary>Updates an existing Species row via <c>EdittlkpSpecies</c>.</summary>
+    public async Task<bool> UpdateSpeciesItemAsync(int speciesId, string species, string? commonName, int userId, CancellationToken ct = default)
+    {
+        try
+        {
+            await _lookups.UpdateSpeciesItemAsync(speciesId, species, commonName, userId, ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to update species item {SpeciesId}.", ex, speciesId);
+            return false;
+        }
+    }
 }

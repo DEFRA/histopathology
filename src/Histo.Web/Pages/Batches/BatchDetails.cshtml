@@ -55,6 +55,11 @@
     }
 
     <form method="post" asp-page-handler="Create">
+        @* asp-page-handler makes the tag helper generate an explicit action URL (?handler=Create),
+           which drops the ambient copyToken query string from the GET — without this hidden field
+           a pending "Copy submission" silently looks abandoned on POST and the batch is created
+           with zero samples. *@
+        <input type="hidden" asp-for="CopyToken" />
 
         @* Read-only: Entered By and Entered Area set from current session user — legacy ddlEnteredBy (disabled) *@
         <dl class="govuk-summary-list govuk-!-margin-bottom-4">
@@ -71,6 +76,37 @@
                 <dd class="govuk-summary-list__value">@Model.Session.UserArea</dd>
             </div>
         </dl>
+
+        @if (Model.Create_CopiedSamples.Any())
+        {
+            @* Disclosure rather than a link/button: the samples aren't created until this form is
+               submitted, and navigating away would discard everything typed so far. *@
+            <details class="govuk-details govuk-!-margin-bottom-4">
+                <summary class="govuk-details__summary">
+                    <span class="govuk-details__summary-text">View samples being copied (@Model.Create_CopiedSamples.Count)</span>
+                </summary>
+                <div class="govuk-details__text">
+                    <p class="govuk-body">These samples will be created when you submit this form.</p>
+                    <table class="govuk-table">
+                        <thead class="govuk-table__head">
+                            <tr class="govuk-table__row">
+                                <th scope="col" class="govuk-table__header">Copied from</th>
+                                <th scope="col" class="govuk-table__header">New sender ref</th>
+                            </tr>
+                        </thead>
+                        <tbody class="govuk-table__body">
+                            @foreach (var s in Model.Create_CopiedSamples)
+                            {
+                                <tr class="govuk-table__row">
+                                    <td class="govuk-table__cell">@s.SenderRef</td>
+                                    <td class="govuk-table__cell">@(string.IsNullOrWhiteSpace(s.NewSenderRef) ? s.SenderRef : s.NewSenderRef)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        }
 
         @* Field pairing mirrors the Edit submission page — each pair is its own govuk-grid-row
            using two-thirds/one-third columns so the right field lines up with the "Special

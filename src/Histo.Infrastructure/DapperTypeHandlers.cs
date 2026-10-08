@@ -32,7 +32,11 @@ namespace Histo.Infrastructure;
 /// </remarks>
 public sealed class DateTimeTypeHandler : SqlMapper.TypeHandler<DateTime>
 {
-    private static readonly string[] Formats = ["dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss"];
+    // Some older imported-data stored procedures (e.g. GetAllImportedData, Get2004MOUSESUB) return
+    // unpadded short dates ("9/3/04") instead of CONVERT-103's zero-padded "09/03/2004" — the extra
+    // d/M variants accept both, since custom format specifiers "d"/"M" already match 1 or 2 digits.
+    private static readonly string[] Formats =
+        ["dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss", "d/M/yyyy", "d/M/yyyy HH:mm:ss", "d/M/yy", "d/M/yy HH:mm:ss"];
 
     /// <inheritdoc/>
     public override void SetValue(IDbDataParameter parameter, DateTime value)
@@ -51,7 +55,9 @@ public sealed class DateTimeTypeHandler : SqlMapper.TypeHandler<DateTime>
 
 public sealed class NullableDateTimeTypeHandler : SqlMapper.TypeHandler<DateTime?>
 {
-    private static readonly string[] Formats = ["dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss"];
+    // See DateTimeTypeHandler's Formats comment — same unpadded short-date variants apply here.
+    private static readonly string[] Formats =
+        ["dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss", "d/M/yyyy", "d/M/yyyy HH:mm:ss", "d/M/yy", "d/M/yy HH:mm:ss"];
 
     /// <inheritdoc/>
     public override void SetValue(IDbDataParameter parameter, DateTime? value)

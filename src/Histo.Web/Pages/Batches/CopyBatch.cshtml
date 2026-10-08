@@ -56,20 +56,21 @@
                 </tr>
             </thead>
             <tbody class="govuk-table__body">
-                @for (var i = 0; i < Model.Animals.Count; i++)
+                @foreach (var visibleRow in Model.DisplayRows)
                 {
+                    var primaryRowIndex = visibleRow.RowIndexes.FirstOrDefault();
                     <tr class="govuk-table__row">
-                        <td class="govuk-table__cell">@Model.Animals[i].SenderRef</td>
+                        <td class="govuk-table__cell">@visibleRow.SenderRef</td>
                         <td class="govuk-table__cell">
-                            @if (Model.Animals[i].TissueDetails.Any())
+                            @if (visibleRow.TissueDetails.Any())
                             {
                                 <details class="govuk-details">
                                     <summary class="govuk-details__summary">
-                                        <span class="govuk-details__summary-text">@Model.Animals[i].TissueDetails.Count tissue(s)</span>
+                                        <span class="govuk-details__summary-text">@visibleRow.TissueDetails.Count tissue(s)</span>
                                     </summary>
                                     <div class="govuk-details__text">
                                         <ul class="govuk-list">
-                                            @foreach (var td in Model.Animals[i].TissueDetails)
+                                            @foreach (var td in visibleRow.TissueDetails)
                                             {
                                                 <li>@td</li>
                                             }
@@ -79,16 +80,29 @@
                             }
                         </td>
                         <td class="govuk-table__cell">
-                            <input type="hidden" asp-for="Animals[i].AnimalId" />
-                            <input type="hidden" asp-for="Animals[i].SubmissionId" />
-                            <input type="hidden" asp-for="Animals[i].SenderRef" />
-                            <input class="govuk-input" id="Animals_@(i)__NewSenderRef" asp-for="Animals[i].NewSenderRef" />
+                            @if (!string.IsNullOrWhiteSpace(visibleRow.DisplayNewSenderRef))
+                            {
+                                <span>@visibleRow.DisplayNewSenderRef</span>
+                            }
+                            else
+                            {
+                                <span class="govuk-hint govuk-!-margin-bottom-0">—</span>
+                            }
+
+                            @foreach (var rowIndex in visibleRow.RowIndexes)
+                            {
+                                <input type="hidden" asp-for="Animals[rowIndex].AnimalId" />
+                                <input type="hidden" asp-for="Animals[rowIndex].SubmissionId" />
+                                <input type="hidden" asp-for="Animals[rowIndex].SenderRef" />
+                                <input type="hidden" asp-for="Animals[rowIndex].NewSenderRef" />
+                            }
                         </td>
                         <td class="govuk-table__cell">
                             <button type="submit"
                                     formaction="?handler=Pick"
-                                    name="rowIndex" value="@i"
-                                    class="govuk-link govuk-!-font-size-19">Change</button>
+                                    name="rowIndex" value="@primaryRowIndex"
+                                    class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0"
+                                    data-module="govuk-button">Change</button>
                         </td>
                     </tr>
                 }

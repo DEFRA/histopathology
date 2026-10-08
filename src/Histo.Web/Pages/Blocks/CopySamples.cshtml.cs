@@ -36,13 +36,15 @@ public class CopySamplesModel : HistoPageModel
     private readonly IBatchService _batches;
     private readonly ISubmissionService _submissions;
     private readonly IBlockService _blocks;
+    private readonly IBlockTestService _blockTests;
 
-    public CopySamplesModel(ISessionService session, IBatchService batches, ISubmissionService submissions, IBlockService blocks)
+    public CopySamplesModel(ISessionService session, IBatchService batches, ISubmissionService submissions, IBlockService blocks, IBlockTestService blockTests)
         : base(session)
     {
         _batches = batches;
         _submissions = submissions;
         _blocks = blocks;
+        _blockTests = blockTests;
     }
 
     [BindProperty] public int SourceBatchId { get; set; }
@@ -137,10 +139,34 @@ public class CopySamplesModel : HistoPageModel
 
         var userId = Session.UserID;
         var allTargetBlocks = await _blocks.GetByBatchAsync(currentBatchId);
+        // Source and target are different batches here (unlike same-batch CopyBlocksModel), so the
+        // test selections to copy must be looked up from the source batch, not the target batch.
+        var sourceTests = await _blockTests.GetAllSelectionsByBatchAsync(SourceBatchId);
+        var targetAnimals = await _submissions.GetAnimalsByBatchAsync(currentBatchId);
         var blocksCopied = 0;
 
         foreach (var targetAnimalId in TargetAnimalIds)
-            blocksCopied += await CopyBlocksToAnimalAsync(sourceBlocks, allTargetBlocks, currentBatchId, targetAnimalId, userId);
+        {
+            var target = targetAnimals.FirstOrDefault(a => a.ID == targetAnimalId);
+            if (target is null) continue;
+
+            try
+            {
+                await SampleCopyHelper.CopyBlocksToAnimalAsync(
+                    _blocks, _submissions, _blockTests, sourceBlocks, allTargetBlocks, sourceTests, currentBatchId, target, userId);
+            }
+            catch (InvalidOperationException ex)
+            {
+                await _submissions.UpdateAnimalAsync(target, userId);
+                Error = blocksCopied == 0
+                    ? ex.Message
+                    : $"{ex.Message} {blocksCopied} block(s) were copied successfully before this failure.";
+                return Page();
+            }
+
+            await _submissions.UpdateAnimalAsync(target, userId);
+            blocksCopied += sourceBlocks.Count;
+        }
 
         return RedirectToPage("/Blocks/CopySamplesSummary", new
         {
@@ -152,38 +178,6 @@ public class CopySamplesModel : HistoPageModel
     }
 
     public IActionResult OnPostCancel() => RedirectToPage("/Batches/BatchBlocks");
-
-    /// <summary>
-    /// Copies each source block (and its tissues) onto the target animal in the
-    /// current batch, computing each new block's reference and order in sequence
-    /// so multiple copies onto the same animal do not collide. Mirrors
-    /// <c>CopyBlocksModel.CopyBlocksToAnimalAsync</c>. Returns the number of blocks copied.
-    /// </summary>
-    private async Task<int> CopyBlocksToAnimalAsync(
-        IReadOnlyList<Block> sourceBlocks, IReadOnlyList<Block> allBlocks,
-        int batchId, int targetAnimalId, int userId)
-    {
-        var animalBlocks = allBlocks.Where(b => b.AnimalID == targetAnimalId).ToList();
-        var refs = animalBlocks.Select(b => b.BlockRef).ToList();
-        var orders = animalBlocks.Select(b => b.Order).ToList();
-        var copied = 0;
-
-        foreach (var sourceBlock in sourceBlocks)
-        {
-            var newBlockId = await _blocks.CopyBlockAsync(sourceBlock, batchId, targetAnimalId, refs, orders, userId);
-            if (newBlockId <= 0) continue;
-
-            refs.Add(BlockHelpers.ComputeNextBlockRef(refs));
-            orders.Add(BlockHelpers.ComputeNextOrder(orders));
-            copied++;
-
-            var tissues = await _submissions.GetTissuesByBlockAsync(sourceBlock.BatchID, sourceBlock.ID);
-            foreach (var tissue in tissues)
-                await _submissions.CopyTissueAsync(tissue, newBlockId, userId);
-        }
-
-        return copied;
-    }
 
     private void SetTitle()
     {

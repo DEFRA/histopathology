@@ -1,6 +1,8 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
 using Histo.Core.Domain;
+using Histo.Histology.Interfaces;
+using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -42,14 +44,19 @@ public class BatchDetailsModel : HistoPageModel
     private readonly ILookupService _lookups;
     private readonly IUserService _users;
     private readonly ISubmissionService _submissions;
+    private readonly IBlockService _blocks;
+    private readonly IBlockTestService _blockTests;
 
-    public BatchDetailsModel(ISessionService session, IBatchService batches, ILookupService lookups, IUserService users, ISubmissionService submissions)
+    public BatchDetailsModel(ISessionService session, IBatchService batches, ILookupService lookups, IUserService users, ISubmissionService submissions,
+        IBlockService blocks, IBlockTestService blockTests)
         : base(session)
     {
         _batches = batches;
         _lookups = lookups;
         _users   = users;
         _submissions = submissions;
+        _blocks = blocks;
+        _blockTests = blockTests;
     }
 
     // ── Query param — "create" activates the new-batch form ──
@@ -99,6 +106,9 @@ public class BatchDetailsModel : HistoPageModel
     public IReadOnlyList<LookupItem> Create_UserAreas  { get; private set; } = [];
     public IReadOnlyList<User>       Create_AllUsers   { get; private set; } = [];
     public string? Create_SubmittedAsName { get; private set; }
+
+    /// <summary>Samples staged by the Copy Submission journey, shown on this form before they are created.</summary>
+    public IReadOnlyList<CopyBatchModel.AnimalRow> Create_CopiedSamples { get; private set; } = [];
 
     // ── Test type lookup lists ──
     public IReadOnlyList<LookupItem> Create_HistologyOptions { get; private set; } = [];
@@ -257,7 +267,7 @@ public class BatchDetailsModel : HistoPageModel
             Create_SelectedAntibodyCodes,
             Create_SelectedStainCodes));
 
-        var returnUrl = Url.Page("/Batches/BatchDetails", new { mode = "create" });
+        var returnUrl = Url.Page("/Batches/BatchDetails", new { mode = "create", copyToken = CopyToken });
 
         return field switch
         {
@@ -293,6 +303,195 @@ public class BatchDetailsModel : HistoPageModel
         return true;
     }
 
+    /// <summary>
+    /// TempData slot holding the samples staged by <see cref="CopyBatchModel"/>'s "Copy submission"
+    /// Finish step. This form is pre-filled from the source batch when the slot is present; the
+    /// staged samples are only actually copied once this form is submitted (<see cref="OnPostCreateAsync"/>).
+    /// </summary>
+    private const string PendingCopyKey = "CopyBatch_PendingCopy";
+
+    /// <summary>
+    /// One-time token minted by <see cref="CopyBatchModel"/> when it stages a pending copy, carried
+    /// via the query string (GET) and a hidden form field (POST — the Create form uses
+    /// <c>asp-page-handler</c>, which makes the tag helper generate an explicit action URL that
+    /// does NOT carry over the ambient query string, unlike a plain self-submitting form). Required
+    /// to tell "the user is continuing THIS copy" apart from "the user abandoned it
+    /// (Cancel/navigated away) and later made an unrelated Create Submission visit" — without it,
+    /// <c>TempData.Keep()</c> alone has no way to distinguish the two, so an abandoned pending copy
+    /// would resurface and get applied to an unrelated submission.
+    /// </summary>
+    [BindProperty(SupportsGet = true)] public string? CopyToken { get; set; }
+
+    /// <summary>
+    /// Returns the staged pending copy only if <see cref="CopyToken"/> matches the token it was
+    /// minted with. A missing/mismatched token means this request did not arrive via the copy
+    /// journey that staged it — the entry is explicitly removed (not just left to expire) so it
+    /// can never be picked up by a later request either.
+    /// </summary>
+    private CopyBatchModel.PendingCopy? TryGetValidPendingCopy()
+    {
+        if (TempData.Peek(PendingCopyKey) is not string json) return null;
+
+        CopyBatchModel.PendingCopy? pending;
+        try { pending = System.Text.Json.JsonSerializer.Deserialize<CopyBatchModel.PendingCopy>(json); }
+        catch (System.Text.Json.JsonException) { pending = null; }
+
+        if (pending is null || string.IsNullOrEmpty(CopyToken) || !string.Equals(pending.Token, CopyToken, StringComparison.Ordinal))
+        {
+            TempData.Remove(PendingCopyKey);
+            return null;
+        }
+
+        TempData.Keep(PendingCopyKey);
+        return pending;
+    }
+
+    /// <summary>
+    /// Pre-fills the Create Submission form from the source batch of a validated pending "Copy
+    /// submission" request, and records its "Submitted As"/cassetted-ness the same way
+    /// <c>Cassetted.cshtml</c> normally would, so <see cref="OnPostCreateAsync"/>'s existing logic
+    /// for those fields needs no changes.
+    /// </summary>
+    private async Task PrefillFromCopySourceAsync(CopyBatchModel.PendingCopy pending)
+    {
+        var sourceBatch = await _batches.GetByIdAsync(pending.SourceBatchId);
+        if (sourceBatch is null) return;
+
+        Create_ProjectContractCode = sourceBatch.ProjectContractCode;
+        Create_ContactName         = sourceBatch.ContactName;
+        Create_SpeciesId           = sourceBatch.Species;
+        Create_BatchDateStr        = DateTime.Today.ToString("yyyy-MM-dd");
+        Create_Fixation            = sourceBatch.Fixation;
+        Create_SafeToHandle        = sourceBatch.SafeToHandle;
+        Create_OtherSubmittedBy    = sourceBatch.OtherSubmittedBy ?? Session.UserID;
+        Create_OtherSubmittedArea  = sourceBatch.OtherSubmittedArea ?? Session.UserAreaID.ToString();
+        Create_Comments            = sourceBatch.Comments;
+
+        var selections = await _batches.GetBatchTestSelectionsAsync(pending.SourceBatchId);
+        Create_SelectedHistologyCodes = selections.Histology.Select(h => h.Code).ToList();
+        Create_SelectedAntibodyCodes  = selections.Antibodies.Select(a => a.Code).ToList();
+        Create_SelectedStainCodes     = selections.Stains.Select(s => s.Code).ToList();
+
+        var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(pending.SourceBatchId);
+        if (!string.IsNullOrWhiteSpace(submittedAsCode))
+        {
+            // includeInactive: the source submission may have been created against a lookup row
+            // that has since been deactivated — it must still copy and display.
+            var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs, includeInactive: true);
+            var match = saLookup.FirstOrDefault(x => string.Equals((x.Code ?? x.ID.ToString()).Trim(), submittedAsCode, StringComparison.OrdinalIgnoreCase));
+
+            // Carry the source's own code through even when no lookup row matches, so the copy
+            // keeps its submission type instead of silently losing it.
+            TempData["CreateSubmittedAsId"]   = match?.ID.ToString() ?? string.Empty;
+            TempData["CreateSubmittedAsCode"] = match?.Code?.Trim() ?? submittedAsCode;
+            Create_SubmittedAsName            = match?.Name;
+        }
+        TempData["CreateIsPreCassetted"] = sourceBatch.IsPreCassetted.ToString();
+    }
+
+    /// <summary>
+    /// Resolves the samples staged by <see cref="CopyBatchModel"/> into a fully-formed copy plan
+    /// (source animal + its submission + its tissues, matched the same way the old
+    /// <c>CopyStagedSamplesAsync</c> did) — read-only; the actual writes happen in
+    /// <see cref="ISubmissionService.CreateBatchWithCopiedSamplesAsync"/>, all in one transaction.
+    /// </summary>
+    private async Task<List<CopiedSamplePlan>> BuildCopyPlanAsync(int sourceBatchId, List<CopyBatchModel.AnimalRow> pendingSamples)
+    {
+        var submissions = await _submissions.GetSubmissionsByBatchAsync(sourceBatchId);
+        var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(sourceBatchId);
+        var animals = blockAnimals.Count > 0 ? blockAnimals : await _submissions.GetAnimalsByBatchAsync(sourceBatchId);
+        var animalsById = animals.GroupBy(a => a.ID).ToDictionary(g => g.Key, g => g.First());
+        var firstSubmId = submissions.Count > 0 ? submissions[0].ID : 0;
+        var blocksByAnimalId = (await _blocks.GetByBatchAsync(sourceBatchId))
+            .GroupBy(b => b.AnimalID)
+            .ToDictionary(g => g.Key, g => g.OrderBy(b => b.Order).ToList());
+
+        var tissuesBySubmissionId = new Dictionary<int, IReadOnlyList<Tissue>>();
+        var blockPlansByAnimalId = new Dictionary<int, IReadOnlyList<CopiedBlockPlan>>();
+        var allTests = await _blockTests.GetAllSelectionsByBatchAsync(sourceBatchId);
+        var plan = new List<CopiedSamplePlan>();
+
+        // Driven by the staged rows rather than the source animals: a mouse-range copy stages
+        // several new sender refs against the same source sample, which a per-animal lookup
+        // would collapse back down to one. Only rows that truly selected a replacement sender ref
+        // should be copied; blank rows are either unselected samples or an abandoned range edit.
+        foreach (var pending in pendingSamples.Where(p => !string.IsNullOrWhiteSpace(p.NewSenderRef)))
+        {
+            // Dropping an unresolvable row would commit a partial copy while telling the user every
+            // staged sample was copied, so both misses abort the whole copy instead.
+            var label = string.IsNullOrWhiteSpace(pending.SenderRef) ? pending.NewSenderRef : pending.SenderRef;
+
+            if (!animalsById.TryGetValue(pending.AnimalId, out var animal))
+                throw new InvalidOperationException(
+                    $"Could not copy sample '{label}' because it is no longer part of the submission being copied. Start the copy again. Nothing was saved.");
+
+            // SubmissionId arrives from a client-controlled hidden field, so it is only honoured
+            // when it actually belongs to the staged animal — a stale or tampered pair would
+            // otherwise graft another animal's tissues onto this one's blocks. A wet-tissue animal
+            // legitimately owns several submissions, which is why the staged value still wins.
+            var submission = submissions.FirstOrDefault(s => s.ID == pending.SubmissionId && BelongsToAnimal(s, animal))
+                ?? submissions.FirstOrDefault(s => s.ID == animal.BatchSubmissionID)
+                ?? (animal.BatchSubmissionID == 0 ? submissions.FirstOrDefault(s => s.ID == firstSubmId) : null);
+
+            if (submission is null)
+                throw new InvalidOperationException(
+                    $"Could not copy sample '{label}' because its submission record could not be found. Start the copy again. Nothing was saved.");
+
+            if (!tissuesBySubmissionId.TryGetValue(submission.ID, out var tissues))
+            {
+                tissues = await _submissions.GetTissuesBySubmissionAsync(sourceBatchId, submission.ID);
+                tissuesBySubmissionId[submission.ID] = tissues;
+            }
+
+            if (!blockPlansByAnimalId.TryGetValue(animal.ID, out var blockPlans))
+            {
+                blockPlans = await BuildBlockPlansAsync(sourceBatchId, blocksByAnimalId.GetValueOrDefault(animal.ID) ?? [], allTests);
+                blockPlansByAnimalId[animal.ID] = blockPlans;
+            }
+
+            plan.Add(new CopiedSamplePlan
+            {
+                SourceAnimal = animal,
+                NewSenderRef = string.IsNullOrWhiteSpace(pending.NewSenderRef) ? animal.SenderRef : pending.NewSenderRef,
+                SourceSubmission = submission,
+                Tissues = tissues,
+                Blocks = blockPlans,
+                // Resolved per staged row, so a mouse-range copy of one source sample still gives
+                // every new sample its own ref. The draw itself happens inside the copy
+                // transaction so a rollback doesn't consume counter values.
+                HistologyRefType = HistologyRefTypeCode.FromExistingRef(animal.HistologyRef),
+            });
+        }
+        return plan;
+    }
+
+    private static bool BelongsToAnimal(BatchSubmission submission, Animal animal) =>
+        submission.AnimalID == animal.ID || submission.ID == animal.BatchSubmissionID;
+
+    /// <summary>Flattens a sample's blocks (tissues and test selections) into the copy plan's module-neutral shape.</summary>
+    private async Task<IReadOnlyList<CopiedBlockPlan>> BuildBlockPlansAsync(int sourceBatchId, IReadOnlyList<Block> blocks, IReadOnlyList<BlockTest> allTests)
+    {
+        var plans = new List<CopiedBlockPlan>(blocks.Count);
+        foreach (var block in blocks)
+        {
+            var tests = allTests.Where(t => t.BlockID == block.ID).ToList();
+            plans.Add(new CopiedBlockPlan
+            {
+                BlockRef = block.BlockRef,
+                CustomerRef = block.CustomerRef,
+                Comment = block.Comment,
+                RepeatBlock = block.RepeatBlock,
+                Status = block.Status,
+                Order = block.Order,
+                Tissues = await _submissions.GetTissuesByBlockAsync(sourceBatchId, block.ID),
+                HistologyCodes = [.. tests.Where(t => t.TestType == BlockTestType.Histology).Select(t => t.Code)],
+                AntibodyCodes = [.. tests.Where(t => t.TestType == BlockTestType.Antibodies).Select(t => t.Code)],
+                StainCodes = [.. tests.Where(t => t.TestType == BlockTestType.Stain).Select(t => t.Code)],
+            });
+        }
+        return plans;
+    }
+
     public async Task<IActionResult> OnGetAsync()
     {
         ViewData["Title"]     = IsCreateMode ? "New submission" : "Submission details";
@@ -301,19 +500,32 @@ public class BatchDetailsModel : HistoPageModel
         if (IsCreateMode)
         {
             await LoadCreateLookupsAsync();
+            var pendingCopy = TryGetValidPendingCopy();
+            Create_CopiedSamples = pendingCopy?.Samples ?? [];
+
             if (!RestoreCreateDraft())
             {
-                Create_BatchDateStr = DateTime.Today.ToString("yyyy-MM-dd");
-                // Default Submitted by/area to the logged-in user — still a normal editable
-                // dropdown, just pre-selected rather than requiring the user to find themselves.
-                Create_OtherSubmittedBy   = Session.UserID;
-                Create_OtherSubmittedArea = Session.UserAreaID.ToString();
+                if (pendingCopy is not null)
+                {
+                    await PrefillFromCopySourceAsync(pendingCopy);
+                }
+                else
+                {
+                    Create_BatchDateStr = DateTime.Today.ToString("yyyy-MM-dd");
+                    // Default Submitted by/area to the logged-in user — still a normal editable
+                    // dropdown, just pre-selected rather than requiring the user to find themselves.
+                    Create_OtherSubmittedBy   = Session.UserID;
+                    Create_OtherSubmittedArea = Session.UserAreaID.ToString();
+                }
             }
             // Resolve SubmittedAs name from TempData for display
             if (TempData.TryGetValue("CreateSubmittedAsId", out var saId))
             {
-                var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs);
-                Create_SubmittedAsName = saLookup.FirstOrDefault(x => x.ID.ToString() == saId?.ToString())?.Name;
+                if (Create_SubmittedAsName is null)
+                {
+                    var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs, includeInactive: true);
+                    Create_SubmittedAsName = saLookup.FirstOrDefault(x => x.ID.ToString() == saId?.ToString())?.Name;
+                }
                 TempData.Keep("CreateSubmittedAsId");
                 TempData.Keep("CreateSubmittedAsCode");
                 TempData.Keep("CreateIsPreCassetted");
@@ -321,7 +533,8 @@ public class BatchDetailsModel : HistoPageModel
             return Page();
         }
 
-        if (Session.BatchID is null or <= 0) return RedirectToPage("/Index");
+        // Query string first, session only as a fallback — checking session before this made every
+        // deep link from a list/search page bounce to /Index, since those pages never set it.
         var effectiveBatchId = BatchId ?? Session.BatchID;
         if (effectiveBatchId is null or <= 0) return RedirectToPage("/Index");
 
@@ -335,7 +548,7 @@ public class BatchDetailsModel : HistoPageModel
         {
             Batch = await _batches.GetByIdAsync(effectiveBatchId.Value);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             LoadError = "Failed to load the submission details. Please go back and try again.";
             return Page();
@@ -467,11 +680,13 @@ public class BatchDetailsModel : HistoPageModel
         TempData.Keep("CreateSubmittedAsId");
         TempData.Keep("CreateSubmittedAsCode");
         TempData.Keep("CreateIsPreCassetted");
+        var pendingCopy = TryGetValidPendingCopy();
+        Create_CopiedSamples = pendingCopy?.Samples ?? [];
 
         // Resolve SubmittedAs name for redisplay
         if (TempData.TryGetValue("CreateSubmittedAsId", out var saId))
         {
-            var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs);
+            var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs, includeInactive: true);
             Create_SubmittedAsName = saLookup.FirstOrDefault(x => x.ID.ToString() == saId?.ToString())?.Name;
         }
 
@@ -545,6 +760,51 @@ public class BatchDetailsModel : HistoPageModel
             Comments            = Create_Comments,
         };
 
+        // "Copy submission" journey: create the batch header, test-type selections, submitted-as,
+        // and every staged sample/tissue in ONE DB transaction — CreateBatchWithCopiedSamplesAsync
+        // rolls everything back on any failure instead of silently continuing past a failed
+        // sample/tissue copy after the batch has already been committed. pendingCopy is only
+        // non-null here when CopyToken matched the token it was staged with (TryGetValidPendingCopy)
+        // — a stale/abandoned entry was already discarded above. Keyed on the request alone, not on
+        // the sample count: copying an empty submission is still a copy, and falling through would
+        // redirect to the wrong summary and leave the pending entry behind.
+        if (pendingCopy is not null)
+        {
+            int newBatchId;
+            try
+            {
+                // Inside the try so an unresolvable staged sample surfaces as a page error, the
+                // same way a failure inside the transaction does.
+                var plan = await BuildCopyPlanAsync(pendingCopy.SourceBatchId, pendingCopy.Samples);
+                newBatchId = await _submissions.CreateBatchWithCopiedSamplesAsync(
+                    batch,
+                    Create_SelectedHistologyCodes,
+                    needsAntibodies ? Create_SelectedAntibodyCodes : new List<string>(),
+                    needsStains     ? Create_SelectedStainCodes    : new List<string>(),
+                    submittedAsCode,
+                    plan,
+                    Session.UserID);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Errors = new Dictionary<string, string> { ["Create_Save"] = ex.Message };
+                Mode = "create";
+                return Page();
+            }
+
+            if (newBatchId <= 0)
+            {
+                Errors = new Dictionary<string, string> { ["Create_Save"] = "Failed to create the submission. Please try again." };
+                Mode = "create";
+                return Page();
+            }
+
+            TempData.Remove(PendingCopyKey);
+            Session.BatchID = newBatchId;
+            Session.SampleSummaryReturnPage = null;
+            return RedirectToPage("/Batches/CopyBatchSummary", new { newBatchId });
+        }
+
         int batchId;
         try { batchId = await _batches.AddAsync(batch, Session.UserID); }
         catch
@@ -585,6 +845,7 @@ public class BatchDetailsModel : HistoPageModel
         // incorrectly redirects back to that old page instead of Print Submission, since
         // SampleSummary.OnPostFinishAsync trusts this value unconditionally once set.
         Session.SampleSummaryReturnPage = null;
+
         return RedirectToPage("/Submissions/SampleSummary", new { batchId });
     }
 

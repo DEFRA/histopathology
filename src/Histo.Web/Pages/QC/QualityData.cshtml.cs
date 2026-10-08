@@ -61,6 +61,11 @@ public class QualityDataModel : GridPageModel
     public int BatchID => Session.BatchID ?? 0;
     public Batch? BatchSummary { get; private set; }
 
+    /// <summary>Mirrors <see cref="Archive.ArchiveBlocksModel.IsViewMode"/> — a submission opened from
+    /// Search outputs/Search submissions/View submissions is read-only here too; Enter quality data
+    /// (<c>BatchesForDispatchModel</c>) resets the flag, so that journey is unaffected.</summary>
+    public bool IsViewMode => Session.IsViewSubmissionMode;
+
     /// <summary>
     /// Back-link target — honours <see cref="ISessionService.ReturnPage"/> so users arriving via
     /// Search submissions / View submissions ("View quality data") return there, not always to
@@ -81,6 +86,13 @@ public class QualityDataModel : GridPageModel
 
     [BindProperty(SupportsGet = true)] public string? FilterHistologyRef { get; set; }
     [BindProperty(SupportsGet = true)] public string? FilterTest { get; set; }
+
+    /// <summary>
+    /// Submission to open, for links arriving from a list/search page rather than from a handler
+    /// that has already put the batch in session. Falls back to <see cref="ISessionService.BatchID"/>
+    /// when absent, so every existing entry point is unaffected.
+    /// </summary>
+    [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
 
     public IReadOnlyList<string> HistologyRefs { get; private set; } = [];
     public IReadOnlyList<string> TestNames { get; private set; } = [];
@@ -148,6 +160,20 @@ public class QualityDataModel : GridPageModel
     {
         ViewData["Title"] = "Quality data";
         ViewData["PageTitle"] = "Quality data";
+
+        if (BatchId is > 0)
+        {
+            // The id came from the URL, so it has not been through an area-filtered list —
+            // authorise it here rather than trusting it the way a session-set id can be trusted.
+            var forbidden = await CheckBatchAccessAsync(_batches, BatchId.Value);
+            if (forbidden is not null) return forbidden;
+
+            Session.BatchID = BatchId;
+            // Arriving directly from a list/search link, not via Enter quality data — same rule
+            // SearchSubmissions/ViewSubmissions apply when a row is selected for viewing.
+            Session.IsViewSubmissionMode = true;
+        }
+
         if (!Session.BatchID.HasValue) return RedirectToPage("/Index");
 
         var allTests    = await _tests.GetByBatchAsync(Session.BatchID.Value);
@@ -189,6 +215,7 @@ public class QualityDataModel : GridPageModel
         ViewData["Title"] = "Quality data";
         ViewData["PageTitle"] = "Quality data";
         if (!Session.BatchID.HasValue) return RedirectToPage("/Index");
+        if (IsViewMode) return RedirectToPage();
         var batchId = Session.BatchID.Value;
 
         var all = await _tests.GetByBatchAsync(batchId);

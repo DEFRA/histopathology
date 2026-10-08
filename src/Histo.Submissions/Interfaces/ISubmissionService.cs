@@ -11,6 +11,23 @@ public interface ISubmissionService
     // Submissions
     Task<IReadOnlyList<BatchSubmission>> GetSubmissionsByBatchAsync(int batchId, CancellationToken ct = default);
     Task<int> AddSubmissionAsync(BatchSubmission submission, int userId, CancellationToken ct = default);
+    Task<bool> CreateMouseRangeAsync(int batchId, int? sourceAnimalId, string mouseNumberFrom, string mouseNumberTo, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Creates a new batch and copies every staged sample/tissue in <paramref name="plan"/> onto
+    /// it, all in one transaction. Returns the new batch ID, or 0 on failure (nothing is left
+    /// behind in that case). See <see cref="Histo.Submissions.Interfaces.ISubmissionRepository.CreateBatchWithCopiedSamplesAsync"/>.
+    /// </summary>
+    Task<int> CreateBatchWithCopiedSamplesAsync(
+        Batch batch,
+        IReadOnlyList<string> histologyCodes,
+        IReadOnlyList<string> antibodyCodes,
+        IReadOnlyList<string> stainCodes,
+        string? submittedAsCode,
+        IReadOnlyList<CopiedSamplePlan> plan,
+        int userId,
+        CancellationToken ct = default);
+
     /// <summary>Copies a submission under a new batch. Pass <paramref name="animalId"/> once the destination animal is known so the copy is correctly linked (see AddSubmissionModel.OnPostAsync fix) — defaults to the unlinked placeholder used for submissions with no known animal yet.</summary>
     Task<int> CopySubmissionAsync(BatchSubmission source, int newBatchId, int userId, int animalId = 0, CancellationToken ct = default);
 
@@ -28,6 +45,12 @@ public interface ISubmissionService
     /// Uses <c>GetAnimalBySender</c> SP (exact match). Returns empty list when not found.
     /// </summary>
     Task<IReadOnlyList<SenderSearchResult>> GetAnimalBySenderAsync(string senderRef, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the subset of <paramref name="senderRefs"/> that already exist on ANY animal in the
+    /// database (not scoped to a batch) — used to validate a whole mouse-number range up front.
+    /// </summary>
+    Task<IReadOnlyList<string>> GetExistingSenderRefsAsync(IEnumerable<string> senderRefs, CancellationToken ct = default);
 
     /// <summary>Renames the Sender Ref. Throws <see cref="AnimalRefUpdateException"/> on conflict.</summary>
     Task UpdateAnimalSenderRefAsync(string senderRef, string newSenderRef, int userId, CancellationToken ct = default);

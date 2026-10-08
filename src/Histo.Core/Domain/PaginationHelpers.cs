@@ -35,9 +35,36 @@ public static class PaginationHelpers
                 else if (page - previous > 2)
                     items.Add(new PaginationItem(null));
             }
+
             items.Add(new PaginationItem(page));
             previous = page;
         }
+
+        return items;
+    }
+
+    /// <summary>
+    /// Builds the sliding window of page numbers shown between the First/Previous and Next/Last
+    /// controls: always <paramref name="windowSize"/> consecutive pages (or every page, when there
+    /// are fewer), positioned so the current page has <paramref name="pagesAfterCurrent"/> pages
+    /// visible ahead of it — e.g. page 10 of 21 shows 4-13. The window is clamped at both ends, so
+    /// the first and last pages show 1-10 and 12-21 rather than running past the page count.
+    /// </summary>
+    /// <param name="currentPage">The current 1-based page number.</param>
+    /// <param name="totalPages">The total number of pages.</param>
+    /// <param name="windowSize">How many page numbers to show (default 10).</param>
+    /// <param name="pagesAfterCurrent">How many pages to keep visible ahead of the current page (default 3).</param>
+    public static IReadOnlyList<int> BuildSlidingWindow(int currentPage, int totalPages, int windowSize = 10, int pagesAfterCurrent = 3)
+    {
+        if (totalPages <= 1) return [1];
+
+        var current = Math.Clamp(currentPage, 1, totalPages);
+        var size = Math.Min(windowSize, totalPages);
+        var start = Math.Clamp(current + pagesAfterCurrent - size + 1, 1, totalPages - size + 1);
+
+        var items = new List<int>(size);
+        for (var i = 0; i < size; i++)
+            items.Add(start + i);
         return items;
     }
 }

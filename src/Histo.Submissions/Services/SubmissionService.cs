@@ -39,6 +39,34 @@ public sealed class SubmissionService : ISubmissionService
         catch (Exception ex) { _logger.LogError("Failed to add submission.", ex); return 0; }
     }
 
+    /// <summary>Creates a whole mouse-number range in one transaction so failures roll back without leaving partial data.</summary>
+    public async Task<bool> CreateMouseRangeAsync(int batchId, int? sourceAnimalId, string mouseNumberFrom, string mouseNumberTo, int userId, CancellationToken ct = default)
+    {
+        try { return await _repo.CreateMouseRangeAsync(batchId, sourceAnimalId, mouseNumberFrom, mouseNumberTo, userId, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to create mouse range for batch {BatchId}.", ex, batchId); return false; }
+    }
+
+    /// <inheritdoc/>
+    public async Task<int> CreateBatchWithCopiedSamplesAsync(
+        Batch batch,
+        IReadOnlyList<string> histologyCodes,
+        IReadOnlyList<string> antibodyCodes,
+        IReadOnlyList<string> stainCodes,
+        string? submittedAsCode,
+        IReadOnlyList<CopiedSamplePlan> plan,
+        int userId,
+        CancellationToken ct = default)
+    {
+        try { return await _repo.CreateBatchWithCopiedSamplesAsync(batch, histologyCodes, antibodyCodes, stainCodes, submittedAsCode, plan, userId, ct); }
+        catch (InvalidOperationException)
+        {
+            // Step-level, user-safe diagnostics ("A sample with sender reference 'X' already
+            // exists.") — the page shows these rather than a generic failure.
+            throw;
+        }
+        catch (Exception ex) { _logger.LogError("Failed to create batch copy with {SampleCount} staged sample(s).", ex, plan.Count); return 0; }
+    }
+
     /// <summary>
     /// Creates a copy of an existing batch submission (sample group) under a new
     /// batch. Used by the "Copy batch" workflow.
@@ -264,6 +292,13 @@ public sealed class SubmissionService : ISubmissionService
     {
         try { return await _repo.GetAnimalBySenderAsync(senderRef, ct); }
         catch (Exception ex) { _logger.LogError("Failed to look up animal by exact sender ref {SenderRef}.", ex, senderRef); return []; }
+    }
+
+    /// <summary>Returns the subset of <paramref name="senderRefs"/> that already exist on any animal.</summary>
+    public async Task<IReadOnlyList<string>> GetExistingSenderRefsAsync(IEnumerable<string> senderRefs, CancellationToken ct = default)
+    {
+        try { return await _repo.GetExistingSenderRefsAsync(senderRefs, ct); }
+        catch (Exception ex) { _logger.LogError("Failed to check existing sender refs.", ex); return []; }
     }
 
     /// <summary>Returns archived tissue records matching the given (optional) filters.</summary>
