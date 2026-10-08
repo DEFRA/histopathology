@@ -217,6 +217,15 @@
     text-align: center;
 }
 
+/* Unassigned-tissue marker on the Blocks grid (legacy BatchBlocks.aspx.vb rendered
+ * <font color="Green" size="Small">*</font> after the sender ref). The star is aria-hidden and
+ * paired with visually-hidden text, so meaning is never carried by colour or symbol alone. */
+.app-unassigned-tissues-marker {
+    color: #00703c;
+    font-size: 0.8em;
+    font-weight: bold;
+}
+
 /* Uniform-width action buttons (Edit sender/histology ref, Batches for archiving) — govuk-button
  * sizes to its label by default, so adjacent buttons with different label lengths ("Get histology
  * ref" vs "Save sender ref", "Archive blocks" vs "Archive tissues") render at inconsistent widths;

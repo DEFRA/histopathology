@@ -93,6 +93,11 @@
 
 <form method="post" asp-page="/Batches/BatchBlocks">
     <input type="hidden" asp-for="BatchId" />
+    <p class="govuk-body">
+        The following table displays all samples, blocks, tissues and tests for the current submission.
+        A green star next to the sender ref indicates that not all tissues for that sample have been
+        assigned to blocks.
+    </p>
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
@@ -132,7 +137,8 @@
                         @Model.SenderRefsByAnimalId.GetValueOrDefault(b.AnimalID, "—")
                         @if (Model.AnimalsWithUnassignedTissues.Contains(b.AnimalID))
                         {
-                            <strong class="govuk-tag govuk-tag--yellow">Tissues unassigned</strong>
+                            <span class="app-unassigned-tissues-marker" aria-hidden="true">*</span>
+                            <span class="govuk-visually-hidden">Not all tissues for this sample have been assigned to blocks</span>
                         }
                     </td>
                     <td class="govuk-table__cell">@(Model.HistologyRefsByAnimalId.GetValueOrDefault(b.AnimalID) ?? "—")</td>
