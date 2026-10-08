@@ -40,6 +40,13 @@ public class BatchDetailsModel : HistoPageModel
     private const int LookupNonTseAntibodies  = 5;
     private const int LookupSpecialStain      = 6;
 
+    private static readonly string[] BatchDateFormats = ["yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy"];
+    private const string CreateSaveErrorKey = "Create_Save";
+    private const string CreateSaveFailedMessage = "Failed to create the submission. Please try again.";
+    private const string CreateSubmittedAsIdKey = "CreateSubmittedAsId";
+    private const string CreateSubmittedAsCodeKey = "CreateSubmittedAsCode";
+    private const string CreateIsPreCassettedKey = "CreateIsPreCassetted";
+
     private readonly IBatchService _batches;
     private readonly ILookupService _lookups;
     private readonly IUserService _users;
@@ -382,11 +389,11 @@ public class BatchDetailsModel : HistoPageModel
 
             // Carry the source's own code through even when no lookup row matches, so the copy
             // keeps its submission type instead of silently losing it.
-            TempData["CreateSubmittedAsId"]   = match?.ID.ToString() ?? string.Empty;
-            TempData["CreateSubmittedAsCode"] = match?.Code?.Trim() ?? submittedAsCode;
+            TempData[CreateSubmittedAsIdKey]   = match?.ID.ToString() ?? string.Empty;
+            TempData[CreateSubmittedAsCodeKey] = match?.Code?.Trim() ?? submittedAsCode;
             Create_SubmittedAsName            = match?.Name;
         }
-        TempData["CreateIsPreCassetted"] = sourceBatch.IsPreCassetted.ToString();
+        TempData[CreateIsPreCassettedKey] = sourceBatch.IsPreCassetted.ToString();
     }
 
     /// <summary>
@@ -411,65 +418,112 @@ public class BatchDetailsModel : HistoPageModel
         var allTests = await _blockTests.GetAllSelectionsByBatchAsync(sourceBatchId);
         var plan = new List<CopiedSamplePlan>();
 
-        // Driven by the staged rows rather than the source animals: a mouse-range copy stages
-        // several new sender refs against the same source sample, which a per-animal lookup
-        // would collapse back down to one. Only rows that truly selected a replacement sender ref
-        // should be copied; blank rows are either unselected samples or an abandoned range edit.
         foreach (var pending in pendingSamples.Where(p => !string.IsNullOrWhiteSpace(p.NewSenderRef)))
         {
-            // Dropping an unresolvable row would commit a partial copy while telling the user every
-            // staged sample was copied, so both misses abort the whole copy instead.
-            var label = string.IsNullOrWhiteSpace(pending.SenderRef) ? pending.NewSenderRef : pending.SenderRef;
+            var samplePlan = await BuildPendingSamplePlanAsync(
+                sourceBatchId,
+                pending,
+                submissions,
+                animalsById,
+                firstSubmId,
+                blocksByAnimalId,
+                allTests,
+                tissuesBySubmissionId,
+                blockPlansByAnimalId);
 
-            if (!animalsById.TryGetValue(pending.AnimalId, out var animal))
-                throw new InvalidOperationException(
-                    $"Could not copy sample '{label}' because it is no longer part of the submission being copied. Start the copy again. Nothing was saved.");
-
-            // SubmissionId arrives from a client-controlled hidden field, so it is only honoured
-            // when it actually belongs to the staged animal — a stale or tampered pair would
-            // otherwise graft another animal's tissues onto this one's blocks. A wet-tissue animal
-            // legitimately owns several submissions, which is why the staged value still wins.
-            var submission = submissions.FirstOrDefault(s => s.ID == pending.SubmissionId && BelongsToAnimal(s, animal))
-                ?? submissions.FirstOrDefault(s => s.ID == animal.BatchSubmissionID)
-                ?? (animal.BatchSubmissionID == 0 ? submissions.FirstOrDefault(s => s.ID == firstSubmId) : null);
-
-            if (submission is null)
-                throw new InvalidOperationException(
-                    $"Could not copy sample '{label}' because its submission record could not be found. Start the copy again. Nothing was saved.");
-
-            if (!tissuesBySubmissionId.TryGetValue(submission.ID, out var tissues))
-            {
-                tissues = await _submissions.GetTissuesBySubmissionAsync(sourceBatchId, submission.ID);
-                tissuesBySubmissionId[submission.ID] = tissues;
-            }
-
-            if (!blockPlansByAnimalId.TryGetValue(animal.ID, out var blockPlans))
-            {
-                blockPlans = await BuildBlockPlansAsync(sourceBatchId, blocksByAnimalId.GetValueOrDefault(animal.ID) ?? [], allTests);
-                blockPlansByAnimalId[animal.ID] = blockPlans;
-            }
-
-            plan.Add(new CopiedSamplePlan
-            {
-                SourceAnimal = animal,
-                NewSenderRef = string.IsNullOrWhiteSpace(pending.NewSenderRef) ? animal.SenderRef : pending.NewSenderRef,
-                SourceSubmission = submission,
-                Tissues = tissues,
-                Blocks = blockPlans,
-                // Resolved per staged row, so a mouse-range copy of one source sample still gives
-                // every new sample its own ref. The draw itself happens inside the copy
-                // transaction so a rollback doesn't consume counter values.
-                HistologyRefType = HistologyRefTypeCode.FromExistingRef(animal.HistologyRef),
-            });
+            if (samplePlan is not null)
+                plan.Add(samplePlan);
         }
+
         return plan;
+    }
+
+    private async Task<CopiedSamplePlan?> BuildPendingSamplePlanAsync(
+        int sourceBatchId,
+        CopyBatchModel.AnimalRow pending,
+        IReadOnlyList<BatchSubmission> submissions,
+        IReadOnlyDictionary<int, Animal> animalsById,
+        int firstSubmId,
+        IReadOnlyDictionary<int, List<Block>> blocksByAnimalId,
+        IReadOnlyList<BlockTest> allTests,
+        Dictionary<int, IReadOnlyList<Tissue>> tissuesBySubmissionId,
+        Dictionary<int, IReadOnlyList<CopiedBlockPlan>> blockPlansByAnimalId)
+    {
+        var label = string.IsNullOrWhiteSpace(pending.SenderRef) ? pending.NewSenderRef : pending.SenderRef;
+        var animal = ResolveAnimalForPendingSample(pending, animalsById, label);
+        var submission = ResolveSubmissionForPendingSample(submissions, pending, animal, firstSubmId);
+
+        if (submission is null)
+            throw new InvalidOperationException(
+                $"Could not copy sample '{label}' because its submission record could not be found. Start the copy again. Nothing was saved.");
+
+        var tissues = await GetTissuesForSubmissionAsync(sourceBatchId, submission, tissuesBySubmissionId);
+        var blockPlans = await GetBlockPlansForAnimalAsync(sourceBatchId, animal, blocksByAnimalId, allTests, blockPlansByAnimalId);
+
+        return new CopiedSamplePlan
+        {
+            SourceAnimal = animal,
+            NewSenderRef = string.IsNullOrWhiteSpace(pending.NewSenderRef) ? animal.SenderRef : pending.NewSenderRef,
+            SourceSubmission = submission,
+            Tissues = tissues,
+            Blocks = blockPlans,
+            HistologyRefType = HistologyRefTypeCode.FromExistingRef(animal.HistologyRef),
+        };
+    }
+
+    private static Animal ResolveAnimalForPendingSample(CopyBatchModel.AnimalRow pending, IReadOnlyDictionary<int, Animal> animalsById, string label)
+    {
+        if (!animalsById.TryGetValue(pending.AnimalId, out var animal))
+            throw new InvalidOperationException(
+                $"Could not copy sample '{label}' because it is no longer part of the submission being copied. Start the copy again. Nothing was saved.");
+
+        return animal;
+    }
+
+    private static BatchSubmission? ResolveSubmissionForPendingSample(
+        IReadOnlyList<BatchSubmission> submissions,
+        CopyBatchModel.AnimalRow pending,
+        Animal animal,
+        int firstSubmId)
+    {
+        return submissions.FirstOrDefault(s => s.ID == pending.SubmissionId && BelongsToAnimal(s, animal))
+            ?? submissions.FirstOrDefault(s => s.ID == animal.BatchSubmissionID)
+            ?? (animal.BatchSubmissionID == 0 ? submissions.FirstOrDefault(s => s.ID == firstSubmId) : null);
+    }
+
+    private async Task<IReadOnlyList<Tissue>> GetTissuesForSubmissionAsync(
+        int sourceBatchId,
+        BatchSubmission submission,
+        Dictionary<int, IReadOnlyList<Tissue>> tissuesBySubmissionId)
+    {
+        if (tissuesBySubmissionId.TryGetValue(submission.ID, out var tissues))
+            return tissues;
+
+        tissues = await _submissions.GetTissuesBySubmissionAsync(sourceBatchId, submission.ID);
+        tissuesBySubmissionId[submission.ID] = tissues;
+        return tissues;
+    }
+
+    private async Task<IReadOnlyList<CopiedBlockPlan>> GetBlockPlansForAnimalAsync(
+        int sourceBatchId,
+        Animal animal,
+        IReadOnlyDictionary<int, List<Block>> blocksByAnimalId,
+        IReadOnlyList<BlockTest> allTests,
+        Dictionary<int, IReadOnlyList<CopiedBlockPlan>> blockPlansByAnimalId)
+    {
+        if (blockPlansByAnimalId.TryGetValue(animal.ID, out var blockPlans))
+            return blockPlans;
+
+        blockPlans = await BuildBlockPlansAsync(sourceBatchId, blocksByAnimalId.GetValueOrDefault(animal.ID) ?? [], allTests);
+        blockPlansByAnimalId[animal.ID] = blockPlans;
+        return blockPlans;
     }
 
     private static bool BelongsToAnimal(BatchSubmission submission, Animal animal) =>
         submission.AnimalID == animal.ID || submission.ID == animal.BatchSubmissionID;
 
     /// <summary>Flattens a sample's blocks (tissues and test selections) into the copy plan's module-neutral shape.</summary>
-    private async Task<IReadOnlyList<CopiedBlockPlan>> BuildBlockPlansAsync(int sourceBatchId, IReadOnlyList<Block> blocks, IReadOnlyList<BlockTest> allTests)
+    private async Task<IReadOnlyList<CopiedBlockPlan>> BuildBlockPlansAsync(int sourceBatchId, List<Block> blocks, IReadOnlyList<BlockTest> allTests)
     {
         var plans = new List<CopiedBlockPlan>(blocks.Count);
         foreach (var block in blocks)
@@ -519,16 +573,16 @@ public class BatchDetailsModel : HistoPageModel
                 }
             }
             // Resolve SubmittedAs name from TempData for display
-            if (TempData.TryGetValue("CreateSubmittedAsId", out var saId))
+            if (TempData.TryGetValue(CreateSubmittedAsIdKey, out var saId))
             {
                 if (Create_SubmittedAsName is null)
                 {
                     var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs, includeInactive: true);
                     Create_SubmittedAsName = saLookup.FirstOrDefault(x => x.ID.ToString() == saId?.ToString())?.Name;
                 }
-                TempData.Keep("CreateSubmittedAsId");
-                TempData.Keep("CreateSubmittedAsCode");
-                TempData.Keep("CreateIsPreCassetted");
+                TempData.Keep(CreateSubmittedAsIdKey);
+                TempData.Keep(CreateSubmittedAsCodeKey);
+                TempData.Keep(CreateIsPreCassettedKey);
             }
             return Page();
         }
@@ -656,7 +710,7 @@ public class BatchDetailsModel : HistoPageModel
     /// Prefers <see cref="LookupItem.Code"/> as key; falls back to
     /// <see cref="LookupItem.ID"/> as string when Code is absent.
     /// </summary>
-    private static IReadOnlyDictionary<string, string> ToDictionary(IReadOnlyList<LookupItem> items)
+    private static Dictionary<string, string> ToDictionary(IReadOnlyList<LookupItem> items)
     {
         var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var item in items)
@@ -674,17 +728,17 @@ public class BatchDetailsModel : HistoPageModel
         await LoadCreateLookupsAsync();
 
         // Read type-selection values from TempData (set by Cassetted step)
-        var submittedAsCode = TempData["CreateSubmittedAsCode"]?.ToString() ?? "";
-        var isPreCassetted  = bool.TryParse(TempData["CreateIsPreCassetted"]?.ToString(), out var ipc) && ipc;
+        var submittedAsCode = TempData[CreateSubmittedAsCodeKey]?.ToString() ?? "";
+        var isPreCassetted  = bool.TryParse(TempData[CreateIsPreCassettedKey]?.ToString(), out var ipc) && ipc;
 
-        TempData.Keep("CreateSubmittedAsId");
-        TempData.Keep("CreateSubmittedAsCode");
-        TempData.Keep("CreateIsPreCassetted");
+        TempData.Keep(CreateSubmittedAsIdKey);
+        TempData.Keep(CreateSubmittedAsCodeKey);
+        TempData.Keep(CreateIsPreCassettedKey);
         var pendingCopy = TryGetValidPendingCopy();
         Create_CopiedSamples = pendingCopy?.Samples ?? [];
 
         // Resolve SubmittedAs name for redisplay
-        if (TempData.TryGetValue("CreateSubmittedAsId", out var saId))
+        if (TempData.TryGetValue(CreateSubmittedAsIdKey, out var saId))
         {
             var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs, includeInactive: true);
             Create_SubmittedAsName = saLookup.FirstOrDefault(x => x.ID.ToString() == saId?.ToString())?.Name;
@@ -709,7 +763,7 @@ public class BatchDetailsModel : HistoPageModel
         DateTime? batchDate = null;
         if (!string.IsNullOrWhiteSpace(Create_BatchDateStr))
         {
-            if (!DateTime.TryParseExact(Create_BatchDateStr, new[] { "yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy" },
+            if (!DateTime.TryParseExact(Create_BatchDateStr, BatchDateFormats,
                     System.Globalization.CultureInfo.InvariantCulture,
                     System.Globalization.DateTimeStyles.None, out var parsed))
                 errors["Create_BatchDateStr"] = "Enter a valid submission date.";
@@ -776,25 +830,27 @@ public class BatchDetailsModel : HistoPageModel
                 // Inside the try so an unresolvable staged sample surfaces as a page error, the
                 // same way a failure inside the transaction does.
                 var plan = await BuildCopyPlanAsync(pendingCopy.SourceBatchId, pendingCopy.Samples);
-                newBatchId = await _submissions.CreateBatchWithCopiedSamplesAsync(
-                    batch,
+                var testCodes = new SelectedTestCodes(
                     Create_SelectedHistologyCodes,
                     needsAntibodies ? Create_SelectedAntibodyCodes : new List<string>(),
-                    needsStains     ? Create_SelectedStainCodes    : new List<string>(),
+                    needsStains     ? Create_SelectedStainCodes    : new List<string>());
+                newBatchId = await _submissions.CreateBatchWithCopiedSamplesAsync(
+                    batch,
+                    testCodes,
                     submittedAsCode,
                     plan,
                     Session.UserID);
             }
             catch (InvalidOperationException ex)
             {
-                Errors = new Dictionary<string, string> { ["Create_Save"] = ex.Message };
+                Errors = new Dictionary<string, string> { [CreateSaveErrorKey] = ex.Message };
                 Mode = "create";
                 return Page();
             }
 
             if (newBatchId <= 0)
             {
-                Errors = new Dictionary<string, string> { ["Create_Save"] = "Failed to create the submission. Please try again." };
+                Errors = new Dictionary<string, string> { [CreateSaveErrorKey] = CreateSaveFailedMessage };
                 Mode = "create";
                 return Page();
             }
@@ -809,14 +865,14 @@ public class BatchDetailsModel : HistoPageModel
         try { batchId = await _batches.AddAsync(batch, Session.UserID); }
         catch
         {
-            Errors = new Dictionary<string, string> { ["Create_Save"] = "Failed to create the submission. Please try again." };
+            Errors = new Dictionary<string, string> { [CreateSaveErrorKey] = CreateSaveFailedMessage };
             Mode = "create";
             return Page();
         }
 
         if (batchId <= 0)
         {
-            Errors = new Dictionary<string, string> { ["Create_Save"] = "Failed to create the submission. Please try again." };
+            Errors = new Dictionary<string, string> { [CreateSaveErrorKey] = CreateSaveFailedMessage };
             Mode = "create";
             return Page();
         }

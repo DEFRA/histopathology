@@ -21,7 +21,7 @@
         </tr>
     </thead>
     <tbody class="govuk-table__body">
-        @foreach (var u in Model.PagedEntries)
+        @foreach (var u in Model.GetPagedEntries())
         {
             <tr class="govuk-table__row @(u.UserID == Model.FocusUserId ? "app-table__row--saved" : "")">
                 <td class="govuk-table__cell">@u.Name</td>

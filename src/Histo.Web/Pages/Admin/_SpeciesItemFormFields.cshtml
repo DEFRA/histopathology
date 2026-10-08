@@ -1,0 +1,21 @@
+@*
+    Shared Species/CommonName fields for the Add/Edit species forms — identical markup on
+    both pages, typed against ISpeciesItemFormFields so asp-for still binds correctly
+    regardless of which concrete page model (AddSpeciesItemModel/EditSpeciesItemModel) is
+    rendering it.
+*@
+@model Histo.Web.Pages.Admin.ISpeciesItemFormFields
+
+<div class="govuk-form-group @(Model.Errors.ContainsKey("Species") ? "govuk-form-group--error" : "")">
+    <label class="govuk-label" for="Species">Species</label>
+    @if (Model.Errors.TryGetValue("Species", out var speciesError))
+    {
+        <p id="Species-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @speciesError</p>
+    }
+    <input class="govuk-input @(Model.Errors.ContainsKey("Species") ? "govuk-input--error" : "")" asp-for="Species" maxlength="20"
+           aria-describedby="@(Model.Errors.ContainsKey("Species") ? "Species-error" : null)" />
+</div>
+<div class="govuk-form-group">
+    <label class="govuk-label" for="CommonName">Common name</label>
+    <input class="govuk-input" asp-for="CommonName" maxlength="20" />
+</div>

@@ -142,9 +142,9 @@
                    (BatchDetails.aspx.vb's enable/disable block); everyone else gets it auto-set from
                    their own session area and locked. *@
                 <div class="govuk-form-group">
-                    <label class="govuk-label" for="Create_OtherSubmittedArea">Submitted area</label>
                     @if (Model.CanEditSubmittedArea)
                     {
+                        <label class="govuk-label" for="Create_OtherSubmittedArea">Submitted area</label>
                         <select class="govuk-select" asp-for="Create_OtherSubmittedArea" id="Create_OtherSubmittedArea">
                             <option value="">-- None --</option>
                             @foreach (var a in Model.Create_UserAreas)
@@ -155,6 +155,7 @@
                     }
                     else
                     {
+                        <label class="govuk-label" for="Create_OtherSubmittedAreaDisplay">Submitted area</label>
                         <select class="govuk-select" id="Create_OtherSubmittedAreaDisplay" disabled>
                             <option value="">-- None --</option>
                             @foreach (var a in Model.Create_UserAreas)

@@ -11,6 +11,10 @@ namespace Histo.Submissions.Repositories;
 /// </summary>
 public sealed class BatchRepository : IBatchRepository
 {
+    private const string ReturnValueParam = "RETURN_VALUE";
+    private const string DateReceivedColumn = "DateReceived";
+    private const string ReceivedByColumn = "ReceivedBy";
+
     private readonly IDbConnectionFactory _db;
 
     public BatchRepository(IDbConnectionFactory db) => _db = db;
@@ -80,7 +84,7 @@ public sealed class BatchRepository : IBatchRepository
             Comments          = Str(dict, "Comments"),
             StatusComments    = Str(dict, "StatusComments"),
             BatchDate         = ParseDate(dict, "BatchDate"),
-            ReceivedDate      = ParseDate(dict, "DateReceived"),   // SP column: DateReceived
+            ReceivedDate      = ParseDate(dict, DateReceivedColumn),   // SP column: DateReceived
             CompletedDate     = ParseDate(dict, "DateCompleted"),  // SP column: DateCompleted
             SubmittedByUserID = Int(dict, "SubmittedBy"),          // populate old field for backward compat
             UserAreaCode      = int.TryParse(submittedAreaStr, out var ua) ? ua : 0,
@@ -102,7 +106,7 @@ public sealed class BatchRepository : IBatchRepository
             SampleSameProjects = Bool(dict, "SampleSameProjects"),
             AllTissuesAssigned = Bool(dict, "AllTissuesAssigned"),
             TimeReceived      = Str(dict, "TimeReceived"),
-            ReceivedBy        = NullInt(dict, "ReceivedBy"),
+            ReceivedBy        = NullInt(dict, ReceivedByColumn),
             PostFixationOther = Str(dict, "PostFixationOther"),
         };
     }
@@ -211,9 +215,9 @@ public sealed class BatchRepository : IBatchRepository
         {
             // SP variant: returns new ID via RETURN statement instead of OUTPUT param
             var p2 = BuildAddBatchParams(batch, userId);
-            p2.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
+            p2.Add(ReturnValueParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
             await conn.ExecuteAsync("AddBatch", p2, commandType: System.Data.CommandType.StoredProcedure);
-            return p2.Get<int>("RETURN_VALUE");
+            return p2.Get<int>(ReturnValueParam);
         }
 
         // INSERT ran but @BatchID = 0: INSERT failed (SP returned error code via RETURN).
@@ -266,9 +270,9 @@ public sealed class BatchRepository : IBatchRepository
         p.Add("SubmittedBy",         batch.SubmittedByUserID > 0 ? batch.SubmittedByUserID : (batch.SubmittedBy ?? 0));
         p.Add("SafeToHandle",        batch.SafeToHandle ?? false);
         p.Add("BatchStatus",         batchStatusInt);
-        p.Add("DateReceived",        batch.ReceivedDate);
+        p.Add(DateReceivedColumn,    batch.ReceivedDate);
         p.Add("TimeReceived",        batch.TimeReceived);
-        p.Add("ReceivedBy",          batch.ReceivedBy);
+        p.Add(ReceivedByColumn,      batch.ReceivedBy);
         p.Add("OtherSubmittedBy",    batch.OtherSubmittedBy ?? 0);
         p.Add("OtherSubmittedArea",  batch.OtherSubmittedArea ?? "");
         p.Add("Cassetted",           batch.IsPreCassetted);
@@ -388,18 +392,18 @@ public sealed class BatchRepository : IBatchRepository
 
         using var conn = _db.CreateConnection();
         var p = new DynamicParameters();
-        p.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
+        p.Add(ReturnValueParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
         p.Add("ID",              batchId);
         p.Add("BatchStatus",     batchStatusInt);
-        p.Add("DateReceived",    dateReceived);
+        p.Add(DateReceivedColumn, dateReceived);
         p.Add("TimeReceived",    timeReceived);
-        p.Add("ReceivedBy",      receivedBy);
+        p.Add(ReceivedByColumn,  receivedBy);
         p.Add("StatusComments",  existing?.StatusComments);
         p.Add("PostFixationOther", existing?.PostFixationOther);
 
         await conn.ExecuteAsync("EditBatchStatus", p, commandType: System.Data.CommandType.StoredProcedure);
 
-        var returnValue = p.Get<int>("RETURN_VALUE");
+        var returnValue = p.Get<int>(ReturnValueParam);
         // SP returns -1 when no rows were updated (concurrency conflict or batch not found).
         if (returnValue == -1) throw new BatchConcurrencyException();
         return returnValue == 0;
@@ -486,7 +490,7 @@ public sealed class BatchRepository : IBatchRepository
             ContactDescription    = Str(dict, "ContactDescription"),
             Species               = Str(dict, "Species"),
             BatchDate             = ParseDate(dict, "BatchDate"),
-            DateReceived          = ParseDate(dict, "DateReceived"),
+            DateReceived          = ParseDate(dict, DateReceivedColumn),
             DateCompleted         = ParseDate(dict, "DateCompleted"),
             CustomerReceivedDate  = ParseDate(dict, "CustomerReceivedDate"),
             Status                = batchStatusInt > 0 ? batchStatusInt.ToString() : Str(dict, "Status"),
@@ -494,7 +498,7 @@ public sealed class BatchRepository : IBatchRepository
             BatchType             = Str(dict, "BatchType"),
             SafeToHandle          = Str(dict, "SafeToHandle"),
             ReceivedTime          = Str(dict, "ReceivedTime"),
-            ReceivedBy            = Str(dict, "ReceivedBy"),
+            ReceivedBy            = Str(dict, ReceivedByColumn),
             OtherSubmittedBy      = Str(dict, "OtherSubmittedBy"),
             Comments              = Str(dict, "Comments"),
         };
@@ -802,9 +806,10 @@ public sealed class BatchRepository : IBatchRepository
         var premiumCharges = await GetActivePremiumChargeDescriptionsAsync(conn);
 
         var results = new List<Models.TestPremiumChargeCount>();
-        await AddCountsAsync(conn, results, "GetTestHistologyCounts", histologyCodes, premiumCharges, projectDesc, batchType, startDate, endDate);
-        await AddCountsAsync(conn, results, "GetTestAntibodiesCounts", antibodyCodes, premiumCharges, projectDesc, batchType, startDate, endDate);
-        await AddCountsAsync(conn, results, "GetTestStainsCounts", stainCodes, premiumCharges, projectDesc, batchType, startDate, endDate);
+        var filter = new PremiumChargeFilter(projectDesc, batchType, startDate, endDate);
+        await AddCountsAsync(conn, results, "GetTestHistologyCounts", histologyCodes, premiumCharges, filter);
+        await AddCountsAsync(conn, results, "GetTestAntibodiesCounts", antibodyCodes, premiumCharges, filter);
+        await AddCountsAsync(conn, results, "GetTestStainsCounts", stainCodes, premiumCharges, filter);
         return results;
     }
 
@@ -822,9 +827,10 @@ public sealed class BatchRepository : IBatchRepository
         var premiumCharges = await GetActivePremiumChargeDescriptionsAsync(conn);
 
         var results = new List<Models.TestPremiumChargeBatchRef>();
-        await AddBatchesAsync(conn, results, "GetTestHistologyBatch", histologyCodes, premiumCharges, projectDesc, batchType, startDate, endDate);
-        await AddBatchesAsync(conn, results, "GetTestAntibodiesBatch", antibodyCodes, premiumCharges, projectDesc, batchType, startDate, endDate);
-        await AddBatchesAsync(conn, results, "GetTestStainsBatch", stainCodes, premiumCharges, projectDesc, batchType, startDate, endDate);
+        var filter = new PremiumChargeFilter(projectDesc, batchType, startDate, endDate);
+        await AddBatchesAsync(conn, results, "GetTestHistologyBatch", histologyCodes, premiumCharges, filter);
+        await AddBatchesAsync(conn, results, "GetTestAntibodiesBatch", antibodyCodes, premiumCharges, filter);
+        await AddBatchesAsync(conn, results, "GetTestStainsBatch", stainCodes, premiumCharges, filter);
         return results;
     }
 
@@ -849,10 +855,13 @@ public sealed class BatchRepository : IBatchRepository
     /// </summary>
     private static string JoinTestCodes(IReadOnlyList<string> codes) => string.Join("','", codes);
 
+    /// <summary>Groups the shared filter parameters for <see cref="AddCountsAsync"/>/<see cref="AddBatchesAsync"/> so both stay under the 7-parameter limit.</summary>
+    private sealed record PremiumChargeFilter(string? ProjectDescription, int BatchType, DateTime? StartDate, DateTime? EndDate);
+
     private static async Task AddCountsAsync(
         System.Data.IDbConnection conn, List<Models.TestPremiumChargeCount> results,
         string procName, IReadOnlyList<string> codes, IReadOnlyList<string> premiumCharges,
-        string? projectDesc, int batchType, DateTime? startDate, DateTime? endDate)
+        PremiumChargeFilter filter)
     {
         if (codes.Count == 0) return;
         var tests = JoinTestCodes(codes);
@@ -861,10 +870,10 @@ public sealed class BatchRepository : IBatchRepository
         {
             var rows = await conn.QueryAsync<dynamic>(procName, new
             {
-                ProjectContractCode = projectDesc ?? "",
-                SubmittedDateFrom = startDate,
-                SubmittedDateTo = endDate,
-                BatchType = batchType != 0,
+                ProjectContractCode = filter.ProjectDescription ?? "",
+                SubmittedDateFrom = filter.StartDate,
+                SubmittedDateTo = filter.EndDate,
+                BatchType = filter.BatchType != 0,
                 Tests = tests,
                 TestCode = testCode,
             }, commandType: System.Data.CommandType.StoredProcedure);
@@ -889,7 +898,7 @@ public sealed class BatchRepository : IBatchRepository
     private static async Task AddBatchesAsync(
         System.Data.IDbConnection conn, List<Models.TestPremiumChargeBatchRef> results,
         string procName, IReadOnlyList<string> codes, IReadOnlyList<string> premiumCharges,
-        string? projectDesc, int batchType, DateTime? startDate, DateTime? endDate)
+        PremiumChargeFilter filter)
     {
         if (codes.Count == 0) return;
         var tests = JoinTestCodes(codes);
@@ -898,10 +907,10 @@ public sealed class BatchRepository : IBatchRepository
         {
             var batchIds = await conn.QueryAsync<int>(procName, new
             {
-                ProjectContractCode = projectDesc ?? "",
-                SubmittedDateFrom = startDate,
-                SubmittedDateTo = endDate,
-                BatchType = batchType != 0,
+                ProjectContractCode = filter.ProjectDescription ?? "",
+                SubmittedDateFrom = filter.StartDate,
+                SubmittedDateTo = filter.EndDate,
+                BatchType = filter.BatchType != 0,
                 Tests = tests,
                 TestCode = testCode,
             }, commandType: System.Data.CommandType.StoredProcedure);

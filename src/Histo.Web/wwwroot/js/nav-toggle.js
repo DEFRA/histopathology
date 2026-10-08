@@ -5,7 +5,9 @@
 (function () {
     var toggle = document.querySelector('.app-nav-toggle');
     var menu = document.getElementById('navigation');
-    if (!toggle || !menu) return;
+    if (!toggle || !menu) {
+        return;
+    }
 
     function setExpanded(expanded) {
         toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
@@ -16,7 +18,7 @@
     setExpanded(false);
 
     toggle.addEventListener('click', function () {
-        setExpanded(toggle.getAttribute('aria-expanded') !== 'true');
+        setExpanded(toggle.ariaExpanded !== 'true');
     });
 
     menu.addEventListener('keydown', function (event) {

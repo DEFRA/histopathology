@@ -10,7 +10,7 @@ namespace Histo.Web.Pages.Admin;
 /// <c>UserMaintenance.aspx</c> inline grid (<c>Pager.AllowAddNew</c> /
 /// <c>clsUser.SaveUserData</c> insert path via the <c>AddUser</c> stored procedure).
 /// </summary>
-public class AddUserModel : HistoPageModel
+public class AddUserModel : HistoPageModel, IUserFormFields
 {
     private readonly IUserService _users;
     private readonly ILookupService _lookups;
@@ -100,14 +100,7 @@ public class AddUserModel : HistoPageModel
 
     private void Validate()
     {
-        if (string.IsNullOrWhiteSpace(Name)) Errors["Name"] = "Enter the user's name.";
-        else if (Name.Length > 35) Errors["Name"] = "Name must be 35 characters or less.";
-
-        if (string.IsNullOrWhiteSpace(Email)) Errors["Email"] = "Enter the user's email.";
-        else if (Email.Length > 60) Errors["Email"] = "Email must be 60 characters or less.";
-
-        if (GroupCode <= 0) Errors["GroupCode"] = "Select a user group.";
-        if (AreaCode <= 0) Errors["AreaCode"] = "Select a user area.";
+        UserFormValidator.Validate(Errors, Name, Email, GroupCode, AreaCode);
     }
 
     /// <summary>Mirrors the DB's unconditional (not Active-filtered) unique index on Email.</summary>

@@ -41,7 +41,7 @@ public class SpeciesItemsModelTests
         await sut.OnGetAsync();
 
         Assert.Equal(2, sut.TotalCount);
-        Assert.Equal("Bovine", sut.PagedEntries.First().Species);
+        Assert.Equal("Bovine", sut.PagedEntries[0].Species);
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public class SpeciesItemsModelTests
 
         Assert.Equal(15, sut.TotalCount);
         Assert.Equal(10, sut.PagedEntries.Count);
-        Assert.Equal("Species 01", sut.PagedEntries.First().Species);
+        Assert.Equal("Species 01", sut.PagedEntries[0].Species);
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public class SpeciesItemsModelTests
 
         await sut.OnGetAsync();
 
-        Assert.Equal(2, sut.PagedEntries.First().SpeciesID);
+        Assert.Equal(2, sut.PagedEntries[0].SpeciesID);
     }
 
     [Fact]
@@ -105,5 +105,59 @@ public class SpeciesItemsModelTests
 
         Assert.Equal(0, sut.TotalCount);
         Assert.Empty(sut.PagedEntries);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_SortByCommonNameAscending_OrdersCorrectly()
+    {
+        // Covers the "CommonName" switch branch (ascending) in GetPagedEntries.
+        _lookups.Setup(l => l.GetSpeciesItemsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<SpeciesItem>)[
+                new SpeciesItem { SpeciesID = 1, Species = "Bovine", CommonName = "Zebra" },
+                new SpeciesItem { SpeciesID = 2, Species = "Ovine", CommonName = "Antelope" },
+            ]);
+        var sut = CreateSut();
+        sut.SortColumn = "CommonName";
+
+        await sut.OnGetAsync();
+
+        Assert.Equal("Antelope", sut.PagedEntries[0].CommonName);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_SortByCommonNameDescending_OrdersCorrectly()
+    {
+        // Covers the "CommonName" switch branch (descending).
+        _lookups.Setup(l => l.GetSpeciesItemsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<SpeciesItem>)[
+                new SpeciesItem { SpeciesID = 1, Species = "Bovine", CommonName = "Zebra" },
+                new SpeciesItem { SpeciesID = 2, Species = "Ovine", CommonName = "Antelope" },
+            ]);
+        var sut = CreateSut();
+        sut.SortColumn = "CommonName";
+        sut.SortDesc = true;
+
+        await sut.OnGetAsync();
+
+        Assert.Equal("Zebra", sut.PagedEntries[0].CommonName);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_SortBySpeciesExplicitDescending_OrdersCorrectly()
+    {
+        // Covers the explicit "Species" switch branch (descending) — distinct from the
+        // default (unmatched SortColumn) branch, which also sorts by Species but ascending.
+        _lookups.Setup(l => l.GetSpeciesItemsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<SpeciesItem>)[
+                new SpeciesItem { SpeciesID = 1, Species = "Bovine" },
+                new SpeciesItem { SpeciesID = 2, Species = "Ovine" },
+            ]);
+        var sut = CreateSut();
+        sut.SortColumn = "Species";
+        sut.SortDesc = true;
+
+        await sut.OnGetAsync();
+
+        Assert.Equal("Ovine", sut.PagedEntries[0].Species);
     }
 }

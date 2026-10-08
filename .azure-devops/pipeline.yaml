@@ -265,7 +265,7 @@ stages:
 
                       TOOLS="$(Agent.TempDirectory)/sqlcmd"
                       mkdir -p "$TOOLS"
-                      curl -sSL --fail --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
+                      curl -sSL --fail --proto '=https' --tlsv1.2 --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
                         https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.2/sqlcmd-linux-amd64.tar.bz2
                       tar -xjf "$TOOLS/sqlcmd.tar.bz2" -C "$TOOLS"
 
@@ -399,7 +399,7 @@ stages:
 
                       TOOLS="$(Agent.TempDirectory)/sqlcmd"
                       mkdir -p "$TOOLS"
-                      curl -sSL --fail --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
+                      curl -sSL --fail --proto '=https' --tlsv1.2 --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
                         https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.2/sqlcmd-linux-amd64.tar.bz2
                       tar -xjf "$TOOLS/sqlcmd.tar.bz2" -C "$TOOLS"
 
@@ -532,7 +532,7 @@ stages:
 
                       TOOLS="$(Agent.TempDirectory)/sqlcmd"
                       mkdir -p "$TOOLS"
-                      curl -sSL --fail --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
+                      curl -sSL --fail --proto '=https' --tlsv1.2 --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
                         https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.2/sqlcmd-linux-amd64.tar.bz2
                       tar -xjf "$TOOLS/sqlcmd.tar.bz2" -C "$TOOLS"
 
@@ -720,7 +720,7 @@ stages:
 
                 TOOLS="$(Agent.TempDirectory)/sqlcmd"
                 mkdir -p "$TOOLS"
-                curl -sSL --fail --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
+                curl -sSL --fail --proto '=https' --tlsv1.2 --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
                   https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.2/sqlcmd-linux-amd64.tar.bz2
                 tar -xjf "$TOOLS/sqlcmd.tar.bz2" -C "$TOOLS"
 
@@ -749,7 +749,7 @@ stages:
 
                 TOOLS="$(Agent.TempDirectory)/sqlcmd"
                 mkdir -p "$TOOLS"
-                curl -sSL --fail --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
+                curl -sSL --fail --proto '=https' --tlsv1.2 --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
                   https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.2/sqlcmd-linux-amd64.tar.bz2
                 tar -xjf "$TOOLS/sqlcmd.tar.bz2" -C "$TOOLS"
 
@@ -778,7 +778,7 @@ stages:
 
                 TOOLS="$(Agent.TempDirectory)/sqlcmd"
                 mkdir -p "$TOOLS"
-                curl -sSL --fail --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
+                curl -sSL --fail --proto '=https' --tlsv1.2 --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
                   https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.2/sqlcmd-linux-amd64.tar.bz2
                 tar -xjf "$TOOLS/sqlcmd.tar.bz2" -C "$TOOLS"
 
