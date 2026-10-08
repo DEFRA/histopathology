@@ -82,6 +82,13 @@ public class QualityDataModel : GridPageModel
     [BindProperty(SupportsGet = true)] public string? FilterHistologyRef { get; set; }
     [BindProperty(SupportsGet = true)] public string? FilterTest { get; set; }
 
+    /// <summary>
+    /// Submission to open, for links arriving from a list/search page rather than from a handler
+    /// that has already put the batch in session. Falls back to <see cref="ISessionService.BatchID"/>
+    /// when absent, so every existing entry point is unaffected.
+    /// </summary>
+    [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
+
     public IReadOnlyList<string> HistologyRefs { get; private set; } = [];
     public IReadOnlyList<string> TestNames { get; private set; } = [];
 
@@ -148,6 +155,17 @@ public class QualityDataModel : GridPageModel
     {
         ViewData["Title"] = "Quality data";
         ViewData["PageTitle"] = "Quality data";
+
+        if (BatchId is > 0)
+        {
+            // The id came from the URL, so it has not been through an area-filtered list —
+            // authorise it here rather than trusting it the way a session-set id can be trusted.
+            var forbidden = await CheckBatchAccessAsync(_batches, BatchId.Value);
+            if (forbidden is not null) return forbidden;
+
+            Session.BatchID = BatchId;
+        }
+
         if (!Session.BatchID.HasValue) return RedirectToPage("/Index");
 
         var allTests    = await _tests.GetByBatchAsync(Session.BatchID.Value);
