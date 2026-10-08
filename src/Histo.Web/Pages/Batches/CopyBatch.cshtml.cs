@@ -206,6 +206,15 @@ public class CopyBatchModel : HistoPageModel
         });
     }
 
+    /// <summary>
+    /// Rows the Copy Submission table shows as a single line: a range copy stages one row per new
+    /// sender ref against the same source sample.
+    /// </summary>
+    public static bool IsSameDisplayGroup(AnimalRow a, AnimalRow b) =>
+        a.AnimalId == b.AnimalId
+        && a.SubmissionId == b.SubmissionId
+        && string.Equals(a.SenderRef, b.SenderRef, StringComparison.OrdinalIgnoreCase);
+
     private static IReadOnlyList<CopyBatchDisplayRow> BuildDisplayRows(IReadOnlyList<AnimalRow> animals)
     {
         var result = new List<CopyBatchDisplayRow>();
@@ -229,9 +238,7 @@ public class CopyBatchModel : HistoPageModel
                     continue;
 
                 var candidate = animals[j];
-                if (candidate.AnimalId == anchor.AnimalId
-                    && candidate.SubmissionId == anchor.SubmissionId
-                    && string.Equals(candidate.SenderRef, anchor.SenderRef, StringComparison.OrdinalIgnoreCase))
+                if (IsSameDisplayGroup(candidate, anchor))
                 {
                     rowIndexes.Add(j);
                     if (!string.IsNullOrWhiteSpace(candidate.NewSenderRef))

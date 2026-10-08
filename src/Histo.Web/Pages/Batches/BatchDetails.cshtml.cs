@@ -425,7 +425,11 @@ public class BatchDetailsModel : HistoPageModel
                 throw new InvalidOperationException(
                     $"Could not copy sample '{label}' because it is no longer part of the submission being copied. Start the copy again. Nothing was saved.");
 
-            var submission = submissions.FirstOrDefault(s => s.ID == pending.SubmissionId)
+            // SubmissionId arrives from a client-controlled hidden field, so it is only honoured
+            // when it actually belongs to the staged animal — a stale or tampered pair would
+            // otherwise graft another animal's tissues onto this one's blocks. A wet-tissue animal
+            // legitimately owns several submissions, which is why the staged value still wins.
+            var submission = submissions.FirstOrDefault(s => s.ID == pending.SubmissionId && BelongsToAnimal(s, animal))
                 ?? submissions.FirstOrDefault(s => s.ID == animal.BatchSubmissionID)
                 ?? (animal.BatchSubmissionID == 0 ? submissions.FirstOrDefault(s => s.ID == firstSubmId) : null);
 
@@ -460,6 +464,9 @@ public class BatchDetailsModel : HistoPageModel
         }
         return plan;
     }
+
+    private static bool BelongsToAnimal(BatchSubmission submission, Animal animal) =>
+        submission.AnimalID == animal.ID || submission.ID == animal.BatchSubmissionID;
 
     /// <summary>Flattens a sample's blocks (tissues and test selections) into the copy plan's module-neutral shape.</summary>
     private async Task<IReadOnlyList<CopiedBlockPlan>> BuildBlockPlansAsync(int sourceBatchId, IReadOnlyList<Block> blocks, IReadOnlyList<BlockTest> allTests)

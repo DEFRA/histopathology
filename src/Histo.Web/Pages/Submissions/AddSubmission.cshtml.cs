@@ -413,13 +413,18 @@ public class AddSubmissionModel : HistoPageModel
         var animals = JsonSerializer.Deserialize<List<CopyBatchModel.AnimalRow>>(savedJson) ?? [];
         if (RowIndex is >= 0 && RowIndex < animals.Count)
         {
+            var edited = animals[RowIndex.Value];
+            // Change acts on a grouped display row, so the previous range's other rows must go —
+            // otherwise re-ranging MC2-MC4 leaves MC3/MC4 staged beside the replacement.
+            animals.RemoveAll(a => !ReferenceEquals(a, edited) && CopyBatchModel.IsSameDisplayGroup(a, edited));
+            var editedIndex = animals.IndexOf(edited);
+
             if (rangeRefs is { Count: > 0 })
             {
-                var edited = animals[RowIndex.Value];
                 edited.NewSenderRef = rangeRefs[0];
                 for (var i = 1; i < rangeRefs.Count; i++)
                 {
-                    animals.Insert(RowIndex.Value + i, new CopyBatchModel.AnimalRow
+                    animals.Insert(editedIndex + i, new CopyBatchModel.AnimalRow
                     {
                         AnimalId = edited.AnimalId,
                         SubmissionId = edited.SubmissionId,
@@ -431,7 +436,7 @@ public class AddSubmissionModel : HistoPageModel
             }
             else
             {
-                animals[RowIndex.Value].NewSenderRef = string.IsNullOrWhiteSpace(SenderRef)
+                edited.NewSenderRef = string.IsNullOrWhiteSpace(SenderRef)
                     ? string.IsNullOrWhiteSpace(MouseNumberFrom) ? string.Empty : MouseNumberFrom.Trim()
                     : SenderRef.Trim();
             }

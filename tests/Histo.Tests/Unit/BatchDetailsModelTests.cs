@@ -401,10 +401,11 @@ public class BatchDetailsModelTests
     [Fact]
     public async Task OnPostCreateAsync_PendingCopy_UsesTheStagedSubmissionIdForWetTissueRows()
     {
+        // A wet-tissue animal owns more than one BatchSubmission, so the staged id picks which one.
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(10, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BatchSubmission>)[
                 new() { ID = 50, BatchID = 10, AnimalID = 1, Order = 1 },
-                new() { ID = 60, BatchID = 10, AnimalID = 2, Order = 2 },
+                new() { ID = 60, BatchID = 10, AnimalID = 1, Order = 2 },
             ]);
         _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[]);
@@ -439,6 +440,51 @@ public class BatchDetailsModelTests
         Assert.Equal(60, captured!.SourceSubmission.ID);
         Assert.Equal("LUNG", captured.Tissues.Single().TissueCode);
         _submissions.Verify(s => s.GetTissuesBySubmissionAsync(10, 60, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// SubmissionId is a client-controlled hidden field, so a pair that points at another animal's
+    /// submission must not be honoured — that would copy animal 2's tissues onto animal 1's blocks.
+    /// </summary>
+    [Fact]
+    public async Task OnPostCreateAsync_StagedSubmissionBelongsToAnotherAnimal_FallsBackToTheAnimalsOwnSubmission()
+    {
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[
+                new() { ID = 50, BatchID = 10, AnimalID = 1, Order = 1 },
+                new() { ID = 60, BatchID = 10, AnimalID = 2, Order = 2 },
+            ]);
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1, SenderRef = "S1", BatchSubmissionID = 0 }]);
+        _submissions.Setup(s => s.GetTissuesBySubmissionAsync(10, 50, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Tissue>)[new Tissue { ID = 10, TissueCode = "LIVER" }]);
+        _submissions.Setup(s => s.GetTissuesBySubmissionAsync(10, 60, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Tissue>)[new Tissue { ID = 20, TissueCode = "LUNG" }]);
+
+        CopiedSamplePlan? captured = null;
+        _submissions.Setup(s => s.CreateBatchWithCopiedSamplesAsync(
+                It.IsAny<Batch>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<string?>(), It.IsAny<IReadOnlyList<CopiedSamplePlan>>(), 7, It.IsAny<CancellationToken>()))
+            .Callback((Batch _, IReadOnlyList<string> _, IReadOnlyList<string> _, IReadOnlyList<string> _,
+                       string? _, IReadOnlyList<CopiedSamplePlan> p, int _, CancellationToken _) => captured = p.Single())
+            .ReturnsAsync(100);
+
+        var sut = CreateSut();
+        sut.Create_SelectedHistologyCodes = [HistologyCode.EO];
+        sut.CopyToken = "tok-1";
+        var pending = new CopyBatchModel.PendingCopy(10, [
+            new CopyBatchModel.AnimalRow { AnimalId = 1, SubmissionId = 60, SenderRef = "S1", NewSenderRef = "S1-NEW" }
+        ], "tok-1");
+        sut.TempData["CopyBatch_PendingCopy"] = System.Text.Json.JsonSerializer.Serialize(pending);
+
+        await sut.OnPostCreateAsync();
+
+        Assert.NotNull(captured);
+        Assert.Equal(50, captured!.SourceSubmission.ID);
+        Assert.Equal("LIVER", captured.Tissues.Single().TissueCode);
+        _submissions.Verify(s => s.GetTissuesBySubmissionAsync(10, 60, It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -565,6 +611,7 @@ public class BatchDetailsModelTests
         session.SetupProperty(s => s.IsViewSubmissionMode);
         session.SetupProperty(s => s.SampleSummaryReturnPage);
         session.SetupProperty(s => s.EditBatchReturnPage);
+        session.SetupProperty(s => s.ReturnPageQuery);
         var batches = new Mock<IBatchService>();
         var submissions = new Mock<ISubmissionService>();
         var sut = new CopyBatchSummaryModel(session.Object, batches.Object, submissions.Object);
@@ -579,6 +626,7 @@ public class BatchDetailsModelTests
 
         var editRedirect = Assert.IsType<RedirectToPageResult>(editResult);
         Assert.Equal("/Batches/EditBatch", editRedirect.PageName);
+        Assert.Equal("?newBatchId=42", session.Object.ReturnPageQuery);
     }
 
     [Fact]

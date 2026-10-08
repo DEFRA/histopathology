@@ -70,6 +70,9 @@ public class CopyBatchSummaryModel : HistoPageModel
         Session.IsViewSubmissionMode = false;
         Session.SampleSummaryReturnPage = "/Batches/CopyBatchSummary";
         Session.EditBatchReturnPage = "/Batches/CopyBatchSummary";
+        // EditBatch rebuilds its Save/Cancel target from the page plus this query, so without it
+        // the summary would be re-entered with no newBatchId (or an unrelated stale one).
+        Session.ReturnPageQuery = $"?newBatchId={newBatchId}";
         return RedirectToPage("/Batches/EditBatch");
     }
 }
