@@ -475,6 +475,11 @@ public sealed class SubmissionRepository : ISubmissionRepository
         }
     }
 
+    /// <summary>
+    /// A copied tissue is a brand-new, unarchived record: <c>AddTissue</c>/<c>AddBlockTissue</c>
+    /// take no Archive* parameters (only <c>EditTissue</c> does), so the source's archive
+    /// location/date/comment stay with the original tissue and are not carried across.
+    /// </summary>
     private static async Task<int> CopyTissueAsync(IDbConnection conn, IDbTransaction tx, Tissue source, int newOwnerId)
     {
         var tissue = new Tissue
@@ -484,9 +489,6 @@ public sealed class SubmissionRepository : ISubmissionRepository
             TissueCode = source.TissueCode,
             NoPieces = source.NoPieces,
             Comment = source.Comment,
-            ArchiveLocation = source.ArchiveLocation,
-            ArchivedDate = source.ArchivedDate,
-            ArchiveComment = source.ArchiveComment,
         };
 
         return await AddTissueAsync(conn, tx, tissue);
@@ -497,19 +499,15 @@ public sealed class SubmissionRepository : ISubmissionRepository
         var procName = tissue.Owner == TissueOwner.Submission ? "AddTissue" : "AddBlockTissue";
         var keyParam = tissue.Owner == TissueOwner.Submission ? "BatchSubmissionID" : "BlockID";
 
+        // Legacy source: clsTissue.vb::UpdateTissueDetails — AddInsertParam list is
+        // {keyField, TissueCode, NoPieces, Comment} only. No @UserID and no Archive* parameters on
+        // AddTissue/AddBlockTissue (those are AddUpdateParams, used by Edit/Delete).
         var parameters = new DynamicParameters();
         parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
         parameters.Add(keyParam, tissue.OwnerID);
         parameters.Add("TissueCode", tissue.TissueCode);
         parameters.Add("NoPieces", tissue.NoPieces);
         parameters.Add("Comment", (object?)tissue.Comment ?? DBNull.Value, dbType: System.Data.DbType.String);
-
-        if (tissue.Owner == TissueOwner.Submission)
-        {
-            parameters.Add("ArchiveLocation", (object?)tissue.ArchiveLocation ?? DBNull.Value, dbType: System.Data.DbType.String);
-            parameters.Add("ArchivedDate", (object?)tissue.ArchivedDate ?? DBNull.Value, dbType: System.Data.DbType.DateTime);
-            parameters.Add("ArchiveComment", (object?)tissue.ArchiveComment ?? DBNull.Value, dbType: System.Data.DbType.String);
-        }
 
         await conn.ExecuteAsync(procName, parameters, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
         return parameters.Get<int>("RETURN_VALUE");
@@ -790,19 +788,15 @@ public sealed class SubmissionRepository : ISubmissionRepository
         var keyParam = tissue.Owner == TissueOwner.Submission ? "BatchSubmissionID" : "BlockID";
 
         using var conn = _db.CreateConnection();
+        // Legacy source: clsTissue.vb::UpdateTissueDetails — AddInsertParam list is
+        // {keyField, TissueCode, NoPieces, Comment} only. No @UserID and no Archive* parameters on
+        // AddTissue/AddBlockTissue; archive details are set afterwards via UpdateTissueAsync.
         var parameters = new DynamicParameters();
         parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
         parameters.Add(keyParam, tissue.OwnerID);
         parameters.Add("TissueCode", tissue.TissueCode);
         parameters.Add("NoPieces", tissue.NoPieces);
         parameters.Add("Comment", (object?)tissue.Comment ?? DBNull.Value, dbType: System.Data.DbType.String);
-
-        if (tissue.Owner == TissueOwner.Submission)
-        {
-            parameters.Add("ArchiveLocation", (object?)tissue.ArchiveLocation ?? DBNull.Value, dbType: System.Data.DbType.String);
-            parameters.Add("ArchivedDate", (object?)tissue.ArchivedDate ?? DBNull.Value, dbType: System.Data.DbType.DateTime);
-            parameters.Add("ArchiveComment", (object?)tissue.ArchiveComment ?? DBNull.Value, dbType: System.Data.DbType.String);
-        }
 
         await conn.ExecuteAsync(procName, parameters,
             commandType: System.Data.CommandType.StoredProcedure);

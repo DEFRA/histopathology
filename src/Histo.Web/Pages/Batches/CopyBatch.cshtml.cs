@@ -147,6 +147,21 @@ public class CopyBatchModel : HistoPageModel
             return Page();
         }
 
+        // Only rows with an actual replacement sender ref are part of the copied submission.
+        // Blank rows represent "not selected" or a cancelled range edit and must never be carried
+        // into the new batch.
+        var selected = Animals
+            .Where(a => !string.IsNullOrWhiteSpace(a.NewSenderRef))
+            .ToList();
+
+        // Every row starts blank, so without this the copy would continue with an empty plan and
+        // create a batch header with no samples at all.
+        if (selected.Count == 0)
+        {
+            Error = "Select at least one sample to copy. Use Change to give a sample a new sender reference.";
+            return Page();
+        }
+
         if (!Confirm)
         {
             ShowConfirmPanel = true;
@@ -156,13 +171,7 @@ public class CopyBatchModel : HistoPageModel
         // Nothing is written to the database here — the samples are staged and the user is sent
         // to the normal Create Submission form, pre-filled from this source batch, so the new
         // batch (and these samples) are only created once that form is actually submitted.
-        // Only rows with an actual replacement sender ref are part of the copied submission.
-        // Blank rows represent "not selected" or a cancelled range edit and must never be carried
-        // into the new batch.
         var token = Guid.NewGuid().ToString("N");
-        var selected = Animals
-            .Where(a => !string.IsNullOrWhiteSpace(a.NewSenderRef))
-            .ToList();
         TempData["CopyBatch_PendingCopy"] = JsonSerializer.Serialize(new PendingCopy(SourceBatchId, selected, token));
 
         // BatchDetailsModel's create-mode form reads Session.BatchType (not the source batch

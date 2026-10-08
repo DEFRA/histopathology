@@ -580,4 +580,30 @@ public class BatchDetailsModelTests
         var editRedirect = Assert.IsType<RedirectToPageResult>(editResult);
         Assert.Equal("/Batches/EditBatch", editRedirect.PageName);
     }
+
+    [Fact]
+    public async Task CopyBatchSummaryModel_OnGetAsync_NoRouteValue_FallsBackToSessionBatchId()
+    {
+        var session = new Mock<ISessionService>();
+        session.SetupProperty(s => s.BatchID);
+        session.Object.BatchID = 42;
+        var batches = new Mock<IBatchService>();
+        batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 42 });
+        var submissions = new Mock<ISubmissionService>();
+        submissions.Setup(s => s.GetSubmissionsByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 1 }]);
+        submissions.Setup(s => s.GetAnimalsByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1 }]);
+
+        var sut = new CopyBatchSummaryModel(session.Object, batches.Object, submissions.Object)
+        {
+            PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
+        };
+
+        var result = await sut.OnGetAsync(0);
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal(42, sut.NewBatchId);
+        Assert.Equal(1, sut.SubmissionCount);
+    }
 }
