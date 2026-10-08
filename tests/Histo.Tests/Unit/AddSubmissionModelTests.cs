@@ -407,6 +407,40 @@ public class AddSubmissionModelTests
         Assert.Equal("OldB", animals[3].SenderRef);
     }
 
+    /// <summary>
+    /// Change acts on the grouped display row, so re-ranging must replace the whole previous range
+    /// rather than leaving its extra rows staged beside the replacement.
+    /// </summary>
+    [Fact]
+    public async Task OnPostAsync_CopySubmissionReturnFlow_ChangingAnExistingRange_ReplacesTheWholeGroup()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _submissions.Setup(s => s.GetExistingSenderRefsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<string>)[]);
+        var sut = CreateSut(returnPage: "/Batches/CopyBatch?sourceBatchId=5");
+        sut.BatchSubmissionId = 99;
+        sut.SourceAnimalId = 42;
+        sut.RowIndex = 0;
+        sut.MouseNumberFrom = "MC000007";
+        sut.MouseNumberTo = "MC000008";
+        sut.TempData["CopyBatch_Animals"] = JsonSerializer.Serialize(new List<CopyBatchModel.AnimalRow>
+        {
+            new() { AnimalId = 10, SenderRef = "OldA", NewSenderRef = "MC000002" },
+            new() { AnimalId = 10, SenderRef = "OldA", NewSenderRef = "MC000003" },
+            new() { AnimalId = 10, SenderRef = "OldA", NewSenderRef = "MC000004" },
+            new() { AnimalId = 11, SenderRef = "OldB", NewSenderRef = "MC000020" },
+        });
+
+        await sut.OnPostAsync();
+
+        var animals = JsonSerializer.Deserialize<List<CopyBatchModel.AnimalRow>>(sut.TempData["CopyBatch_Animals"] as string ?? "[]");
+        Assert.Equal(3, animals!.Count);
+        Assert.Equal(["MC000007", "MC000008"], animals.Take(2).Select(a => a.NewSenderRef));
+        Assert.DoesNotContain(animals, a => a.NewSenderRef is "MC000003" or "MC000004");
+        Assert.Equal("OldB", animals[2].SenderRef);
+    }
+
     [Fact]
     public async Task OnPostAsync_CopySample_CopiesSourceBlocksWithTestSelectionsAndDrawsAHistologyRef()
     {

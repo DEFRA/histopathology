@@ -56,6 +56,15 @@
         <fieldset class="govuk-fieldset">
             <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Copy to sample(s)</legend>
             <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                @if (Model.TargetAnimals.Any())
+                {
+                    @* Legacy CopyBlocks.aspx's cbSelectAll. Starts hidden so it never appears as a
+                       dead control when JavaScript is unavailable. *@
+                    <div class="govuk-checkboxes__item" id="select-all-samples-item" hidden>
+                        <input class="govuk-checkboxes__input" type="checkbox" id="select-all-samples" />
+                        <label class="govuk-label govuk-checkboxes__label" for="select-all-samples"><strong>Select all</strong></label>
+                    </div>
+                }
                 @foreach (var a in Model.TargetAnimals)
                 {
                     <div class="govuk-checkboxes__item">
@@ -92,3 +101,28 @@
         <a href="@Model.BackLinkPage" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
     </div>
 </form>
+
+@section Scripts {
+    <script>
+        (function () {
+            var item = document.getElementById('select-all-samples-item');
+            if (!item) return;
+
+            var selectAll = document.getElementById('select-all-samples');
+            var targets = Array.prototype.slice.call(document.querySelectorAll('input[name="TargetAnimalIds"]'));
+            if (!selectAll || targets.length === 0) return;
+
+            item.hidden = false;
+
+            selectAll.addEventListener('change', function () {
+                targets.forEach(function (t) { t.checked = selectAll.checked; });
+            });
+
+            targets.forEach(function (t) {
+                t.addEventListener('change', function () {
+                    selectAll.checked = targets.every(function (x) { return x.checked; });
+                });
+            });
+        })();
+    </script>
+}

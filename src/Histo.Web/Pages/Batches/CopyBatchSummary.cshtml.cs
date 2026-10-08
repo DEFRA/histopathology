@@ -31,13 +31,18 @@ public class CopyBatchSummaryModel : HistoPageModel
         ViewData["Title"] = "Submission Copied";
         ViewData["PageTitle"] = "Submission Copied";
 
-        NewBatchId = newBatchId;
-        NewBatch = await _batches.GetByIdAsync(newBatchId);
+        // Returning here from SampleSummary/EditBatch carries no newBatchId — SampleSummary's back
+        // link sends BatchId and its Finish handler sends no route value at all — so fall back to
+        // the copied batch the handlers below stored in session.
+        NewBatchId = newBatchId > 0 ? newBatchId : Session.BatchID ?? 0;
+        if (NewBatchId <= 0) return RedirectToPage("/Index");
+
+        NewBatch = await _batches.GetByIdAsync(NewBatchId);
         if (NewBatch is null) return RedirectToPage("/Index");
 
-        var submissions = await _submissions.GetSubmissionsByBatchAsync(newBatchId);
+        var submissions = await _submissions.GetSubmissionsByBatchAsync(NewBatchId);
         SubmissionCount = submissions.Count;
-        AnimalCount = (await _submissions.GetAnimalsByBatchAsync(newBatchId)).Count;
+        AnimalCount = (await _submissions.GetAnimalsByBatchAsync(NewBatchId)).Count;
         return Page();
     }
 
@@ -49,5 +54,25 @@ public class CopyBatchSummaryModel : HistoPageModel
         // stale read-only flag from an earlier, unrelated ViewSubmissions/SearchSubmissions visit.
         Session.IsViewSubmissionMode = false;
         return RedirectToPage("/Batches/BatchDetails");
+    }
+
+    public IActionResult OnPostSamplesAsync(int newBatchId)
+    {
+        Session.BatchID = newBatchId;
+        Session.IsViewSubmissionMode = false;
+        Session.SampleSummaryReturnPage = "/Batches/CopyBatchSummary";
+        return RedirectToPage("/Submissions/SampleSummary", new { batchId = newBatchId });
+    }
+
+    public IActionResult OnPostEditAsync(int newBatchId)
+    {
+        Session.BatchID = newBatchId;
+        Session.IsViewSubmissionMode = false;
+        Session.SampleSummaryReturnPage = "/Batches/CopyBatchSummary";
+        Session.EditBatchReturnPage = "/Batches/CopyBatchSummary";
+        // EditBatch rebuilds its Save/Cancel target from the page plus this query, so without it
+        // the summary would be re-entered with no newBatchId (or an unrelated stale one).
+        Session.ReturnPageQuery = $"?newBatchId={newBatchId}";
+        return RedirectToPage("/Batches/EditBatch");
     }
 }

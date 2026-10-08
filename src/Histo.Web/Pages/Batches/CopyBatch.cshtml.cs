@@ -36,6 +36,8 @@ public class CopyBatchModel : HistoPageModel
     [BindProperty] public int SourceBatchId { get; set; }
     [BindProperty] public List<AnimalRow> Animals { get; set; } = [];
 
+    public IReadOnlyList<CopyBatchDisplayRow> DisplayRows => BuildDisplayRows(Animals);
+
     public Batch? SourceBatch { get; private set; }
     // Persisted as hidden field so the view branches correctly on POST re-render.
     [BindProperty] public bool IsCassetted { get; set; }
@@ -145,6 +147,21 @@ public class CopyBatchModel : HistoPageModel
             return Page();
         }
 
+        // Only rows with an actual replacement sender ref are part of the copied submission.
+        // Blank rows represent "not selected" or a cancelled range edit and must never be carried
+        // into the new batch.
+        var selected = Animals
+            .Where(a => !string.IsNullOrWhiteSpace(a.NewSenderRef))
+            .ToList();
+
+        // Every row starts blank, so without this the copy would continue with an empty plan and
+        // create a batch header with no samples at all.
+        if (selected.Count == 0)
+        {
+            Error = "Select at least one sample to copy. Use Change to give a sample a new sender reference.";
+            return Page();
+        }
+
         if (!Confirm)
         {
             ShowConfirmPanel = true;
@@ -154,12 +171,8 @@ public class CopyBatchModel : HistoPageModel
         // Nothing is written to the database here — the samples are staged and the user is sent
         // to the normal Create Submission form, pre-filled from this source batch, so the new
         // batch (and these samples) are only created once that form is actually submitted.
-        // The token lets BatchDetailsModel tell "the user is continuing THIS copy" apart from
-        // "the user abandoned it and later made an unrelated Create Submission visit" — a plain
-        // TempData.Keep() has no such distinction, so a stale entry would otherwise resurface and
-        // get applied to a completely unrelated submission.
         var token = Guid.NewGuid().ToString("N");
-        TempData["CopyBatch_PendingCopy"] = JsonSerializer.Serialize(new PendingCopy(SourceBatchId, Animals, token));
+        TempData["CopyBatch_PendingCopy"] = JsonSerializer.Serialize(new PendingCopy(SourceBatchId, selected, token));
 
         // BatchDetailsModel's create-mode form reads Session.BatchType (not the source batch
         // directly) to pick the TSE/Non-TSE antibody lookup table and to stamp the new batch's own
@@ -193,6 +206,64 @@ public class CopyBatchModel : HistoPageModel
         });
     }
 
+    /// <summary>
+    /// Rows the Copy Submission table shows as a single line: a range copy stages one row per new
+    /// sender ref against the same source sample.
+    /// </summary>
+    public static bool IsSameDisplayGroup(AnimalRow a, AnimalRow b) =>
+        a.AnimalId == b.AnimalId
+        && a.SubmissionId == b.SubmissionId
+        && string.Equals(a.SenderRef, b.SenderRef, StringComparison.OrdinalIgnoreCase);
+
+    private static IReadOnlyList<CopyBatchDisplayRow> BuildDisplayRows(IReadOnlyList<AnimalRow> animals)
+    {
+        var result = new List<CopyBatchDisplayRow>();
+        var consumed = new HashSet<int>();
+
+        for (var i = 0; i < animals.Count; i++)
+        {
+            if (!consumed.Add(i))
+                continue;
+
+            var anchor = animals[i];
+            var rowIndexes = new List<int> { i };
+            var newSenderRefs = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(anchor.NewSenderRef))
+                newSenderRefs.Add(anchor.NewSenderRef);
+
+            for (var j = i + 1; j < animals.Count; j++)
+            {
+                if (!consumed.Add(j))
+                    continue;
+
+                var candidate = animals[j];
+                if (IsSameDisplayGroup(candidate, anchor))
+                {
+                    rowIndexes.Add(j);
+                    if (!string.IsNullOrWhiteSpace(candidate.NewSenderRef))
+                        newSenderRefs.Add(candidate.NewSenderRef);
+                }
+                else
+                {
+                    consumed.Remove(j);
+                }
+            }
+
+            result.Add(new CopyBatchDisplayRow
+            {
+                AnimalId = anchor.AnimalId,
+                SubmissionId = anchor.SubmissionId,
+                SenderRef = anchor.SenderRef,
+                TissueDetails = anchor.TissueDetails,
+                RowIndexes = rowIndexes,
+                NewSenderRefs = newSenderRefs,
+            });
+        }
+
+        return result;
+    }
+
     /// <summary>One editable row of the source submission's samples.</summary>
     public class AnimalRow
     {
@@ -202,6 +273,34 @@ public class CopyBatchModel : HistoPageModel
         public string NewSenderRef { get; set; } = string.Empty;
         /// <summary>Tissue detail strings for Scenario 2 (non-cassetted). Empty for Scenario 1.</summary>
         public List<string> TissueDetails { get; set; } = [];
+    }
+
+    public sealed class CopyBatchDisplayRow
+    {
+        public int AnimalId { get; init; }
+        public int SubmissionId { get; init; }
+        public string SenderRef { get; init; } = string.Empty;
+        public List<string> TissueDetails { get; init; } = [];
+        public List<int> RowIndexes { get; init; } = [];
+        public List<string> NewSenderRefs { get; init; } = [];
+
+        public string DisplayNewSenderRef
+        {
+            get
+            {
+                var refs = NewSenderRefs
+                    .Where(r => !string.IsNullOrWhiteSpace(r))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                return refs.Count switch
+                {
+                    0 => string.Empty,
+                    1 => refs[0],
+                    _ => $"{refs[0]} - {refs[^1]}",
+                };
+            }
+        }
     }
 
     /// <summary>

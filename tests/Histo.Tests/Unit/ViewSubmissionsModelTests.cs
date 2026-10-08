@@ -7,6 +7,7 @@ using Histo.Submissions.Models;
 using Histo.Web.Pages.Submissions;
 using Histo.Web.Services;
 using ExcelDataReader;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
@@ -53,6 +54,8 @@ public class ViewSubmissionsModelTests
                 ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()),
                 HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext(),
             },
+            TempData = new TempDataDictionary(
+                new Microsoft.AspNetCore.Http.DefaultHttpContext(), Mock.Of<ITempDataProvider>()),
         };
 
     [Fact]
@@ -71,27 +74,74 @@ public class ViewSubmissionsModelTests
     }
 
     [Fact]
-    public async Task OnPostSelectAsync_BlockCommentOnly_NoHeaderComment_EnablesPrintSubmissionNotes()
+    public async Task OnGetAsync_BlockCommentOnly_NoHeaderComment_EnablesPrintSubmissionNotes()
     {
         _blocks.Setup(b => b.GetByBatchAsync(7, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 1, Comment = "Block note" }]);
         var sut = CreateSut();
         sut.SelectedBatchId = 7;
 
-        await sut.OnPostSelectAsync();
+        await sut.OnGetAsync();
 
         Assert.True(sut.HasNotes);
     }
 
     [Fact]
-    public async Task OnPostSelectAsync_NoCommentsAnywhere_PrintSubmissionNotesStaysDisabled()
+    public async Task OnGetAsync_NoCommentsAnywhere_PrintSubmissionNotesStaysDisabled()
     {
         var sut = CreateSut();
         sut.SelectedBatchId = 7;
 
-        await sut.OnPostSelectAsync();
+        await sut.OnGetAsync();
 
         Assert.False(sut.HasNotes);
+    }
+
+    [Fact]
+    public void OnPostSelect_RedirectsSoBackButtonDoesNotReplayThePost()
+    {
+        var sut = CreateSut();
+        sut.SelectedBatchId = 7;
+
+        var result = sut.OnPostSelect();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal(7, redirect.RouteValues!["SelectedBatchId"]);
+        _session.VerifySet(s => s.BatchID = 7);
+    }
+
+    /// <summary>
+    /// The action/report links read Session.BatchID rather than the URL, so Back-navigating to an
+    /// earlier selected-result URL must re-point the session at that row's batch.
+    /// </summary>
+    [Fact]
+    public async Task OnGetAsync_SelectedBatchIdInUrl_ResynchronisesSessionBatchId()
+    {
+        var sut = CreateSut();
+        sut.SelectedBatchId = 7;
+
+        await sut.OnGetAsync();
+
+        _session.VerifySet(s => s.BatchID = 7);
+        _session.VerifySet(s => s.IsViewSubmissionMode = true);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_NoSelectedBatchId_DiscardsStashedCriteriaSoClearSearchIsUnfiltered()
+    {
+        var sut = CreateSut();
+        sut.SelectedBatchId = 7;
+        sut.SubmissionNumber = 12345;
+        sut.OnPostSelect();
+
+        var cleared = CreateSut();
+        cleared.TempData = sut.TempData;
+        cleared.SelectedBatchId = 0;
+
+        await cleared.OnGetAsync();
+
+        Assert.Null(cleared.SubmissionNumber);
+        Assert.False(cleared.TempData.ContainsKey("ViewSubmissions_Criteria"));
     }
 
     [Fact]

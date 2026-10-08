@@ -413,8 +413,9 @@ public class BatchDetailsModel : HistoPageModel
 
         // Driven by the staged rows rather than the source animals: a mouse-range copy stages
         // several new sender refs against the same source sample, which a per-animal lookup
-        // would collapse back down to one.
-        foreach (var pending in pendingSamples)
+        // would collapse back down to one. Only rows that truly selected a replacement sender ref
+        // should be copied; blank rows are either unselected samples or an abandoned range edit.
+        foreach (var pending in pendingSamples.Where(p => !string.IsNullOrWhiteSpace(p.NewSenderRef)))
         {
             // Dropping an unresolvable row would commit a partial copy while telling the user every
             // staged sample was copied, so both misses abort the whole copy instead.
@@ -424,8 +425,14 @@ public class BatchDetailsModel : HistoPageModel
                 throw new InvalidOperationException(
                     $"Could not copy sample '{label}' because it is no longer part of the submission being copied. Start the copy again. Nothing was saved.");
 
-            var submission = submissions.FirstOrDefault(s =>
-                animal.BatchSubmissionID == s.ID || (animal.BatchSubmissionID == 0 && s.ID == firstSubmId));
+            // SubmissionId arrives from a client-controlled hidden field, so it is only honoured
+            // when it actually belongs to the staged animal — a stale or tampered pair would
+            // otherwise graft another animal's tissues onto this one's blocks. A wet-tissue animal
+            // legitimately owns several submissions, which is why the staged value still wins.
+            var submission = submissions.FirstOrDefault(s => s.ID == pending.SubmissionId && BelongsToAnimal(s, animal))
+                ?? submissions.FirstOrDefault(s => s.ID == animal.BatchSubmissionID)
+                ?? (animal.BatchSubmissionID == 0 ? submissions.FirstOrDefault(s => s.ID == firstSubmId) : null);
+
             if (submission is null)
                 throw new InvalidOperationException(
                     $"Could not copy sample '{label}' because its submission record could not be found. Start the copy again. Nothing was saved.");
@@ -457,6 +464,9 @@ public class BatchDetailsModel : HistoPageModel
         }
         return plan;
     }
+
+    private static bool BelongsToAnimal(BatchSubmission submission, Animal animal) =>
+        submission.AnimalID == animal.ID || submission.ID == animal.BatchSubmissionID;
 
     /// <summary>Flattens a sample's blocks (tissues and test selections) into the copy plan's module-neutral shape.</summary>
     private async Task<IReadOnlyList<CopiedBlockPlan>> BuildBlockPlansAsync(int sourceBatchId, IReadOnlyList<Block> blocks, IReadOnlyList<BlockTest> allTests)

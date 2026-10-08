@@ -69,7 +69,7 @@ public class CopyBatchModelTests
         var sut = CreateSut();
         sut.SourceBatchId = 10;
         sut.Confirm = false;
-        sut.Animals = [new CopyBatchModel.AnimalRow { AnimalId = 7, SenderRef = "S1" }];
+        sut.Animals = [new CopyBatchModel.AnimalRow { AnimalId = 7, SenderRef = "S1", NewSenderRef = "S1-NEW" }];
 
         var result = await sut.OnPostAsync();
 
@@ -138,7 +138,7 @@ public class CopyBatchModelTests
         var sut = CreateSut();
         sut.SourceBatchId = 10;
         sut.Confirm = true;
-        sut.Animals = [new CopyBatchModel.AnimalRow { AnimalId = 7, SenderRef = "S1" }];
+        sut.Animals = [new CopyBatchModel.AnimalRow { AnimalId = 7, SenderRef = "S1", NewSenderRef = "S1-NEW" }];
 
         await sut.OnPostAsync();
 
@@ -157,6 +157,48 @@ public class CopyBatchModelTests
 
         Assert.Equal("The submission to copy could not be found.", sut.Error);
         Assert.False(sut.TempData.ContainsKey("CopyBatch_PendingCopy"));
+    }
+
+    [Fact]
+    public async Task OnPostAsync_NoSampleSelected_ShowsValidationErrorAndStagesNothing()
+    {
+        var sut = CreateSut();
+        sut.SourceBatchId = 10;
+        sut.Confirm = true;
+        sut.Animals =
+        [
+            new CopyBatchModel.AnimalRow { AnimalId = 7, SenderRef = "MC000001", NewSenderRef = string.Empty },
+            new CopyBatchModel.AnimalRow { AnimalId = 8, SenderRef = "MC000002", NewSenderRef = "   " },
+        ];
+        _batches.Setup(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(MakeSourceBatch());
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.False(string.IsNullOrWhiteSpace(sut.Error));
+        Assert.False(sut.TempData.ContainsKey("CopyBatch_PendingCopy"));
+    }
+
+    [Fact]
+    public void DisplayRows_GroupsRangeCopiesIntoLegacyStyleDisplay()
+    {
+        var sut = CreateSut();
+        sut.Animals =
+        [
+            new CopyBatchModel.AnimalRow { AnimalId = 7, SubmissionId = 11, SenderRef = "MC000001", NewSenderRef = "MC000002" },
+            new CopyBatchModel.AnimalRow { AnimalId = 7, SubmissionId = 11, SenderRef = "MC000001", NewSenderRef = "MC000003" },
+            new CopyBatchModel.AnimalRow { AnimalId = 7, SubmissionId = 11, SenderRef = "MC000001", NewSenderRef = "MC000004" },
+            new CopyBatchModel.AnimalRow { AnimalId = 8, SubmissionId = 12, SenderRef = "MC000010", NewSenderRef = "MC000011" },
+        ];
+
+        var rows = sut.DisplayRows;
+
+        Assert.Equal(2, rows.Count);
+        Assert.Equal("MC000001", rows[0].SenderRef);
+        Assert.Equal("MC000002 - MC000004", rows[0].DisplayNewSenderRef);
+        Assert.Equal("MC000010", rows[1].SenderRef);
+        Assert.Equal("MC000011", rows[1].DisplayNewSenderRef);
+        Assert.Equal([0, 1, 2], rows[0].RowIndexes);
     }
 
     [Fact]
