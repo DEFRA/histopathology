@@ -36,6 +36,8 @@ public class CopyBatchModel : HistoPageModel
     [BindProperty] public int SourceBatchId { get; set; }
     [BindProperty] public List<AnimalRow> Animals { get; set; } = [];
 
+    public IReadOnlyList<CopyBatchDisplayRow> DisplayRows => BuildDisplayRows(Animals);
+
     public Batch? SourceBatch { get; private set; }
     // Persisted as hidden field so the view branches correctly on POST re-render.
     [BindProperty] public bool IsCassetted { get; set; }
@@ -195,6 +197,57 @@ public class CopyBatchModel : HistoPageModel
         });
     }
 
+    private static IReadOnlyList<CopyBatchDisplayRow> BuildDisplayRows(IReadOnlyList<AnimalRow> animals)
+    {
+        var result = new List<CopyBatchDisplayRow>();
+        var consumed = new HashSet<int>();
+
+        for (var i = 0; i < animals.Count; i++)
+        {
+            if (!consumed.Add(i))
+                continue;
+
+            var anchor = animals[i];
+            var rowIndexes = new List<int> { i };
+            var newSenderRefs = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(anchor.NewSenderRef))
+                newSenderRefs.Add(anchor.NewSenderRef);
+
+            for (var j = i + 1; j < animals.Count; j++)
+            {
+                if (!consumed.Add(j))
+                    continue;
+
+                var candidate = animals[j];
+                if (candidate.AnimalId == anchor.AnimalId
+                    && candidate.SubmissionId == anchor.SubmissionId
+                    && string.Equals(candidate.SenderRef, anchor.SenderRef, StringComparison.OrdinalIgnoreCase))
+                {
+                    rowIndexes.Add(j);
+                    if (!string.IsNullOrWhiteSpace(candidate.NewSenderRef))
+                        newSenderRefs.Add(candidate.NewSenderRef);
+                }
+                else
+                {
+                    consumed.Remove(j);
+                }
+            }
+
+            result.Add(new CopyBatchDisplayRow
+            {
+                AnimalId = anchor.AnimalId,
+                SubmissionId = anchor.SubmissionId,
+                SenderRef = anchor.SenderRef,
+                TissueDetails = anchor.TissueDetails,
+                RowIndexes = rowIndexes,
+                NewSenderRefs = newSenderRefs,
+            });
+        }
+
+        return result;
+    }
+
     /// <summary>One editable row of the source submission's samples.</summary>
     public class AnimalRow
     {
@@ -204,6 +257,34 @@ public class CopyBatchModel : HistoPageModel
         public string NewSenderRef { get; set; } = string.Empty;
         /// <summary>Tissue detail strings for Scenario 2 (non-cassetted). Empty for Scenario 1.</summary>
         public List<string> TissueDetails { get; set; } = [];
+    }
+
+    public sealed class CopyBatchDisplayRow
+    {
+        public int AnimalId { get; init; }
+        public int SubmissionId { get; init; }
+        public string SenderRef { get; init; } = string.Empty;
+        public List<string> TissueDetails { get; init; } = [];
+        public List<int> RowIndexes { get; init; } = [];
+        public List<string> NewSenderRefs { get; init; } = [];
+
+        public string DisplayNewSenderRef
+        {
+            get
+            {
+                var refs = NewSenderRefs
+                    .Where(r => !string.IsNullOrWhiteSpace(r))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                return refs.Count switch
+                {
+                    0 => string.Empty,
+                    1 => refs[0],
+                    _ => $"{refs[0]} - {refs[^1]}",
+                };
+            }
+        }
     }
 
     /// <summary>

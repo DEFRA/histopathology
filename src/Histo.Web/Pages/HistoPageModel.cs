@@ -38,6 +38,7 @@ public abstract class HistoPageModel : PageModel
         PageHandlerExecutingContext context,
         PageHandlerExecutionDelegate next)
     {
+
         // Gate 1 — Authentication: redirect to Entra ID via SAML if not signed in.
         if (User.Identity?.IsAuthenticated != true)
         {

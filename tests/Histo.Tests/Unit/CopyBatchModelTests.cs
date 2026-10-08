@@ -160,6 +160,28 @@ public class CopyBatchModelTests
     }
 
     [Fact]
+    public void DisplayRows_GroupsRangeCopiesIntoLegacyStyleDisplay()
+    {
+        var sut = CreateSut();
+        sut.Animals =
+        [
+            new CopyBatchModel.AnimalRow { AnimalId = 7, SubmissionId = 11, SenderRef = "MC000001", NewSenderRef = "MC000002" },
+            new CopyBatchModel.AnimalRow { AnimalId = 7, SubmissionId = 11, SenderRef = "MC000001", NewSenderRef = "MC000003" },
+            new CopyBatchModel.AnimalRow { AnimalId = 7, SubmissionId = 11, SenderRef = "MC000001", NewSenderRef = "MC000004" },
+            new CopyBatchModel.AnimalRow { AnimalId = 8, SubmissionId = 12, SenderRef = "MC000010", NewSenderRef = "MC000011" },
+        ];
+
+        var rows = sut.DisplayRows;
+
+        Assert.Equal(2, rows.Count);
+        Assert.Equal("MC000001", rows[0].SenderRef);
+        Assert.Equal("MC000002 - MC000004", rows[0].DisplayNewSenderRef);
+        Assert.Equal("MC000010", rows[1].SenderRef);
+        Assert.Equal("MC000011", rows[1].DisplayNewSenderRef);
+        Assert.Equal([0, 1, 2], rows[0].RowIndexes);
+    }
+
+    [Fact]
     public void OnPostPick_RedirectsToAddSubmissionSoUserCanChooseSenderOrMouseRange()
     {
         var sut = CreateSut();
