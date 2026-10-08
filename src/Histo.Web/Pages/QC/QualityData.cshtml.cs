@@ -61,6 +61,11 @@ public class QualityDataModel : GridPageModel
     public int BatchID => Session.BatchID ?? 0;
     public Batch? BatchSummary { get; private set; }
 
+    /// <summary>Mirrors <see cref="Archive.ArchiveBlocksModel.IsViewMode"/> — a submission opened from
+    /// Search outputs/Search submissions/View submissions is read-only here too; Enter quality data
+    /// (<c>BatchesForDispatchModel</c>) resets the flag, so that journey is unaffected.</summary>
+    public bool IsViewMode => Session.IsViewSubmissionMode;
+
     /// <summary>
     /// Back-link target — honours <see cref="ISessionService.ReturnPage"/> so users arriving via
     /// Search submissions / View submissions ("View quality data") return there, not always to
@@ -164,6 +169,9 @@ public class QualityDataModel : GridPageModel
             if (forbidden is not null) return forbidden;
 
             Session.BatchID = BatchId;
+            // Arriving directly from a list/search link, not via Enter quality data — same rule
+            // SearchSubmissions/ViewSubmissions apply when a row is selected for viewing.
+            Session.IsViewSubmissionMode = true;
         }
 
         if (!Session.BatchID.HasValue) return RedirectToPage("/Index");
@@ -207,6 +215,7 @@ public class QualityDataModel : GridPageModel
         ViewData["Title"] = "Quality data";
         ViewData["PageTitle"] = "Quality data";
         if (!Session.BatchID.HasValue) return RedirectToPage("/Index");
+        if (IsViewMode) return RedirectToPage();
         var batchId = Session.BatchID.Value;
 
         var all = await _tests.GetByBatchAsync(batchId);
