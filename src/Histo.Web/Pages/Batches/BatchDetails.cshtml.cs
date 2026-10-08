@@ -523,7 +523,8 @@ public class BatchDetailsModel : HistoPageModel
             return Page();
         }
 
-        if (Session.BatchID is null or <= 0) return RedirectToPage("/Index");
+        // Query string first, session only as a fallback — checking session before this made every
+        // deep link from a list/search page bounce to /Index, since those pages never set it.
         var effectiveBatchId = BatchId ?? Session.BatchID;
         if (effectiveBatchId is null or <= 0) return RedirectToPage("/Index");
 

@@ -112,6 +112,10 @@ public class SearchTestModel : HistoPageModel
             ProjectDescription, SubmissionType, SelectedHistology, SelectedAntibodies, SelectedSpecialStain, StartDate, EndDate);
         BuildSubmissionGroups(raw);
         SubmissionsSearched = true;
+
+        // Recorded once here rather than repeated on every result link: a full criteria query string
+        // is ~2KB and these results can run to tens of thousands of submissions.
+        Session.ReturnPage = Request.Path + Request.QueryString;
     }
 
     /// <summary>Replaces the legacy <c>hlbExcel</c> ("Export Outputs to Excel") link.</summary>
