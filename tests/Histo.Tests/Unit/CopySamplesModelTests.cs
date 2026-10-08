@@ -60,12 +60,17 @@ public class CopySamplesModelTests
             .ReturnsAsync((IReadOnlyList<Animal>)[target]);
         _submissions.Setup(s => s.GetTissuesByBlockAsync(9, 1, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Tissue>)[]);
-        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+        // Source batch (9) and target batch (5) are different here — the test selections to copy
+        // must be read from the source batch. A mock on the target batch's selections would mask
+        // the real bug (reading tests from the wrong batch) if it happened to return the same data.
+        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(9, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BlockTest>)[
                 new BlockTest { BlockID = 1, TestType = BlockTestType.Histology, Code = "H&E(BSE)" },
                 new BlockTest { BlockID = 1, TestType = BlockTestType.Histology, Code = "IHC-PrP" },
                 new BlockTest { BlockID = 1, TestType = BlockTestType.Antibodies, Code = "F99" },
             ]);
+        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[]);
         _blocks.Setup(b => b.CopyBlockAsync(sourceBlock, 5, 20, It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>()))
             .ReturnsAsync(55);
 

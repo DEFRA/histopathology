@@ -139,7 +139,9 @@ public class CopySamplesModel : HistoPageModel
 
         var userId = Session.UserID;
         var allTargetBlocks = await _blocks.GetByBatchAsync(currentBatchId);
-        var allTargetTests = await _blockTests.GetAllSelectionsByBatchAsync(currentBatchId);
+        // Source and target are different batches here (unlike same-batch CopyBlocksModel), so the
+        // test selections to copy must be looked up from the source batch, not the target batch.
+        var sourceTests = await _blockTests.GetAllSelectionsByBatchAsync(SourceBatchId);
         var targetAnimals = await _submissions.GetAnimalsByBatchAsync(currentBatchId);
         var blocksCopied = 0;
 
@@ -151,7 +153,7 @@ public class CopySamplesModel : HistoPageModel
             try
             {
                 await SampleCopyHelper.CopyBlocksToAnimalAsync(
-                    _blocks, _submissions, _blockTests, sourceBlocks, allTargetBlocks, allTargetTests, currentBatchId, target, userId);
+                    _blocks, _submissions, _blockTests, sourceBlocks, allTargetBlocks, sourceTests, currentBatchId, target, userId);
             }
             catch (InvalidOperationException ex)
             {
