@@ -175,6 +175,16 @@ public sealed class SubmissionService : ISubmissionService
     }
 
     /// <summary>
+    /// Removes a sample and everything recorded against it (blocks, block tissues/tests, batch
+    /// submissions and their tissues) from one submission, keeping the shared animal record.
+    /// </summary>
+    public async Task<bool> DeleteSampleFromBatchAsync(int batchId, int animalId, int userId, CancellationToken ct = default)
+    {
+        try { await _repo.DeleteSampleFromBatchAsync(batchId, animalId, userId, ct); return true; }
+        catch (Exception ex) { _logger.LogError("Failed to delete sample {AnimalId} from submission {BatchId}.", ex, animalId, batchId); return false; }
+    }
+
+    /// <summary>
     /// Renames the Sender Ref of an existing sample. Throws
     /// <see cref="AnimalRefUpdateException"/> when the original Sender Ref is not
     /// found or the new Sender Ref is already in use — the UI layer must handle it.

@@ -160,10 +160,24 @@ public class BatchBlocksModel : HistoPageModel
         return RedirectToPage(new { batchId = BatchId, confirmDeleteAnimalId = selected.AnimalID });
     }
 
-    /// <summary>"Delete Sample" step 2 — removes the sample (animal) and all of its blocks/tissues.</summary>
+    /// <summary>
+    /// "Delete Sample" step 2 — removes the sample from this submission along with all of its
+    /// blocks, block tissues, block test selections and submission tissues. Legacy source:
+    /// <c>clsAnimal.vb::RemoveSubmission</c> (BATCH_BLOCK_TABLE branch), which likewise leaves the
+    /// shared Animal record itself in place.
+    /// </summary>
     public async Task<IActionResult> OnPostDeleteSampleAsync(int animalId)
     {
-        await _submissions.DeleteAnimalAsync(animalId, Session.UserID);
+        var redirect = await ResolveBatchAsync();
+        if (redirect is not null) return redirect;
+
+        if (!await _submissions.DeleteSampleFromBatchAsync(BatchId ?? 0, animalId, Session.UserID))
+        {
+            ErrorMessage = "Could not delete this sample. No changes were made.";
+            await LoadGridAsync();
+            return Page();
+        }
+
         return RedirectToPage(new { batchId = BatchId });
     }
 
