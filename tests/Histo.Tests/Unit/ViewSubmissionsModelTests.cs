@@ -110,6 +110,40 @@ public class ViewSubmissionsModelTests
         _session.VerifySet(s => s.BatchID = 7);
     }
 
+    /// <summary>
+    /// The action/report links read Session.BatchID rather than the URL, so Back-navigating to an
+    /// earlier selected-result URL must re-point the session at that row's batch.
+    /// </summary>
+    [Fact]
+    public async Task OnGetAsync_SelectedBatchIdInUrl_ResynchronisesSessionBatchId()
+    {
+        var sut = CreateSut();
+        sut.SelectedBatchId = 7;
+
+        await sut.OnGetAsync();
+
+        _session.VerifySet(s => s.BatchID = 7);
+        _session.VerifySet(s => s.IsViewSubmissionMode = true);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_NoSelectedBatchId_DiscardsStashedCriteriaSoClearSearchIsUnfiltered()
+    {
+        var sut = CreateSut();
+        sut.SelectedBatchId = 7;
+        sut.SubmissionNumber = 12345;
+        sut.OnPostSelect();
+
+        var cleared = CreateSut();
+        cleared.TempData = sut.TempData;
+        cleared.SelectedBatchId = 0;
+
+        await cleared.OnGetAsync();
+
+        Assert.Null(cleared.SubmissionNumber);
+        Assert.False(cleared.TempData.ContainsKey("ViewSubmissions_Criteria"));
+    }
+
     [Fact]
     public void HasNoSubmittedAreaOrAreaRestrictionProperty()
     {

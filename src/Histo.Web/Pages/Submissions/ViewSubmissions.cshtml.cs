@@ -198,7 +198,12 @@ public class ViewSubmissionsModel : HistoPageModel
         Searched = true;
 
         if (SelectedBatchId > 0)
+        {
+            // The action links read Session.BatchID, not the URL, so Back-navigating to an older
+            // selected-result URL would otherwise act on whichever batch was selected most recently.
+            ApplySelectionToSession(SelectedBatchId);
             HasNotes = await SubmissionNotesHelper.HasAnyNotesAsync(SelectedBatchId, _batches, _blocks, _submissions, _tests);
+        }
 
         PopulateGridViewData();
     }
@@ -226,15 +231,22 @@ public class ViewSubmissionsModel : HistoPageModel
     public IActionResult OnPostSelect()
     {
         if (SelectedBatchId > 0)
-        {
-            Session.BatchID     = SelectedBatchId;
-            Session.ReturnPage  = "/Submissions/ViewSubmissions";  // GAP-3: context-aware back link on BatchDetails
-            Session.EditBatchReturnPage = null; // this entry point owns EditBatch's return target, not any stale Edit Submission Status detour
-            Session.IsViewSubmissionMode = true;
-        }
+            ApplySelectionToSession(SelectedBatchId);
 
         StashCriteria();
         return RedirectToPage(new { SelectedBatchId, SortColumn, SortDesc, PageNumber });
+    }
+
+    /// <summary>
+    /// Points the session-driven downstream pages (BatchDetails, EditBatch, CopyBatch,
+    /// ReceiveBatch) and the report links at the selected batch.
+    /// </summary>
+    private void ApplySelectionToSession(int batchId)
+    {
+        Session.BatchID     = batchId;
+        Session.ReturnPage  = "/Submissions/ViewSubmissions";  // GAP-3: context-aware back link on BatchDetails
+        Session.EditBatchReturnPage = null; // this entry point owns EditBatch's return target, not any stale Edit Submission Status detour
+        Session.IsViewSubmissionMode = true;
     }
 
     /// <summary>Keeps the posted filters for the redirect that follows a Select.</summary>
@@ -245,6 +257,14 @@ public class ViewSubmissionsModel : HistoPageModel
 
     private void RestoreCriteria()
     {
+        // Criteria belong to a selected-result URL only. On a plain GET — "Clear search" or a
+        // fresh visit — drop them, otherwise the saved filters reapply and Clear search does nothing.
+        if (SelectedBatchId <= 0)
+        {
+            TempData.Remove(CriteriaKey);
+            return;
+        }
+
         if (TempData.Peek(CriteriaKey) is not string json) return;
         TempData.Keep(CriteriaKey); // survives Back/Forward returning to this same URL
 
