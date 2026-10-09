@@ -228,12 +228,19 @@
 
 /* Legacy BSE-style sliding-window pagination: << < [1 2 3 ... 10] > >> plus a
  * "Page X of Y" summary, used by both _Pagination (links) and _PaginationPost (form-
- * submitting buttons), so every selector below has to cover <a> and <button> alike. */
+ * submitting buttons), so every selector below has to cover <a> and <button> alike.
+ *
+ * "font-family: inherit" used to sit here, but html/body carry no font-family of their own in
+ * this govuk-frontend build — every typographic element (govuk-link, govuk-body, table cells)
+ * sets "GDS Transport" itself rather than relying on inheritance, so inheriting here picked up
+ * the browser's serif default instead. Declaring the same stack directly, at the same 19px
+ * govuk-link size, is what actually matches row action links like "Change". */
 .app-pagination-window {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-family: inherit;
+    font-family: "GDS Transport", arial, sans-serif;
+    font-size: 19px;
 }
 
 .app-pagination-window button {
@@ -258,10 +265,9 @@
 }
 
 .app-pagination-window__nav-link {
-    color: #1d70b8;
+    color: #1a65a6;
     text-decoration: none;
-    font-weight: bold;
-    font-size: 1.1em;
+    font-weight: 400;
     padding: 2px 4px;
 }
 
@@ -286,7 +292,7 @@
 
 .app-pagination-window__item a,
 .app-pagination-window__item button {
-    color: #1d70b8;
+    color: #1a65a6;
     text-decoration: underline;
     padding: 0;
 }
@@ -297,14 +303,14 @@
 }
 
 .app-pagination-window__item--current span {
-    font-weight: bold;
-    color: #0b0c0c;
+    color: #1a65a6;
+    text-decoration: underline;
 }
 
 .app-pagination-window__summary {
     margin: 0 0 0 15px;
-    color: #1d70b8;
-    font-weight: bold;
+    color: #1a65a6;
+    font-weight: 400;
     white-space: nowrap;
 }
 
