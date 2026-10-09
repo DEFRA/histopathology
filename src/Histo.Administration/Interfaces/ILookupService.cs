@@ -61,4 +61,13 @@ public interface ILookupService
     /// <summary>Updates an existing pick-list row. Returns <see langword="false"/> on failure.</summary>
     /// <param name="originalCode">For Code-keyed tables: the original code identifying the row. Null for ID-keyed tables.</param>
     Task<bool> UpdateLookupItemAsync(int tableId, LookupItem item, int userId, string? originalCode = null, CancellationToken ct = default);
+
+    /// <summary>Returns all rows from the Species pick-list admin screen (<c>GettlkpSpecies</c>).</summary>
+    Task<IReadOnlyList<SpeciesItem>> GetSpeciesItemsAsync(CancellationToken ct = default);
+
+    /// <summary>Creates a new Species row. Returns <see langword="false"/> on failure.</summary>
+    Task<bool> AddSpeciesItemAsync(int speciesId, string species, string? commonName, CancellationToken ct = default);
+
+    /// <summary>Updates an existing Species row. Returns <see langword="false"/> on failure.</summary>
+    Task<bool> UpdateSpeciesItemAsync(int speciesId, string species, string? commonName, int userId, CancellationToken ct = default);
 }

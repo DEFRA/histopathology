@@ -11,7 +11,7 @@ namespace Histo.Web.Pages.Admin;
 /// <c>UserMaintenance.aspx</c> grid (<c>clsUser.SaveUserData</c> update path via
 /// the <c>EditUser</c> stored procedure).
 /// </summary>
-public class EditUserModel : HistoPageModel
+public class EditUserModel : HistoPageModel, IUserFormFields
 {
     private readonly IUserService _users;
     private readonly ILookupService _lookups;
@@ -32,6 +32,12 @@ public class EditUserModel : HistoPageModel
 
     /// <summary>Submission page to resume after the detour into user maintenance.</summary>
     [BindProperty(SupportsGet = true)] public string? ReturnUrl { get; set; }
+
+    // Grid state carried through from the User maintenance list so saving can return to the same
+    // ordering/filter, and the page the saved row falls on can be worked out under that ordering.
+    [BindProperty(SupportsGet = true)] public string? SortColumn { get; set; }
+    [BindProperty(SupportsGet = true)] public bool SortDesc { get; set; }
+    [BindProperty(SupportsGet = true)] public bool ShowDeactivated { get; set; } = true;
 
     /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
     public string? SafeReturnUrl => !string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : null;
@@ -58,10 +64,6 @@ public class EditUserModel : HistoPageModel
     /// <summary>Not tied to a specific field, so shown separately (matches EditQualityDataTest's ConcurrencyError convention).</summary>
     public string? SaveError { get; private set; }
 
-    /// <summary>The user's Area as originally stored — used so saving without touching a
-    /// since-retired Area (e.g. Mouse Bioassay/Neuropath) isn't treated as a new assignment.</summary>
-    private int _originalAreaCode;
-
     public async Task<IActionResult> OnGetAsync()
     {
         ViewData["Title"] = "Edit user";
@@ -69,7 +71,7 @@ public class EditUserModel : HistoPageModel
         await LoadLookupsAsync();
 
         var user = (await _users.GetAllUsersAsync()).FirstOrDefault(u => u.UserID == UserId);
-        if (user is null) return RedirectToPage("/Admin/UserMaintenance", new { returnUrl = SafeReturnUrl });
+        if (user is null) return RedirectToPage("/Admin/UserMaintenance", new { returnUrl = SafeReturnUrl, SortColumn, SortDesc, ShowDeactivated });
 
         Name = user.Name;
         Email = user.Email;
@@ -87,8 +89,10 @@ public class EditUserModel : HistoPageModel
         await LoadLookupsAsync();
 
         var existing = (await _users.GetAllUsersAsync()).FirstOrDefault(u => u.UserID == UserId);
-        _originalAreaCode = existing?.AreaCode ?? 0;
-        await EnsureCurrentAreaVisibleAsync(_originalAreaCode);
+        // The user's Area as originally stored — used so saving without touching a
+        // since-retired Area (e.g. Mouse Bioassay/Neuropath) isn't treated as a new assignment.
+        var originalAreaCode = existing?.AreaCode ?? 0;
+        await EnsureCurrentAreaVisibleAsync(originalAreaCode);
 
         Validate();
         if (Errors.Count == 0 && await EmailAlreadyExistsAsync(Email.Trim(), UserId)) Errors["Email"] = "A user with this email already exists.";
@@ -116,19 +120,13 @@ public class EditUserModel : HistoPageModel
         }
 
         TempData["StatusMessage"] = $"User '{user.Name}' was updated.";
-        return RedirectToPage("/Admin/UserMaintenance", new { returnUrl = SafeReturnUrl });
+        TempData["FocusUserId"] = UserId;
+        return RedirectToPage("/Admin/UserMaintenance", new { returnUrl = SafeReturnUrl, SortColumn, SortDesc, ShowDeactivated });
     }
 
     private void Validate()
     {
-        if (string.IsNullOrWhiteSpace(Name)) Errors["Name"] = "Enter the user's name.";
-        else if (Name.Length > 35) Errors["Name"] = "Name must be 35 characters or less.";
-
-        if (string.IsNullOrWhiteSpace(Email)) Errors["Email"] = "Enter the user's email.";
-        else if (Email.Length > 60) Errors["Email"] = "Email must be 60 characters or less.";
-
-        if (GroupCode <= 0) Errors["GroupCode"] = "Select a user group.";
-        if (AreaCode <= 0) Errors["AreaCode"] = "Select a user area.";
+        UserFormValidator.Validate(Errors, Name, Email, GroupCode, AreaCode);
     }
 
     /// <summary>Mirrors the DB's unconditional (not Active-filtered) unique index on Email — excludes this user's own row.</summary>

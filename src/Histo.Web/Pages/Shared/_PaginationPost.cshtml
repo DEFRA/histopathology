@@ -2,8 +2,9 @@
 @*
     POST-variant of _Pagination for grids whose filter criteria are bound via
     [BindProperty] on a POST handler (e.g. ViewSubmissions), rather than the query
-    string. Submits the page's existing hidden carrier form instead of navigating
-    via a GET link, so POST-bound filter values are not lost when paging.
+    string. Renders the identical « ‹ [page numbers] › » + "Page X of Y" control, but
+    submits the page's existing hidden carrier form instead of navigating via a GET
+    link, so POST-bound filter values are not lost when paging.
 
     Usage (render immediately after </table>):
         @{ ViewData["FormId"] = "view-action-form"; ViewData["Handler"] = "Search"; }
@@ -34,49 +35,34 @@
 }
 @if (totalPages > 1)
 {
-    <nav class="govuk-pagination" aria-label="Pagination">
-        @if (currentPage > 1)
-        {
-            <div class="govuk-pagination__prev">
-                <button type="submit" form="@formId" formaction="@BuildAction(currentPage - 1)" class="app-link-button govuk-pagination__link" rel="prev">
-                    <svg class="govuk-pagination__icon govuk-pagination__icon--prev" xmlns="http://www.w3.org/2000/svg" height="13" width="15" aria-hidden="true" focusable="false" viewBox="0 0 15 13">
-                        <path d="m6.5938-0.0078125-6.6157 6.5947 6.6157 6.6183 1.4142-1.4142-4.2005-4.2021 4.2005-4.2005-1.4142-1.4142z"></path>
-                    </svg>
-                    <span class="govuk-pagination__link-title">Previous</span>
-                </button>
-            </div>
-        }
-        <ul class="govuk-pagination__list">
-            @foreach (var item in PaginationHelpers.BuildPageItems(currentPage, totalPages))
+    <nav class="app-pagination-window" aria-label="Pagination">
+        <button type="submit" form="@formId" formaction="@BuildAction(1)" class="app-pagination-window__nav-link"
+                aria-label="First page" title="First page" disabled="@(currentPage == 1)">&laquo;</button>
+        <button type="submit" form="@formId" formaction="@BuildAction(currentPage - 1)" class="app-pagination-window__nav-link"
+                aria-label="Previous page" title="Previous page" disabled="@(currentPage == 1)">&lsaquo;</button>
+        <button type="submit" form="@formId" formaction="@BuildAction(currentPage + 1)" class="app-pagination-window__nav-link"
+                aria-label="Next page" title="Next page" disabled="@(currentPage == totalPages)">&rsaquo;</button>
+        <button type="submit" form="@formId" formaction="@BuildAction(totalPages)" class="app-pagination-window__nav-link"
+                aria-label="Last page" title="Last page" disabled="@(currentPage == totalPages)">&raquo;</button>
+
+        <ul class="app-pagination-window__list">
+            @foreach (var pageNum in PaginationHelpers.BuildSlidingWindow(currentPage, totalPages))
             {
-                if (item.IsEllipsis)
+                if (pageNum == currentPage)
                 {
-                    <li class="govuk-pagination__item govuk-pagination__item--ellipses">&ctdot;</li>
-                }
-                else if (item.Page == currentPage)
-                {
-                    <li class="govuk-pagination__item govuk-pagination__item--current">
-                        <button type="submit" form="@formId" formaction="@BuildAction(item.Page.Value)" class="app-link-button govuk-pagination__link" aria-label="Page @item.Page" aria-current="page">@item.Page</button>
+                    <li class="app-pagination-window__item app-pagination-window__item--current">
+                        <span aria-current="page">@pageNum</span>
                     </li>
                 }
                 else
                 {
-                    <li class="govuk-pagination__item">
-                        <button type="submit" form="@formId" formaction="@BuildAction(item.Page!.Value)" class="app-link-button govuk-pagination__link" aria-label="Page @item.Page">@item.Page</button>
+                    <li class="app-pagination-window__item">
+                        <button type="submit" form="@formId" formaction="@BuildAction(pageNum)" aria-label="Page @(pageNum)">@pageNum</button>
                     </li>
                 }
             }
         </ul>
-        @if (currentPage < totalPages)
-        {
-            <div class="govuk-pagination__next">
-                <button type="submit" form="@formId" formaction="@BuildAction(currentPage + 1)" class="app-link-button govuk-pagination__link" rel="next">
-                    <span class="govuk-pagination__link-title">Next</span>
-                    <svg class="govuk-pagination__icon govuk-pagination__icon--next" xmlns="http://www.w3.org/2000/svg" height="13" width="15" aria-hidden="true" focusable="false" viewBox="0 0 15 13">
-                        <path d="m8.107-0.0078125-1.4142 1.4142 4.2005 4.2005-4.2005 4.2021 1.4142 1.4142 6.6157-6.6183-6.6157-6.5947z"></path>
-                    </svg>
-                </button>
-            </div>
-        }
+
+        <p class="app-pagination-window__summary">Page @currentPage of @totalPages</p>
     </nav>
 }

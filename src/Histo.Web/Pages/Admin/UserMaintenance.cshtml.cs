@@ -1,6 +1,7 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
 using Histo.Web.Services;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace Histo.Web.Pages.Admin;
@@ -44,18 +45,21 @@ public class UserMaintenanceModel : GridPageModel
 
     public int TotalCount => Users.Count;
 
-    public IReadOnlyList<User> PagedEntries =>
-        (SortColumn switch
+    private IEnumerable<User> GetSortedUsers() =>
+        SortColumn switch
         {
             "Group"   => SortDesc ? Users.OrderByDescending(u => ResolveGroupName(u)) : Users.OrderBy(u => ResolveGroupName(u)),
             "Area"    => SortDesc ? Users.OrderByDescending(u => ResolveAreaName(u))  : Users.OrderBy(u => ResolveAreaName(u)),
             "Email"   => SortDesc ? Users.OrderByDescending(u => u.Email)   : Users.OrderBy(u => u.Email),
             "Active"  => SortDesc ? Users.OrderByDescending(u => u.Active) : Users.OrderBy(u => u.Active),
             _         => SortDesc ? Users.OrderByDescending(u => u.Name)   : Users.OrderBy(u => u.Name),
-        })
-        .Skip((PageNumber - 1) * PageSize)
-        .Take(PageSize)
-        .ToList();
+        };
+
+    public IReadOnlyList<User> GetPagedEntries() =>
+        GetSortedUsers()
+            .Skip((PageNumber - 1) * PageSize)
+            .Take(PageSize)
+            .ToList();
 
     /// <summary>
     /// Group code → display name fallback map. Populated from <c>GetluUserGroup</c>
@@ -76,6 +80,50 @@ public class UserMaintenanceModel : GridPageModel
         ViewData["Title"] = "User maintenance";
         ViewData["PageTitle"] = "User maintenance";
         StatusMessage = TempData["StatusMessage"] as string;
+        var focusUserId = TempData["FocusUserId"] as int?;
+        await LoadAsync();
+
+        // Add/Edit hand back the id of the row they saved so the grid reopens on the page that row
+        // now falls on under the active sort, rather than always on page 1.
+        if (focusUserId is int id)
+        {
+            var index = GetSortedUsers().ToList().FindIndex(u => u.UserID == id);
+            if (index >= 0)
+            {
+                PageNumber = index / PageSize + 1;
+                FocusUserId = id;
+            }
+        }
+
+        PopulateGridViewData(TotalCount);
+    }
+
+    /// <summary>Row to visually mark as just-saved, set only on the redirect back from Add/Edit.</summary>
+    public int? FocusUserId { get; private set; }
+
+    /// <summary>
+    /// AJAX endpoint used by grid-pagination.js — returns just the table + pagination
+    /// markup (_UserMaintenanceGrid partial) so page/sort navigation refreshes the grid
+    /// in place instead of reloading the whole page.
+    /// </summary>
+    public async Task<IActionResult> OnGetGridAsync()
+    {
+        await LoadAsync();
+        PopulateGridViewData(TotalCount);
+        // Partial("_UserMaintenanceGrid", this) builds a fresh ViewDataDictionary scoped to
+        // the model, which does NOT inherit the entries PopulateGridViewData just set on
+        // this.ViewData (CurrentPage/TotalPages/SortBase/etc.) — those are needed by the
+        // nested _Pagination partial, so the ViewDataDictionary must be constructed
+        // from this.ViewData explicitly to carry them across.
+        return new PartialViewResult
+        {
+            ViewName = "_UserMaintenanceGrid",
+            ViewData = new Microsoft.AspNetCore.Mvc.ViewFeatures.ViewDataDictionary<UserMaintenanceModel>(ViewData, this),
+        };
+    }
+
+    private async Task LoadAsync()
+    {
         try
         {
             var all = await _users.GetAllUsersAsync();
@@ -97,8 +145,6 @@ public class UserMaintenanceModel : GridPageModel
         {
             ErrorMessage = $"{ex.GetType().Name}: {ex.Message}";
         }
-
-        PopulateGridViewData(TotalCount);
     }
 
     /// <summary>

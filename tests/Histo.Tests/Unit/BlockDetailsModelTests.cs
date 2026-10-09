@@ -338,6 +338,44 @@ public class BlockDetailsModelTests
     }
 
     [Fact]
+    public async Task OnGetAsync_AddMode_PreCassetted_ClaimsThePreBookedPlaceholderInsteadOfInserting()
+    {
+        // Regression (UAT TEST002.5): block "01" was already used for an earlier submission on this
+        // sender ref, but its pre-booked placeholder (BatchID NULL, Status PreBooked) was never
+        // retired — so it kept being returned as the "next" ref for every later submission. The
+        // fix claims the matching placeholder row in place (ClaimPreBookedBlockAsync) instead of
+        // inserting a new row via AddBlockAsync, which would otherwise create a duplicate "01".
+        _session.Setup(s => s.UserArea).Returns("Neuropath");
+        _batches.Setup(b => b.GetByIdAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 5, IsPreCassetted = true });
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2", HistoRefSet = true }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        // This batch (a secondary submission) has no blocks of its own yet.
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
+        // "01" is a stale pre-booked placeholder (already used elsewhere for this animal); "02" is genuinely free.
+        var preBooked01 = new Block { ID = 900, AnimalID = 2, BlockRef = "01", Status = BlockStatus.PreBooked };
+        _blocks.Setup(b => b.GetPreBookedByAnimalAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            preBooked01,
+            new Block { ID = 901, AnimalID = 2, BlockRef = "02", Status = BlockStatus.PreBooked },
+        ]);
+        _blocks.Setup(b => b.ClaimPreBookedBlockAsync(preBooked01, 5, It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        var sut = CreateSut(animalId: 2, blockId: 0);
+
+        var result = await sut.OnGetAsync();
+
+        Assert.Equal("01", sut.NewBlockRef);
+        _blocks.Verify(b => b.ClaimPreBookedBlockAsync(preBooked01, 5, It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
+            It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+        var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+        Assert.Equal(900, redirect.RouteValues?["blockId"]);
+    }
+
+    [Fact]
     public async Task OnPostDoneAsync_AddFlow_HistopathAreaUser_NoHistologyRef_SetsErrorAndDoesNotSave()
     {
         _session.Setup(s => s.UserArea).Returns("Histopath");
@@ -403,6 +441,9 @@ public class BlockDetailsModelTests
         // delete button, orphaning it if the user backed out without adding anything.
         _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
             new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
         ]);
@@ -420,10 +461,14 @@ public class BlockDetailsModelTests
     }
 
     [Fact]
-    public async Task OnPostNextBlockAsync_Failure_PreservesOriginalBlockAddFlowState()
+    public async Task OnPostNextBlockAsync_PreCassetted_NoPreBookedRefsLeft_SetsErrorAndDoesNotCreateABlock()
     {
         _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _batches.Setup(b => b.GetByIdAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 5, IsPreCassetted = true });
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
             new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
@@ -435,9 +480,39 @@ public class BlockDetailsModelTests
 
         var result = await sut.OnPostNextBlockAsync();
 
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("There are no more pre-booked block references available for this sample.", sut.ErrorMessage);
+        _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
+            It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostNextBlockAsync_PreCassetted_ClaimsThePreBookedPlaceholderInsteadOfInserting()
+    {
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _batches.Setup(b => b.GetByIdAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 5, IsPreCassetted = true });
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+        ]);
+        var preBooked02 = new Block { ID = 901, AnimalID = 2, BlockRef = "02", Status = BlockStatus.PreBooked };
+        _blocks.Setup(b => b.GetPreBookedByAnimalAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[preBooked02]);
+        _blocks.Setup(b => b.ClaimPreBookedBlockAsync(preBooked02, 5, It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.IsAddFlow = false;
+        sut.SelectedHistologyCodes = [HistologyCode.EO];
+
+        var result = await sut.OnPostNextBlockAsync();
+
+        _blocks.Verify(b => b.ClaimPreBookedBlockAsync(preBooked02, 5, It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
+            It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
-        Assert.Equal(true, redirect.RouteValues?["isAddFlow"]);
-        Assert.Equal(319181, redirect.RouteValues?["blockId"]);
+        Assert.Equal(901, redirect.RouteValues?["blockId"]);
     }
 }
 

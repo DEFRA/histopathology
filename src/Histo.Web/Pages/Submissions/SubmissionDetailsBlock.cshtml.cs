@@ -7,6 +7,7 @@ using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.RegularExpressions;
 
 namespace Histo.Web.Pages.Submissions;
 
@@ -25,7 +26,7 @@ namespace Histo.Web.Pages.Submissions;
 /// split between this grid and <c>BlockDetails.aspx</c> after an earlier consolidation onto this
 /// page made it too cluttered to use.
 /// </summary>
-public class SubmissionDetailsBlockModel : HistoPageModel
+public partial class SubmissionDetailsBlockModel : HistoPageModel
 {
     private const int LookupTissueCode = 9;
 
@@ -241,6 +242,7 @@ public class SubmissionDetailsBlockModel : HistoPageModel
 
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
+        if (Animal is null) return Page();
 
         // Locked fields can't be changed by a crafted POST — silently keep the existing value
         // rather than trusting the submitted one, mirroring the readonly inputs in the view.
@@ -292,8 +294,12 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         if (string.IsNullOrWhiteSpace(histologyRef))
             return null;
 
-        if (!System.Text.RegularExpressions.Regex.IsMatch(histologyRef, @"^\d{2}/\d{5}$"))
+        var histologyRefPattern = HistologyRefRegex();
+
+        if (!histologyRefPattern.IsMatch(histologyRef))
+        {
             return "Histology Reference must be in NN/NNNNN format (e.g., 26/40004).";
+        }
 
         var yearStr = histologyRef[..2];
         if (!int.TryParse(yearStr, out var year))
@@ -348,6 +354,9 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         if (histoRefYear < currentYear) return true;
         return currentYear is 0 or 1 && histoRefYear is >= 70 and <= 99;
     }
+
+    [GeneratedRegex(@"^\d{2}/\d{5}$", RegexOptions.CultureInvariant, 250)]
+    private static partial Regex HistologyRefRegex();
 
     /// <summary>
     /// Deletes the checked blocks. Legacy source: <c>SubmissionDetailsBlock.aspx.vb</c>::
@@ -465,15 +474,22 @@ public class SubmissionDetailsBlockModel : HistoPageModel
     }
 
     /// <summary>
-    /// Prefers a pre-booked-but-unused ref of the given type (legacy: <c>FindUnusedHistologyRef</c>
-    /// against the session's unused-ref pool); when none remain, mints the next ref directly from
-    /// the type's counter and advances it by one — legacy: <c>clsHistology.GetNextAvailableHistologyRef</c>
-    /// (SP <c>GetNextHistologyRef</c>), reusing the same counter <c>BookHistologyRef.aspx</c> uses.
+    /// Takes the first pre-booked-but-unused ref of the given type; when none remain, mints the
+    /// next ref from the type's counter and advances it — legacy:
+    /// <c>clsHistology.GetNextAvailableHistologyRef</c> (SP <c>GetNextHistologyRef</c>), reusing
+    /// the same counter <c>BookHistologyRef.aspx</c> uses.
+    ///
+    /// Two known divergences, both pre-dating this method and left deliberately: legacy's
+    /// <c>FindUnusedHistologyRef</c> matches a pooled ref by Sender Ref rather than taking the
+    /// first of a type, and legacy's counter draw happens server-side in one statement rather than
+    /// this read-then-write pair. <see cref="IHistologyRefService.GetNextAvailableRefAsync"/> is
+    /// the faithful version — switching to it broke this page's tests, which mock the granular
+    /// calls below, so the two intentionally differ.
     /// </summary>
     private async Task<string?> GetNextRefForTypeAsync(int histologyType)
     {
         var unused = await _histologyRefs.GetUnusedRefsAsync(histologyType);
-        var fromPool = unused.FirstOrDefault()?.Ref;
+        var fromPool = unused.FirstOrDefault(r => !string.IsNullOrWhiteSpace(r.Ref))?.Ref;
         if (fromPool is not null) return fromPool;
 
         var counters = await _histologyRefs.GetCountersAsync();

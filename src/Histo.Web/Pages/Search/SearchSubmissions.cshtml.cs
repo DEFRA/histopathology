@@ -1,5 +1,6 @@
 using Histo.Administration.Interfaces;
 using Histo.Core.Domain;
+using Histo.Histology.Interfaces;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -29,19 +30,25 @@ public class SearchSubmissionsModel : HistoPageModel
     private readonly IBatchService _batches;
     private readonly IUserService _users;
     private readonly ILookupService _lookups;
+    private readonly IBlockService _blocks;
+    private readonly ISubmissionService _submissions;
+    private readonly IBlockTestService _tests;
 
     // Constants matching Common.vb
     private const int LookupFixative = 10;
-    private const int LookupUserArea = 13;
     private const int LookupContacts = 18;
     private const int LookupProjects = 19;
 
-    public SearchSubmissionsModel(ISessionService session, IBatchService batches, IUserService users, ILookupService lookups)
+    public SearchSubmissionsModel(ISessionService session, IBatchService batches, IUserService users, ILookupService lookups,
+        IBlockService blocks, ISubmissionService submissions, IBlockTestService tests)
         : base(session)
     {
         _batches = batches;
         _users = users;
         _lookups = lookups;
+        _blocks = blocks;
+        _submissions = submissions;
+        _tests = tests;
     }
 
     [BindProperty] public int? SubmissionNumber { get; set; }
@@ -134,7 +141,23 @@ public class SearchSubmissionsModel : HistoPageModel
     /// <see cref="BatchStatus"/> code of the selected row, or <c>null</c> when no row is selected.
     /// Evaluated from <see cref="Results"/> after the search re-runs in <see cref="OnPostSelectAsync"/>.
     /// </summary>
-    public string? SelectedBatchStatus => Results.FirstOrDefault(r => r.ID == SelectedBatchId)?.Status;
+    public string? SelectedBatchStatus
+    {
+        get
+        {
+            for (var i = 0; i < Results.Count; i++)
+            {
+                var result = Results[i];
+                if (result.ID == SelectedBatchId)
+                    return result.Status;
+            }
+
+            return null;
+        }
+    }
+
+    /// <summary>Mirrors legacy FinalPrintBatch.aspx's EnableSubmissionNotes — only offered when notes exist.</summary>
+    public bool HasNotes { get; private set; }
 
     // ── Action-button availability — mirrors grdSearchResults_SelectedIndexChanged ──────────
     // Submitted("1"): Print only.
@@ -258,6 +281,8 @@ public class SearchSubmissionsModel : HistoPageModel
             Session.ReturnPage = "/Search/SearchSubmissions";  // GAP-3: context-aware back link on BatchDetails
             Session.EditBatchReturnPage = null; // this entry point owns EditBatch's return target, not any stale Edit Submission Status detour
             Session.IsViewSubmissionMode = true;
+
+            HasNotes = await SubmissionNotesHelper.HasAnyNotesAsync(SelectedBatchId, _batches, _blocks, _submissions, _tests);
         }
 
         Results = await _batches.SearchAsync(BuildCriteria());

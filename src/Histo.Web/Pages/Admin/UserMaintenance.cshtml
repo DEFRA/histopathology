@@ -61,50 +61,19 @@
 </form>
 
 <p class="govuk-body">
-    <a asp-page="/Admin/AddUser" asp-route-returnUrl="@Model.SafeReturnUrl" class="govuk-button" data-module="govuk-button">Add user</a>
+    <a asp-page="/Admin/AddUser" asp-route-returnUrl="@Model.SafeReturnUrl" asp-route-sortColumn="@Model.SortColumn" asp-route-sortDesc="@Model.SortDesc" asp-route-showDeactivated="@Model.ShowDeactivated" class="govuk-button" data-module="govuk-button">Add user</a>
 </p>
 
-<div class="app-table-responsive">
-<table class="govuk-table" id="user-maintenance-table">
-    <thead class="govuk-table__head">
-        <tr class="govuk-table__row">
-            @{ ViewData["Label"] = "Name"; ViewData["Column"] = "Name"; }
-            <partial name="_SortableHeader" />
-            @{ ViewData["Label"] = "Email"; ViewData["Column"] = "Email"; }
-            <partial name="_SortableHeader" />
-            @{ ViewData["Label"] = "Group"; ViewData["Column"] = "Group"; }
-            <partial name="_SortableHeader" />
-            @{ ViewData["Label"] = "Area"; ViewData["Column"] = "Area"; }
-            <partial name="_SortableHeader" />
-            @{ ViewData["Label"] = "Active"; ViewData["Column"] = "Active"; }
-            <partial name="_SortableHeader" />
-            <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
-        </tr>
-    </thead>
-    <tbody class="govuk-table__body">
-        @foreach (var u in Model.PagedEntries)
-        {
-            <tr class="govuk-table__row">
-                <td class="govuk-table__cell">@u.Name</td>
-                <td class="govuk-table__cell">@u.Email</td>
-                <td class="govuk-table__cell">@Model.ResolveGroupName(u)</td>
-                <td class="govuk-table__cell">@Model.ResolveAreaName(u)</td>
-                <td class="govuk-table__cell">@(u.Active ? "Yes" : "No")</td>
-                <td class="govuk-table__cell">
-                    <a class="govuk-link" asp-page="/Admin/EditUser" asp-route-userId="@u.UserID" asp-route-returnUrl="@Model.SafeReturnUrl">Change<span class="govuk-visually-hidden"> @u.Name</span></a>
-                </td>
-            </tr>
-        }
-        @if (!Model.Users.Any())
-        {
-            <tr class="govuk-table__row"><td colspan="6" class="govuk-table__cell">No users found.</td></tr>
-        }
-    </tbody>
-</table>
+<div id="user-maintenance-grid-container" data-grid-url="@Url.Page("/Admin/UserMaintenance", "Grid")">
+    <partial name="_UserMaintenanceGrid" model="Model" />
 </div>
-<partial name="_Pagination" />
 
 @if (Model.SafeReturnUrl is not null)
 {
     <a href="@Model.SafeReturnUrl" class="govuk-button govuk-button--secondary" data-module="govuk-button">Return to submission</a>
 }
+
+@section Scripts {
+    <script src="~/js/grid-pagination.js" asp-append-version="true"></script>
+}
+

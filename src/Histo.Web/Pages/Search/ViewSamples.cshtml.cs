@@ -21,13 +21,15 @@ namespace Histo.Web.Pages.Search;
 /// <c>BatchBlockSummary</c> and creating this page to reproduce the real
 /// <c>ViewSamples.aspx</c> feature.
 ///
-/// Validation: at least one of Sender Ref / Histology Ref must be supplied — both
-/// stored procedures tolerate both being given (each branches internally on one
-/// ref, ignoring the other; confirmed via <c>sp_helptext</c> — <c>GetAnimalBatchTissues</c>
-/// (Tissue mode) prefers Sender Ref, <c>GetAnimalBlockTissues</c> (Block mode) prefers
-/// Histology Ref), so an exactly-one-only rule was an unnecessarily strict UI
-/// invention. Two mutually exclusive search modes (legacy <c>rbWetTissue</c> /
-/// <c>rbBlockInformation</c> radio buttons) select between
+/// Validation: EXACTLY ONE of Sender Ref / Histology Ref must be supplied, matching the real
+/// legacy page — confirmed live (2026-10-07) that legacy rejects both blank AND both given with
+/// the same message ("Enter the Sender Ref or the Histology Ref."). Although the underlying
+/// stored procedures would technically tolerate both being given (each branches internally on
+/// one ref, ignoring the other — confirmed via <c>sp_helptext</c>: <c>GetAnimalBatchTissues</c>
+/// (Tissue mode) prefers Sender Ref, <c>GetAnimalBlockTissues</c> (Block mode) prefers Histology
+/// Ref), legacy's own UI validation is stricter than the SPs require, so this reproduces that
+/// stricter UI rule rather than the SPs' own tolerance. Two mutually exclusive search modes
+/// (legacy <c>rbWetTissue</c> / <c>rbBlockInformation</c> radio buttons) select between
 /// <c>clsAnimal.GetAnimalTissues</c> (SP <c>GetAnimalBatchTissues</c>,
 /// "Tissue Information") and <c>GetAnimalBlockTissues</c> (SP
 /// <c>GetAnimalBlockTissues</c>, "Block Information") — see
@@ -125,28 +127,25 @@ public class ViewSamplesModel : GridPageModel
         Searched = true;
         Results = await SearchAsync();
 
-        // Legacy source: ViewSamples.aspx.vb::FillviewGrid — fills in whichever ref was NOT
-        // entered by the user, resolved from the matched sample, directly into that field's own
-        // input box (not just a separate label) so both refs are visible/editable afterwards.
-        var resolvedHistologyRef = string.IsNullOrWhiteSpace(SenderRef) ? null : Results.FirstOrDefault()?.HistologyRef;
-        var resolvedSenderRef = string.IsNullOrWhiteSpace(HistologyRef) ? null : Results.FirstOrDefault()?.SenderRef;
+        // Legacy source: ViewSamples.aspx.vb::FillviewGrid — shows whichever ref was NOT entered
+        // by the user as a read-only label only; the SenderRef/HistologyRef input boxes themselves
+        // are left exactly as submitted, never auto-populated with the resolved value.
+        var firstResult = Results.Count > 0 ? Results[0] : null;
+        var resolvedHistologyRef = string.IsNullOrWhiteSpace(SenderRef) ? null : firstResult?.HistologyRef;
+        var resolvedSenderRef = string.IsNullOrWhiteSpace(HistologyRef) ? null : firstResult?.SenderRef;
 
-        if (string.IsNullOrWhiteSpace(SenderRef))
-            SenderRef = Results.FirstOrDefault()?.SenderRef;
-        if (string.IsNullOrWhiteSpace(HistologyRef))
-            HistologyRef = Results.FirstOrDefault()?.HistologyRef;
-
-        // The <input asp-for="..."> tag helper renders whatever was model-bound from the query
-        // string (ModelState) in preference to the property's current value — without this, the
-        // resolved ref set above is computed correctly but the input box still shows blank.
-        ModelState.Remove(nameof(SenderRef));
-        ModelState.Remove(nameof(HistologyRef));
-
-        OtherFieldLabel = resolvedHistologyRef is not null
-            ? $"Histology Ref: {resolvedHistologyRef}"
-            : resolvedSenderRef is not null
-                ? $"Sender Ref: {resolvedSenderRef}"
-                : null;
+        if (resolvedHistologyRef is not null)
+        {
+            OtherFieldLabel = $"Histology Ref: {resolvedHistologyRef}";
+        }
+        else if (resolvedSenderRef is not null)
+        {
+            OtherFieldLabel = $"Sender Ref: {resolvedSenderRef}";
+        }
+        else
+        {
+            OtherFieldLabel = null;
+        }
 
         PopulateGridViewData(Results.Count);
     }
@@ -198,13 +197,12 @@ public class ViewSamplesModel : GridPageModel
 
     private bool Validate()
     {
-        // Both Sender ref and Histology ref are shown as plain, always-visible fields — the
-        // underlying stored procedures tolerate either or both being supplied (each branches
-        // internally on one and ignores the other); only reject when neither is given.
+        // Legacy requires EXACTLY ONE of Sender ref / Histology ref — reject both blank and both
+        // given, using the same message either way, matching the real legacy validation.
         var hasSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
         var hasHistologyRef = !string.IsNullOrWhiteSpace(HistologyRef);
 
-        if (!hasSenderRef && !hasHistologyRef)
+        if (hasSenderRef == hasHistologyRef)
         {
             Errors[nameof(SenderRef)] = "Enter the Sender Ref or the Histology Ref.";
             return false;

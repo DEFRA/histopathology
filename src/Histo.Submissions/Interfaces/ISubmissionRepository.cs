@@ -23,6 +23,24 @@ public interface ISubmissionRepository
     /// <summary>Adds a batch submission. Maps to <c>AddBatchSubmission</c>. Returns new ID.</summary>
     Task<int> AddSubmissionAsync(BatchSubmission submission, int userId, CancellationToken ct = default);
 
+    /// <summary>Creates a complete mouse-number range in one transaction so the whole operation rolls back if any animal, submission, or tissue copy fails.</summary>
+    Task<bool> CreateMouseRangeAsync(int batchId, int? sourceAnimalId, string mouseNumberFrom, string mouseNumberTo, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Creates a new batch (header, test-type selections, submitted-as) and every sample/tissue
+    /// in <paramref name="plan"/> in a single transaction — used by the "Copy submission" journey
+    /// so a failure partway through (e.g. one sample's tissue copy) rolls back the whole operation
+    /// instead of leaving a partially-created batch or an orphan animal behind. Returns the new
+    /// batch ID, or 0 if any step failed (the transaction is rolled back in that case).
+    /// </summary>
+    Task<int> CreateBatchWithCopiedSamplesAsync(
+        Batch batch,
+        SelectedTestCodes testCodes,
+        string? submittedAsCode,
+        IReadOnlyList<CopiedSamplePlan> plan,
+        int userId,
+        CancellationToken ct = default);
+
     /// <summary>Updates a batch submission. Maps to <c>EditBatchSubmission</c>.</summary>
     Task UpdateSubmissionAsync(BatchSubmission submission, int userId, CancellationToken ct = default);
 
@@ -69,6 +87,13 @@ public interface ISubmissionRepository
     /// perform a partial (wildcard) search used by the search-submission pages.
     /// </summary>
     Task<IReadOnlyList<SenderSearchResult>> GetAnimalBySenderAsync(string senderRef, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the subset of <paramref name="senderRefs"/> that already exist on ANY animal in the
+    /// database (not scoped to a batch) — used to check a whole mouse-number range for collisions
+    /// in a single query instead of one round trip per candidate.
+    /// </summary>
+    Task<IReadOnlyList<string>> GetExistingSenderRefsAsync(IEnumerable<string> senderRefs, CancellationToken ct = default);
 
     /// <summary>
     /// Renames the Sender Ref of an existing animal/sample record, cascading to

@@ -1,6 +1,6 @@
 using Histo.Core.Domain;
 using Histo.Histology.Interfaces;
-using Histo.Submissions.Interfaces;
+using Histo.Histology.Models;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,10 +17,9 @@ namespace Histo.Web.Pages.Bookings;
 public class BookBlockRefModel : HistoPageModel
 {
     private readonly IBlockService _blocks;
-    private readonly ISubmissionService _submissions;
 
-    public BookBlockRefModel(ISessionService session, IBlockService blocks, ISubmissionService submissions)
-        : base(session) { _blocks = blocks; _submissions = submissions; }
+    public BookBlockRefModel(ISessionService session, IBlockService blocks)
+        : base(session) { _blocks = blocks; }
 
     [BindProperty] public string SenderRefFrom { get; set; } = string.Empty;
     [BindProperty] public string? SenderRefTo { get; set; }
@@ -132,42 +131,37 @@ public class BookBlockRefModel : HistoPageModel
             senderRefs = [senderRefFrom];
         }
 
-        var userId = Session.UserID;
+        var requestedRefs = Enumerable.Range(blockRefFrom, blockRefTo - blockRefFrom + 1).ToList();
         foreach (var senderRef in senderRefs)
         {
-            var existing = await _submissions.GetAnimalBySenderAsync(senderRef);
-            var animalId = existing.FirstOrDefault()?.ID ?? 0;
-            if (animalId == 0)
-                animalId = await _submissions.AddAnimalAsync(batchSubmissionId: 0, senderRef, userId);
-
-            if (animalId == 0)
+            // One atomic call: the duplicate check, sample resolution and inserts all run on a
+            // single locked transaction, so concurrent bookings cannot both claim the same ref.
+            var results = await _blocks.BookPreBookedBlocksAsync(senderRef, requestedRefs);
+            if (results is null)
             {
-                ResultMessages.Add($"Sample: {senderRef} — failed to retrieve or create sample data.");
+                ResultMessages.Add($"Sample: {senderRef} — booking failed, so no blocks were booked.");
                 continue;
             }
 
-            var alreadyBooked = await _blocks.GetPreBookedByAnimalAsync(animalId);
-            var numberFails = 0;
             var numberSuccess = 0;
+            var numberFails = 0;
 
-            for (var blockRefNum = blockRefFrom; blockRefNum <= blockRefTo; blockRefNum++)
+            foreach (var result in results)
             {
-                var blockRef = SenderRefHelpers.FormatBlockRef(blockRefNum);
-                if (alreadyBooked.Any(b => b.BlockRef == blockRef))
+                var blockRef = SenderRefHelpers.FormatBlockRef(result.BlockRef);
+                switch (result.Outcome)
                 {
-                    ResultMessages.Add($"Sample: {senderRef} Block {blockRef} not booked as it already exists.");
-                    numberFails++;
-                    continue;
-                }
-
-                if (await _blocks.CreatePreBookedBlockAsync(animalId, blockRef))
-                {
-                    numberSuccess++;
-                }
-                else
-                {
-                    ResultMessages.Add($"Sample: {senderRef} Block {blockRef} not booked.");
-                    numberFails++;
+                    case PreBookedBlockOutcome.Booked:
+                        numberSuccess++;
+                        break;
+                    case PreBookedBlockOutcome.AlreadyExists:
+                        ResultMessages.Add($"Sample: {senderRef} Block {blockRef} not booked as it already exists.");
+                        numberFails++;
+                        break;
+                    default:
+                        ResultMessages.Add($"Sample: {senderRef} — failed to retrieve or create sample data.");
+                        numberFails++;
+                        break;
                 }
             }
 

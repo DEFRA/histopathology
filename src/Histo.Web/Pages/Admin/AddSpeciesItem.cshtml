@@ -1,0 +1,24 @@
+@page
+@model Histo.Web.Pages.Admin.AddSpeciesItemModel
+@{
+    ViewData["Title"] = "Add species";
+    ViewData["PageTitle"] = "Add species";
+}
+
+@section BeforeHeading {
+    <a asp-page="/Admin/SpeciesItems" class="govuk-back-link">Back</a>
+}
+
+<h2 class="govuk-heading-m">Species</h2>
+
+<partial name="_ErrorSummary" model="Model.Errors" />
+
+<partial name="_SaveErrorSummary" model="Model.SaveError" />
+
+<form method="post" asp-antiforgery="true">
+    <partial name="_SpeciesItemFormFields" model="(Histo.Web.Pages.Admin.ISpeciesItemFormFields)Model" />
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Add item</button>
+        <a asp-page="/Admin/SpeciesItems" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+    </div>
+</form>

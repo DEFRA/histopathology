@@ -282,6 +282,18 @@
             {
                 <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="Not available for submissions in Rejected status">Print submission</button>
             }
+
+            @* Print submission notes — only enabled when the submission has recorded notes at ANY
+               level (header comments, or any block/tissue/antibody/histology/stain test comment),
+               mirroring legacy FinalPrintBatch.aspx's EnableSubmissionNotes and ViewSubmissions.cshtml. *@
+            @if (Model.HasNotes)
+            {
+                <a asp-page="/Reports/SubmissionNotes" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission notes</a>
+            }
+            else
+            {
+                <button class="govuk-button govuk-button--secondary" disabled aria-disabled="true" title="No submission notes have been recorded">Print submission notes</button>
+            }
             
             @* Edit submission — available for Received / On Hold / In Progress only *@
             @if (Model.CanEditSubmission)

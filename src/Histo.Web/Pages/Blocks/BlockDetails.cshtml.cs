@@ -246,6 +246,21 @@ public class BlockDetailsModel : HistoPageModel
             {
                 newId = abandoned.ID;
             }
+            else if (IsPreCassetted)
+            {
+                // Claim the matching pre-booked placeholder in place instead of inserting a new
+                // row, so it's retired (Status PreBooked -> PreBookedUsed) and never reappears as
+                // a "next" ref for this animal's future submissions.
+                var existingOrders = allBatchBlocks.Select(b => b.Order).ToList();
+                var preBookedToClaim = PreBookedBlockRefs.First(b => string.Equals(b.BlockRef, NewBlockRef, StringComparison.OrdinalIgnoreCase));
+                var claimed = await _blocks.ClaimPreBookedBlockAsync(preBookedToClaim, BatchId ?? 0, existingOrders, Session.UserID);
+                newId = claimed ? preBookedToClaim.ID : 0;
+                if (newId <= 0)
+                {
+                    ErrorMessage = "Could not create the block. Please try again or contact support if the problem continues.";
+                    return Page();
+                }
+            }
             else
             {
                 var existingOrders = allBatchBlocks.Select(b => b.Order).ToList();
@@ -419,7 +434,7 @@ public class BlockDetailsModel : HistoPageModel
             var existingOrders = allBlocks.Select(b => b.Order).ToList();
             var existingRefs = allBlocks.Where(b => b.ID != current.ID).Select(b => b.BlockRef).ToList();
             existingRefs.Add(NewBlockRef);
-            var preBookedRefsForCreate = IsPreCassetted ? PreBookedBlockRefs.Select(b => b.BlockRef).ToList() : null;
+            var preBookedBlocksForCreate = IsPreCassetted ? PreBookedBlockRefs.ToList() : null;
             var blockRef = NewBlockRef;
 
             // Legacy CreateMultiBlocks duplicates the source block's tissues and tests into every
@@ -428,14 +443,24 @@ public class BlockDetailsModel : HistoPageModel
 
             for (var i = 1; i < count; i++)
             {
-                // Pre-cassetted blocks must use the next pre-booked ref, not the free-text auto-increment scheme.
-                blockRef = IsPreCassetted
-                    ? preBookedRefsForCreate![preBookedIndex + i]
-                    : BlockHelpers.ComputeNextBlockRef(existingRefs);
-
-                var siblingId = await _blocks.AddBlockAsync(
-                    BatchId ?? 0, Animal.ID, blockRef, existingOrders, Session.UserID,
-                    customerRef: NewCustomerRef, comment: NewComment, repeatBlock: NewRepeatBlock);
+                int siblingId;
+                if (IsPreCassetted)
+                {
+                    // Pre-cassetted blocks must claim the next pre-booked ref in place, not the
+                    // free-text auto-increment scheme — same reasoning as the Add-flow claim above.
+                    var toClaim = preBookedBlocksForCreate![preBookedIndex + i];
+                    blockRef = toClaim.BlockRef;
+                    var claimed = await _blocks.ClaimPreBookedBlockAsync(toClaim, BatchId ?? 0, existingOrders, Session.UserID,
+                        customerRef: NewCustomerRef, comment: NewComment, repeatBlock: NewRepeatBlock);
+                    siblingId = claimed ? toClaim.ID : 0;
+                }
+                else
+                {
+                    blockRef = BlockHelpers.ComputeNextBlockRef(existingRefs);
+                    siblingId = await _blocks.AddBlockAsync(
+                        BatchId ?? 0, Animal.ID, blockRef, existingOrders, Session.UserID,
+                        customerRef: NewCustomerRef, comment: NewComment, repeatBlock: NewRepeatBlock);
+                }
 
                 if (siblingId > 0)
                 {
@@ -483,6 +508,7 @@ public class BlockDetailsModel : HistoPageModel
                 Comment = NewTissueComment,
             };
             await _submissions.AddTissueAsync(tissue, Session.UserID);
+            await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
         }
 
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
@@ -491,6 +517,7 @@ public class BlockDetailsModel : HistoPageModel
     public async Task<IActionResult> OnPostDeleteTissueAsync(int tissueId)
     {
         await _submissions.DeleteTissueAsync(tissueId, TissueOwner.Block, Session.UserID);
+        await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
     }
 
@@ -517,6 +544,7 @@ public class BlockDetailsModel : HistoPageModel
             RowStamp = existing.RowStamp,
         };
         await _submissions.UpdateTissueAsync(updated, Session.UserID);
+        await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
     }
 
@@ -533,6 +561,11 @@ public class BlockDetailsModel : HistoPageModel
         if (redirect is not null) return redirect;
         if (Animal is null || BlockId is not > 0) return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
 
+        // Loads Batch (IsPreCassetted depends on it) — without this, the pre-booked-ref branch
+        // below was always unreachable and every "Next block" silently fell through to the
+        // free-text auto-increment scheme, even for pre-cassetted submissions.
+        await LoadSupportingDataAsync();
+
         var error = ValidateTestSelections(SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes);
         if (error is not null)
         {
@@ -548,10 +581,13 @@ public class BlockDetailsModel : HistoPageModel
             BatchId ?? 0, BlockId.Value, SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes, Session.UserID);
 
         var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
-        string nextRef;
+        var existingOrders = allBlocks.Select(b => b.Order).ToList();
+        int newBlockId;
         if (IsPreCassetted)
         {
-            var preBooked = await _blocks.GetPreBookedByAnimalAsync(Animal.ID);
+            // Status PreBookedUsed (3) refs are already claimed into a real block elsewhere —
+            // only Status PreBooked (2) is genuinely available to claim here.
+            var preBooked = (await _blocks.GetPreBookedByAnimalAsync(Animal.ID) ?? []).Where(b => b.Status == BlockStatus.PreBooked).ToList();
             if (preBooked.Count == 0)
             {
                 ErrorMessage = "There are no more pre-booked block references available for this sample.";
@@ -561,16 +597,16 @@ public class BlockDetailsModel : HistoPageModel
                 await LoadEditModeDataAsync();
                 return Page();
             }
-            nextRef = preBooked[0].BlockRef;
+            // Claim the placeholder in place instead of inserting a new row — see OnGetAsync.
+            var claimed = await _blocks.ClaimPreBookedBlockAsync(preBooked[0], BatchId ?? 0, existingOrders, Session.UserID);
+            newBlockId = claimed ? preBooked[0].ID : 0;
         }
         else
         {
-            nextRef = BlockHelpers.ComputeNextBlockRef(allBlocks.Where(b => b.AnimalID == Animal.ID).Select(b => b.BlockRef));
+            var nextRef = BlockHelpers.ComputeNextBlockRef(allBlocks.Where(b => b.AnimalID == Animal.ID).Select(b => b.BlockRef));
+            newBlockId = await _blocks.AddBlockAsync(BatchId ?? 0, Animal.ID, nextRef, existingOrders, Session.UserID,
+                customerRef: null, comment: null, repeatBlock: false);
         }
-
-        var existingOrders = allBlocks.Select(b => b.Order).ToList();
-        var newBlockId = await _blocks.AddBlockAsync(BatchId ?? 0, Animal.ID, nextRef, existingOrders, Session.UserID,
-            customerRef: null, comment: null, repeatBlock: false);
 
         if (CarryTestsToNextBlock && newBlockId > 0)
             await _blockTests.SaveTestSelectionsAsync(
@@ -664,8 +700,12 @@ public class BlockDetailsModel : HistoPageModel
 
         // Loaded for the initial provisioning request (BlockId not yet assigned) and for every
         // re-render while still mid add-flow — true edits of an already-established block never need it.
+        // GetAnimalPreBookedBlocks returns Status PreBooked (2) AND PreBookedUsed (3) — the latter
+        // are refs already claimed into a real block elsewhere, so they must be excluded here or a
+        // already-claimed ref would be offered/re-claimed again (stealing it from its real block).
         if (IsPreCassetted && (!IsEditMode || IsAddFlow))
-            PreBookedBlockRefs = await _blocks.GetPreBookedByAnimalAsync(Animal?.ID ?? AnimalId ?? 0);
+            PreBookedBlockRefs = (await _blocks.GetPreBookedByAnimalAsync(Animal?.ID ?? AnimalId ?? 0) ?? [])
+                .Where(b => b.Status == BlockStatus.PreBooked).ToList();
         if (IsEditMode)
             await LoadTestOptionsAsync();
     }
@@ -780,8 +820,14 @@ public class BlockDetailsModel : HistoPageModel
             return null; // Empty is allowed (not recorded)
 
         // Check format: NN/NNNNN
-        if (!System.Text.RegularExpressions.Regex.IsMatch(histologyRef, @"^\d{2}/\d{5}$"))
+        var histologyRefPattern = new System.Text.RegularExpressions.Regex(@"^\d{2}/\d{5}$",
+            System.Text.RegularExpressions.RegexOptions.CultureInvariant,
+            TimeSpan.FromMilliseconds(250));
+
+        if (!histologyRefPattern.IsMatch(histologyRef))
+        {
             return "Histology Reference must be in NN/NNNNN format (e.g., 26/40004).";
+        }
 
         // Extract year (first 2 digits)
         var yearStr = histologyRef.Substring(0, 2);
