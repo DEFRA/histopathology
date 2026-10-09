@@ -15,6 +15,12 @@ namespace Histo.Submissions.Repositories;
 public sealed class SubmissionRepository : ISubmissionRepository
 {
     private const int MaxMouseRangeEntries = 1000;
+
+    // Mirrors Histo.Histology.Models.BlockStatus — duplicated rather than referenced, as this
+    // assembly does not depend on Histo.Histology (same approach as Core's BlockRefRangeHelpers).
+    private const int BlockStatusPreBooked = 2;
+    private const int BlockStatusPreBookedUsed = 3;
+
     private const string BatchIdParam = "BatchID";
     private const string ReturnValueParam = "RETURN_VALUE";
     private const string TissueCodeParam = "TissueCode";
@@ -668,6 +674,60 @@ public sealed class SubmissionRepository : ISubmissionRepository
             "DeleteAnimal",
             new { ID = animalId },
             commandType: System.Data.CommandType.StoredProcedure);
+    }
+
+    /// <inheritdoc/>
+    public async Task DeleteSampleFromBatchAsync(int batchId, int animalId, int userId, CancellationToken ct = default)
+    {
+        // Done as one transactional set-based statement batch rather than via the per-row Delete*
+        // SPs: every one of those takes a single @ID, so a cascade through blocks -> block
+        // tissues/histology/antibodies/stain -> submissions -> tissues would be dozens of round
+        // trips with no atomicity. There are no FK constraints between these tables (verified
+        // against the schema), so nothing cascades on its own — each child table must be cleared
+        // explicitly or its rows are silently orphaned, which is what left samples half-deleted.
+        using var conn = _db.CreateConnection();
+        await conn.OpenAsync(ct);
+        using var tx = await conn.BeginTransactionAsync(ct);
+
+        try
+        {
+            await conn.ExecuteAsync(new CommandDefinition(
+                """
+                DELETE bt FROM BlockTissues    bt INNER JOIN BatchBlock b ON b.ID = bt.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
+                DELETE bh FROM BlockHistology  bh INNER JOIN BatchBlock b ON b.ID = bh.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
+                DELETE ba FROM BlockAntibodies ba INNER JOIN BatchBlock b ON b.ID = ba.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
+                DELETE bs FROM BlockStain      bs INNER JOIN BatchBlock b ON b.ID = bs.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
+
+                -- Pre-booked block refs are a finite booked resource: releasing them back to the
+                -- pool (status PreBookedUsed -> PreBooked, no batch) keeps them available for
+                -- re-assignment instead of destroying the booking.
+                UPDATE BatchBlock
+                   SET Status = @PreBookedStatus, BatchID = NULL
+                 WHERE BatchID = @BatchID AND AnimalID = @AnimalID AND Status = @PreBookedUsedStatus;
+
+                DELETE FROM BatchBlock WHERE BatchID = @BatchID AND AnimalID = @AnimalID;
+
+                DELETE t FROM BatchTissues t INNER JOIN BatchSubmission s ON s.ID = t.BatchSubmissionID WHERE s.BatchID = @BatchID AND s.AnimalID = @AnimalID;
+                DELETE FROM BatchSubmission WHERE BatchID = @BatchID AND AnimalID = @AnimalID;
+                """,
+                new
+                {
+                    BatchID = batchId,
+                    AnimalID = animalId,
+                    PreBookedStatus = BlockStatusPreBooked,
+                    PreBookedUsedStatus = BlockStatusPreBookedUsed,
+                },
+                transaction: tx,
+                cancellationToken: ct));
+
+            await tx.CommitAsync(ct);
+        }
+        catch
+        {
+            // Not ct — a cancelled token must not stop the rollback from running.
+            await tx.RollbackAsync(CancellationToken.None);
+            throw;
+        }
     }
 
     /// <inheritdoc/>
