@@ -5,14 +5,25 @@ SET QUOTED_IDENTIFIER ON;
 GO
 
 PRINT '--- picklist-species-changes: dropping obsolete tlkpSpecies columns ---';
-IF COL_LENGTH('dbo.tlkpSpecies', 'AllowRBSE') IS NOT NULL
-  alter table [dbo].[tlkpSpecies] drop column [AllowRBSE];
-IF COL_LENGTH('dbo.tlkpSpecies', 'AllowRSCRAP') IS NOT NULL
-  alter table [dbo].[tlkpSpecies] drop column [AllowRSCRAP];
-IF COL_LENGTH('dbo.tlkpSpecies', 'AllowSE') IS NOT NULL
-  alter table [dbo].[tlkpSpecies] drop column [AllowSE];
-IF COL_LENGTH('dbo.tlkpSpecies', 'ImageID') IS NOT NULL
-  alter table [dbo].[tlkpSpecies] drop column [ImageID];
+DECLARE @speciesColumns TABLE (ColumnName sysname NOT NULL);
+INSERT INTO @speciesColumns (ColumnName)
+VALUES ('AllowRBSE'), ('AllowRSCRAP'), ('AllowSE'), ('ImageID');
+
+DECLARE @columnName sysname;
+DECLARE columnCursor CURSOR LOCAL FAST_FORWARD FOR
+SELECT ColumnName FROM @speciesColumns;
+
+OPEN columnCursor;
+FETCH NEXT FROM columnCursor INTO @columnName;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    IF COL_LENGTH('dbo.tlkpSpecies', @columnName) IS NOT NULL
+        EXEC('ALTER TABLE [dbo].[tlkpSpecies] DROP COLUMN [' + @columnName + ']');
+
+    FETCH NEXT FROM columnCursor INTO @columnName;
+END
+CLOSE columnCursor;
+DEALLOCATE columnCursor;
 GO
 
 PRINT '--- picklist-species-changes: registering Species in EditableLookup ---';

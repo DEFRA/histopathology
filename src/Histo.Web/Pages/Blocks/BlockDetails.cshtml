@@ -418,31 +418,43 @@ else
             var stainsSection = document.getElementById('block-stains-section');
 
             function syncTestSections() {
-                var codes = Array.from(group.querySelectorAll('input[type=checkbox]:checked')).map(function (cb) { return cb.getAttribute('data-histology-code'); });
+                var codes = Array.from(group.querySelectorAll('input[type=checkbox]:checked')).map(function (cb) {
+                    return cb.dataset.histologyCode;
+                });
                 var showAntibodies = codes.some(function (c) { return ihcCodes.indexOf(c) >= 0; });
                 var showStains = codes.indexOf(stainCode) >= 0;
                 if (antibodiesSection) {
                     antibodiesSection.style.display = showAntibodies ? '' : 'none';
-                    if (!showAntibodies) antibodiesSection.querySelectorAll('input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
+                    if (!showAntibodies) {
+                        antibodiesSection.querySelectorAll('input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
+                    }
                 }
                 if (stainsSection) {
                     stainsSection.style.display = showStains ? '' : 'none';
-                    if (!showStains) stainsSection.querySelectorAll('input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
+                    if (!showStains) {
+                        stainsSection.querySelectorAll('input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
+                    }
                 }
             }
             syncTestSections();
             group.addEventListener('change', function (e) {
                 var target = e.target;
-                if (!target || !target.matches('input[type="checkbox"]')) return;
+                if (!target || !target.matches('input[type="checkbox"]')) {
+                    return;
+                }
                 var checkboxes = group.querySelectorAll('input[type="checkbox"]');
-                var isExclusive = exclusiveCodes.indexOf(target.getAttribute('data-histology-code')) !== -1;
+                var isExclusive = exclusiveCodes.indexOf(target.dataset.histologyCode) !== -1;
                 if (target.checked && isExclusive) {
                     checkboxes.forEach(function (cb) {
-                        if (cb !== target) cb.checked = false;
+                        if (cb !== target) {
+                            cb.checked = false;
+                        }
                     });
                 } else if (target.checked && !isExclusive) {
                     checkboxes.forEach(function (cb) {
-                        if (cb !== target && exclusiveCodes.indexOf(cb.getAttribute('data-histology-code')) !== -1) cb.checked = false;
+                        if (cb !== target && exclusiveCodes.indexOf(cb.dataset.histologyCode) !== -1) {
+                            cb.checked = false;
+                        }
                     });
                 }
                 syncTestSections();

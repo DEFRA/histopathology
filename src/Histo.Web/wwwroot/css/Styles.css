@@ -206,7 +206,7 @@
  * govuk-button-group runs out of room and wraps the buttons onto separate lines. */
 .app-table-comment-cell {
     max-width: 320px;
-    word-break: break-word;
+    overflow-wrap: anywhere;
 }
 
 /* Uniform-width submission status tag (SearchSubmissions/ViewSubmissions/BatchesForEditing grids)

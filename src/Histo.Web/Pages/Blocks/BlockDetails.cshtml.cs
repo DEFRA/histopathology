@@ -820,8 +820,14 @@ public class BlockDetailsModel : HistoPageModel
             return null; // Empty is allowed (not recorded)
 
         // Check format: NN/NNNNN
-        if (!System.Text.RegularExpressions.Regex.IsMatch(histologyRef, @"^\d{2}/\d{5}$"))
+        var histologyRefPattern = new System.Text.RegularExpressions.Regex(@"^\d{2}/\d{5}$",
+            System.Text.RegularExpressions.RegexOptions.CultureInvariant,
+            TimeSpan.FromMilliseconds(250));
+
+        if (!histologyRefPattern.IsMatch(histologyRef))
+        {
             return "Histology Reference must be in NN/NNNNN format (e.g., 26/40004).";
+        }
 
         // Extract year (first 2 digits)
         var yearStr = histologyRef.Substring(0, 2);

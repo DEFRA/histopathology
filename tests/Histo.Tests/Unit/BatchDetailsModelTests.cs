@@ -221,7 +221,7 @@ public class BatchDetailsModelTests
         _submissions.Setup(s => s.GetTissuesBySubmissionAsync(10, 50, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Tissue>)[tissue]);
         _submissions.Setup(s => s.CreateBatchWithCopiedSamplesAsync(
-                It.IsAny<Batch>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<Batch>(), It.IsAny<SelectedTestCodes>(),
                 It.IsAny<string?>(), It.Is<IReadOnlyList<CopiedSamplePlan>>(p => p.Count == 1 && p[0].SourceAnimal.ID == 1 && p[0].Tissues.Count == 1 && p[0].Tissues[0].ArchiveLocation == "Freezer 1" && p[0].Tissues[0].ArchiveComment == "archive note"), 7, It.IsAny<CancellationToken>()))
             .ReturnsAsync(100);
 
@@ -261,9 +261,9 @@ public class BatchDetailsModelTests
 
         IReadOnlyList<CopiedSamplePlan>? captured = null;
         _submissions.Setup(s => s.CreateBatchWithCopiedSamplesAsync(
-                It.IsAny<Batch>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<Batch>(), It.IsAny<SelectedTestCodes>(),
                 It.IsAny<string?>(), It.IsAny<IReadOnlyList<CopiedSamplePlan>>(), 7, It.IsAny<CancellationToken>()))
-            .Callback((Batch _, IReadOnlyList<string> _, IReadOnlyList<string> _, IReadOnlyList<string> _,
+            .Callback((Batch _, SelectedTestCodes _,
                        string? _, IReadOnlyList<CopiedSamplePlan> p, int _, CancellationToken _) => captured = p)
             .ReturnsAsync(100);
 
@@ -306,9 +306,9 @@ public class BatchDetailsModelTests
 
         CopiedSamplePlan? captured = null;
         _submissions.Setup(s => s.CreateBatchWithCopiedSamplesAsync(
-                It.IsAny<Batch>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<Batch>(), It.IsAny<SelectedTestCodes>(),
                 It.IsAny<string?>(), It.IsAny<IReadOnlyList<CopiedSamplePlan>>(), 7, It.IsAny<CancellationToken>()))
-            .Callback((Batch _, IReadOnlyList<string> _, IReadOnlyList<string> _, IReadOnlyList<string> _,
+            .Callback((Batch _, SelectedTestCodes _,
                        string? _, IReadOnlyList<CopiedSamplePlan> p, int _, CancellationToken _) => captured = p.Single())
             .ReturnsAsync(100);
 
@@ -351,9 +351,9 @@ public class BatchDetailsModelTests
 
         CopiedSamplePlan? captured = null;
         _submissions.Setup(s => s.CreateBatchWithCopiedSamplesAsync(
-                It.IsAny<Batch>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<Batch>(), It.IsAny<SelectedTestCodes>(),
                 It.IsAny<string?>(), It.IsAny<IReadOnlyList<CopiedSamplePlan>>(), 7, It.IsAny<CancellationToken>()))
-            .Callback((Batch _, IReadOnlyList<string> _, IReadOnlyList<string> _, IReadOnlyList<string> _,
+            .Callback((Batch _, SelectedTestCodes _,
                        string? _, IReadOnlyList<CopiedSamplePlan> p, int _, CancellationToken _) => captured = p.Single())
             .ReturnsAsync(100);
 
@@ -394,7 +394,7 @@ public class BatchDetailsModelTests
         Assert.IsType<RedirectToPageResult>(result);
         _batches.Verify(b => b.AddAsync(It.IsAny<Batch>(), 7, It.IsAny<CancellationToken>()), Times.Once);
         _submissions.Verify(s => s.CreateBatchWithCopiedSamplesAsync(
-            It.IsAny<Batch>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+            It.IsAny<Batch>(), It.IsAny<SelectedTestCodes>(),
             It.IsAny<string?>(), It.IsAny<IReadOnlyList<CopiedSamplePlan>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -418,9 +418,9 @@ public class BatchDetailsModelTests
 
         CopiedSamplePlan? captured = null;
         _submissions.Setup(s => s.CreateBatchWithCopiedSamplesAsync(
-                It.IsAny<Batch>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<Batch>(), It.IsAny<SelectedTestCodes>(),
                 It.IsAny<string?>(), It.IsAny<IReadOnlyList<CopiedSamplePlan>>(), 7, It.IsAny<CancellationToken>()))
-            .Callback((Batch _, IReadOnlyList<string> _, IReadOnlyList<string> _, IReadOnlyList<string> _,
+            .Callback((Batch _, SelectedTestCodes _,
                        string? _, IReadOnlyList<CopiedSamplePlan> p, int _, CancellationToken _) => captured = p.Single())
             .ReturnsAsync(100);
 
@@ -465,9 +465,9 @@ public class BatchDetailsModelTests
 
         CopiedSamplePlan? captured = null;
         _submissions.Setup(s => s.CreateBatchWithCopiedSamplesAsync(
-                It.IsAny<Batch>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<Batch>(), It.IsAny<SelectedTestCodes>(),
                 It.IsAny<string?>(), It.IsAny<IReadOnlyList<CopiedSamplePlan>>(), 7, It.IsAny<CancellationToken>()))
-            .Callback((Batch _, IReadOnlyList<string> _, IReadOnlyList<string> _, IReadOnlyList<string> _,
+            .Callback((Batch _, SelectedTestCodes _,
                        string? _, IReadOnlyList<CopiedSamplePlan> p, int _, CancellationToken _) => captured = p.Single())
             .ReturnsAsync(100);
 
@@ -510,7 +510,7 @@ public class BatchDetailsModelTests
         Assert.IsType<PageResult>(result);
         Assert.Contains("GONE", sut.Errors?["Create_Save"]);
         _submissions.Verify(s => s.CreateBatchWithCopiedSamplesAsync(
-            It.IsAny<Batch>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+            It.IsAny<Batch>(), It.IsAny<SelectedTestCodes>(),
             It.IsAny<string?>(), It.IsAny<IReadOnlyList<CopiedSamplePlan>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -536,7 +536,7 @@ public class BatchDetailsModelTests
         Assert.IsType<PageResult>(result);
         Assert.Contains("submission record could not be found", sut.Errors?["Create_Save"]);
         _submissions.Verify(s => s.CreateBatchWithCopiedSamplesAsync(
-            It.IsAny<Batch>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+            It.IsAny<Batch>(), It.IsAny<SelectedTestCodes>(),
             It.IsAny<string?>(), It.IsAny<IReadOnlyList<CopiedSamplePlan>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -550,7 +550,7 @@ public class BatchDetailsModelTests
         _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[]);
         _submissions.Setup(s => s.CreateBatchWithCopiedSamplesAsync(
-                It.IsAny<Batch>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<Batch>(), It.IsAny<SelectedTestCodes>(),
                 It.IsAny<string?>(), It.Is<IReadOnlyList<CopiedSamplePlan>>(p => p.Count == 0), 7, It.IsAny<CancellationToken>()))
             .ReturnsAsync(100);
 
@@ -586,7 +586,7 @@ public class BatchDetailsModelTests
         _submissions.Setup(s => s.GetTissuesBySubmissionAsync(10, 50, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _submissions.Setup(s => s.CreateBatchWithCopiedSamplesAsync(
-                It.IsAny<Batch>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<Batch>(), It.IsAny<SelectedTestCodes>(),
                 It.IsAny<string?>(), It.IsAny<IReadOnlyList<CopiedSamplePlan>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
 

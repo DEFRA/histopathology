@@ -1,5 +1,5 @@
-/****** Object:  StoredProcedure [dbo].[GettlkpSpecies] ******/
-/****** ONE-TIME DEPLOYMENT SCRIPT — Safe to re-run via pipeline ******/
+-- Object:  StoredProcedure [dbo].[GettlkpSpecies]
+-- ONE-TIME DEPLOYMENT SCRIPT — Safe to re-run via pipeline
 
 SET ANSI_NULLS ON
 GO
