@@ -125,6 +125,21 @@ public sealed class BlockService : IBlockService
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<PreBookedBlockResult>?> BookPreBookedBlocksAsync(
+        string senderRef, IReadOnlyList<int> blockRefs, CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repo.BookPreBookedBlocksAsync(senderRef, blockRefs, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to book block refs for sender ref {SenderRef}.", ex, senderRef);
+            return null;
+        }
+    }
+
     /// <summary>
     /// Claims a pre-booked placeholder (BatchID NULL, Status PreBooked) into a real block for
     /// <paramref name="batchId"/>, updating the existing row rather than inserting a new one —

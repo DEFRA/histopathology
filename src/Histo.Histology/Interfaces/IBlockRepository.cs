@@ -48,6 +48,17 @@ public interface IBlockRepository
     /// </summary>
     Task CreatePreBookedBlockAsync(int animalId, string blockRef, CancellationToken ct = default);
 
+    /// <summary>
+    /// Books every ref in <paramref name="blockRefs"/> for <paramref name="senderRef"/> as one
+    /// atomic unit: an exclusive application lock on the sender ref, then the duplicate check
+    /// (<c>GetBlocksForSenderRef</c>), sample resolution (<c>GetAnimalBySender</c>/<c>AddAnimal</c>)
+    /// and the <c>AddBlock</c> inserts, all on a single transaction. Concurrent callers for the
+    /// same sender ref therefore cannot both see a ref as free, nor both create the Animal row.
+    /// Legacy source: BookBlockRef.aspx.vb::ProcessMultipleBookings (which had no such guard).
+    /// </summary>
+    Task<IReadOnlyList<PreBookedBlockResult>> BookPreBookedBlocksAsync(
+        string senderRef, IReadOnlyList<int> blockRefs, CancellationToken ct = default);
+
     // -----------------------------------------------------------------------
     // Search (read-only)
     // -----------------------------------------------------------------------
