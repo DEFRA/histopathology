@@ -58,10 +58,10 @@ public class BookBlockRefModelTests
         sut.BlockRefFrom = "01";
         sut.BlockRefTo = "02";
 
+        _blocks.Setup(b => b.TryGetUsedBlockRefsBySenderRefAsync("PLAINREF", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<UsedBlockRef>)[]);
         _submissions.Setup(s => s.GetAnimalBySenderAsync("PLAINREF", It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<SenderSearchResult>)[new SenderSearchResult { ID = 7 }]);
-        _blocks.Setup(b => b.GetPreBookedByAnimalAsync(7, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<Block>)[]);
         _blocks.Setup(b => b.CreatePreBookedBlockAsync(7, It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
@@ -79,12 +79,12 @@ public class BookBlockRefModelTests
         sut.SenderRefFrom = "NEWREF";
         sut.BlockRefFrom = "01";
 
+        _blocks.Setup(b => b.TryGetUsedBlockRefsBySenderRefAsync("NEWREF", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<UsedBlockRef>)[]);
         _submissions.Setup(s => s.GetAnimalBySenderAsync("NEWREF", It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<SenderSearchResult>)[]);
         _submissions.Setup(s => s.AddAnimalAsync(0, "NEWREF", It.IsAny<int>(), null, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(9);
-        _blocks.Setup(b => b.GetPreBookedByAnimalAsync(9, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<Block>)[]);
         _blocks.Setup(b => b.CreatePreBookedBlockAsync(9, It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
@@ -92,5 +92,77 @@ public class BookBlockRefModelTests
 
         Assert.Null(sut.Error);
         _blocks.Verify(b => b.CreatePreBookedBlockAsync(9, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // Blocks claimed by a received submission are Status Used against a BatchID — the old
+    // pre-booked-placeholder check missed them and silently double-booked the refs.
+    [Theory]
+    [InlineData(BlockStatus.Used)]
+    [InlineData(BlockStatus.PreBooked)]
+    [InlineData(BlockStatus.PreBookedUsed)]
+    public async Task OnPostAsync_BlockRefAlreadyExistsForSenderRef_DoesNotBook(int status)
+    {
+        var sut = CreateSut();
+        sut.SenderRefFrom = "RefTest";
+        sut.BlockRefFrom = "01";
+
+        _blocks.Setup(b => b.TryGetUsedBlockRefsBySenderRefAsync("RefTest", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<UsedBlockRef>)[new UsedBlockRef { BlockRef = 1, Status = status }]);
+
+        await sut.OnPostAsync();
+
+        _blocks.Verify(b => b.CreatePreBookedBlockAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _submissions.Verify(s => s.AddAnimalAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Contains(sut.ResultMessages, m => m == "Sample: RefTest Block 01 not booked as it already exists.");
+        Assert.Null(sut.SuccessMessage);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_PartiallyExistingRange_BooksOnlyFreeRefs()
+    {
+        var sut = CreateSut();
+        sut.SenderRefFrom = "RefTest";
+        sut.BlockRefFrom = "01";
+        sut.BlockRefTo = "03";
+
+        _blocks.Setup(b => b.TryGetUsedBlockRefsBySenderRefAsync("RefTest", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<UsedBlockRef>)
+            [
+                new UsedBlockRef { BlockRef = 1, Status = BlockStatus.Used },
+                new UsedBlockRef { BlockRef = 2, Status = BlockStatus.Used },
+            ]);
+        _submissions.Setup(s => s.GetAnimalBySenderAsync("RefTest", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<SenderSearchResult>)[new SenderSearchResult { ID = 7 }]);
+        _blocks.Setup(b => b.CreatePreBookedBlockAsync(7, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        await sut.OnPostAsync();
+
+        _blocks.Verify(b => b.CreatePreBookedBlockAsync(7, "03", It.IsAny<CancellationToken>()), Times.Once);
+        _blocks.Verify(b => b.CreatePreBookedBlockAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(
+        [
+            "Sample: RefTest Block 01 not booked as it already exists.",
+            "Sample: RefTest Block 02 not booked as it already exists.",
+            "Sample: RefTest 1 blocks booked, 2 blocks not booked.",
+        ], sut.ResultMessages);
+    }
+
+    // An empty result from a failed lookup would read as "the ref is free" and double-book it.
+    [Fact]
+    public async Task OnPostAsync_ExistingRefLookupFails_BooksNothing()
+    {
+        var sut = CreateSut();
+        sut.SenderRefFrom = "RefTest";
+        sut.BlockRefFrom = "01";
+
+        _blocks.Setup(b => b.TryGetUsedBlockRefsBySenderRefAsync("RefTest", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<UsedBlockRef>?)null);
+
+        await sut.OnPostAsync();
+
+        _blocks.Verify(b => b.CreatePreBookedBlockAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Null(sut.SuccessMessage);
+        Assert.Contains(sut.ResultMessages, m => m.Contains("existing block ref check failed"));
     }
 }

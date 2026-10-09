@@ -217,7 +217,11 @@ public sealed class BlockService : IBlockService
     }
 
     /// <summary>Returns the used block refs (with status) for a sender ref.</summary>
-    public async Task<IReadOnlyList<UsedBlockRef>> GetUsedBlockRefsBySenderRefAsync(string senderRef, CancellationToken ct = default)
+    public async Task<IReadOnlyList<UsedBlockRef>> GetUsedBlockRefsBySenderRefAsync(string senderRef, CancellationToken ct = default) =>
+        await TryGetUsedBlockRefsBySenderRefAsync(senderRef, ct) ?? [];
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<UsedBlockRef>?> TryGetUsedBlockRefsBySenderRefAsync(string senderRef, CancellationToken ct = default)
     {
         try
         {
@@ -226,7 +230,7 @@ public sealed class BlockService : IBlockService
         catch (Exception ex)
         {
             _logger.LogError("Failed to search used block refs by sender ref {SenderRef}.", ex, senderRef);
-            return [];
+            return null;
         }
     }
 

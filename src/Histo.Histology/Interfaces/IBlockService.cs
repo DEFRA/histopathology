@@ -40,6 +40,13 @@ public interface IBlockService
     // Search
     Task<IReadOnlyList<UsedBlockRef>> GetUsedBlockRefsByHistologyRefAsync(string histologyRef, CancellationToken ct = default);
     Task<IReadOnlyList<UsedBlockRef>> GetUsedBlockRefsBySenderRefAsync(string senderRef, CancellationToken ct = default);
+
+    /// <summary>
+    /// As <see cref="GetUsedBlockRefsBySenderRefAsync"/> but returns <c>null</c> on lookup failure, for
+    /// callers where an empty list means "the ref is free" and a swallowed error would corrupt data.
+    /// </summary>
+    Task<IReadOnlyList<UsedBlockRef>?> TryGetUsedBlockRefsBySenderRefAsync(string senderRef, CancellationToken ct = default);
+
     Task<IReadOnlyList<BlockArchiveInfo>> GetBlockArchiveAsync(string? senderRef, string? histologyRef, string? blockRef, string? archiveLocation, CancellationToken ct = default);
     Task<IReadOnlyList<SlideArchiveInfo>> GetSlideArchiveAsync(string? senderRef, string? histologyRef, string? archiveLocation, CancellationToken ct = default);
 }
