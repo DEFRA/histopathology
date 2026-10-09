@@ -7,6 +7,7 @@ using Histo.Submissions.Models;
 using Histo.Web.Pages.Batches;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using System.Text.Json;
 
 namespace Histo.Web.Pages.Submissions;
@@ -14,6 +15,8 @@ namespace Histo.Web.Pages.Submissions;
 /// <summary>Replaces <c>AddSubmission.aspx</c>.</summary>
 public class AddSubmissionModel : HistoPageModel
 {
+    private const string CopyBatchPage = "/Batches/CopyBatch";
+
     private readonly ISubmissionService _submissions;
     private readonly IBatchService _batches;
     private readonly ILookupService _lookups;
@@ -76,9 +79,16 @@ public class AddSubmissionModel : HistoPageModel
     [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
 
     /// <summary>Resolved back-link for this page. Falls back to any session-scoped return context, then to the batch list.</summary>
-    public string BackLinkPage => string.IsNullOrWhiteSpace(ReturnPage)
-        ? string.IsNullOrWhiteSpace(Session.ReturnPage) ? "/Batches/BatchesNotReceived" : Session.ReturnPage
-        : ReturnPage;
+    public string BackLinkPage
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(ReturnPage))
+                return ReturnPage;
+
+            return string.IsNullOrWhiteSpace(Session.ReturnPage) ? "/Batches/BatchesNotReceived" : Session.ReturnPage;
+        }
+    }
 
     /// <summary>
     /// True when reached from the Copy Submission "Change" button. Matched on the path only:
@@ -89,7 +99,7 @@ public class AddSubmissionModel : HistoPageModel
     /// </summary>
     private bool IsCopyBatchReturn =>
         (ReturnPage ?? string.Empty).Split('?')[0]
-            .Equals("/Batches/CopyBatch", StringComparison.OrdinalIgnoreCase);
+            .Equals(CopyBatchPage, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// True when reached from the "Assign Tissues to Blocks" journey (<c>BatchBlocks.cshtml</c>'s
@@ -168,7 +178,8 @@ public class AddSubmissionModel : HistoPageModel
         ViewData["Title"] = "Add sample";
 
         var batchId = BatchId ?? Session.BatchID;
-        if (batchId is null or <= 0) return RedirectToPage("/Index");
+        if (batchId is null or <= 0)
+            return RedirectToPage("/Index");
 
         if (IsAssignTissueMode)
             return await HandleAssignTissueModeAsync(batchId.Value);
@@ -177,29 +188,15 @@ public class AddSubmissionModel : HistoPageModel
         if (inputError is not null)
             return inputError;
 
+        return await ProcessSubmissionAsync(batchId.Value);
+    }
+
+    private async Task<IActionResult> ProcessSubmissionAsync(int batchId)
+    {
         if (ShouldRedirectBackToCopyBatch())
-        {
-            // Staging only — the copy journey writes nothing until the Create Submission form is submitted.
-            if (ShouldUseMouseRange())
-            {
-                var (rangeRefs, rangeError) = await ResolveMouseRangeRefsAsync();
-                if (rangeError is not null)
-                {
-                    ModelError = rangeError;
-                    MouseRangeHasError = true;
-                    return Page();
-                }
-                PersistCopyBatchState(rangeRefs);
-            }
-            else
-            {
-                PersistCopyBatchState();
-            }
+            return await HandleCopyBatchRedirectAsync(batchId);
 
-            return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
-        }
-
-        var submissionId = await GetOrCreateSubmissionIdAsync(batchId.Value);
+        var submissionId = await GetOrCreateSubmissionIdAsync(batchId);
         if (submissionId is null or <= 0)
         {
             ModelError = "Could not add the sample. Please try again.";
@@ -207,19 +204,41 @@ public class AddSubmissionModel : HistoPageModel
         }
 
         Session.BatchSubmissionID = submissionId;
-        var batch = await _batches.GetByIdAsync(batchId.Value);
+        var batch = await _batches.GetByIdAsync(batchId);
 
         if (ShouldUseMouseRange())
-            return await OnPostMouseRangeAsync(batchId.Value, submissionId.Value, batch);
+            return await OnPostMouseRangeAsync(batchId);
 
-        var (newAnimalId, createError) = await CreateAnimalForSenderAsync(batchId.Value, submissionId.Value, batch, SenderRef);
+        var (newAnimalId, createError) = await CreateAnimalForSenderAsync(submissionId.Value, batch, SenderRef);
         if (createError is not null)
         {
             ModelError = createError;
             return Page();
         }
 
-        return await CompleteSampleCreationAsync(batchId.Value, newAnimalId, submissionId.Value);
+        return await CompleteSampleCreationAsync(batchId, newAnimalId);
+    }
+
+    private async Task<IActionResult> HandleCopyBatchRedirectAsync(int batchId)
+    {
+        // Staging only — the copy journey writes nothing until the Create Submission form is submitted.
+        if (ShouldUseMouseRange())
+        {
+            var (rangeRefs, rangeError) = await ResolveMouseRangeRefsAsync();
+            if (rangeError is not null)
+            {
+                ModelError = rangeError;
+                MouseRangeHasError = true;
+                return Page();
+            }
+            PersistCopyBatchState(rangeRefs);
+        }
+        else
+        {
+            PersistCopyBatchState();
+        }
+
+        return RedirectToPage(CopyBatchPage, new { sourceBatchId = batchId });
     }
 
     private async Task<IActionResult> HandleAssignTissueModeAsync(int batchId)
@@ -238,7 +257,7 @@ public class AddSubmissionModel : HistoPageModel
         return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = chosen.ID });
     }
 
-    private IActionResult? ValidateSubmissionInput()
+    private PageResult? ValidateSubmissionInput()
     {
         var hasMouseRangeInput = ShowMouseRange && (!string.IsNullOrWhiteSpace(MouseNumberFrom) || !string.IsNullOrWhiteSpace(MouseNumberTo));
         var usingMouseRange = ShowMouseRange && !string.IsNullOrWhiteSpace(MouseNumberFrom) && !string.IsNullOrWhiteSpace(MouseNumberTo);
@@ -271,7 +290,7 @@ public class AddSubmissionModel : HistoPageModel
     private async Task<int?> GetOrCreateSubmissionIdAsync(int batchId)
     {
         var submissionId = BatchSubmissionId ?? Session.BatchSubmissionID;
-        if (submissionId is not null and > 0)
+        if (submissionId is > 0)
             return submissionId;
 
         var existing = await _submissions.GetSubmissionsByBatchAsync(batchId);
@@ -283,7 +302,7 @@ public class AddSubmissionModel : HistoPageModel
             Session.UserID);
     }
 
-    private async Task<IActionResult> CompleteSampleCreationAsync(int batchId, int newAnimalId, int submissionId)
+    private async Task<IActionResult> CompleteSampleCreationAsync(int batchId, int newAnimalId)
     {
         var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(batchId);
         var isWetTissue = await IsWetTissueCodeAsync(submittedAsCode);
@@ -316,7 +335,7 @@ public class AddSubmissionModel : HistoPageModel
             if (IsCopyBatchReturn)
             {
                 PersistCopyBatchState();
-                return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
+                return RedirectToPage(CopyBatchPage, new { sourceBatchId = batchId });
             }
             return RedirectToPage("/Submissions/SampleSummary", new { batchId });
         }
@@ -348,7 +367,7 @@ public class AddSubmissionModel : HistoPageModel
         {
             var allTests = await _blockTests.GetAllSelectionsByBatchAsync(batchId);
             await SampleCopyHelper.CopyBlocksToAnimalAsync(
-                _blocks, _submissions, _blockTests, sourceBlocks, allBlocks, allTests, batchId, target, Session.UserID);
+                new SampleCopyServices(_blocks, _submissions, _blockTests), sourceBlocks, allBlocks, allTests, batchId, target, Session.UserID);
         }
 
         if (!target.HistoRefSet)
@@ -372,7 +391,15 @@ public class AddSubmissionModel : HistoPageModel
     {
         if (SourceAnimalId is > 0 && ownSubmissionId > 0)
         {
-            var sourceSubmission = siblingSubmissions.FirstOrDefault(s => s.AnimalID == SourceAnimalId);
+            BatchSubmission? sourceSubmission = null;
+            foreach (var s in siblingSubmissions)
+            {
+                if (s.AnimalID == SourceAnimalId)
+                {
+                    sourceSubmission = s;
+                    break;
+                }
+            }
             if (sourceSubmission is not null)
             {
                 var sourceTissues = await _submissions.GetTissuesBySubmissionAsync(batchId, sourceSubmission.ID);
@@ -385,7 +412,7 @@ public class AddSubmissionModel : HistoPageModel
             if (IsCopyBatchReturn)
             {
                 PersistCopyBatchState();
-                return RedirectToPage("/Batches/CopyBatch", new { sourceBatchId = batchId });
+                return RedirectToPage(CopyBatchPage, new { sourceBatchId = batchId });
             }
 
             // Copy sample started from Sample Summary — return there so it's clear the new sample
@@ -402,7 +429,7 @@ public class AddSubmissionModel : HistoPageModel
     /// <paramref name="rangeRefs"/> stages one row per mouse number in a range copy, cloning the
     /// edited row so each new sample still copies the same source sample's tissues.
     /// </summary>
-    private void PersistCopyBatchState(IReadOnlyList<string>? rangeRefs = null)
+    private void PersistCopyBatchState(List<string>? rangeRefs = null)
     {
         if (TempData is null || !IsCopyBatchReturn)
             return;
@@ -413,47 +440,66 @@ public class AddSubmissionModel : HistoPageModel
         var animals = JsonSerializer.Deserialize<List<CopyBatchModel.AnimalRow>>(savedJson) ?? [];
         if (RowIndex is >= 0 && RowIndex < animals.Count)
         {
-            var edited = animals[RowIndex.Value];
-            // Change acts on a grouped display row, so the previous range's other rows must go —
-            // otherwise re-ranging MC2-MC4 leaves MC3/MC4 staged beside the replacement.
-            animals.RemoveAll(a => !ReferenceEquals(a, edited) && CopyBatchModel.IsSameDisplayGroup(a, edited));
-            var editedIndex = animals.IndexOf(edited);
-
-            if (rangeRefs is { Count: > 0 })
-            {
-                edited.NewSenderRef = rangeRefs[0];
-                for (var i = 1; i < rangeRefs.Count; i++)
-                {
-                    animals.Insert(editedIndex + i, new CopyBatchModel.AnimalRow
-                    {
-                        AnimalId = edited.AnimalId,
-                        SubmissionId = edited.SubmissionId,
-                        SenderRef = edited.SenderRef,
-                        NewSenderRef = rangeRefs[i],
-                        TissueDetails = edited.TissueDetails,
-                    });
-                }
-            }
-            else
-            {
-                edited.NewSenderRef = string.IsNullOrWhiteSpace(SenderRef)
-                    ? string.IsNullOrWhiteSpace(MouseNumberFrom) ? string.Empty : MouseNumberFrom.Trim()
-                    : SenderRef.Trim();
-            }
+            UpdateExistingCopyBatchAnimal(animals, rangeRefs);
         }
-        else if (!string.IsNullOrWhiteSpace(SenderRef) || !string.IsNullOrWhiteSpace(MouseNumberFrom))
+        else if (ShouldAppendCopyBatchAnimal())
         {
-            animals.Add(new CopyBatchModel.AnimalRow
-            {
-                AnimalId = SourceAnimalId ?? 0,
-                SubmissionId = BatchSubmissionId ?? 0,
-                SenderRef = string.IsNullOrWhiteSpace(SenderRef) ? MouseNumberFrom.Trim() : SenderRef.Trim(),
-                NewSenderRef = string.IsNullOrWhiteSpace(SenderRef) ? MouseNumberFrom.Trim() : SenderRef.Trim(),
-            });
+            AddNewCopyBatchAnimal(animals);
         }
 
         TempData["CopyBatch_Animals"] = JsonSerializer.Serialize(animals);
     }
+
+    private void UpdateExistingCopyBatchAnimal(List<CopyBatchModel.AnimalRow> animals, List<string>? rangeRefs)
+    {
+        var edited = animals[RowIndex!.Value];
+        // Change acts on a grouped display row, so the previous range's other rows must go —
+        // otherwise re-ranging MC2-MC4 leaves MC3/MC4 staged beside the replacement.
+        animals.RemoveAll(a => !ReferenceEquals(a, edited) && CopyBatchModel.IsSameDisplayGroup(a, edited));
+        var editedIndex = animals.IndexOf(edited);
+
+        if (rangeRefs is { Count: > 0 })
+        {
+            edited.NewSenderRef = rangeRefs[0];
+            for (var i = 1; i < rangeRefs.Count; i++)
+            {
+                animals.Insert(editedIndex + i, new CopyBatchModel.AnimalRow
+                {
+                    AnimalId = edited.AnimalId,
+                    SubmissionId = edited.SubmissionId,
+                    SenderRef = edited.SenderRef,
+                    NewSenderRef = rangeRefs[i],
+                    TissueDetails = edited.TissueDetails,
+                });
+            }
+            return;
+        }
+
+        edited.NewSenderRef = ResolveCopyBatchSenderRef();
+    }
+
+    private void AddNewCopyBatchAnimal(List<CopyBatchModel.AnimalRow> animals)
+    {
+        var senderRef = ResolveCopyBatchSenderRef();
+        animals.Add(new CopyBatchModel.AnimalRow
+        {
+            AnimalId = SourceAnimalId ?? 0,
+            SubmissionId = BatchSubmissionId ?? 0,
+            SenderRef = senderRef,
+            NewSenderRef = senderRef,
+        });
+    }
+
+    private string ResolveCopyBatchSenderRef()
+    {
+        if (!string.IsNullOrWhiteSpace(SenderRef))
+            return SenderRef.Trim();
+
+        return string.IsNullOrWhiteSpace(MouseNumberFrom) ? string.Empty : MouseNumberFrom.Trim();
+    }
+
+    private bool ShouldAppendCopyBatchAnimal() =>
+        !string.IsNullOrWhiteSpace(SenderRef) || !string.IsNullOrWhiteSpace(MouseNumberFrom);
 
     /// <summary>
     /// Resolves a raw "Submitted As" code to its LOOKUP_SUBMITTEDAS (table 11) description and
@@ -477,7 +523,7 @@ public class AddSubmissionModel : HistoPageModel
     /// Animal for <paramref name="senderRef"/>. Shared by the single Sender Ref path and the
     /// mouse-range loop in <see cref="OnPostMouseRangeAsync"/>.
     /// </summary>
-    private async Task<(int AnimalId, string? Error)> CreateAnimalForSenderAsync(int batchId, int submissionId, Batch? batch, string senderRef)
+    private async Task<(int AnimalId, string? Error)> CreateAnimalForSenderAsync(int submissionId, Batch? batch, string senderRef)
     {
         // Pre-cassetted samples may only use a block ref already pre-booked for this sender
         // (Book Blocks) — legacy: clsBlock.NewBlock -> GetPreBookedBlock. Checking here, before
@@ -557,7 +603,7 @@ public class AddSubmissionModel : HistoPageModel
     /// [<see cref="MouseNumberFrom"/>, <see cref="MouseNumberTo"/>], each with its own BatchSubmission
     /// row, then returns to Sample Summary rather than a single sample's detail page.
     /// </summary>
-    private async Task<IActionResult> OnPostMouseRangeAsync(int batchId, int submissionId, Batch? batch)
+    private async Task<IActionResult> OnPostMouseRangeAsync(int batchId)
     {
         var (rangeRefs, rangeError) = await ResolveMouseRangeRefsAsync();
         if (rangeError is not null)
@@ -596,7 +642,7 @@ public class AddSubmissionModel : HistoPageModel
     }
 
     /// <summary>Gives every sample just created by a range copy the same blocks and histology ref a single-sample copy would get.</summary>
-    private async Task CopyToRangeSamplesAsync(int batchId, IReadOnlyList<string> rangeRefs)
+    private async Task CopyToRangeSamplesAsync(int batchId, List<string> rangeRefs)
     {
         if (SourceAnimalId is not > 0 || rangeRefs.Count == 0) return;
 

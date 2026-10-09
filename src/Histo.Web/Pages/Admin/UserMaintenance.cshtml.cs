@@ -45,7 +45,7 @@ public class UserMaintenanceModel : GridPageModel
 
     public int TotalCount => Users.Count;
 
-    private IEnumerable<User> SortedUsers =>
+    private IEnumerable<User> GetSortedUsers() =>
         SortColumn switch
         {
             "Group"   => SortDesc ? Users.OrderByDescending(u => ResolveGroupName(u)) : Users.OrderBy(u => ResolveGroupName(u)),
@@ -55,8 +55,8 @@ public class UserMaintenanceModel : GridPageModel
             _         => SortDesc ? Users.OrderByDescending(u => u.Name)   : Users.OrderBy(u => u.Name),
         };
 
-    public IReadOnlyList<User> PagedEntries =>
-        SortedUsers
+    public IReadOnlyList<User> GetPagedEntries() =>
+        GetSortedUsers()
             .Skip((PageNumber - 1) * PageSize)
             .Take(PageSize)
             .ToList();
@@ -87,7 +87,7 @@ public class UserMaintenanceModel : GridPageModel
         // now falls on under the active sort, rather than always on page 1.
         if (focusUserId is int id)
         {
-            var index = SortedUsers.ToList().FindIndex(u => u.UserID == id);
+            var index = GetSortedUsers().ToList().FindIndex(u => u.UserID == id);
             if (index >= 0)
             {
                 PageNumber = index / PageSize + 1;

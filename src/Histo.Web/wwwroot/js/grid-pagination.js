@@ -12,36 +12,48 @@
     function initGridContainer(container) {
         container.addEventListener("click", function (event) {
             var link = event.target.closest("a[href]");
-            if (!link || !container.contains(link)) return;
+            if (!link || !container.contains(link)) {
+                return;
+            }
 
-            var href = link.getAttribute("href");
+            var href = link.search;
             // Only intercept same-page query-string links (pagination/sort) — real
             // navigation links (e.g. "Change", "Return to submission") are left alone.
-            if (!href || !href.startsWith("?") || href === "#") return;
+            if (!href || !href.startsWith("?") || href === "#") {
+                return;
+            }
 
             event.preventDefault();
-            if (link.classList.contains("app-pagination-window__nav-link--disabled")) return;
+            if (link.classList.contains("app-pagination-window__nav-link--disabled")) {
+                return;
+            }
 
-            var gridUrl = container.getAttribute("data-grid-url");
+            var gridUrl = container.dataset.gridUrl;
+            if (!gridUrl) {
+                return;
+            }
+
             var query = href.slice(1); // drop leading "?"
             var requestUrl = gridUrl + (gridUrl.includes("?") ? "&" : "?") + query;
 
             fetch(requestUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } })
                 .then(function (response) {
-                    if (!response.ok) throw new Error("Grid refresh failed: " + response.status);
+                    if (!response.ok) {
+                        throw new Error(`Grid refresh failed: ${response.status}`);
+                    }
                     return response.text();
                 })
                 .then(function (html) {
                     container.innerHTML = html;
                     // Keep the browser URL/history in sync with the current page/sort state
                     // without triggering a navigation or reload.
-                    var displayUrl = window.location.pathname + "?" + query;
+                    var displayUrl = `${window.location.pathname}?${query}`;
                     window.history.replaceState(null, "", displayUrl);
                 })
                 .catch(function (err) {
                     // Fall back to a normal navigation if the AJAX refresh fails for any reason.
                     console.error(err);
-                    window.location.href = href;
+                    window.location.href = link.href;
                 });
         });
     }

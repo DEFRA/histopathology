@@ -153,7 +153,7 @@ public class CopySamplesModel : HistoPageModel
             try
             {
                 await SampleCopyHelper.CopyBlocksToAnimalAsync(
-                    _blocks, _submissions, _blockTests, sourceBlocks, allTargetBlocks, sourceTests, currentBatchId, target, userId);
+                    new SampleCopyServices(_blocks, _submissions, _blockTests), sourceBlocks, allTargetBlocks, sourceTests, currentBatchId, target, userId);
             }
             catch (InvalidOperationException ex)
             {

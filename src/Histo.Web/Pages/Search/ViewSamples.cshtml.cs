@@ -130,14 +130,22 @@ public class ViewSamplesModel : GridPageModel
         // Legacy source: ViewSamples.aspx.vb::FillviewGrid — shows whichever ref was NOT entered
         // by the user as a read-only label only; the SenderRef/HistologyRef input boxes themselves
         // are left exactly as submitted, never auto-populated with the resolved value.
-        var resolvedHistologyRef = string.IsNullOrWhiteSpace(SenderRef) ? null : Results.FirstOrDefault()?.HistologyRef;
-        var resolvedSenderRef = string.IsNullOrWhiteSpace(HistologyRef) ? null : Results.FirstOrDefault()?.SenderRef;
+        var firstResult = Results.Count > 0 ? Results[0] : null;
+        var resolvedHistologyRef = string.IsNullOrWhiteSpace(SenderRef) ? null : firstResult?.HistologyRef;
+        var resolvedSenderRef = string.IsNullOrWhiteSpace(HistologyRef) ? null : firstResult?.SenderRef;
 
-        OtherFieldLabel = resolvedHistologyRef is not null
-            ? $"Histology Ref: {resolvedHistologyRef}"
-            : resolvedSenderRef is not null
-                ? $"Sender Ref: {resolvedSenderRef}"
-                : null;
+        if (resolvedHistologyRef is not null)
+        {
+            OtherFieldLabel = $"Histology Ref: {resolvedHistologyRef}";
+        }
+        else if (resolvedSenderRef is not null)
+        {
+            OtherFieldLabel = $"Sender Ref: {resolvedSenderRef}";
+        }
+        else
+        {
+            OtherFieldLabel = null;
+        }
 
         PopulateGridViewData(Results.Count);
     }

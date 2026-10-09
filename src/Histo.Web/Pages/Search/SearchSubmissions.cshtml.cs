@@ -36,7 +36,6 @@ public class SearchSubmissionsModel : HistoPageModel
 
     // Constants matching Common.vb
     private const int LookupFixative = 10;
-    private const int LookupUserArea = 13;
     private const int LookupContacts = 18;
     private const int LookupProjects = 19;
 
@@ -142,7 +141,20 @@ public class SearchSubmissionsModel : HistoPageModel
     /// <see cref="BatchStatus"/> code of the selected row, or <c>null</c> when no row is selected.
     /// Evaluated from <see cref="Results"/> after the search re-runs in <see cref="OnPostSelectAsync"/>.
     /// </summary>
-    public string? SelectedBatchStatus => Results.FirstOrDefault(r => r.ID == SelectedBatchId)?.Status;
+    public string? SelectedBatchStatus
+    {
+        get
+        {
+            for (var i = 0; i < Results.Count; i++)
+            {
+                var result = Results[i];
+                if (result.ID == SelectedBatchId)
+                    return result.Status;
+            }
+
+            return null;
+        }
+    }
 
     /// <summary>Mirrors legacy FinalPrintBatch.aspx's EnableSubmissionNotes — only offered when notes exist.</summary>
     public bool HasNotes { get; private set; }

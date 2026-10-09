@@ -9,7 +9,7 @@ namespace Histo.Web.Pages.Admin;
 /// "Add item" button. See <see cref="SpeciesItemsModel"/> for why Species has its own
 /// pages instead of reusing <see cref="AddLookupItemModel"/>.
 /// </summary>
-public class AddSpeciesItemModel : HistoPageModel
+public class AddSpeciesItemModel : HistoPageModel, ISpeciesItemFormFields
 {
     private readonly ILookupService _lookups;
 

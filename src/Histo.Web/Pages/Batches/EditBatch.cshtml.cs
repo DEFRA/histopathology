@@ -20,7 +20,6 @@ public class EditBatchModel : HistoPageModel
     private const int LookupContacts = 18;
     private const int LookupProjects = 19;
     private const int LookupFixation = 10;
-    private const int LookupUserArea = 13;
     private const int LookupSubmittedAs = 11;
     private const int LookupTseAntibodies    = 4;
     private const int LookupNonTseAntibodies = 5;
@@ -78,9 +77,16 @@ public class EditBatchModel : HistoPageModel
     // Prefers a caller-specific override (e.g. "Continue to edit submission" from Edit Submission
     // Status) over the general ReturnPage, which EditSubmissionStatus itself uses for its OWN back
     // link — falls back to BatchesForEditing when neither is available (legacy SV_RedirectCancelPage).
-    public string ReturnPage => !string.IsNullOrWhiteSpace(Session.EditBatchReturnPage)
-        ? Session.EditBatchReturnPage
-        : string.IsNullOrWhiteSpace(Session.ReturnPage) ? "/Batches/BatchesForEditing" : Session.ReturnPage;
+    public string ReturnPage
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(Session.EditBatchReturnPage))
+                return Session.EditBatchReturnPage;
+
+            return string.IsNullOrWhiteSpace(Session.ReturnPage) ? "/Batches/BatchesForEditing" : Session.ReturnPage;
+        }
+    }
 
     /// <summary>
     /// <see cref="ReturnPage"/> plus the sort/page query string captured when the user left the

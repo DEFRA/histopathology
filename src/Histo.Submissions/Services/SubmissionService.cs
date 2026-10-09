@@ -49,15 +49,13 @@ public sealed class SubmissionService : ISubmissionService
     /// <inheritdoc/>
     public async Task<int> CreateBatchWithCopiedSamplesAsync(
         Batch batch,
-        IReadOnlyList<string> histologyCodes,
-        IReadOnlyList<string> antibodyCodes,
-        IReadOnlyList<string> stainCodes,
+        SelectedTestCodes testCodes,
         string? submittedAsCode,
         IReadOnlyList<CopiedSamplePlan> plan,
         int userId,
         CancellationToken ct = default)
     {
-        try { return await _repo.CreateBatchWithCopiedSamplesAsync(batch, histologyCodes, antibodyCodes, stainCodes, submittedAsCode, plan, userId, ct); }
+        try { return await _repo.CreateBatchWithCopiedSamplesAsync(batch, testCodes, submittedAsCode, plan, userId, ct); }
         catch (InvalidOperationException)
         {
             // Step-level, user-safe diagnostics ("A sample with sender reference 'X' already

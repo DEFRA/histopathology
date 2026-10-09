@@ -63,6 +63,11 @@ namespace Histo.Reporting.Reports;
 /// </summary>
 public sealed class SubmissionNotesRenderer
 {
+    private static readonly string[] TissueCommentHeaders = ["SenderRef", "Tissue Code", "Tissue Comment", "Tissue Archive Comment"];
+    private static readonly string[] BlockCommentHeaders = ["SenderRef", "Block Ref", "Block Comment", "Block Archive Comment"];
+    private static readonly string[] TestCommentHeaders = ["Block Ref", "Test", "Test Comment", "Test Archive Comment"];
+    private static readonly string[] TestCommentHeadersWithoutBlockRef = ["BlockRef", "Test", "Test Comment", "Test Archive Comment"];
+
     static SubmissionNotesRenderer()
     {
         // QuestPDF Community licence must be declared before any Document.Create() call.
@@ -178,7 +183,7 @@ public sealed class SubmissionNotesRenderer
                                 c.RelativeColumn(25); // Tissue Archive Comment
                             });
 
-                            foreach (var heading in new[] { "SenderRef", "Tissue Code", "Tissue Comment", "Tissue Archive Comment" })
+                            foreach (var heading in TissueCommentHeaders)
                                 t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
 
                             t.Cell().ColumnSpan(4).LineHorizontal(0.5f);
@@ -211,7 +216,7 @@ public sealed class SubmissionNotesRenderer
                                 c.RelativeColumn(25); // Block Archive Comment
                             });
 
-                            foreach (var heading in new[] { "SenderRef", "Block Ref", "Block Comment", "Block Archive Comment" })
+                            foreach (var heading in BlockCommentHeaders)
                                 t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
 
                             t.Cell().ColumnSpan(4).LineHorizontal(0.5f);
@@ -244,7 +249,7 @@ public sealed class SubmissionNotesRenderer
                                 c.RelativeColumn(25); // Test Archive Comment
                             });
 
-                            foreach (var heading in new[] { "Block Ref", "Test", "Test Comment", "Test Archive Comment" })
+                            foreach (var heading in TestCommentHeaders)
                                 t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
 
                             t.Cell().ColumnSpan(4).LineHorizontal(0.5f);
@@ -277,7 +282,7 @@ public sealed class SubmissionNotesRenderer
                                 c.RelativeColumn(25); // Test Archive Comment
                             });
 
-                            foreach (var heading in new[] { "Block Ref", "Test", "Test Comment", "Test Archive Comment" })
+                            foreach (var heading in TestCommentHeaders)
                                 t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
 
                             t.Cell().ColumnSpan(4).LineHorizontal(0.5f);
@@ -310,7 +315,7 @@ public sealed class SubmissionNotesRenderer
                                 c.RelativeColumn(25); // Test Archive Comment
                             });
 
-                            foreach (var heading in new[] { "BlockRef", "Test", "Test Comment", "Test Archive Comment" })
+                            foreach (var heading in TestCommentHeadersWithoutBlockRef)
                                 t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
 
                             t.Cell().ColumnSpan(4).LineHorizontal(0.5f);

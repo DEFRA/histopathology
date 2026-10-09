@@ -20,9 +20,7 @@ public interface ISubmissionService
     /// </summary>
     Task<int> CreateBatchWithCopiedSamplesAsync(
         Batch batch,
-        IReadOnlyList<string> histologyCodes,
-        IReadOnlyList<string> antibodyCodes,
-        IReadOnlyList<string> stainCodes,
+        SelectedTestCodes testCodes,
         string? submittedAsCode,
         IReadOnlyList<CopiedSamplePlan> plan,
         int userId,
