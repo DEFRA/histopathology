@@ -125,6 +125,21 @@ public sealed class BlockService : IBlockService
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<PreBookedBlockResult>?> BookPreBookedBlocksAsync(
+        string senderRef, IReadOnlyList<int> blockRefs, CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repo.BookPreBookedBlocksAsync(senderRef, blockRefs, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to book block refs for sender ref {SenderRef}.", ex, senderRef);
+            return null;
+        }
+    }
+
     /// <summary>
     /// Claims a pre-booked placeholder (BatchID NULL, Status PreBooked) into a real block for
     /// <paramref name="batchId"/>, updating the existing row rather than inserting a new one —
@@ -217,11 +232,7 @@ public sealed class BlockService : IBlockService
     }
 
     /// <summary>Returns the used block refs (with status) for a sender ref.</summary>
-    public async Task<IReadOnlyList<UsedBlockRef>> GetUsedBlockRefsBySenderRefAsync(string senderRef, CancellationToken ct = default) =>
-        await TryGetUsedBlockRefsBySenderRefAsync(senderRef, ct) ?? [];
-
-    /// <inheritdoc/>
-    public async Task<IReadOnlyList<UsedBlockRef>?> TryGetUsedBlockRefsBySenderRefAsync(string senderRef, CancellationToken ct = default)
+    public async Task<IReadOnlyList<UsedBlockRef>> GetUsedBlockRefsBySenderRefAsync(string senderRef, CancellationToken ct = default)
     {
         try
         {
@@ -230,7 +241,7 @@ public sealed class BlockService : IBlockService
         catch (Exception ex)
         {
             _logger.LogError("Failed to search used block refs by sender ref {SenderRef}.", ex, senderRef);
-            return null;
+            return [];
         }
     }
 

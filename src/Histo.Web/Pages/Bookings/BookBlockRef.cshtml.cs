@@ -1,6 +1,6 @@
 using Histo.Core.Domain;
 using Histo.Histology.Interfaces;
-using Histo.Submissions.Interfaces;
+using Histo.Histology.Models;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,10 +17,9 @@ namespace Histo.Web.Pages.Bookings;
 public class BookBlockRefModel : HistoPageModel
 {
     private readonly IBlockService _blocks;
-    private readonly ISubmissionService _submissions;
 
-    public BookBlockRefModel(ISessionService session, IBlockService blocks, ISubmissionService submissions)
-        : base(session) { _blocks = blocks; _submissions = submissions; }
+    public BookBlockRefModel(ISessionService session, IBlockService blocks)
+        : base(session) { _blocks = blocks; }
 
     [BindProperty] public string SenderRefFrom { get; set; } = string.Empty;
     [BindProperty] public string? SenderRefTo { get; set; }
@@ -132,52 +131,37 @@ public class BookBlockRefModel : HistoPageModel
             senderRefs = [senderRefFrom];
         }
 
-        var userId = Session.UserID;
+        var requestedRefs = Enumerable.Range(blockRefFrom, blockRefTo - blockRefFrom + 1).ToList();
         foreach (var senderRef in senderRefs)
         {
-            // A ref is taken whatever its status and whichever Animal row owns it: blocks claimed by a
-            // real submission are Status Used against a BatchID, so the pre-booked placeholder lookup
-            // (GetAnimalPreBookedBlocks, Status 2/3 only) never sees them.
-            var existingRefs = await _blocks.TryGetUsedBlockRefsBySenderRefAsync(senderRef);
-            if (existingRefs is null)
+            // One atomic call: the duplicate check, sample resolution and inserts all run on a
+            // single locked transaction, so concurrent bookings cannot both claim the same ref.
+            var results = await _blocks.BookPreBookedBlocksAsync(senderRef, requestedRefs);
+            if (results is null)
             {
-                ResultMessages.Add($"Sample: {senderRef} — existing block ref check failed, so no blocks were booked.");
+                ResultMessages.Add($"Sample: {senderRef} — booking failed, so no blocks were booked.");
                 continue;
             }
 
-            var takenRefs = existingRefs.Select(b => b.BlockRef).ToHashSet();
-            var numberFails = 0;
             var numberSuccess = 0;
-            var animalId = 0;
+            var numberFails = 0;
 
-            for (var blockRefNum = blockRefFrom; blockRefNum <= blockRefTo; blockRefNum++)
+            foreach (var result in results)
             {
-                var blockRef = SenderRefHelpers.FormatBlockRef(blockRefNum);
-
-                if (takenRefs.Contains(blockRefNum))
+                var blockRef = SenderRefHelpers.FormatBlockRef(result.BlockRef);
+                switch (result.Outcome)
                 {
-                    ResultMessages.Add($"Sample: {senderRef} Block {blockRef} not booked as it already exists.");
-                    numberFails++;
-                    continue;
-                }
-
-                // Deferred so a fully-duplicate range leaves no orphan Animal row behind.
-                if (animalId == 0) animalId = await ResolveAnimalIdAsync(senderRef, userId);
-                if (animalId == 0)
-                {
-                    ResultMessages.Add($"Sample: {senderRef} — failed to retrieve or create sample data.");
-                    numberFails++;
-                    continue;
-                }
-
-                if (await _blocks.CreatePreBookedBlockAsync(animalId, blockRef))
-                {
-                    numberSuccess++;
-                }
-                else
-                {
-                    ResultMessages.Add($"Sample: {senderRef} Block {blockRef} not booked.");
-                    numberFails++;
+                    case PreBookedBlockOutcome.Booked:
+                        numberSuccess++;
+                        break;
+                    case PreBookedBlockOutcome.AlreadyExists:
+                        ResultMessages.Add($"Sample: {senderRef} Block {blockRef} not booked as it already exists.");
+                        numberFails++;
+                        break;
+                    default:
+                        ResultMessages.Add($"Sample: {senderRef} — failed to retrieve or create sample data.");
+                        numberFails++;
+                        break;
                 }
             }
 
@@ -190,17 +174,5 @@ public class BookBlockRefModel : HistoPageModel
             || m.Contains("failed", StringComparison.OrdinalIgnoreCase));
         SuccessMessage = requested == 0 ? "No blocks were requested." : (anyFailed ? null : "Blocks booked successfully.");
         return Page();
-    }
-
-    /// <summary>
-    /// Picks the Animal row new placeholders hang off. Legacy source: ProcessMultipleBookings —
-    /// <c>dtAnimaldata.Rows(0)("ID")</c>, i.e. the first GetAnimalBySender match, creating the row
-    /// only when the sender ref is unknown.
-    /// </summary>
-    private async Task<int> ResolveAnimalIdAsync(string senderRef, int userId)
-    {
-        var existing = await _submissions.GetAnimalBySenderAsync(senderRef);
-        return existing.FirstOrDefault()?.ID
-            ?? await _submissions.AddAnimalAsync(batchSubmissionId: 0, senderRef, userId);
     }
 }

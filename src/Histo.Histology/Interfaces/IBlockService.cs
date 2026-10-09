@@ -21,6 +21,14 @@ public interface IBlockService
     Task<bool> CreatePreBookedBlockAsync(int animalId, string blockRef, CancellationToken ct = default);
 
     /// <summary>
+    /// Books a range of block refs for one sender ref atomically (duplicate check, sample
+    /// resolution and inserts on a single locked transaction). Returns <c>null</c> when the
+    /// operation failed, so the caller does not report a non-booking as success.
+    /// </summary>
+    Task<IReadOnlyList<PreBookedBlockResult>?> BookPreBookedBlocksAsync(
+        string senderRef, IReadOnlyList<int> blockRefs, CancellationToken ct = default);
+
+    /// <summary>
     /// Claims an existing pre-booked placeholder block (<paramref name="preBooked"/>) into a real
     /// batch, updating it in place rather than inserting a new row — so the placeholder is retired
     /// (Status PreBooked -&gt; PreBookedUsed) and never reappears in <see cref="GetPreBookedByAnimalAsync"/>.
@@ -40,12 +48,6 @@ public interface IBlockService
     // Search
     Task<IReadOnlyList<UsedBlockRef>> GetUsedBlockRefsByHistologyRefAsync(string histologyRef, CancellationToken ct = default);
     Task<IReadOnlyList<UsedBlockRef>> GetUsedBlockRefsBySenderRefAsync(string senderRef, CancellationToken ct = default);
-
-    /// <summary>
-    /// As <see cref="GetUsedBlockRefsBySenderRefAsync"/> but returns <c>null</c> on lookup failure, for
-    /// callers where an empty list means "the ref is free" and a swallowed error would corrupt data.
-    /// </summary>
-    Task<IReadOnlyList<UsedBlockRef>?> TryGetUsedBlockRefsBySenderRefAsync(string senderRef, CancellationToken ct = default);
 
     Task<IReadOnlyList<BlockArchiveInfo>> GetBlockArchiveAsync(string? senderRef, string? histologyRef, string? blockRef, string? archiveLocation, CancellationToken ct = default);
     Task<IReadOnlyList<SlideArchiveInfo>> GetSlideArchiveAsync(string? senderRef, string? histologyRef, string? archiveLocation, CancellationToken ct = default);
