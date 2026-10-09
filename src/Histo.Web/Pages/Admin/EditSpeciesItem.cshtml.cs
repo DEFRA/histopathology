@@ -9,7 +9,7 @@ namespace Histo.Web.Pages.Admin;
 /// per-row "Change" link. See <see cref="SpeciesItemsModel"/> for why Species has its own
 /// pages instead of reusing <see cref="EditLookupItemModel"/>.
 /// </summary>
-public class EditSpeciesItemModel : HistoPageModel
+public class EditSpeciesItemModel : HistoPageModel, ISpeciesItemFormFields
 {
     private readonly ILookupService _lookups;
 

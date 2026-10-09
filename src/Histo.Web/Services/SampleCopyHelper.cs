@@ -6,6 +6,9 @@ using Histo.Submissions.Models;
 
 namespace Histo.Web.Services;
 
+/// <summary>Groups the three services <see cref="SampleCopyHelper.CopyBlocksToAnimalAsync"/> needs so the method stays under the 7-parameter limit.</summary>
+public sealed record SampleCopyServices(IBlockService Blocks, ISubmissionService Submissions, IBlockTestService BlockTests);
+
 /// <summary>
 /// Shared "copy a sample's blocks" steps used by Copy blocks and the Copy sample journey, so both
 /// reproduce a block identically: the block row, its tissues, and its test-type selections.
@@ -23,9 +26,7 @@ public static class SampleCopyHelper
     /// reports the failure rather than leaving the sample short of blocks, tissues and test ticks.
     /// </summary>
     public static async Task CopyBlocksToAnimalAsync(
-        IBlockService blocks,
-        ISubmissionService submissions,
-        IBlockTestService blockTests,
+        SampleCopyServices services,
         IReadOnlyList<Block> sourceBlocks,
         IReadOnlyList<Block> allBatchBlocks,
         IReadOnlyList<BlockTest> allBatchTests,
@@ -39,7 +40,7 @@ public static class SampleCopyHelper
 
         foreach (var sourceBlock in sourceBlocks)
         {
-            var newBlockId = await blocks.CopyBlockAsync(sourceBlock, batchId, target.ID, refs, orders, userId);
+            var newBlockId = await services.Blocks.CopyBlockAsync(sourceBlock, batchId, target.ID, refs, orders, userId);
             if (newBlockId <= 0)
                 throw new InvalidOperationException(
                     $"Could not copy block '{sourceBlock.BlockRef}' to sample '{target.SenderRef}'. The copy is incomplete — check that sample's blocks before continuing.");
@@ -47,11 +48,11 @@ public static class SampleCopyHelper
             refs.Add(BlockHelpers.ComputeNextBlockRef(refs));
             orders.Add(BlockHelpers.ComputeNextOrder(orders));
 
-            var tissues = await submissions.GetTissuesByBlockAsync(sourceBlock.BatchID, sourceBlock.ID);
+            var tissues = await services.Submissions.GetTissuesByBlockAsync(sourceBlock.BatchID, sourceBlock.ID);
             foreach (var tissue in tissues)
-                await submissions.CopyTissueAsync(tissue, newBlockId, userId);
+                await services.Submissions.CopyTissueAsync(tissue, newBlockId, userId);
 
-            await CopyBlockTestsAsync(blockTests, allBatchTests, sourceBlock.ID, batchId, newBlockId, userId);
+            await CopyBlockTestsAsync(services.BlockTests, allBatchTests, sourceBlock.ID, batchId, newBlockId, userId);
 
             target.NextBlockRef = BlockHelpers.ComputeNextBlockRef(refs);
         }

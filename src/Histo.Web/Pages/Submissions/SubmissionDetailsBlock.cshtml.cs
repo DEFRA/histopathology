@@ -7,6 +7,7 @@ using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.RegularExpressions;
 
 namespace Histo.Web.Pages.Submissions;
 
@@ -25,7 +26,7 @@ namespace Histo.Web.Pages.Submissions;
 /// split between this grid and <c>BlockDetails.aspx</c> after an earlier consolidation onto this
 /// page made it too cluttered to use.
 /// </summary>
-public class SubmissionDetailsBlockModel : HistoPageModel
+public partial class SubmissionDetailsBlockModel : HistoPageModel
 {
     private const int LookupTissueCode = 9;
 
@@ -293,8 +294,12 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         if (string.IsNullOrWhiteSpace(histologyRef))
             return null;
 
-        if (!System.Text.RegularExpressions.Regex.IsMatch(histologyRef, @"^\d{2}/\d{5}$"))
+        var histologyRefPattern = HistologyRefRegex();
+
+        if (!histologyRefPattern.IsMatch(histologyRef))
+        {
             return "Histology Reference must be in NN/NNNNN format (e.g., 26/40004).";
+        }
 
         var yearStr = histologyRef[..2];
         if (!int.TryParse(yearStr, out var year))
@@ -349,6 +354,9 @@ public class SubmissionDetailsBlockModel : HistoPageModel
         if (histoRefYear < currentYear) return true;
         return currentYear is 0 or 1 && histoRefYear is >= 70 and <= 99;
     }
+
+    [GeneratedRegex(@"^\d{2}/\d{5}$", RegexOptions.CultureInvariant, 250)]
+    private static partial Regex HistologyRefRegex();
 
     /// <summary>
     /// Deletes the checked blocks. Legacy source: <c>SubmissionDetailsBlock.aspx.vb</c>::

@@ -13,34 +13,10 @@
 
 <partial name="_ErrorSummary" model="Model.Errors" />
 
-@if (!string.IsNullOrEmpty(Model.SaveError))
-{
-    <div class="govuk-error-summary" data-module="govuk-error-summary">
-        <div role="alert">
-            <h2 class="govuk-error-summary__title">There is a problem</h2>
-            <div class="govuk-error-summary__body">
-                <ul class="govuk-list govuk-error-summary__list">
-                    <li>@Model.SaveError</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-}
+<partial name="_SaveErrorSummary" model="Model.SaveError" />
 
 <form method="post" asp-antiforgery="true">
-    <div class="govuk-form-group @(Model.Errors.ContainsKey("Species") ? "govuk-form-group--error" : "")">
-        <label class="govuk-label" for="Species">Species</label>
-        @if (Model.Errors.TryGetValue("Species", out var speciesError))
-        {
-            <p id="Species-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @speciesError</p>
-        }
-        <input class="govuk-input @(Model.Errors.ContainsKey("Species") ? "govuk-input--error" : "")" asp-for="Species" maxlength="20"
-               aria-describedby="@(Model.Errors.ContainsKey("Species") ? "Species-error" : null)" />
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="CommonName">Common name</label>
-        <input class="govuk-input" asp-for="CommonName" maxlength="20" />
-    </div>
+    <partial name="_SpeciesItemFormFields" model="(Histo.Web.Pages.Admin.ISpeciesItemFormFields)Model" />
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Add item</button>
         <a asp-page="/Admin/SpeciesItems" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>

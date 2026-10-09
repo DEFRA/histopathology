@@ -11,6 +11,10 @@ namespace Histo.Submissions.Repositories;
 /// </summary>
 public sealed class BatchRepository : IBatchRepository
 {
+    private const string ReturnValueParam = "RETURN_VALUE";
+    private const string DateReceivedColumn = "DateReceived";
+    private const string ReceivedByColumn = "ReceivedBy";
+
     private readonly IDbConnectionFactory _db;
 
     public BatchRepository(IDbConnectionFactory db) => _db = db;
@@ -80,7 +84,7 @@ public sealed class BatchRepository : IBatchRepository
             Comments          = Str(dict, "Comments"),
             StatusComments    = Str(dict, "StatusComments"),
             BatchDate         = ParseDate(dict, "BatchDate"),
-            ReceivedDate      = ParseDate(dict, "DateReceived"),   // SP column: DateReceived
+            ReceivedDate      = ParseDate(dict, DateReceivedColumn),   // SP column: DateReceived
             CompletedDate     = ParseDate(dict, "DateCompleted"),  // SP column: DateCompleted
             SubmittedByUserID = Int(dict, "SubmittedBy"),          // populate old field for backward compat
             UserAreaCode      = int.TryParse(submittedAreaStr, out var ua) ? ua : 0,
@@ -102,7 +106,7 @@ public sealed class BatchRepository : IBatchRepository
             SampleSameProjects = Bool(dict, "SampleSameProjects"),
             AllTissuesAssigned = Bool(dict, "AllTissuesAssigned"),
             TimeReceived      = Str(dict, "TimeReceived"),
-            ReceivedBy        = NullInt(dict, "ReceivedBy"),
+            ReceivedBy        = NullInt(dict, ReceivedByColumn),
             PostFixationOther = Str(dict, "PostFixationOther"),
         };
     }
@@ -211,9 +215,9 @@ public sealed class BatchRepository : IBatchRepository
         {
             // SP variant: returns new ID via RETURN statement instead of OUTPUT param
             var p2 = BuildAddBatchParams(batch, userId);
-            p2.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
+            p2.Add(ReturnValueParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
             await conn.ExecuteAsync("AddBatch", p2, commandType: System.Data.CommandType.StoredProcedure);
-            return p2.Get<int>("RETURN_VALUE");
+            return p2.Get<int>(ReturnValueParam);
         }
 
         // INSERT ran but @BatchID = 0: INSERT failed (SP returned error code via RETURN).
@@ -266,9 +270,9 @@ public sealed class BatchRepository : IBatchRepository
         p.Add("SubmittedBy",         batch.SubmittedByUserID > 0 ? batch.SubmittedByUserID : (batch.SubmittedBy ?? 0));
         p.Add("SafeToHandle",        batch.SafeToHandle ?? false);
         p.Add("BatchStatus",         batchStatusInt);
-        p.Add("DateReceived",        batch.ReceivedDate);
+        p.Add(DateReceivedColumn,    batch.ReceivedDate);
         p.Add("TimeReceived",        batch.TimeReceived);
-        p.Add("ReceivedBy",          batch.ReceivedBy);
+        p.Add(ReceivedByColumn,      batch.ReceivedBy);
         p.Add("OtherSubmittedBy",    batch.OtherSubmittedBy ?? 0);
         p.Add("OtherSubmittedArea",  batch.OtherSubmittedArea ?? "");
         p.Add("Cassetted",           batch.IsPreCassetted);
@@ -343,6 +347,122 @@ public sealed class BatchRepository : IBatchRepository
     }
 
     /// <inheritdoc/>
+    public async Task<IReadOnlyCollection<int>> GetAnimalsWithUnassignedTissuesAsync(int batchId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+
+        // GetBatchBlockDetails returns one row per block, so it answers "which animals have a
+        // block", never "which tissues are in a block" — the comparison has to be made against
+        // BlockTissues, mapped back to the owning animal via the block.
+        var blockToAnimal = (await conn.QueryAsync<dynamic>(
+                "GetBatchBlockDetails",
+                new { ID = batchId },
+                commandType: System.Data.CommandType.StoredProcedure))
+            .Select(r => (IDictionary<string, object>)r)
+            .Select(d => (
+                BlockId: d.TryGetValue("ID", out var bid) && bid is not DBNull ? Convert.ToInt32(bid) : 0,
+                AnimalId: d.TryGetValue("AnimalID", out var aid) && aid is not DBNull ? Convert.ToInt32(aid) : 0))
+            .Where(x => x.BlockId > 0 && x.AnimalId > 0)
+            .GroupBy(x => x.BlockId)
+            .ToDictionary(g => g.Key, g => g.First().AnimalId);
+
+        var assignedByAnimal = new Dictionary<int, HashSet<string>>();
+        foreach (var d in (await conn.QueryAsync<dynamic>(
+                "GetBatchBlockTissues",
+                new { ID = batchId },
+                commandType: System.Data.CommandType.StoredProcedure))
+            .Select(r => (IDictionary<string, object>)r))
+        {
+            var blockId = d.TryGetValue("BlockID", out var bid) && bid is not DBNull ? Convert.ToInt32(bid) : 0;
+            if (!blockToAnimal.TryGetValue(blockId, out var animalId)) continue;
+
+            var code = d.TryGetValue("TissueCode", out var tc) && tc is not DBNull ? Convert.ToString(tc)?.Trim() : null;
+            if (string.IsNullOrEmpty(code)) continue;
+
+            if (!assignedByAnimal.TryGetValue(animalId, out var codes))
+                assignedByAnimal[animalId] = codes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            codes.Add(code);
+        }
+
+        var unassigned = new HashSet<int>();
+        foreach (var d in (await conn.QueryAsync<dynamic>(
+                "GetBatchTissues",
+                new { ID = batchId },
+                commandType: System.Data.CommandType.StoredProcedure))
+            .Select(r => (IDictionary<string, object>)r))
+        {
+            var animalId = d.TryGetValue("AnimalID", out var aid) && aid is not DBNull ? Convert.ToInt32(aid) : 0;
+            if (animalId <= 0) continue;
+
+            var code = d.TryGetValue("TissueCode", out var tc) && tc is not DBNull ? Convert.ToString(tc)?.Trim() : null;
+            if (string.IsNullOrEmpty(code)) continue;
+
+            if (!assignedByAnimal.TryGetValue(animalId, out var codes) || !codes.Contains(code))
+                unassigned.Add(animalId);
+        }
+
+        return unassigned;
+    }
+
+    /// <inheritdoc/>
+    public async Task RefreshAllTissuesAssignedAsync(int batchId, int userId, CancellationToken ct = default)
+    {
+        var existing = await GetByIdAsync(batchId, ct);
+        if (existing is null) return;
+
+        using var conn = _db.CreateConnection();
+        var animals = (await conn.QueryAsync<dynamic>(
+                "GetBatchAnimal",
+                new { ID = batchId },
+                commandType: System.Data.CommandType.StoredProcedure))
+            .Select(r => (IDictionary<string, object>)r)
+            .Select(d => d.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0)
+            .Where(id => id > 0)
+            .Distinct()
+            .ToList();
+
+        var unassignedAnimals = await GetAnimalsWithUnassignedTissuesAsync(batchId, ct);
+
+        var allTissuesAssigned = animals.Count > 0 && unassignedAnimals.Count == 0;
+        if (allTissuesAssigned == existing.AllTissuesAssigned) return;
+
+        var updated = new Batch
+        {
+            ID = existing.ID,
+            Status = existing.Status,
+            Comments = existing.Comments,
+            StatusComments = existing.StatusComments,
+            BatchDate = existing.BatchDate,
+            ReceivedDate = existing.ReceivedDate,
+            CompletedDate = existing.CompletedDate,
+            SubmittedByUserID = existing.SubmittedByUserID,
+            UserAreaCode = existing.UserAreaCode,
+            IsPreCassetted = existing.IsPreCassetted,
+            ByPassSort = existing.ByPassSort,
+            RowStamp = existing.RowStamp,
+            BatchType = existing.BatchType,
+            ProjectContractCode = existing.ProjectContractCode,
+            ContactName = existing.ContactName,
+            Species = existing.Species,
+            Fixation = existing.Fixation,
+            CustomerReceivedDate = existing.CustomerReceivedDate,
+            SubmittedBy = existing.SubmittedBy,
+            SubmittedArea = existing.SubmittedArea,
+            OtherSubmittedBy = existing.OtherSubmittedBy,
+            OtherSubmittedArea = existing.OtherSubmittedArea,
+            SafeToHandle = existing.SafeToHandle,
+            IsBlocked = existing.IsBlocked,
+            SampleSameProjects = existing.SampleSameProjects,
+            AllTissuesAssigned = allTissuesAssigned,
+            TimeReceived = existing.TimeReceived,
+            ReceivedBy = existing.ReceivedBy,
+            PostFixationOther = existing.PostFixationOther,
+        };
+
+        await UpdateAsync(updated, userId, ct);
+    }
+
+    /// <inheritdoc/>
     public async Task SetCompletedAsync(int batchId, DateTime completedDate, int userId, CancellationToken ct = default)
     {
         var existing = await GetByIdAsync(batchId, ct);
@@ -388,18 +508,18 @@ public sealed class BatchRepository : IBatchRepository
 
         using var conn = _db.CreateConnection();
         var p = new DynamicParameters();
-        p.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
+        p.Add(ReturnValueParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
         p.Add("ID",              batchId);
         p.Add("BatchStatus",     batchStatusInt);
-        p.Add("DateReceived",    dateReceived);
+        p.Add(DateReceivedColumn, dateReceived);
         p.Add("TimeReceived",    timeReceived);
-        p.Add("ReceivedBy",      receivedBy);
+        p.Add(ReceivedByColumn,  receivedBy);
         p.Add("StatusComments",  existing?.StatusComments);
         p.Add("PostFixationOther", existing?.PostFixationOther);
 
         await conn.ExecuteAsync("EditBatchStatus", p, commandType: System.Data.CommandType.StoredProcedure);
 
-        var returnValue = p.Get<int>("RETURN_VALUE");
+        var returnValue = p.Get<int>(ReturnValueParam);
         // SP returns -1 when no rows were updated (concurrency conflict or batch not found).
         if (returnValue == -1) throw new BatchConcurrencyException();
         return returnValue == 0;
@@ -486,7 +606,7 @@ public sealed class BatchRepository : IBatchRepository
             ContactDescription    = Str(dict, "ContactDescription"),
             Species               = Str(dict, "Species"),
             BatchDate             = ParseDate(dict, "BatchDate"),
-            DateReceived          = ParseDate(dict, "DateReceived"),
+            DateReceived          = ParseDate(dict, DateReceivedColumn),
             DateCompleted         = ParseDate(dict, "DateCompleted"),
             CustomerReceivedDate  = ParseDate(dict, "CustomerReceivedDate"),
             Status                = batchStatusInt > 0 ? batchStatusInt.ToString() : Str(dict, "Status"),
@@ -494,7 +614,7 @@ public sealed class BatchRepository : IBatchRepository
             BatchType             = Str(dict, "BatchType"),
             SafeToHandle          = Str(dict, "SafeToHandle"),
             ReceivedTime          = Str(dict, "ReceivedTime"),
-            ReceivedBy            = Str(dict, "ReceivedBy"),
+            ReceivedBy            = Str(dict, ReceivedByColumn),
             OtherSubmittedBy      = Str(dict, "OtherSubmittedBy"),
             Comments              = Str(dict, "Comments"),
         };
@@ -802,9 +922,10 @@ public sealed class BatchRepository : IBatchRepository
         var premiumCharges = await GetActivePremiumChargeDescriptionsAsync(conn);
 
         var results = new List<Models.TestPremiumChargeCount>();
-        await AddCountsAsync(conn, results, "GetTestHistologyCounts", histologyCodes, premiumCharges, projectDesc, batchType, startDate, endDate);
-        await AddCountsAsync(conn, results, "GetTestAntibodiesCounts", antibodyCodes, premiumCharges, projectDesc, batchType, startDate, endDate);
-        await AddCountsAsync(conn, results, "GetTestStainsCounts", stainCodes, premiumCharges, projectDesc, batchType, startDate, endDate);
+        var filter = new PremiumChargeFilter(projectDesc, batchType, startDate, endDate);
+        await AddCountsAsync(conn, results, "GetTestHistologyCounts", histologyCodes, premiumCharges, filter);
+        await AddCountsAsync(conn, results, "GetTestAntibodiesCounts", antibodyCodes, premiumCharges, filter);
+        await AddCountsAsync(conn, results, "GetTestStainsCounts", stainCodes, premiumCharges, filter);
         return results;
     }
 
@@ -822,9 +943,10 @@ public sealed class BatchRepository : IBatchRepository
         var premiumCharges = await GetActivePremiumChargeDescriptionsAsync(conn);
 
         var results = new List<Models.TestPremiumChargeBatchRef>();
-        await AddBatchesAsync(conn, results, "GetTestHistologyBatch", histologyCodes, premiumCharges, projectDesc, batchType, startDate, endDate);
-        await AddBatchesAsync(conn, results, "GetTestAntibodiesBatch", antibodyCodes, premiumCharges, projectDesc, batchType, startDate, endDate);
-        await AddBatchesAsync(conn, results, "GetTestStainsBatch", stainCodes, premiumCharges, projectDesc, batchType, startDate, endDate);
+        var filter = new PremiumChargeFilter(projectDesc, batchType, startDate, endDate);
+        await AddBatchesAsync(conn, results, "GetTestHistologyBatch", histologyCodes, premiumCharges, filter);
+        await AddBatchesAsync(conn, results, "GetTestAntibodiesBatch", antibodyCodes, premiumCharges, filter);
+        await AddBatchesAsync(conn, results, "GetTestStainsBatch", stainCodes, premiumCharges, filter);
         return results;
     }
 
@@ -849,10 +971,13 @@ public sealed class BatchRepository : IBatchRepository
     /// </summary>
     private static string JoinTestCodes(IReadOnlyList<string> codes) => string.Join("','", codes);
 
+    /// <summary>Groups the shared filter parameters for <see cref="AddCountsAsync"/>/<see cref="AddBatchesAsync"/> so both stay under the 7-parameter limit.</summary>
+    private sealed record PremiumChargeFilter(string? ProjectDescription, int BatchType, DateTime? StartDate, DateTime? EndDate);
+
     private static async Task AddCountsAsync(
         System.Data.IDbConnection conn, List<Models.TestPremiumChargeCount> results,
         string procName, IReadOnlyList<string> codes, IReadOnlyList<string> premiumCharges,
-        string? projectDesc, int batchType, DateTime? startDate, DateTime? endDate)
+        PremiumChargeFilter filter)
     {
         if (codes.Count == 0) return;
         var tests = JoinTestCodes(codes);
@@ -861,10 +986,10 @@ public sealed class BatchRepository : IBatchRepository
         {
             var rows = await conn.QueryAsync<dynamic>(procName, new
             {
-                ProjectContractCode = projectDesc ?? "",
-                SubmittedDateFrom = startDate,
-                SubmittedDateTo = endDate,
-                BatchType = batchType != 0,
+                ProjectContractCode = filter.ProjectDescription ?? "",
+                SubmittedDateFrom = filter.StartDate,
+                SubmittedDateTo = filter.EndDate,
+                BatchType = filter.BatchType != 0,
                 Tests = tests,
                 TestCode = testCode,
             }, commandType: System.Data.CommandType.StoredProcedure);
@@ -889,7 +1014,7 @@ public sealed class BatchRepository : IBatchRepository
     private static async Task AddBatchesAsync(
         System.Data.IDbConnection conn, List<Models.TestPremiumChargeBatchRef> results,
         string procName, IReadOnlyList<string> codes, IReadOnlyList<string> premiumCharges,
-        string? projectDesc, int batchType, DateTime? startDate, DateTime? endDate)
+        PremiumChargeFilter filter)
     {
         if (codes.Count == 0) return;
         var tests = JoinTestCodes(codes);
@@ -898,10 +1023,10 @@ public sealed class BatchRepository : IBatchRepository
         {
             var batchIds = await conn.QueryAsync<int>(procName, new
             {
-                ProjectContractCode = projectDesc ?? "",
-                SubmittedDateFrom = startDate,
-                SubmittedDateTo = endDate,
-                BatchType = batchType != 0,
+                ProjectContractCode = filter.ProjectDescription ?? "",
+                SubmittedDateFrom = filter.StartDate,
+                SubmittedDateTo = filter.EndDate,
+                BatchType = filter.BatchType != 0,
                 Tests = tests,
                 TestCode = testCode,
             }, commandType: System.Data.CommandType.StoredProcedure);

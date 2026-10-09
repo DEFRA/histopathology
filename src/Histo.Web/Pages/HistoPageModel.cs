@@ -39,6 +39,16 @@ public abstract class HistoPageModel : PageModel
         PageHandlerExecutionDelegate next)
     {
 
+        // LOCAL-DEV-ONLY (uncommitted): identity is already baked onto HttpContext.User by the
+        // dev-bypass middleware in Program.cs (must run before antiforgery validation, which
+        // happens earlier than this page filter) — here we only need to populate the session.
+        if (context.HttpContext.RequestServices.GetRequiredService<IConfiguration>().GetValue<bool>("DevAuthBypass"))
+        {
+            Session.PopulateFromClaims(User);
+            await next();
+            return;
+        }
+
         // Gate 1 — Authentication: redirect to Entra ID via SAML if not signed in.
         if (User.Identity?.IsAuthenticated != true)
         {

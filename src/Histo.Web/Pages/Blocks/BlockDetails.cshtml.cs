@@ -508,6 +508,7 @@ public class BlockDetailsModel : HistoPageModel
                 Comment = NewTissueComment,
             };
             await _submissions.AddTissueAsync(tissue, Session.UserID);
+            await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
         }
 
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
@@ -516,6 +517,7 @@ public class BlockDetailsModel : HistoPageModel
     public async Task<IActionResult> OnPostDeleteTissueAsync(int tissueId)
     {
         await _submissions.DeleteTissueAsync(tissueId, TissueOwner.Block, Session.UserID);
+        await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
     }
 
@@ -542,6 +544,7 @@ public class BlockDetailsModel : HistoPageModel
             RowStamp = existing.RowStamp,
         };
         await _submissions.UpdateTissueAsync(updated, Session.UserID);
+        await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
     }
 
@@ -817,8 +820,14 @@ public class BlockDetailsModel : HistoPageModel
             return null; // Empty is allowed (not recorded)
 
         // Check format: NN/NNNNN
-        if (!System.Text.RegularExpressions.Regex.IsMatch(histologyRef, @"^\d{2}/\d{5}$"))
+        var histologyRefPattern = new System.Text.RegularExpressions.Regex(@"^\d{2}/\d{5}$",
+            System.Text.RegularExpressions.RegexOptions.CultureInvariant,
+            TimeSpan.FromMilliseconds(250));
+
+        if (!histologyRefPattern.IsMatch(histologyRef))
+        {
             return "Histology Reference must be in NN/NNNNN format (e.g., 26/40004).";
+        }
 
         // Extract year (first 2 digits)
         var yearStr = histologyRef.Substring(0, 2);

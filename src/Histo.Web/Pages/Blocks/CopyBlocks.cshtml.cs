@@ -104,25 +104,74 @@ public class CopyBlocksModel : HistoPageModel
             return Page();
         }
 
+        return await ProcessCopyBlocksAsync(batchId.Value);
+    }
+
+    private async Task<IActionResult> ProcessCopyBlocksAsync(int batchId)
+    {
         var userId = Session.UserID;
-        var allBlocks = await _blocks.GetByBatchAsync(batchId.Value);
+        var allBlocks = await _blocks.GetByBatchAsync(batchId);
         var sourceBlocks = allBlocks.Where(b => BlockIds.Contains(b.ID)).ToList();
-        var allTests = await _blockTests.GetAllSelectionsByBatchAsync(batchId.Value);
-        var animals = await GetAllAnimalsAsync(batchId.Value);
+        var allTests = await _blockTests.GetAllSelectionsByBatchAsync(batchId);
+        var animals = await GetAllAnimalsAsync(batchId);
         var sourceAnimal = sourceBlocks.Count > 0
             ? animals.FirstOrDefault(a => a.ID == sourceBlocks[0].AnimalID)
             : null;
 
-        var histoRefsAssigned = 0;
-        string? histoRefProblem = null;
+        var copyResult = await CopyToTargetsAsync(
+            batchId, userId, allBlocks, sourceBlocks, allTests, animals, sourceAnimal);
+
+        if (!string.IsNullOrEmpty(copyResult.ErrorMessage))
+        {
+            Error = copyResult.ErrorMessage;
+            await LoadDisplayDataAsync();
+            return Page();
+        }
+
+        var statusMessage = BuildCopyStatusMessage(sourceBlocks.Count, copyResult);
+        TempData["StatusMessage"] = statusMessage;
+        return RedirectToOrigin(batchId);
+    }
+
+    private static string BuildCopyStatusMessage(int sourceBlockCount, (int HistoRefsAssigned, string? HistoRefProblem, int SkippedExisting, int CopiedTo, string? ErrorMessage) copyResult)
+    {
+        var message = $"Copied {sourceBlockCount} block(s) to {copyResult.CopiedTo} sample(s).";
+        if (copyResult.HistoRefsAssigned > 0)
+            message += $" Assigned a histology ref to {copyResult.HistoRefsAssigned} sample(s).";
+
+        var histologyProblem = copyResult.HistoRefProblem;
+        if (histologyProblem is null && copyResult.HistoRefsAssigned == 0 && copyResult.SkippedExisting > 0)
+            histologyProblem = "No histology refs were generated because the selected samples already have one.";
+
+        if (histologyProblem is not null)
+            message += $" {histologyProblem}";
+
+        return message;
+    }
+
+    private async Task<(int HistoRefsAssigned, string? HistoRefProblem, int SkippedExisting, int CopiedTo, string? ErrorMessage)> CopyToTargetsAsync(
+        int batchId,
+        int userId,
+        IReadOnlyList<Block> allBlocks,
+        IReadOnlyList<Block> sourceBlocks,
+        IReadOnlyList<BlockTest> allTests,
+        IReadOnlyList<Animal> animals,
+        Animal? sourceAnimal)
+    {
         var histologyType = AutoGenerateHistologyRefs && sourceBlocks.Count > 0
             ? HistologyRefTypeCode.FromExistingRef(sourceAnimal?.HistologyRef)
             : null;
         if (AutoGenerateHistologyRefs && sourceBlocks.Count > 0 && histologyType is null)
-            histoRefProblem = $"No histology refs were generated because the reference type could not be determined from sample {sourceAnimal?.SenderRef ?? "the source sample"}. Give that sample a histology reference first.";
+        {
+            return (0, $"No histology refs were generated because the reference type could not be determined from sample {sourceAnimal?.SenderRef ?? "the source sample"}. Give that sample a histology reference first.", 0, 0, null);
+        }
 
+        var histoRefsAssigned = 0;
         var skippedExisting = 0;
         var copiedTo = 0;
+        string? histoRefProblem = null;
+        string? errorMessage = null;
+
         foreach (var targetAnimalId in TargetAnimalIds)
         {
             var target = animals.FirstOrDefault(a => a.ID == targetAnimalId);
@@ -131,21 +180,18 @@ public class CopyBlocksModel : HistoPageModel
             try
             {
                 await SampleCopyHelper.CopyBlocksToAnimalAsync(
-                    _blocks, _submissions, _blockTests, sourceBlocks, allBlocks, allTests, batchId.Value, target, userId);
+                    new SampleCopyServices(_blocks, _submissions, _blockTests), sourceBlocks, allBlocks, allTests, batchId, target, userId);
             }
             catch (InvalidOperationException ex)
             {
-                // Save what this sample did get (blocks already created, NextBlockRef advanced)
-                // before reporting, so the page reflects the real state of the data.
                 await _submissions.UpdateAnimalAsync(target, userId);
-                Error = copiedTo == 0
+                errorMessage = copiedTo == 0
                     ? ex.Message
                     : $"{ex.Message} {copiedTo} other sample(s) were copied successfully.";
                 await LoadDisplayDataAsync();
-                return Page();
+                return (histoRefsAssigned, histoRefProblem, skippedExisting, copiedTo, errorMessage);
             }
 
-            // Legacy CopyBlocks.aspx.vb only generates for targets with no ref of their own.
             var drawRef = histologyType is not null && !target.HistoRefSet;
             if (histologyType is not null && target.HistoRefSet) skippedExisting++;
 
@@ -164,21 +210,14 @@ public class CopyBlocksModel : HistoPageModel
                 }
             }
 
-            // One save per sample — carries both the drawn ref and the advanced NextBlockRef.
             await _submissions.UpdateAnimalAsync(target, userId);
             copiedTo++;
         }
 
-        if (histoRefProblem is null && histoRefsAssigned == 0 && skippedExisting > 0)
-            histoRefProblem = "No histology refs were generated because the selected samples already have one.";
-
-        TempData["StatusMessage"] = $"Copied {sourceBlocks.Count} block(s) to {copiedTo} sample(s)."
-            + (histoRefsAssigned > 0 ? $" Assigned a histology ref to {histoRefsAssigned} sample(s)." : string.Empty)
-            + (histoRefProblem is null ? string.Empty : $" {histoRefProblem}");
-        return RedirectToOrigin(batchId.Value);
+        return (histoRefsAssigned, histoRefProblem, skippedExisting, copiedTo, null);
     }
 
-    private IActionResult RedirectToOrigin(int? batchId) => AnimalId is > 0
+    private RedirectToPageResult RedirectToOrigin(int? batchId) => AnimalId is > 0
         ? RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = AnimalId })
         : RedirectToPage("/Batches/BatchBlocks", new { batchId });
 

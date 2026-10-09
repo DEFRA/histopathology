@@ -65,6 +65,20 @@ public interface IBatchService
     Task<bool> SetCustomerReceivedDateAsync(int batchId, DateTime? date, byte[] rowStamp, int userId, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns the IDs of every animal in the batch that still has at least one submission-level
+    /// tissue not present in any of that animal's blocks. Drives both the <c>AllTissuesAssigned</c>
+    /// flag and the block grid's unassigned-tissue indicator.
+    /// </summary>
+    Task<IReadOnlyCollection<int>> GetAnimalsWithUnassignedTissuesAsync(int batchId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Recomputes the batch's <c>AllTissuesAssigned</c> flag from the current animals/blocks and
+    /// saves it back without changing status. Used after tissue edits that should clear a stale
+    /// "all assigned" flag.
+    /// </summary>
+    Task RefreshAllTissuesAssignedAsync(int batchId, int userId, CancellationToken ct = default);
+
+    /// <summary>
     /// "Done" on the batch-wide block-assignment overview: marks the batch as blocked (has had
     /// blocks created), records whether every sample's tissues have been assigned to a block, and
     /// transitions status to In progress. Returns <see langword="false"/> on failure.

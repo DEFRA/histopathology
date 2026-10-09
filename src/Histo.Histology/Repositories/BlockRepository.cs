@@ -1,7 +1,9 @@
 using Dapper;
+using Histo.Core.Domain;
 using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
 using Histo.Infrastructure;
+using System.Data;
 
 namespace Histo.Histology.Repositories;
 
@@ -118,6 +120,128 @@ public sealed class BlockRepository : IBlockRepository
         parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync("AddBlock", parameters, commandType: System.Data.CommandType.StoredProcedure);
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<PreBookedBlockResult>> BookPreBookedBlocksAsync(
+        string senderRef, IReadOnlyList<int> blockRefs, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        await conn.OpenAsync(ct);
+        using var tx = await conn.BeginTransactionAsync(ct);
+
+        try
+        {
+            await AcquireSenderRefLockAsync(conn, tx, senderRef);
+
+            var takenRefs = (await conn.QueryAsync<UsedBlockRef>(
+                    "GetBlocksForSenderRef",
+                    new { SenderRef = senderRef },
+                    tx,
+                    commandType: System.Data.CommandType.StoredProcedure))
+                .Select(b => b.BlockRef)
+                .ToHashSet();
+
+            var results = new List<PreBookedBlockResult>(blockRefs.Count);
+            var animalId = 0;
+
+            foreach (var blockRefNum in blockRefs)
+            {
+                if (takenRefs.Contains(blockRefNum))
+                {
+                    results.Add(new PreBookedBlockResult(blockRefNum, PreBookedBlockOutcome.AlreadyExists));
+                    continue;
+                }
+
+                // Deferred so a fully-duplicate range creates no Animal row.
+                if (animalId == 0) animalId = await ResolveAnimalIdAsync(conn, tx, senderRef);
+                if (animalId == 0)
+                {
+                    results.Add(new PreBookedBlockResult(blockRefNum, PreBookedBlockOutcome.NoSample));
+                    continue;
+                }
+
+                await InsertPreBookedBlockAsync(conn, tx, animalId, SenderRefHelpers.FormatBlockRef(blockRefNum));
+                takenRefs.Add(blockRefNum);
+                results.Add(new PreBookedBlockResult(blockRefNum, PreBookedBlockOutcome.Booked));
+            }
+
+            await tx.CommitAsync(ct);
+            return results;
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Transaction-scoped exclusive lock on the sender ref. There is no unique index on
+    /// (AnimalID, BlockRef), so this is what stops two concurrent bookings both seeing a ref as free.
+    /// </summary>
+    private static async Task AcquireSenderRefLockAsync(IDbConnection conn, IDbTransaction tx, string senderRef)
+    {
+        var parameters = new DynamicParameters();
+        parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
+        parameters.Add("Resource", $"BookBlockRef:{senderRef}");
+        parameters.Add("LockMode", "Exclusive");
+        parameters.Add("LockOwner", "Transaction");
+        parameters.Add("LockTimeout", 15000);
+
+        await conn.ExecuteAsync("sp_getapplock", parameters, tx, commandType: System.Data.CommandType.StoredProcedure);
+
+        // 0/1 granted; negative values are timeout (-1), deadlock (-2), cancelled (-3) or error (-999).
+        var result = parameters.Get<int?>("RETURN_VALUE") ?? -999;
+        if (result < 0)
+            throw new InvalidOperationException($"Could not acquire the booking lock for sender ref '{senderRef}' (sp_getapplock returned {result}).");
+    }
+
+    /// <summary>Returns the first existing Animal row for the sender ref, creating one when none exists.</summary>
+    private static async Task<int> ResolveAnimalIdAsync(IDbConnection conn, IDbTransaction tx, string senderRef)
+    {
+        var rows = await conn.QueryAsync<dynamic>(
+            "GetAnimalBySender", new { SenderRef = senderRef }, tx, commandType: System.Data.CommandType.StoredProcedure);
+
+        foreach (var row in rows)
+        {
+            var columns = new Dictionary<string, object?>(
+                ((IDictionary<string, object>)row).ToDictionary(p => p.Key, p => (object?)p.Value),
+                StringComparer.OrdinalIgnoreCase);
+            if (columns.TryGetValue("ID", out var id) && id is not null)
+                return Convert.ToInt32(id);
+        }
+
+        // AddAnimal's insert signature — matches SubmissionRepository.AddAnimalAsync.
+        var parameters = new DynamicParameters();
+        parameters.Add("SenderRef", senderRef);
+        parameters.Add("HistologyRef", null, dbType: System.Data.DbType.String);
+        parameters.Add("NextBlockRef", "01");
+        parameters.Add("PMDate", DBNull.Value, dbType: System.Data.DbType.String);
+        parameters.Add("OnHold", false);
+        parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+
+        await conn.ExecuteAsync("AddAnimal", parameters, tx, commandType: System.Data.CommandType.StoredProcedure);
+        return parameters.Get<int?>("NewID") ?? 0;
+    }
+
+    /// <summary>Inserts one pre-booked placeholder inside the booking transaction.</summary>
+    private static async Task InsertPreBookedBlockAsync(IDbConnection conn, IDbTransaction tx, int animalId, string blockRef)
+    {
+        var parameters = new DynamicParameters();
+        parameters.Add("ID", 0);
+        parameters.Add("BatchID", dbType: System.Data.DbType.Int32, value: DBNull.Value);
+        parameters.Add("AnimalID", animalId);
+        parameters.Add("BlockRef", blockRef);
+        parameters.Add("CustomerRef", " ");
+        parameters.Add("RepeatBlock", false);
+        parameters.Add("Comment", " ");
+        parameters.Add("Status", BlockStatus.PreBooked);
+        parameters.Add("Order", dbType: System.Data.DbType.Int32, value: DBNull.Value);
+        parameters.Add("OldID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+        parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+
+        await conn.ExecuteAsync("AddBlock", parameters, tx, commandType: System.Data.CommandType.StoredProcedure);
     }
 
     // -----------------------------------------------------------------------
