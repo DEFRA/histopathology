@@ -474,22 +474,29 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
     }
 
     /// <summary>
-    /// Takes the first pre-booked-but-unused ref of the given type; when none remain, mints the
-    /// next ref from the type's counter and advances it — legacy:
-    /// <c>clsHistology.GetNextAvailableHistologyRef</c> (SP <c>GetNextHistologyRef</c>), reusing
-    /// the same counter <c>BookHistologyRef.aspx</c> uses.
+    /// Takes the lowest-numbered pre-booked-but-unused ref of the given type from the CURRENT
+    /// calendar year; when none remain, mints the next ref from the type's counter and advances
+    /// it — legacy: <c>clsHistology.GetNextAvailableHistologyRef</c> (SP <c>GetNextHistologyRef</c>),
+    /// reusing the same counter <c>BookHistologyRef.aspx</c> uses. Either way the ref returned
+    /// always carries the current two-digit year prefix.
     ///
     /// Two known divergences, both pre-dating this method and left deliberately: legacy's
-    /// <c>FindUnusedHistologyRef</c> matches a pooled ref by Sender Ref rather than taking the
-    /// first of a type, and legacy's counter draw happens server-side in one statement rather than
+    /// <c>FindUnusedHistologyRef</c> matches a pooled ref by Sender Ref rather than by type, and
+    /// legacy's counter draw happens server-side in one statement rather than
     /// this read-then-write pair. <see cref="IHistologyRefService.GetNextAvailableRefAsync"/> is
     /// the faithful version — switching to it broke this page's tests, which mock the granular
     /// calls below, so the two intentionally differ.
     /// </summary>
     private async Task<string?> GetNextRefForTypeAsync(int histologyType)
     {
-        var unused = await _histologyRefs.GetUnusedRefsAsync(histologyType);
-        var fromPool = unused.FirstOrDefault(r => !string.IsNullOrWhiteSpace(r.Ref))?.Ref;
+        // Pooled refs carry their own "yy/" prefix from whenever they were booked, so the pool
+        // holds refs from many past years. Only this calendar year's refs are eligible, and the
+        // lowest-numbered one of those is taken first.
+        var fromPool = (await _histologyRefs.GetUnusedRefsAsync(histologyType))
+            .Select(r => r.Ref?.Trim())
+            .Where(Histo.Core.Domain.HistologyRefHelpers.IsCurrentYear)
+            .OrderBy(Histo.Core.Domain.HistologyRefHelpers.RefNumber)
+            .FirstOrDefault();
         if (fromPool is not null) return fromPool;
 
         var counters = await _histologyRefs.GetCountersAsync();
@@ -499,7 +506,7 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         var advanced = await _histologyRefs.SetCounterAsync(histologyType, (current + 1).ToString());
         if (!advanced) return null;
 
-        return $"{DateTime.Now.Year % 100:D2}/{counter.NextHistologyRef}";
+        return Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(counter.NextHistologyRef);
     }
 
     /// <summary>

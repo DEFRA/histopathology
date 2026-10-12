@@ -449,12 +449,40 @@ public sealed class SubmissionRepository : ISubmissionRepository
     /// <summary>
     /// Draws the next histology ref for a type inside the copy transaction, so a rollback returns
     /// the counter rather than permanently skipping the claimed numbers. Mirrors
-    /// <c>HistologyRefService.GetNextAvailableRefAsync</c> (SP <c>GetNextHistologyRef</c> plus the
-    /// <c>yy/NNNNN</c> format) — duplicated because this module can't reference Histo.Histology.
+    /// <c>HistologyRefService.GetNextAvailableRefAsync</c> — this year's lowest pre-booked-unused
+    /// ref first, then the <c>GetNextHistologyRef</c> SP — duplicated because this module can't
+    /// reference Histo.Histology.
     /// </summary>
     private static async Task<string?> DrawHistologyRefAsync(IDbConnection conn, IDbTransaction tx, int? histologyType)
     {
         if (histologyType is not > 0) return null;
+
+        var (lower, upper) = histologyType.Value switch
+        {
+            1 => (10000, 20000), // Neuropath
+            2 => (20000, 30000), // AbattoirSurvey
+            3 => (30000, 40000), // TBDiagnostic
+            4 => (40000, 60000), // GeneralPool
+            5 => (60000, 90000), // MouseProjects
+            _ => (0, 0),
+        };
+        if (upper == 0) return null;
+
+        // UnUsedHistologyRefs has no type column — a ref's type is the range of its last 5 digits.
+        // TRY_CAST keeps the pool's non-numeric rows from failing the whole statement.
+        var pooled = await conn.QueryFirstOrDefaultAsync<string?>(
+            """
+            SELECT TOP (1) HistologyRef
+            FROM   UnUsedHistologyRefs
+            WHERE  Used = 0
+              AND  LEFT(RTRIM(HistologyRef), 3) = @YearPrefix
+              AND  TRY_CAST(RIGHT(RTRIM(HistologyRef), 5) AS INT) >= @Lower
+              AND  TRY_CAST(RIGHT(RTRIM(HistologyRef), 5) AS INT) <  @Upper
+            ORDER BY TRY_CAST(RIGHT(RTRIM(HistologyRef), 5) AS INT)
+            """,
+            new { YearPrefix = Histo.Core.Domain.HistologyRefHelpers.CurrentYearPrefix, Lower = lower, Upper = upper },
+            transaction: tx);
+        if (!string.IsNullOrWhiteSpace(pooled)) return pooled.Trim();
 
         var p = new DynamicParameters();
         p.Add("Type", histologyType.Value, dbType: System.Data.DbType.Int32);
@@ -464,7 +492,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         await conn.ExecuteAsync("GetNextHistologyRef", p, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
 
         var next = p.Get<string?>("NextHistologyRef")?.Trim();
-        return string.IsNullOrEmpty(next) ? null : $"{DateTime.Now.Year % 100:D2}/{next}";
+        return string.IsNullOrEmpty(next) ? null : Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(next);
     }
 
     /// <summary>

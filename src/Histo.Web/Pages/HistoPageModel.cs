@@ -8,6 +8,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Histo.Web.Pages;
 
 /// <summary>
@@ -39,9 +42,6 @@ public abstract class HistoPageModel : PageModel
         PageHandlerExecutionDelegate next)
     {
 
-        // LOCAL-DEV-ONLY (uncommitted): identity is already baked onto HttpContext.User by the
-        // dev-bypass middleware in Program.cs (must run before antiforgery validation, which
-        // happens earlier than this page filter) — here we only need to populate the session.
         if (context.HttpContext.RequestServices.GetRequiredService<IConfiguration>().GetValue<bool>("DevAuthBypass"))
         {
             Session.PopulateFromClaims(User);

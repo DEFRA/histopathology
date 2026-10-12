@@ -176,9 +176,19 @@ public sealed class HistologyRefService : IHistologyRefService
             if (!HistologyRefTypeCode.TryGetRange(histologyType, out _, out var upperBoundExclusive))
                 return null;
 
+            // Pre-booked-but-unused refs of this type are consumed first, lowest number first, so
+            // auto-generate matches SubmissionDetailsBlock's "Get next ref" button exactly. Only
+            // this calendar year's refs are eligible — a pooled ref stores its own year prefix
+            // from whenever it was booked, so the pool still holds refs from years gone by.
+            var fromPool = (await _repo.GetUnusedRefsAsync(histologyType, ct))
+                .Select(r => r.Ref?.Trim())
+                .Where(Histo.Core.Domain.HistologyRefHelpers.IsCurrentYear)
+                .OrderBy(Histo.Core.Domain.HistologyRefHelpers.RefNumber)
+                .FirstOrDefault();
+            if (fromPool is not null) return fromPool;
+
             // Legacy clsHistology.vb::GetNextAvailableHistologyRef — the GetNextHistologyRef SP
-            // reads and advances the counter itself. The unused-refs pool is deliberately NOT
-            // consulted here: legacy only ever searches it by SenderRef for a specific sample.
+            // reads and advances the counter itself.
             var claimed = await _repo.DrawNextRefAsync(histologyType, ct);
             if (claimed is null) return null;
 
@@ -186,7 +196,7 @@ public sealed class HistologyRefService : IHistologyRefService
             if (int.TryParse(claimed, out var number) && number >= upperBoundExclusive)
                 _logger.LogWarning("Histology ref {Claimed} exceeds the maximum for type {HistologyType}.", claimed, histologyType);
 
-            return $"{DateTime.Now.Year % 100:D2}/{claimed}";
+            return Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(claimed);
         }
         catch (Exception ex)
         {

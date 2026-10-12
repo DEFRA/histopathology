@@ -69,4 +69,42 @@ public class CassettedModelTests
         Assert.Equal(BatchTypeConstants.Tse, sut.BatchType);
         Assert.Null(sut.Session.CassettedBatchTypeDraft);
     }
+
+    /// <summary>
+    /// Regression: <c>GetluSubmittedAs</c> returns Code/Description/IsActive only, so every
+    /// <see cref="LookupItem.ID"/> comes back as 0. Matching the posted value on ID therefore
+    /// always resolved to the first option in the list, whatever the user picked.
+    /// </summary>
+    [Fact]
+    public async Task OnPostAsync_MatchesTheSelectedTypeOnCodeNotId()
+    {
+        _lookups.Setup(l => l.GetLookupDataAsync(11, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)
+            [
+                new LookupItem { ID = 0, Code = "2", Name = "Wax Block" },
+                new LookupItem { ID = 0, Code = "1", Name = "Wet Tissue" },
+            ]);
+        var sut = CreateSut();
+        sut.SubmittedAs = "1";
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+        Assert.Empty(sut.Errors);
+        Assert.Equal("1", sut.TempData["CreateSubmittedAsCode"]);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_NoTypeSelected_ShowsValidationError()
+    {
+        _lookups.Setup(l => l.GetLookupDataAsync(11, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 0, Code = "1", Name = "Wet Tissue" }]);
+        var sut = CreateSut();
+        sut.SubmittedAs = null;
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RazorPages.PageResult>(result);
+        Assert.True(sut.Errors.ContainsKey("SubmittedAs"));
+    }
 }
