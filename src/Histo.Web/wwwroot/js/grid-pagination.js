@@ -22,6 +22,12 @@
             if (!href || !href.startsWith("?") || href === "#") {
                 return;
             }
+            // Row-action links (e.g. "Change") also carry query-string state (returnUrl,
+            // sortColumn, etc.) but point at a different page — only the query string alone
+            // isn't enough to identify a pagination/sort link, so the pathname must match too.
+            if (link.pathname !== window.location.pathname) {
+                return;
+            }
 
             event.preventDefault();
             if (link.classList.contains("app-pagination-window__nav-link--disabled")) {
