@@ -134,6 +134,29 @@ public class AddSubmissionModelTests
     }
 
     [Fact]
+    public async Task OnGetAsync_CopySample_LeavesSenderRefEmpty()
+    {
+        // A copy needs its own new Sender Ref — pre-filling the source's would make AddAnimal
+        // link the existing sample (return code 1) instead of creating a new one.
+        var sut = CreateSut(returnPage: null);
+
+        await sut.OnGetAsync("S1", 7);
+
+        Assert.Equal(7, sut.SourceAnimalId);
+        Assert.Equal(string.Empty, sut.SenderRef);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_NotCopying_StillPrefillsSenderRefFromTheQueryString()
+    {
+        var sut = CreateSut(returnPage: null);
+
+        await sut.OnGetAsync("S1", null);
+
+        Assert.Equal("S1", sut.SenderRef);
+    }
+
+    [Fact]
     public async Task OnPostAsync_AssignTissueMode_SelectsExistingSample_DoesNotCreateNewAnimal()
     {
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))

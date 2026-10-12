@@ -15,6 +15,12 @@ namespace Histo.Submissions.Repositories;
 public sealed class SubmissionRepository : ISubmissionRepository
 {
     private const int MaxMouseRangeEntries = 1000;
+
+    // Mirrors Histo.Histology.Models.BlockStatus — duplicated rather than referenced, as this
+    // assembly does not depend on Histo.Histology (same approach as Core's BlockRefRangeHelpers).
+    private const int BlockStatusPreBooked = 2;
+    private const int BlockStatusPreBookedUsed = 3;
+
     private const string BatchIdParam = "BatchID";
     private const string ReturnValueParam = "RETURN_VALUE";
     private const string TissueCodeParam = "TissueCode";
@@ -443,12 +449,44 @@ public sealed class SubmissionRepository : ISubmissionRepository
     /// <summary>
     /// Draws the next histology ref for a type inside the copy transaction, so a rollback returns
     /// the counter rather than permanently skipping the claimed numbers. Mirrors
-    /// <c>HistologyRefService.GetNextAvailableRefAsync</c> (SP <c>GetNextHistologyRef</c> plus the
-    /// <c>yy/NNNNN</c> format) — duplicated because this module can't reference Histo.Histology.
+    /// <c>HistologyRefService.GetNextAvailableRefAsync</c> — this year's lowest pre-booked-unused
+    /// ref first, then the <c>GetNextHistologyRef</c> SP — duplicated because this module can't
+    /// reference Histo.Histology.
     /// </summary>
     private static async Task<string?> DrawHistologyRefAsync(IDbConnection conn, IDbTransaction tx, int? histologyType)
     {
         if (histologyType is not > 0) return null;
+
+        var (lower, upper) = histologyType.Value switch
+        {
+            1 => (10000, 20000), // Neuropath
+            2 => (20000, 30000), // AbattoirSurvey
+            3 => (30000, 40000), // TBDiagnostic
+            4 => (40000, 60000), // GeneralPool
+            5 => (60000, 90000), // MouseProjects
+            _ => (0, 0),
+        };
+        if (upper == 0) return null;
+
+        // UnUsedHistologyRefs has no type column — a ref's type is the range of its last 5 digits.
+        // TRY_CAST keeps the pool's non-numeric rows from failing the whole statement.
+        // UPDLOCK holds the chosen row for the rest of THIS transaction (a plain read-committed
+        // SELECT releases its shared lock immediately, letting a concurrent copy pick the same ref
+        // and then fail on AddAnimal); READPAST sends concurrent copies to the next free row
+        // instead of blocking on this one.
+        var pooled = await conn.QueryFirstOrDefaultAsync<string?>(
+            """
+            SELECT TOP (1) HistologyRef
+            FROM   UnUsedHistologyRefs WITH (UPDLOCK, ROWLOCK, READPAST)
+            WHERE  Used = 0
+              AND  LEFT(RTRIM(HistologyRef), 3) = @YearPrefix
+              AND  TRY_CAST(RIGHT(RTRIM(HistologyRef), 5) AS INT) >= @Lower
+              AND  TRY_CAST(RIGHT(RTRIM(HistologyRef), 5) AS INT) <  @Upper
+            ORDER BY TRY_CAST(RIGHT(RTRIM(HistologyRef), 5) AS INT)
+            """,
+            new { YearPrefix = Histo.Core.Domain.HistologyRefHelpers.CurrentYearPrefix, Lower = lower, Upper = upper },
+            transaction: tx);
+        if (!string.IsNullOrWhiteSpace(pooled)) return pooled.Trim();
 
         var p = new DynamicParameters();
         p.Add("Type", histologyType.Value, dbType: System.Data.DbType.Int32);
@@ -458,7 +496,12 @@ public sealed class SubmissionRepository : ISubmissionRepository
         await conn.ExecuteAsync("GetNextHistologyRef", p, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
 
         var next = p.Get<string?>("NextHistologyRef")?.Trim();
-        return string.IsNullOrEmpty(next) ? null : $"{DateTime.Now.Year % 100:D2}/{next}";
+        // Same guard as HistologyRefService.GetNextAvailableRefAsync: the counter is an
+        // unconstrained varchar(5), so refuse anything that isn't a number inside this type's range
+        // rather than stamping a wrong-type or non-numeric ref onto the copied sample.
+        return int.TryParse(next, out var number) && number >= lower && number < upper
+            ? Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(next!)
+            : null;
     }
 
     /// <summary>
@@ -668,6 +711,66 @@ public sealed class SubmissionRepository : ISubmissionRepository
             "DeleteAnimal",
             new { ID = animalId },
             commandType: System.Data.CommandType.StoredProcedure);
+    }
+
+    /// <inheritdoc/>
+    public async Task DeleteSampleFromBatchAsync(int batchId, int animalId, int userId, CancellationToken ct = default)
+    {
+        // Done as one transactional set-based statement batch rather than via the per-row Delete*
+        // SPs: every one of those takes a single @ID, so a cascade through blocks -> block
+        // tissues/histology/antibodies/stain -> submissions -> tissues would be dozens of round
+        // trips with no atomicity. There are no FK constraints between these tables (verified
+        // against the schema), so nothing cascades on its own — each child table must be cleared
+        // explicitly or its rows are silently orphaned, which is what left samples half-deleted.
+        // BatchSubmission/BatchTissues (the sender ref and its submitted tissues) are deliberately
+        // kept: legacy clsAnimal.RemoveSubmission's block branch only removes the blocks, so the
+        // sample stays pickable in Add sample and can be re-assigned.
+        using var conn = _db.CreateConnection();
+        await conn.OpenAsync(ct);
+        using var tx = await conn.BeginTransactionAsync(ct);
+
+        try
+        {
+            await conn.ExecuteAsync(new CommandDefinition(
+                """
+                -- TC (premium charge) codes hang off the block test rows by TestID and are not
+                -- cascaded, so they must go before their parents or they are orphaned.
+                DELETE tc FROM HistologyTCCodes    tc INNER JOIN BlockHistology  bh ON bh.ID = tc.TestID INNER JOIN BatchBlock b ON b.ID = bh.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
+                DELETE tc FROM AntibodiesTCCodes   tc INNER JOIN BlockAntibodies ba ON ba.ID = tc.TestID INNER JOIN BatchBlock b ON b.ID = ba.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
+                DELETE tc FROM SpecialStainTCCodes tc INNER JOIN BlockStain      bs ON bs.ID = tc.TestID INNER JOIN BatchBlock b ON b.ID = bs.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
+
+                DELETE bt FROM BlockTissues    bt INNER JOIN BatchBlock b ON b.ID = bt.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
+                DELETE bh FROM BlockHistology  bh INNER JOIN BatchBlock b ON b.ID = bh.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
+                DELETE ba FROM BlockAntibodies ba INNER JOIN BatchBlock b ON b.ID = ba.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
+                DELETE bs FROM BlockStain      bs INNER JOIN BatchBlock b ON b.ID = bs.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
+
+                -- Pre-booked block refs are a finite booked resource: releasing them back to the
+                -- pool (status PreBookedUsed -> PreBooked, no batch) keeps them available for
+                -- re-assignment instead of destroying the booking.
+                UPDATE BatchBlock
+                   SET Status = @PreBookedStatus, BatchID = NULL
+                 WHERE BatchID = @BatchID AND AnimalID = @AnimalID AND Status = @PreBookedUsedStatus;
+
+                DELETE FROM BatchBlock WHERE BatchID = @BatchID AND AnimalID = @AnimalID;
+                """,
+                new
+                {
+                    BatchID = batchId,
+                    AnimalID = animalId,
+                    PreBookedStatus = BlockStatusPreBooked,
+                    PreBookedUsedStatus = BlockStatusPreBookedUsed,
+                },
+                transaction: tx,
+                cancellationToken: ct));
+
+            await tx.CommitAsync(ct);
+        }
+        catch
+        {
+            // Not ct — a cancelled token must not stop the rollback from running.
+            await tx.RollbackAsync(CancellationToken.None);
+            throw;
+        }
     }
 
     /// <inheritdoc/>

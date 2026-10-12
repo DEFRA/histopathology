@@ -23,7 +23,13 @@ public class CassettedModel : HistoPageModel
         : base(session) => _lookups = lookups;
 
     [BindProperty] public int  BatchType   { get; set; } = BatchTypeConstants.Tse;
-    [BindProperty] public int? SubmittedAs { get; set; }
+
+    /// <summary>
+    /// The <c>luSubmittedAs</c> <c>Code</c>, not an ID — <c>GetluSubmittedAs</c> returns only
+    /// Code/Description/IsActive, so <see cref="LookupItem.ID"/> is always 0 for this table.
+    /// Legacy binds the same column (<c>chkblSubmittedAs.DataValueField = "Code"</c>).
+    /// </summary>
+    [BindProperty] public string? SubmittedAs { get; set; }
 
     public IReadOnlyList<LookupItem> SubmittedAsOptions { get; private set; } = [];
     public IDictionary<string, string> Errors { get; private set; } = new Dictionary<string, string>();
@@ -43,6 +49,16 @@ public class CassettedModel : HistoPageModel
             BatchType = Session.CassettedBatchTypeDraft.Value;
         else
             Session.CassettedBatchTypeDraft = null;
+
+        // The Back link from BatchDetails must bring the submission type back with it, or the user
+        // has to pick it again. BatchDetails re-reads the same key on the way forward, so it is
+        // kept rather than consumed.
+        if (restore && TempData.TryGetValue("CreateSubmittedAsCode", out var code))
+        {
+            SubmittedAs = code?.ToString();
+            TempData.Keep("CreateSubmittedAsCode");
+            TempData.Keep("CreateIsPreCassetted");
+        }
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -53,7 +69,9 @@ public class CassettedModel : HistoPageModel
 
         var errors = new Dictionary<string, string>();
 
-        var selected = SubmittedAsOptions.FirstOrDefault(o => o.ID == SubmittedAs);
+        var selected = SubmittedAsOptions.FirstOrDefault(
+            o => !string.IsNullOrWhiteSpace(o.Code) &&
+                 string.Equals(o.Code.Trim(), SubmittedAs?.Trim(), StringComparison.OrdinalIgnoreCase));
         if (selected is null)
             errors["SubmittedAs"] = "Select a submission type.";
 
@@ -74,9 +92,9 @@ public class CassettedModel : HistoPageModel
         Session.IsViewSubmissionMode = false;
         Session.ReturnPage = string.Empty; // also reset stale back-link context for the new journey
         // Pass SubmittedAs code and pre-cassetted flag via TempData so BatchDetails can read them once.
-        TempData["CreateSubmittedAsId"]   = selected!.ID.ToString();
-        TempData["CreateSubmittedAsCode"] = selected.Code ?? selected.ID.ToString();
-        TempData["CreateIsPreCassetted"]  = Histo.Core.Domain.ValidationHelpers.IsBatchPreCassetted(selected.Code ?? selected.ID.ToString()).ToString();
+        var code = selected!.Code!.Trim();
+        TempData["CreateSubmittedAsCode"] = code;
+        TempData["CreateIsPreCassetted"]  = Histo.Core.Domain.ValidationHelpers.IsBatchPreCassetted(code).ToString();
 
         return RedirectToPage("/Batches/BatchDetails", new { mode = "create" });
     }

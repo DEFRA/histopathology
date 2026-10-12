@@ -39,6 +39,13 @@ public interface ISubmissionService
     Task<bool> DeleteAnimalAsync(int animalId, int userId, CancellationToken ct = default);
 
     /// <summary>
+    /// Removes a sample from one submission along with its blocks (and each block's tissues,
+    /// histology, antibody and special-stain rows), its batch submission rows and their tissues.
+    /// Pre-booked blocks are released back to the pool; the shared animal record is kept.
+    /// </summary>
+    Task<bool> DeleteSampleFromBatchAsync(int batchId, int animalId, int userId, CancellationToken ct = default);
+
+    /// <summary>
     /// Returns the single animal that exactly matches the given Sender Ref.
     /// Uses <c>GetAnimalBySender</c> SP (exact match). Returns empty list when not found.
     /// </summary>

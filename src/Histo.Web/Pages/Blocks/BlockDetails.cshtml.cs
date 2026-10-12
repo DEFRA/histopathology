@@ -86,9 +86,9 @@ public class BlockDetailsModel : HistoPageModel
     [BindProperty] public short EditNoPieces { get; set; } = 1;
     [BindProperty] public string? EditComment { get; set; }
 
-    /// <summary>Legacy: chkUseWholeTissueList. Unchecked (default) filters the tissue dropdown to
-    /// codes already used on this submission; checked shows the full lookup list.</summary>
-    [BindProperty(SupportsGet = true)] public bool UseWholeTissueList { get; set; }
+    /// <summary>Legacy: chkUseWholeTissueList. Defaults to the full lookup list; the user opts in
+    /// to filtering the dropdown down to codes already used on this submission.</summary>
+    [BindProperty(SupportsGet = true)] public bool UseWholeTissueList { get; set; } = true;
 
     [BindProperty] public List<string> SelectedHistologyCodes { get; set; } = [];
     [BindProperty] public List<string> SelectedAntibodyCodes { get; set; } = [];
@@ -511,14 +511,14 @@ public class BlockDetailsModel : HistoPageModel
             await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
         }
 
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
+        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow, useWholeTissueList = UseWholeTissueList });
     }
 
     public async Task<IActionResult> OnPostDeleteTissueAsync(int tissueId)
     {
         await _submissions.DeleteTissueAsync(tissueId, TissueOwner.Block, Session.UserID);
         await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
+        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow, useWholeTissueList = UseWholeTissueList });
     }
 
     public async Task<IActionResult> OnPostUpdateTissueAsync()
@@ -545,7 +545,7 @@ public class BlockDetailsModel : HistoPageModel
         };
         await _submissions.UpdateTissueAsync(updated, Session.UserID);
         await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow });
+        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow, useWholeTissueList = UseWholeTissueList });
     }
 
     /// <summary>
@@ -655,7 +655,7 @@ public class BlockDetailsModel : HistoPageModel
         }
         else
         {
-            // Legacy: LoadLookupTypeList default (chkUseWholeTissueList unchecked) — the tissue types
+            // Legacy: LoadLookupTypeList with chkUseWholeTissueList checked — the tissue types
             // recorded against this SAMPLE, i.e. the ones waiting to be assigned to its blocks.
             // Legacy source: BlockDetails.aspx.vb::LoadLookupTypeList ->
             // clsTissue.GetBatchAnimalTissues(BatchID, AnimalID) -> SP GetBatchSampleTissues.

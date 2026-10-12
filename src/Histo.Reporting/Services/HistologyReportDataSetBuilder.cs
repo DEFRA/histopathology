@@ -425,7 +425,10 @@ public sealed class HistologyReportDataSetBuilder
             .GroupBy(a => Convert.ToInt32(a["ID"]))
             .ToDictionary(g => g.Key, g => g.First());
 
-        if (rawTissues.Count > 0)
+        // Legacy SubmissionForm.aspx.vb picks ONE source: block-owned tissues once blocks are
+        // assigned (CreateBatchBlocksDataTable), else submission tissues. Emitting both listed every
+        // tissue twice — once as a numbered pseudo-block per tissue, once under its real block.
+        if (rawTissues.Count > 0 && rawBlockTissues.Count == 0)
         {
             // Track per-animal block ref counter (1-based, zero-padded to 2 digits) — Wet Tissue
             // has no real BlockRef of its own, legacy numbers each tissue within its animal.
@@ -469,8 +472,17 @@ public sealed class HistologyReportDataSetBuilder
                 .Where(b => b.ContainsKey("ID"))
                 .ToDictionary(b => Convert.ToInt32(b["ID"]), b => b);
 
+            // Group by sample, then block, so a block's tissues are contiguous (legacy sorted animals
+            // by Histology Ref and blocks by Block Ref); block IDs alone interleave samples.
             var sortedBlockTissues = rawBlockTissues
-                .OrderBy(t => t.TryGetValue("BlockID", out var bid) ? Convert.ToInt32(bid) : 0)
+                .OrderBy(t => blockById.TryGetValue(t.TryGetValue("BlockID", out var b0) ? Convert.ToInt32(b0) : 0, out var blk)
+                    && blk.TryGetValue("AnimalID", out var a0) && animalById.TryGetValue(Convert.ToInt32(a0), out var an)
+                    ? Str(an, "HistologyRef") : string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(t => blockById.TryGetValue(t.TryGetValue("BlockID", out var b1) ? Convert.ToInt32(b1) : 0, out var blk1)
+                    && blk1.TryGetValue("AnimalID", out var a1) ? Convert.ToInt32(a1) : 0)
+                .ThenBy(t => blockById.TryGetValue(t.TryGetValue("BlockID", out var b2) ? Convert.ToInt32(b2) : 0, out var blk2)
+                    ? Str(blk2, "BlockRef") : string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(t => t.TryGetValue("BlockID", out var bid) ? Convert.ToInt32(bid) : 0)
                 .ThenBy(t => t.TryGetValue("ID", out var tid) ? Convert.ToInt32(tid) : 0)
                 .ToList();
 
@@ -483,15 +495,21 @@ public sealed class HistologyReportDataSetBuilder
                     ? Convert.ToInt32(aidVal) : 0;
                 animalById.TryGetValue(animalId, out var animal);
 
-                var dr = dt.NewRow();
-                dr["BatchID"]       = batchId.ToString();
-                dr["SenderRef"]     = animal is not null ? Str(animal, "SenderRef")    : string.Empty;
-                dr["HistologyRef"]  = animal is not null ? Str(animal, "HistologyRef") : string.Empty;
-                dr["BlockRef"]      = block is not null ? Str(block, "BlockRef") : string.Empty;
-                dr["TissueDetails"] = Str(tissue, "TissueCode");
-                dr["RepeatBlock"]   = block is not null && Bool(block, "RepeatBlock") ? "Yes" : string.Empty;
-                dr["CustomerRef"]   = Str(tissue, "Comment");
-                dt.Rows.Add(dr);
+                // Legacy lists one row per physical piece (NoPieces) under the same block.
+                var pieces = tissue.TryGetValue("NoPieces", out var npVal) && npVal is not null and not DBNull
+                    ? Math.Max(1, Convert.ToInt32(npVal)) : 1;
+                for (var p = 0; p < pieces; p++)
+                {
+                    var dr = dt.NewRow();
+                    dr["BatchID"]       = batchId.ToString();
+                    dr["SenderRef"]     = animal is not null ? Str(animal, "SenderRef")    : string.Empty;
+                    dr["HistologyRef"]  = animal is not null ? Str(animal, "HistologyRef") : string.Empty;
+                    dr["BlockRef"]      = block is not null ? Str(block, "BlockRef") : string.Empty;
+                    dr["TissueDetails"] = Str(tissue, "TissueCode");
+                    dr["RepeatBlock"]   = block is not null && Bool(block, "RepeatBlock") ? "Yes" : string.Empty;
+                    dr["CustomerRef"]   = Str(tissue, "Comment");
+                    dt.Rows.Add(dr);
+                }
             }
         }
 

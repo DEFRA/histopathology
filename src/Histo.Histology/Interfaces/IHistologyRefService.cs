@@ -31,13 +31,11 @@ public interface IHistologyRefService
     Task<bool> SetCounterAsync(int histologyType, string newNextHistologyRef, CancellationToken ct = default);
 
     /// <summary>
-    /// Mints the next ref from the type's counter and advances it, returning it formatted as
-    /// <c>yy/NNNNN</c>. Returns <see langword="null"/> when the type has no range of its own
-    /// (e.g. "use pg number") or no counter row.
-    ///
-    /// The pre-booked-but-unused pool (<see cref="GetUnusedRefsAsync"/>) is deliberately NOT
-    /// consulted: legacy only ever searches it for a specific Sender Ref
-    /// (<c>clsHistology.FindUnusedHistologyRef</c>), never as a source for the next ref.
+    /// Draws the next available ref for a type, formatted as <c>yy/NNNNN</c> with the CURRENT
+    /// two-digit year. Takes the lowest-numbered current-year ref from the pre-booked-but-unused
+    /// pool (<see cref="GetUnusedRefsAsync"/>) first, then falls back to minting from the type's
+    /// counter and advancing it. Returns <see langword="null"/> when the type has no range of its
+    /// own (e.g. "use pg number") or no counter row.
     ///
     /// Legacy source: <c>clsHistology.GetNextAvailableHistologyRef</c> (SP <c>GetNextHistologyRef</c>).
     /// </summary>

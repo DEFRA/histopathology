@@ -86,6 +86,17 @@ public class BatchDetailsModelTests
     }
 
     [Fact]
+    public async Task OnGetAsync_CreateMode_DoesNotShowExitWarningByDefault()
+    {
+        var sut = CreateSut();
+        sut.Mode = "create";
+
+        await sut.OnGetAsync();
+
+        Assert.False(sut.ShowLeaveWarning);
+    }
+
+    [Fact]
     public async Task OnPostCreateAsync_Success_ClearsStaleSampleSummaryReturnPage()
     {
         // Regression: Session.SampleSummaryReturnPage is only ever set (by BatchDetails/EditBatch's
@@ -158,7 +169,6 @@ public class BatchDetailsModelTests
         Assert.Equal("A Contact", sut.Create_ContactName);
         Assert.Equal("Mouse", sut.Create_SpeciesId);
         Assert.Equal(["2"], sut.Create_SelectedHistologyCodes);
-        Assert.Equal("99", sut.TempData["CreateSubmittedAsId"]);
         Assert.Equal("WT", sut.TempData["CreateSubmittedAsCode"]);
         Assert.Equal("Wet Tissue", sut.Create_SubmittedAsName);
         Assert.Equal("True", sut.TempData["CreateIsPreCassetted"]);

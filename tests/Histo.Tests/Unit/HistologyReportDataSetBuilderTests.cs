@@ -512,4 +512,51 @@ public class HistologyReportDataSetBuilderTests
         Assert.Equal("Viscera", row["TissueDetails"]);
         Assert.Equal("visc 1",  row["CustomerRef"]);
     }
+
+    [Fact]
+    public void BuildSubmissionTable_BlocksOfInterleavedSamples_GroupedPerSampleAndBlock()
+    {
+        // Defect 755816 screenshot: C54327's rows were split apart by other samples' blocks.
+        var a1 = Row(("ID", (object)1), ("SenderRef", "C54327"), ("HistologyRef", "08/10002"));
+        var a2 = Row(("ID", (object)2), ("SenderRef", "C54328"), ("HistologyRef", "08/10003"));
+        var b1 = Row(("ID", (object)900), ("AnimalID", (object)1), ("BlockRef", "01"), ("RepeatBlock", (object)false));
+        var b2 = Row(("ID", (object)901), ("AnimalID", (object)2), ("BlockRef", "01"), ("RepeatBlock", (object)false));
+        var b3 = Row(("ID", (object)902), ("AnimalID", (object)1), ("BlockRef", "02"), ("RepeatBlock", (object)false));
+        var tissues = new[]
+        {
+            Row(("BlockID", (object)900), ("ID", (object)1), ("TissueCode", "O"),       ("NoPieces", (object)1), ("Comment", "")),
+            Row(("BlockID", (object)901), ("ID", (object)2), ("TissueCode", "O"),       ("NoPieces", (object)1), ("Comment", "")),
+            Row(("BlockID", (object)902), ("ID", (object)3), ("TissueCode", "ADRENALS"), ("NoPieces", (object)1), ("Comment", "")),
+        };
+
+        var table = HistologyReportDataSetBuilder.BuildSubmissionTable([], [], [a1, a2], [b1, b2, b3], tissues, 7);
+
+        Assert.Equal(["C54327", "C54327", "C54328"], table.Rows.Cast<DataRow>().Select(r => (string)r["SenderRef"]));
+        Assert.Equal(["01", "02", "01"], table.Rows.Cast<DataRow>().Select(r => (string)r["BlockRef"]));
+    }
+
+    [Fact]
+    public void BuildSubmissionTable_WetTissueWithAssignedBlocks_ListsTissuesPerBlockOnly()
+    {
+        // Defect 755816: submission tissues (numbered 01/02/.. as pseudo-blocks) were emitted in
+        // addition to the real blocks, so assigned tissues showed up as separate extra blocks.
+        var animal = Row(("ID", (object)5), ("SenderRef", "S-1"), ("HistologyRef", "26/40001"));
+        var subTissues = new[]
+        {
+            Row(("AnimalID", (object)5), ("ID", (object)1), ("TissueCode", "Obex"),    ("Comment", "")),
+            Row(("AnimalID", (object)5), ("ID", (object)2), ("TissueCode", "Adrenal"), ("Comment", "")),
+        };
+        var block1 = Row(("ID", (object)900), ("AnimalID", (object)5), ("BlockRef", "A"), ("RepeatBlock", (object)false));
+        var block2 = Row(("ID", (object)901), ("AnimalID", (object)5), ("BlockRef", "B"), ("RepeatBlock", (object)false));
+        var blockTissues = new[]
+        {
+            Row(("BlockID", (object)900), ("ID", (object)10), ("TissueCode", "Obex"),    ("NoPieces", (object)2), ("Comment", "")),
+            Row(("BlockID", (object)901), ("ID", (object)11), ("TissueCode", "Adrenal"), ("NoPieces", (object)3), ("Comment", "")),
+        };
+
+        var table = HistologyReportDataSetBuilder.BuildSubmissionTable([], subTissues, [animal], [block1, block2], blockTissues, 7);
+
+        Assert.Equal(["A", "A", "B", "B", "B"], table.Rows.Cast<DataRow>().Select(r => (string)r["BlockRef"]));
+        Assert.Equal(["Obex", "Obex", "Adrenal", "Adrenal", "Adrenal"], table.Rows.Cast<DataRow>().Select(r => (string)r["TissueDetails"]));
+    }
 }

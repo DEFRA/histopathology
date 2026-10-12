@@ -162,11 +162,12 @@ public class AddSubmissionModel : HistoPageModel
             if (existing.Count > 0) BatchSubmissionId = existing[0].ID;
         }
 
-        // Restore the sender ref chosen via the Search Sender picker (SearchSender.cshtml),
-        // or pre-fill from the "Copy sample" query parameter (SampleSummary).
+        // Restore the sender ref chosen via the Search Sender picker (SearchSender.cshtml).
+        // A "Copy sample" arrival never pre-fills: the copy must be given its own new Sender Ref,
+        // and pre-filling the source's would link the existing sample instead of creating one.
         if (TempData.TryGetValue("SenderRefPicker_Selected", out var chosen) && chosen is string chosenRef)
             SenderRef = chosenRef;
-        else if (!string.IsNullOrWhiteSpace(senderRef))
+        else if (!string.IsNullOrWhiteSpace(senderRef) && SourceAnimalId is not > 0)
             SenderRef = senderRef;
 
         if (IsAssignTissueMode && BatchId is > 0)

@@ -22,17 +22,17 @@
 @if (isHisto || isMaint)
 {
     <li class="govuk-service-navigation__item">
-        <a class="govuk-service-navigation__link" asp-page="/Search/SearchMenu">Search</a>
+        <a class="govuk-service-navigation__link" asp-page="/Search/SearchMenu" data-leave-check="submission">Search</a>
     </li>
 }
 
 @if (isMaint)
 {
     <li class="govuk-service-navigation__item">
-        <a class="govuk-service-navigation__link" asp-page="/Admin/UserMaintenance">User maintenance</a>
+        <a class="govuk-service-navigation__link" asp-page="/Admin/UserMaintenance" data-leave-check="submission">User maintenance</a>
     </li>
     <li class="govuk-service-navigation__item">
-        <a class="govuk-service-navigation__link" asp-page="/Admin/PickListMaintenance">Pick list maintenance</a>
+        <a class="govuk-service-navigation__link" asp-page="/Admin/PickListMaintenance" data-leave-check="submission">Pick list maintenance</a>
     </li>
 @*     <li class="govuk-service-navigation__item">
         <a class="govuk-service-navigation__link" asp-page="/Admin/EditAnimalRef">Edit Sender/Histology Ref</a>
@@ -44,6 +44,6 @@
 
 <li class="govuk-service-navigation__item">
     <a class="govuk-service-navigation__link" href="@helpHref"
-       target="_blank" rel="noreferrer noopener">Help</a>
+       target="_blank" rel="noreferrer noopener" data-leave-check="submission">Help</a>
 </li>
 

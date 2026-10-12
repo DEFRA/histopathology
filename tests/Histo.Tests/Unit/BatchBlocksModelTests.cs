@@ -6,8 +6,9 @@ using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.Batches;
 using Histo.Web.Services;
-using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -15,8 +16,12 @@ using Moq;
 namespace Histo.Tests.Unit;
 
 /// <summary>
-/// Unit tests for <see cref="BatchBlocksModel"/> — the "Assign tissues to blocks" overview
-/// (legacy <c>BatchBlocks.aspx</c>).
+/// Covers the "Assign tissues to blocks" delete-sample journey on <see cref="BatchBlocksModel"/>.
+///
+/// Regression: the handler used to call <c>DeleteAnimalAsync</c>, whose stored procedure only
+/// removes the shared <c>Animal</c> row. With no FK cascades in this schema, the sample's blocks,
+/// block tissues, block test selections, batch submissions and submission tissues were all left
+/// behind — the sample was only partially deleted.
 /// </summary>
 public class BatchBlocksModelTests
 {
@@ -44,6 +49,8 @@ public class BatchBlocksModelTests
             .ReturnsAsync((IReadOnlyCollection<int>)[]);
         _batches.Setup(b => b.CompleteBlockAssignmentAsync(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
+        _batches.Setup(b => b.RefreshAllTissuesAssignedAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
 
         _blocks.Setup(b => b.GetByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 317164, BatchID = BatchId, AnimalID = AnimalId, BlockRef = "01" }]);
@@ -53,6 +60,10 @@ public class BatchBlocksModelTests
             .ReturnsAsync((IReadOnlyList<Animal>)[]);
         _submissions.Setup(s => s.GetTissuesByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.DeleteSampleFromBatchAsync(BatchId, AnimalId, 99, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        _submissions.Setup(s => s.DeleteSampleFromBatchAsync(BatchId, 42, 99, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
         _lookups.Setup(l => l.GetLookupDataAsync(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<LookupItem>)[]);
         _lookups.Setup(l => l.GetSpeciesLookupAsync(It.IsAny<CancellationToken>()))
@@ -72,8 +83,32 @@ public class BatchBlocksModelTests
             _blockTests.Object, _users.Object, Mock.Of<ILogger<BatchBlocksModel>>())
         {
             PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
+            TempData = new TempDataDictionary(new Microsoft.AspNetCore.Http.DefaultHttpContext(), Mock.Of<ITempDataProvider>()),
             BatchId = BatchId,
         };
+
+    [Fact]
+    public async Task OnPostDeleteSampleAsync_RemovesTheWholeSampleFromTheSubmission()
+    {
+        var result = await CreateSut().OnPostDeleteSampleAsync(AnimalId);
+
+        Assert.IsType<RedirectToPageResult>(result);
+        _submissions.Verify(s => s.DeleteSampleFromBatchAsync(BatchId, AnimalId, 99, It.IsAny<CancellationToken>()), Times.Once);
+        _submissions.Verify(s => s.DeleteAnimalAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _batches.Verify(b => b.RefreshAllTissuesAssignedAsync(BatchId, 99, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostDeleteSampleAsync_DeleteFails_ShowsErrorAndStaysOnPage()
+    {
+        _submissions.Setup(s => s.DeleteSampleFromBatchAsync(BatchId, AnimalId, 99, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+
+        var sut = CreateSut();
+        var result = await sut.OnPostDeleteSampleAsync(AnimalId);
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("Could not delete this sample. No changes were made.", sut.ErrorMessage);
+    }
 
     [Fact]
     public async Task OnPostDoneAsync_AllTissuesInBlocks_RecordsAllTissuesAssigned()
