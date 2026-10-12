@@ -515,9 +515,19 @@ public sealed class HistologyReportRenderer
                                 Th("Dispatch");
                             });
 
+                            DataRow? prevRow = null;
                             foreach (var row in chunk)
                             {
-                                var blockRef = Field(row, "BlockRef")
+                                // Legacy: further tissues of the same block leave Sender/Histology/Block Ref
+                                // blank so the block reads as one group; refs repeat at the top of each page.
+                                var continuesBlock = prevRow is not null
+                                    && Field(row, "BlockRef").Length > 0
+                                    && Field(row, "BlockRef") == Field(prevRow, "BlockRef")
+                                    && Field(row, "SenderRef") == Field(prevRow, "SenderRef")
+                                    && Field(row, "HistologyRef") == Field(prevRow, "HistologyRef");
+                                prevRow = row;
+
+                                var blockRef = continuesBlock ? string.Empty : Field(row, "BlockRef")
                                     + (IsRepeatBlock(Field(row, "RepeatBlock")) ? "*" : string.Empty);
 
                                 void Td(string v) =>
@@ -525,8 +535,8 @@ public sealed class HistologyReportRenderer
                                      .PaddingVertical(2).PaddingHorizontal(2)
                                      .Text(v).FontSize(8);
 
-                                Td(Field(row, "SenderRef"));
-                                Td(Field(row, "HistologyRef"));
+                                Td(continuesBlock ? string.Empty : Field(row, "SenderRef"));
+                                Td(continuesBlock ? string.Empty : Field(row, "HistologyRef"));
                                 Td(blockRef);
                                 Td(Field(row, "TissueDetails"));
                                 Td(string.Empty); // Block
