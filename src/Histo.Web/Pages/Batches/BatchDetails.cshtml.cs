@@ -43,7 +43,8 @@ public class BatchDetailsModel : HistoPageModel
     private static readonly string[] BatchDateFormats = ["yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy"];
     private const string CreateSaveErrorKey = "Create_Save";
     private const string CreateSaveFailedMessage = "Failed to create the submission. Please try again.";
-    private const string CreateSubmittedAsIdKey = "CreateSubmittedAsId";
+    // luSubmittedAs is keyed on Code only — the SP returns no ID column, so LookupItem.ID is
+    // always 0 for this table and must never be used to identify a submission type.
     private const string CreateSubmittedAsCodeKey = "CreateSubmittedAsCode";
     private const string CreateIsPreCassettedKey = "CreateIsPreCassetted";
 
@@ -389,15 +390,26 @@ public class BatchDetailsModel : HistoPageModel
             // includeInactive: the source submission may have been created against a lookup row
             // that has since been deactivated — it must still copy and display.
             var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs, includeInactive: true);
-            var match = saLookup.FirstOrDefault(x => string.Equals((x.Code ?? x.ID.ToString()).Trim(), submittedAsCode, StringComparison.OrdinalIgnoreCase));
+            var match = saLookup.FirstOrDefault(x => string.Equals(x.Code?.Trim(), submittedAsCode, StringComparison.OrdinalIgnoreCase));
 
             // Carry the source's own code through even when no lookup row matches, so the copy
             // keeps its submission type instead of silently losing it.
-            TempData[CreateSubmittedAsIdKey]   = match?.ID.ToString() ?? string.Empty;
             TempData[CreateSubmittedAsCodeKey] = match?.Code?.Trim() ?? submittedAsCode;
             Create_SubmittedAsName            = match?.Name;
         }
         TempData[CreateIsPreCassettedKey] = sourceBatch.IsPreCassetted.ToString();
+    }
+
+    /// <summary>
+    /// Resolves a <c>luSubmittedAs</c> code to its description. <c>includeInactive</c> is required:
+    /// a batch may have been created against a type that has since been deactivated (e.g. code 6,
+    /// "Fresh Frozen") and must still display its name.
+    /// </summary>
+    private async Task<string?> ResolveSubmittedAsNameAsync(string? submittedAsCode)
+    {
+        if (string.IsNullOrWhiteSpace(submittedAsCode)) return null;
+        var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs, includeInactive: true);
+        return saLookup.FirstOrDefault(x => string.Equals(x.Code?.Trim(), submittedAsCode.Trim(), StringComparison.OrdinalIgnoreCase))?.Name;
     }
 
     /// <summary>
@@ -577,14 +589,9 @@ public class BatchDetailsModel : HistoPageModel
                 }
             }
             // Resolve SubmittedAs name from TempData for display
-            if (TempData.TryGetValue(CreateSubmittedAsIdKey, out var saId))
+            if (TempData.TryGetValue(CreateSubmittedAsCodeKey, out var saCode))
             {
-                if (Create_SubmittedAsName is null)
-                {
-                    var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs, includeInactive: true);
-                    Create_SubmittedAsName = saLookup.FirstOrDefault(x => x.ID.ToString() == saId?.ToString())?.Name;
-                }
-                TempData.Keep(CreateSubmittedAsIdKey);
+                Create_SubmittedAsName ??= await ResolveSubmittedAsNameAsync(saCode?.ToString());
                 TempData.Keep(CreateSubmittedAsCodeKey);
                 TempData.Keep(CreateIsPreCassettedKey);
             }
@@ -735,18 +742,12 @@ public class BatchDetailsModel : HistoPageModel
         var submittedAsCode = TempData[CreateSubmittedAsCodeKey]?.ToString() ?? "";
         var isPreCassetted  = bool.TryParse(TempData[CreateIsPreCassettedKey]?.ToString(), out var ipc) && ipc;
 
-        TempData.Keep(CreateSubmittedAsIdKey);
         TempData.Keep(CreateSubmittedAsCodeKey);
         TempData.Keep(CreateIsPreCassettedKey);
         var pendingCopy = TryGetValidPendingCopy();
         Create_CopiedSamples = pendingCopy?.Samples ?? [];
 
-        // Resolve SubmittedAs name for redisplay
-        if (TempData.TryGetValue(CreateSubmittedAsIdKey, out var saId))
-        {
-            var saLookup = await _lookups.GetLookupDataAsync(LookupSubmittedAs, includeInactive: true);
-            Create_SubmittedAsName = saLookup.FirstOrDefault(x => x.ID.ToString() == saId?.ToString())?.Name;
-        }
+        Create_SubmittedAsName = await ResolveSubmittedAsNameAsync(submittedAsCode);
 
         var errors = new Dictionary<string, string>();
 

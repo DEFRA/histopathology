@@ -312,6 +312,55 @@ public class SubmissionDetailsBlockModelTests
     }
 
     [Fact]
+    public async Task OnPostGetNextHistologyRefAsync_PrefersLowestPooledRefOfTheCurrentYear()
+    {
+        var thisYear = $"{DateTime.Now.Year % 100:D2}";
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _histologyRefs.Setup(h => h.GetUnusedRefsAsync(HistologyRefTypeCode.GeneralPool, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<HistologyRef>)
+            [
+                new HistologyRef { Ref = "08/40070" },
+                new HistologyRef { Ref = $"{thisYear}/40500" },
+                new HistologyRef { Ref = $"{thisYear}/40120" },
+            ]);
+        Animal? saved = null;
+        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<Animal, int, CancellationToken>((a, _, _) => saved = a)
+            .ReturnsAsync(true);
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+        sut.HistologyRefType = HistologyRefTypeCode.GeneralPool;
+
+        await sut.OnPostGetNextHistologyRefAsync();
+
+        Assert.Equal($"{thisYear}/40120", saved?.HistologyRef);
+        _histologyRefs.Verify(h => h.GetCountersAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostGetNextHistologyRefAsync_PoolHoldsOnlyPriorYearRefs_FallsBackToCounter()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _histologyRefs.Setup(h => h.GetUnusedRefsAsync(HistologyRefTypeCode.GeneralPool, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<HistologyRef>)[new HistologyRef { Ref = "08/40070" }]);
+        _histologyRefs.Setup(h => h.GetCountersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<HistologyRefCounter>)[new HistologyRefCounter { Type = HistologyRefTypeCode.GeneralPool, NextHistologyRef = "40800" }]);
+        _histologyRefs.Setup(h => h.SetCounterAsync(HistologyRefTypeCode.GeneralPool, "40801", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        Animal? saved = null;
+        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<Animal, int, CancellationToken>((a, _, _) => saved = a)
+            .ReturnsAsync(true);
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+        sut.HistologyRefType = HistologyRefTypeCode.GeneralPool;
+
+        await sut.OnPostGetNextHistologyRefAsync();
+
+        Assert.Equal($"{DateTime.Now.Year % 100:D2}/40800", saved?.HistologyRef);
+    }
+
+    [Fact]
     public async Task OnPostGetNextHistologyRefAsync_UsePgNumber_ReversesSenderRefIntoHistologyRef()
     {
         var animal = new Animal { ID = 1, SenderRef = "PG0001/26" };
