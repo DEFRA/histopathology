@@ -173,7 +173,7 @@ public sealed class HistologyRefService : IHistologyRefService
     {
         try
         {
-            if (!HistologyRefTypeCode.TryGetRange(histologyType, out _, out var upperBoundExclusive))
+            if (!HistologyRefTypeCode.TryGetRange(histologyType, out var lowerBoundInclusive, out var upperBoundExclusive))
                 return null;
 
             // Pre-booked-but-unused refs of this type are consumed first, lowest number first, so
@@ -192,9 +192,16 @@ public sealed class HistologyRefService : IHistologyRefService
             var claimed = await _repo.DrawNextRefAsync(histologyType, ct);
             if (claimed is null) return null;
 
-            // Legacy warns (and keeps going) past the type's ceiling rather than failing.
-            if (int.TryParse(claimed, out var number) && number >= upperBoundExclusive)
-                _logger.LogWarning("Histology ref {Claimed} exceeds the maximum for type {HistologyType}.", claimed, histologyType);
+            // The counter is an unconstrained varchar(5), so it can hold a non-numeric or
+            // out-of-range value. Minting from one produces a ref of the wrong type (or literal
+            // garbage), so refuse rather than write it.
+            if (!int.TryParse(claimed, out var number) || number < lowerBoundInclusive || number >= upperBoundExclusive)
+            {
+                _logger.LogError(
+                    "Histology ref counter for type {HistologyType} holds '{Claimed}', which is not a number in the range {Lower}-{Upper}. No ref was drawn.",
+                    null, histologyType, claimed, lowerBoundInclusive, upperBoundExclusive - 1);
+                return null;
+            }
 
             return Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(claimed);
         }

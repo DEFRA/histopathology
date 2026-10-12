@@ -434,6 +434,9 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
             {
                 nextRef = await GetNextRefForTypeAsync(HistologyRefType.Value);
                 isPgNumber = false;
+                if (nextRef is null)
+                    ErrorMessage = "No histology reference is available for the selected type. " +
+                                   "Check the next available reference for this type on the Edit Histology Reference page.";
             }
 
             if (nextRef is not null)
@@ -489,6 +492,8 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
     /// </summary>
     private async Task<string?> GetNextRefForTypeAsync(int histologyType)
     {
+        if (!HistologyRefTypeCode.TryGetRange(histologyType, out var lower, out var upper)) return null;
+
         // Pooled refs carry their own "yy/" prefix from whenever they were booked, so the pool
         // holds refs from many past years. Only this calendar year's refs are eligible, and the
         // lowest-numbered one of those is taken first.
@@ -501,7 +506,12 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
 
         var counters = await _histologyRefs.GetCountersAsync();
         var counter = counters.FirstOrDefault(c => c.Type == histologyType);
-        if (counter is null || !int.TryParse(counter.NextHistologyRef, out var current)) return null;
+        // The counter is an unconstrained varchar(5) — a non-numeric or out-of-range value would
+        // otherwise mint a ref of the wrong type, so refuse rather than write it.
+        if (counter is null ||
+            !int.TryParse(counter.NextHistologyRef, out var current) ||
+            current < lower || current >= upper)
+            return null;
 
         var advanced = await _histologyRefs.SetCounterAsync(histologyType, (current + 1).ToString());
         if (!advanced) return null;

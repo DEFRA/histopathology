@@ -89,4 +89,35 @@ public class HistologyRefServiceTests
         _repo.Verify(r => r.DrawNextRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         _repo.Verify(r => r.GetUnusedRefsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    /// <summary>
+    /// The counter column is an unconstrained varchar(5) — General Pool held the literal value
+    /// 'df' in a real database, which would otherwise have minted "26/df" onto a sample.
+    /// </summary>
+    [Theory]
+    [InlineData("df")]    // not a number at all
+    [InlineData("100")]   // below the General Pool floor of 40000
+    [InlineData("60000")] // past the General Pool ceiling (max valid is 59999)
+    public async Task GetNextAvailableRefAsync_CounterOutsideTheTypeRange_ReturnsNull(string counterValue)
+    {
+        _repo.Setup(r => r.DrawNextRefAsync(HistologyRefTypeCode.GeneralPool, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(counterValue);
+
+        var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.GeneralPool);
+
+        Assert.Null(result);
+    }
+
+    [Theory]
+    [InlineData("40000")]
+    [InlineData("59999")]
+    public async Task GetNextAvailableRefAsync_GeneralPoolBoundsAreInclusive(string counterValue)
+    {
+        _repo.Setup(r => r.DrawNextRefAsync(HistologyRefTypeCode.GeneralPool, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(counterValue);
+
+        var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.GeneralPool);
+
+        Assert.Equal($"{ThisYear}/{counterValue}", result);
+    }
 }
