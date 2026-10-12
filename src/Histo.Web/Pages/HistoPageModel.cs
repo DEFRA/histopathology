@@ -8,9 +8,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-
 namespace Histo.Web.Pages;
 
 /// <summary>
@@ -41,13 +38,6 @@ public abstract class HistoPageModel : PageModel
         PageHandlerExecutingContext context,
         PageHandlerExecutionDelegate next)
     {
-
-        if (context.HttpContext.RequestServices.GetRequiredService<IConfiguration>().GetValue<bool>("DevAuthBypass"))
-        {
-            Session.PopulateFromClaims(User);
-            await next();
-            return;
-        }
 
         // Gate 1 — Authentication: redirect to Entra ID via SAML if not signed in.
         if (User.Identity?.IsAuthenticated != true)
