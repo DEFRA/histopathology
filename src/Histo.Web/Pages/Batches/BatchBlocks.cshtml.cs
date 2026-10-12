@@ -165,8 +165,9 @@ public class BatchBlocksModel : HistoPageModel
     }
 
     /// <summary>
-    /// "Delete Sample" step 2 — removes the sample from this submission along with all of its
-    /// blocks, block tissues, block test selections and submission tissues. Legacy source:
+    /// "Delete Sample" step 2 — removes the sample's blocks, block tissues and block test selections
+    /// from this submission. The sender ref and its submitted tissues are kept so the sample can be
+    /// assigned again. Legacy source:
     /// <c>clsAnimal.vb::RemoveSubmission</c> (BATCH_BLOCK_TABLE branch), which likewise leaves the
     /// shared Animal record itself in place.
     /// </summary>

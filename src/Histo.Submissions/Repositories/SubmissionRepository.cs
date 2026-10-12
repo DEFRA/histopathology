@@ -722,6 +722,9 @@ public sealed class SubmissionRepository : ISubmissionRepository
         // trips with no atomicity. There are no FK constraints between these tables (verified
         // against the schema), so nothing cascades on its own — each child table must be cleared
         // explicitly or its rows are silently orphaned, which is what left samples half-deleted.
+        // BatchSubmission/BatchTissues (the sender ref and its submitted tissues) are deliberately
+        // kept: legacy clsAnimal.RemoveSubmission's block branch only removes the blocks, so the
+        // sample stays pickable in Add sample and can be re-assigned.
         using var conn = _db.CreateConnection();
         await conn.OpenAsync(ct);
         using var tx = await conn.BeginTransactionAsync(ct);
@@ -749,9 +752,6 @@ public sealed class SubmissionRepository : ISubmissionRepository
                  WHERE BatchID = @BatchID AND AnimalID = @AnimalID AND Status = @PreBookedUsedStatus;
 
                 DELETE FROM BatchBlock WHERE BatchID = @BatchID AND AnimalID = @AnimalID;
-
-                DELETE t FROM BatchTissues t INNER JOIN BatchSubmission s ON s.ID = t.BatchSubmissionID WHERE s.BatchID = @BatchID AND s.AnimalID = @AnimalID;
-                DELETE FROM BatchSubmission WHERE BatchID = @BatchID AND AnimalID = @AnimalID;
                 """,
                 new
                 {

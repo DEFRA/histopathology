@@ -78,10 +78,10 @@ public interface ISubmissionRepository
     Task DeleteAnimalAsync(int animalId, int userId, CancellationToken ct = default);
 
     /// <summary>
-    /// Removes a sample from one submission: its blocks (plus each block's tissues, histology,
-    /// antibody and special-stain rows), its batch submission rows and their tissues — all in a
-    /// single transaction. Pre-booked blocks are released back to the pool rather than deleted.
-    /// The <c>Animal</c> record itself is kept, as it is shared across submissions.
+    /// Removes a sample's blocks from one submission (plus each block's tissues, histology,
+    /// antibody and special-stain rows) in a single transaction. Pre-booked blocks are released
+    /// back to the pool rather than deleted. The sample's <c>Animal</c>, <c>BatchSubmission</c> link
+    /// and submitted <c>BatchTissues</c> are kept so it can be picked and assigned again.
     /// Legacy source: <c>clsAnimal.vb::RemoveSubmission</c> + <c>clsBlock.vb::DeleteBlockData</c>.
     /// </summary>
     Task DeleteSampleFromBatchAsync(int batchId, int animalId, int userId, CancellationToken ct = default);
