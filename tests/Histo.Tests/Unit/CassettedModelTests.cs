@@ -107,4 +107,28 @@ public class CassettedModelTests
         Assert.IsType<Microsoft.AspNetCore.Mvc.RazorPages.PageResult>(result);
         Assert.True(sut.Errors.ContainsKey("SubmittedAs"));
     }
+
+    [Fact]
+    public async Task OnGetAsync_Restore_RestoresTheSubmissionTypeCodeFromTempData()
+    {
+        // Back from BatchDetails must bring the submission type with it, or the user has to pick
+        // it again on a journey they have already completed this step of.
+        var sut = CreateSut();
+        sut.TempData["CreateSubmittedAsCode"] = "1";
+
+        await sut.OnGetAsync(restore: true);
+
+        Assert.Equal("1", sut.SubmittedAs);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_NotRestoring_DoesNotRestoreTheSubmissionType()
+    {
+        var sut = CreateSut();
+        sut.TempData["CreateSubmittedAsCode"] = "1";
+
+        await sut.OnGetAsync(restore: false);
+
+        Assert.Null(sut.SubmittedAs);
+    }
 }

@@ -470,10 +470,14 @@ public sealed class SubmissionRepository : ISubmissionRepository
 
         // UnUsedHistologyRefs has no type column — a ref's type is the range of its last 5 digits.
         // TRY_CAST keeps the pool's non-numeric rows from failing the whole statement.
+        // UPDLOCK holds the chosen row for the rest of THIS transaction (a plain read-committed
+        // SELECT releases its shared lock immediately, letting a concurrent copy pick the same ref
+        // and then fail on AddAnimal); READPAST sends concurrent copies to the next free row
+        // instead of blocking on this one.
         var pooled = await conn.QueryFirstOrDefaultAsync<string?>(
             """
             SELECT TOP (1) HistologyRef
-            FROM   UnUsedHistologyRefs
+            FROM   UnUsedHistologyRefs WITH (UPDLOCK, ROWLOCK, READPAST)
             WHERE  Used = 0
               AND  LEFT(RTRIM(HistologyRef), 3) = @YearPrefix
               AND  TRY_CAST(RIGHT(RTRIM(HistologyRef), 5) AS INT) >= @Lower
@@ -492,7 +496,12 @@ public sealed class SubmissionRepository : ISubmissionRepository
         await conn.ExecuteAsync("GetNextHistologyRef", p, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
 
         var next = p.Get<string?>("NextHistologyRef")?.Trim();
-        return string.IsNullOrEmpty(next) ? null : Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(next);
+        // Same guard as HistologyRefService.GetNextAvailableRefAsync: the counter is an
+        // unconstrained varchar(5), so refuse anything that isn't a number inside this type's range
+        // rather than stamping a wrong-type or non-numeric ref onto the copied sample.
+        return int.TryParse(next, out var number) && number >= lower && number < upper
+            ? Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(next!)
+            : null;
     }
 
     /// <summary>
@@ -721,6 +730,12 @@ public sealed class SubmissionRepository : ISubmissionRepository
         {
             await conn.ExecuteAsync(new CommandDefinition(
                 """
+                -- TC (premium charge) codes hang off the block test rows by TestID and are not
+                -- cascaded, so they must go before their parents or they are orphaned.
+                DELETE tc FROM HistologyTCCodes    tc INNER JOIN BlockHistology  bh ON bh.ID = tc.TestID INNER JOIN BatchBlock b ON b.ID = bh.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
+                DELETE tc FROM AntibodiesTCCodes   tc INNER JOIN BlockAntibodies ba ON ba.ID = tc.TestID INNER JOIN BatchBlock b ON b.ID = ba.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
+                DELETE tc FROM SpecialStainTCCodes tc INNER JOIN BlockStain      bs ON bs.ID = tc.TestID INNER JOIN BatchBlock b ON b.ID = bs.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
+
                 DELETE bt FROM BlockTissues    bt INNER JOIN BatchBlock b ON b.ID = bt.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
                 DELETE bh FROM BlockHistology  bh INNER JOIN BatchBlock b ON b.ID = bh.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
                 DELETE ba FROM BlockAntibodies ba INNER JOIN BatchBlock b ON b.ID = ba.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;

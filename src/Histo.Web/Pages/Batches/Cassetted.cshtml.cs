@@ -49,6 +49,16 @@ public class CassettedModel : HistoPageModel
             BatchType = Session.CassettedBatchTypeDraft.Value;
         else
             Session.CassettedBatchTypeDraft = null;
+
+        // The Back link from BatchDetails must bring the submission type back with it, or the user
+        // has to pick it again. BatchDetails re-reads the same key on the way forward, so it is
+        // kept rather than consumed.
+        if (restore && TempData.TryGetValue("CreateSubmittedAsCode", out var code))
+        {
+            SubmittedAs = code?.ToString();
+            TempData.Keep("CreateSubmittedAsCode");
+            TempData.Keep("CreateIsPreCassetted");
+        }
     }
 
     public async Task<IActionResult> OnPostAsync()

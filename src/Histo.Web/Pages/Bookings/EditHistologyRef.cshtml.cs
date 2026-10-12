@@ -63,9 +63,12 @@ public class EditHistologyRefModel : HistoPageModel
         }
 
         var entered = NewHistologyRef.Trim();
-        if (!int.TryParse(entered, out var number) || number < lower || number >= upper)
+        // Exactly five ASCII digits: the column is varchar(5), and int.TryParse would otherwise
+        // accept "040000"/"+40000"/"4 0000" — all in range numerically, none storable in 5 chars.
+        if (entered.Length != 5 || !entered.All(char.IsAsciiDigit) ||
+            !int.TryParse(entered, out var number) || number < lower || number >= upper)
         {
-            Error = $"The Histology Ref must be a number between {lower} and {upper - 1} for this type.";
+            Error = $"The Histology Ref must be a 5-digit number between {lower} and {upper - 1} for this type.";
             return Page();
         }
 
