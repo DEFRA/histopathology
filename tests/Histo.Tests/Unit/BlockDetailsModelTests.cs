@@ -82,11 +82,40 @@ public class BlockDetailsModelTests
             new LookupItem { Code = "OTHER", Name = "Other tissue" },
         ]);
         var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.UseWholeTissueList = false; // the filtered view is opt-in; the default is the full list
 
         await sut.OnGetAsync();
 
         Assert.Contains(sut.TissueOptions, o => o.Code == "AGAR");
         Assert.DoesNotContain(sut.TissueOptions, o => o.Code == "OTHER");
+    }
+
+    [Fact]
+    public async Task LoadSupportingData_DefaultsToTheWholeTissueList()
+    {
+        var animal = new Animal { ID = 2, SenderRef = "S2" };
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[animal]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[
+            new BatchSubmission { ID = 69945, BatchID = 5, AnimalID = 2, Order = 1 },
+        ]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 69945, Owner = TissueOwner.Submission, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01", Order = 1 },
+        ]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _lookups.Setup(l => l.GetLookupDataAsync(9, It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[
+            new LookupItem { Code = "AGAR", Name = "Agar" },
+            new LookupItem { Code = "OTHER", Name = "Other tissue" },
+        ]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+
+        await sut.OnGetAsync();
+
+        Assert.True(sut.UseWholeTissueList);
+        Assert.Contains(sut.TissueOptions, o => o.Code == "OTHER");
     }
 
     [Fact]
