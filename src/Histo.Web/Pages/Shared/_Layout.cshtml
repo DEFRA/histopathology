@@ -84,9 +84,9 @@
             @RenderSection("BeforeHeading", required: false)
             @if (ViewData["PageTitle"] is string pt)
             {
-                @if (ViewData["BatchNo"] is string batchNo)
+                @if (ViewData["Caption"] is string caption)
                 {
-                    <span class="govuk-caption-l">Batch No: @batchNo</span>
+                    <span class="govuk-caption-l">@caption</span>
                 }
                 <h1 class="govuk-heading-xl">@pt</h1>
             }
