@@ -131,5 +131,43 @@ public sealed class HistologyRepository : IHistologyRepository
         return null;
     }
 
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<string>> DrawNextRefRunAsync(int histologyType, int count, CancellationToken ct = default)
+    {
+        if (count <= 0) return [];
+
+        using var conn = _db.CreateConnection();
+        for (var attempt = 0; attempt < MaxRunAttempts; attempt++)
+        {
+            // One statement: the row lock it holds reserves the whole run, so no other request can
+            // draw between its numbers. TRY_CONVERT skips a non-numeric counter (e.g. the stray 'df')
+            // and the ceiling keeps the new value inside varchar(5).
+            var start = await conn.ExecuteScalarAsync<int?>(
+                """
+                UPDATE HistologyRef
+                   SET NextHistologyRef = CONVERT(varchar(5), CONVERT(int, NextHistologyRef) + @Count)
+                OUTPUT CONVERT(int, DELETED.NextHistologyRef)
+                 WHERE [Type] = @Type
+                   AND TRY_CONVERT(int, NextHistologyRef) IS NOT NULL
+                   AND TRY_CONVERT(int, NextHistologyRef) + @Count <= 99999
+                """,
+                new { Type = histologyType, Count = count });
+            if (start is null) return [];
+
+            var numbers = Enumerable.Range(start.Value, count).Select(n => n.ToString("D5")).ToList();
+            var withYear = numbers.Select(Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear).ToList();
+
+            // A number already on a sample can't be part of a consecutive run, so discard this whole
+            // run and reserve a fresh one rather than skipping inside it.
+            var taken = await conn.ExecuteScalarAsync<int>(
+                "SELECT COUNT(1) FROM Animal WHERE RTRIM(HistologyRef) IN @Refs",
+                new { Refs = withYear });
+            if (taken == 0) return numbers;
+        }
+
+        return [];
+    }
+
     private const int MaxDrawAttempts = 1000;
+    private const int MaxRunAttempts = 50;
 }
