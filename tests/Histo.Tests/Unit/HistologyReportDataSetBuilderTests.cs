@@ -423,9 +423,9 @@ public class HistologyReportDataSetBuilderTests
     }
 
     [Fact]
-    public void BuildSubmissionTable_BlockRef_SequentialPerAnimal()
+    public void BuildSubmissionTable_SubmissionTissues_HaveNoBlockRef_AndOneRowPerPiece()
     {
-        var tissue1 = Row(("AnimalID", (object)5), ("ID", (object)10), ("BatchSubmissionID", (object)1), ("TissueCode", "Lung"),  ("Comment", ""));
+        var tissue1 = Row(("AnimalID", (object)5), ("ID", (object)10), ("BatchSubmissionID", (object)1), ("TissueCode", "Lung"),  ("Comment", ""), ("NoPieces", (object)2));
         var tissue2 = Row(("AnimalID", (object)5), ("ID", (object)11), ("BatchSubmissionID", (object)1), ("TissueCode", "Liver"), ("Comment", ""));
         var animal  = Row(("ID", (object)5), ("SenderRef", "REF-1"), ("HistologyRef", "25/001"));
 
@@ -437,9 +437,8 @@ public class HistologyReportDataSetBuilderTests
             rawBlockTissues: [],
             batchId: 1);
 
-        Assert.Equal(2, table.Rows.Count);
-        Assert.Equal("01", table.Rows[0]["BlockRef"]);
-        Assert.Equal("02", table.Rows[1]["BlockRef"]);
+        Assert.Equal(3, table.Rows.Count);
+        Assert.All(table.Rows.Cast<DataRow>(), r => Assert.Equal("", r["BlockRef"]));
     }
 
     [Fact]
@@ -460,7 +459,7 @@ public class HistologyReportDataSetBuilderTests
         Assert.Equal("7",      row["BatchID"]);
         Assert.Equal("S-001",  row["SenderRef"]);
         Assert.Equal("11/999", row["HistologyRef"]);
-        Assert.Equal("01",     row["BlockRef"]);
+        Assert.Equal("",       row["BlockRef"]);
         Assert.Equal("Kidney", row["TissueDetails"]);
         Assert.Equal("",       row["RepeatBlock"]);
         Assert.Equal("c-ref",  row["CustomerRef"]);

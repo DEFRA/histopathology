@@ -430,10 +430,6 @@ public sealed class HistologyReportDataSetBuilder
         // tissue twice — once as a numbered pseudo-block per tissue, once under its real block.
         if (rawTissues.Count > 0 && rawBlockTissues.Count == 0)
         {
-            // Track per-animal block ref counter (1-based, zero-padded to 2 digits) — Wet Tissue
-            // has no real BlockRef of its own, legacy numbers each tissue within its animal.
-            var blockCounter = new Dictionary<int, int>();
-
             // Sort tissues by AnimalID then tissue ID for stable ordering
             var sortedTissues = rawTissues
                 .OrderBy(t => t.TryGetValue("AnimalID", out var aid) ? Convert.ToInt32(aid) : 0)
@@ -447,19 +443,21 @@ public sealed class HistologyReportDataSetBuilder
 
                 animalById.TryGetValue(animalId, out var animal);
 
-                blockCounter.TryGetValue(animalId, out var counter);
-                counter++;
-                blockCounter[animalId] = counter;
-
-                var dr = dt.NewRow();
-                dr["BatchID"]       = batchId.ToString();
-                dr["SenderRef"]     = animal is not null ? Str(animal, "SenderRef")    : string.Empty;
-                dr["HistologyRef"]  = animal is not null ? Str(animal, "HistologyRef") : string.Empty;
-                dr["BlockRef"]      = counter.ToString("D2");
-                dr["TissueDetails"] = Str(tissue, "TissueCode");
-                dr["RepeatBlock"]   = string.Empty;
-                dr["CustomerRef"]   = Str(tissue, "Comment");
-                dt.Rows.Add(dr);
+                // Legacy never sets BlockRef here and lists one row per piece (NoPieces).
+                var pieces = tissue.TryGetValue("NoPieces", out var npVal) && npVal is not null and not DBNull
+                    ? Math.Max(1, Convert.ToInt32(npVal)) : 1;
+                for (var p = 0; p < pieces; p++)
+                {
+                    var dr = dt.NewRow();
+                    dr["BatchID"]       = batchId.ToString();
+                    dr["SenderRef"]     = animal is not null ? Str(animal, "SenderRef")    : string.Empty;
+                    dr["HistologyRef"]  = animal is not null ? Str(animal, "HistologyRef") : string.Empty;
+                    dr["BlockRef"]      = string.Empty;
+                    dr["TissueDetails"] = Str(tissue, "TissueCode");
+                    dr["RepeatBlock"]   = string.Empty;
+                    dr["CustomerRef"]   = Str(tissue, "Comment");
+                    dt.Rows.Add(dr);
+                }
             }
         }
 
