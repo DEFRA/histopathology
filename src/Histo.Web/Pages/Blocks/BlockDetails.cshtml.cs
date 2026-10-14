@@ -671,27 +671,21 @@ public class BlockDetailsModel : HistoPageModel
             // Legacy source: BlockDetails.aspx.vb::LoadLookupTypeList ->
             // clsTissue.GetBatchAnimalTissues(BatchID, AnimalID) -> SP GetBatchSampleTissues.
             var submissions = await _submissions.GetSubmissionsByBatchAsync(BatchId ?? 0);
-            var submissionIds = submissions.Select(s => s.ID).ToHashSet();
-            var firstSubmId = submissions.Count > 0 ? submissions[0].ID : 0;
 
             var bySubmission = (await _submissions.GetBatchSubmissionTissuesAsync(BatchId ?? 0))
                 .GroupBy(t => t.OwnerID)
                 .ToDictionary(g => g.Key, g => g.Select(t => t.TissueCode).ToList());
 
-            // Same fallback chain as SampleSummary/CopyBatch: this animal's own BatchSubmission row
-            // → BatchSubmissionID → the batch's first submission → the unkeyed (0) group.
-            // Neither GetBatchAnimal nor GetBatchBlocksByID's animal result-set ever returns
-            // BatchSubmissionID (verified against the actual SP output), so Animal.BatchSubmissionID
-            // is always 0 here — relying on it alone silently matched nothing and fell through to
-            // firstSubmId, which is wrong for every animal except the batch's very first submission
-            // (reproduced live: batch 33425/animal 103547 is submission order 2, so its real tissue
-            // list at submission 69945 was skipped entirely in favour of submission 69944's empty one).
-            var ownSubmissionId = submissions.FirstOrDefault(s => s.AnimalID == Animal.ID)?.ID;
-            var submId = ownSubmissionId
-                ?? (Animal.BatchSubmissionID > 0 && submissionIds.Contains(Animal.BatchSubmissionID) ? Animal.BatchSubmissionID : firstSubmId);
-            var sampleCodes = (bySubmission.TryGetValue(submId, out var codes) ? codes
-                    : bySubmission.TryGetValue(0, out var unkeyed) ? unkeyed
-                    : [])
+            // Only this sample's OWN submission rows count (all of them, if it has several). The animal
+            // SPs never return BatchSubmissionID (always 0) and every batch starts with an empty default
+            // submission (AnimalID 0, Order 1), so there is deliberately no fallback to the batch's first
+            // submission or an unkeyed group: a sample with no row of its own must offer nothing rather
+            // than another sample's tissues.
+            var ownSubmissionIds = submissions
+                .Where(s => s.AnimalID == Animal.ID || (Animal.BatchSubmissionID > 0 && s.ID == Animal.BatchSubmissionID))
+                .Select(s => s.ID);
+            var sampleCodes = ownSubmissionIds
+                .SelectMany(id => bySubmission.GetValueOrDefault(id) ?? [])
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             // Anything already assigned to this sample's blocks must stay selectable even if it

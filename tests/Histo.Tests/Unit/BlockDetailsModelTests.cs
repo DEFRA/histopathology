@@ -152,6 +152,64 @@ public class BlockDetailsModelTests
     }
 
     [Fact]
+    public async Task LoadSupportingData_AssignTissueJourney_SampleWithNoSubmissionRow_OffersNoOtherSamplesTissues()
+    {
+        // The batch's first submission (the empty default, or another sample's) must never stand in
+        // for a sample that has no submission of its own.
+        _session.Setup(s => s.SampleDetailReturnPage).Returns("/Batches/BatchBlocks?batchId=5");
+        var animal = new Animal { ID = 2, SenderRef = "S2" };
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[animal]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[
+            new BatchSubmission { ID = 100, BatchID = 5, AnimalID = 9, Order = 1 },
+        ]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 100, Owner = TissueOwner.Submission, TissueCode = "AGAR", NoPieces = 1 },
+            new Tissue { ID = 2, OwnerID = 0, Owner = TissueOwner.Submission, TissueCode = "OTHER", NoPieces = 1 },
+        ]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _lookups.Setup(l => l.GetLookupDataAsync(9, It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[
+            new LookupItem { Code = "AGAR", Name = "Agar" },
+            new LookupItem { Code = "OTHER", Name = "Other tissue" },
+        ]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+
+        await sut.OnGetAsync();
+
+        Assert.Empty(sut.TissueOptions);
+    }
+
+    [Fact]
+    public async Task LoadSupportingData_AssignTissueJourney_SampleWithSeveralSubmissions_OffersAllTheirTissues()
+    {
+        _session.Setup(s => s.SampleDetailReturnPage).Returns("/Batches/BatchBlocks?batchId=5");
+        var animal = new Animal { ID = 2, SenderRef = "S2" };
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[animal]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[
+            new BatchSubmission { ID = 100, BatchID = 5, AnimalID = 2, Order = 1 },
+            new BatchSubmission { ID = 101, BatchID = 5, AnimalID = 2, Order = 2 },
+        ]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 100, Owner = TissueOwner.Submission, TissueCode = "AGAR", NoPieces = 1 },
+            new Tissue { ID = 2, OwnerID = 101, Owner = TissueOwner.Submission, TissueCode = "BRN", NoPieces = 1 },
+        ]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _lookups.Setup(l => l.GetLookupDataAsync(9, It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[
+            new LookupItem { Code = "AGAR", Name = "Agar" },
+            new LookupItem { Code = "BRN", Name = "Brain" },
+            new LookupItem { Code = "OTHER", Name = "Other tissue" },
+        ]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+
+        await sut.OnGetAsync();
+
+        Assert.Equal(["AGAR", "BRN"], sut.TissueOptions.Select(o => o.Code));
+    }
+
+    [Fact]
     public async Task ExistingHistologyCodes_IncludesSpecialStainIhcPrpAndIhcOther()
     {
         // Regression: GetByBatchAsync excludes Histology codes 3/4/6 (QC-worklist-only gating

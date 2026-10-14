@@ -206,15 +206,20 @@ public sealed class HistologyRefService : IHistologyRefService
             if (count <= 0 || !HistologyRefTypeCode.TryGetRange(histologyType, out var lower, out var upper))
                 return [];
 
-            var refs = new List<string>(count);
-            for (var i = 0; i < count; i++)
+            // Reserved in one repository call so nothing can interleave with the run.
+            var numbers = await _repo.DrawNextRefRunAsync(histologyType, count, ct);
+            if (numbers.Count != count) return [];
+
+            // The counter is unconstrained, so refuse a run that isn't wholly inside the type's range.
+            if (numbers.Any(n => !int.TryParse(n, out var v) || v < lower || v >= upper))
             {
-                var next = await DrawFromCounterAsync(histologyType, lower, upper, ct);
-                if (next is null) return [];
-                refs.Add(next);
+                _logger.LogError(
+                    "Histology ref run {First}-{Last} for type {HistologyType} is outside the range {Lower}-{Upper}. No refs were assigned.",
+                    null, numbers[0], numbers[^1], histologyType, lower, upper - 1);
+                return [];
             }
 
-            return refs;
+            return [.. numbers.Select(Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear)];
         }
         catch (Exception ex)
         {

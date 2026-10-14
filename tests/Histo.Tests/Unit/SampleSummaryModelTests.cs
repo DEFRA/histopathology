@@ -142,6 +142,39 @@ public class SampleSummaryModelTests
     }
 
     [Fact]
+    public async Task OnGetAsync_SampleLinkedToSeveralSubmissions_ShowsTheTissuesOfAllOfThem()
+    {
+        // A sample can own more than one BatchSubmission row; one summary row per sample must not
+        // hide the tissues of the others.
+        _batches.Setup(b => b.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 1 });
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)
+        [
+            new Animal { ID = 10, SenderRef = "A" },
+        ]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)
+        [
+            new BatchSubmission { ID = 901, BatchID = 1, AnimalID = 10, Order = 1 },
+            new BatchSubmission { ID = 902, BatchID = 1, AnimalID = 10, Order = 2 },
+        ]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)
+        [
+            new Tissue { ID = 1, OwnerID = 901, Owner = TissueOwner.Submission, TissueCode = "AGAR", NoPieces = 1 },
+            new Tissue { ID = 2, OwnerID = 902, Owner = TissueOwner.Submission, TissueCode = "BRN", NoPieces = 2 },
+        ]);
+        _lookups.Setup(l => l.GetLookupDataAsync(9, It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)
+        [
+            new LookupItem { Code = "AGAR", Name = "Agar" },
+            new LookupItem { Code = "BRN", Name = "Brain" },
+        ]);
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        await sut.OnGetAsync();
+
+        Assert.Equal(["1 x Agar", "2 x Brain"], sut.TissuesByAnimalId[10]);
+    }
+
+    [Fact]
     public async Task OnPostSelect_NoBatchId_RedirectsToIndex()
     {
         var sut = CreateSut();

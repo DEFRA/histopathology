@@ -370,18 +370,20 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
             var batchBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
             foreach (var id in blockIds)
             {
-                if (!await _blocks.DeleteBlockAsync(id, Session.UserID))
+                // The counter moves past the ref BEFORE the block goes, and a failure stops the delete:
+                // doing it afterwards would leave a window where the deleted ref is reissued. If the
+                // delete then fails, the counter has only skipped a number, which is harmless.
+                // Pre-booked blocks are excluded: their refs come from the pre-booked pool, not the counter.
+                var existing = batchBlocks.FirstOrDefault(b => b.ID == id);
+                if (existing is { Status: BlockStatus.Used } && BlockHelpers.NextRefAfter(existing.BlockRef) is { } next
+                    && !await _submissions.AdvanceNextBlockRefAsync(existing.AnimalID, next))
                 {
                     failedIds.Add(id);
                     continue;
                 }
 
-                // The deleted ref must not be handed out again to the next block added for this
-                // sample (legacy never moved Animal.NextBlockRef back). Pre-booked blocks are
-                // excluded: their refs come from the pre-booked pool, not the counter.
-                var deleted = batchBlocks.FirstOrDefault(b => b.ID == id);
-                if (deleted is { Status: BlockStatus.Used } && BlockHelpers.NextRefAfter(deleted.BlockRef) is { } next)
-                    await _submissions.AdvanceNextBlockRefAsync(deleted.AnimalID, next);
+                if (!await _blocks.DeleteBlockAsync(id, Session.UserID))
+                    failedIds.Add(id);
             }
         }
 

@@ -154,20 +154,21 @@ public class SampleSummaryModel : HistoPageModel
                     .Select(t => $"{t.NoPieces} x {tissueNames.GetValueOrDefault(t.TissueCode, t.TissueCode)}")
                     .ToList());
 
-        // A sample's tissues hang off its OWN BatchSubmission row. The animal SPs never return
+        // A sample's tissues hang off its OWN BatchSubmission row(s). The animal SPs never return
         // BatchSubmissionID (always 0), and every batch starts with an empty "Default" submission
         // (AnimalID 0, Order 1) — falling back to the batch's first submission therefore showed no
-        // tissues at all, or another sample's. Same resolution as SubmissionDetails.LoadAnimalAsync.
-        var submissionByAnimalId = submissions
+        // tissues at all, or another sample's. This page is one row per sample, so a sample linked to
+        // several submissions shows all of their tissues together.
+        var submissionIdsByAnimalId = submissions
             .Where(s => s.AnimalID > 0)
             .GroupBy(s => s.AnimalID)
-            .ToDictionary(g => g.Key, g => g.First().ID);
+            .ToDictionary(g => g.Key, g => g.Select(s => s.ID).ToList());
 
         TissuesByAnimalId = Animals.ToDictionary(
             a => a.ID,
-            a => submissionByAnimalId.TryGetValue(a.ID, out var submId) && tissuesBySubmId.TryGetValue(submId, out var td)
-                ? td
-                : (IReadOnlyList<string>)[]);
+            a => (IReadOnlyList<string>)(submissionIdsByAnimalId.TryGetValue(a.ID, out var submIds)
+                ? submIds.SelectMany(id => tissuesBySubmId.GetValueOrDefault(id) ?? []).ToList()
+                : []));
 
         // Populate session BatchSubmissionID using already-loaded submissions (no second query needed).
         var firstAnimalSubId = Animals.FirstOrDefault(a => a.BatchSubmissionID > 0)?.BatchSubmissionID;

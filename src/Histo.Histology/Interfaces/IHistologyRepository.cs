@@ -62,4 +62,13 @@ public interface IHistologyRepository
     /// by a sample this year are skipped (and so consumed from the counter) rather than returned.
     /// </summary>
     Task<string?> DrawNextRefAsync(int histologyType, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reserves <paramref name="count"/> consecutive numbers from a type's counter in a single
+    /// server-side statement, so no other request can draw between them, and returns them as 5-digit
+    /// strings. A run containing a number already held by a sample is discarded whole and a fresh run
+    /// reserved, so the result is always consecutive. Empty when the counter is missing, non-numeric,
+    /// would overflow, or no clean run was found.
+    /// </summary>
+    Task<IReadOnlyList<string>> DrawNextRefRunAsync(int histologyType, int count, CancellationToken ct = default);
 }

@@ -267,23 +267,27 @@ public class SubmissionDetailsBlockModelTests
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 100, BatchID = 5, AnimalID = 1, BlockRef = "01", Status = BlockStatus.Used }]);
         _blocks.Setup(b => b.DeleteBlockAsync(100, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _submissions.Setup(s => s.AdvanceNextBlockRefAsync(1, "02", It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         await sut.OnPostDeleteAsync([100]);
 
         _submissions.Verify(s => s.AdvanceNextBlockRefAsync(1, "02", It.IsAny<CancellationToken>()), Times.Once);
+        _blocks.Verify(b => b.DeleteBlockAsync(100, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task OnPostDeleteAsync_FailedDelete_DoesNotAdvanceTheCounter()
+    public async Task OnPostDeleteAsync_CounterCannotBeAdvanced_DoesNotDeleteTheBlock()
     {
+        // Deleting first and failing to advance would leave the deleted ref free to be reissued.
         var sut = CreateSut(1, new Animal { ID = 1, SenderRef = "S1" }, null);
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 100, BatchID = 5, AnimalID = 1, BlockRef = "01", Status = BlockStatus.Used }]);
-        _blocks.Setup(b => b.DeleteBlockAsync(100, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _submissions.Setup(s => s.AdvanceNextBlockRefAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
         await sut.OnPostDeleteAsync([100]);
 
-        _submissions.Verify(s => s.AdvanceNextBlockRefAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _blocks.Verify(b => b.DeleteBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Contains("100", sut.TempData["SubmissionDetailsBlock_Error"]?.ToString());
     }
 
     [Fact]
