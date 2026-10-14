@@ -114,7 +114,7 @@ public class HistologyRefServiceTests
         // A pooled ref (26/60000) sits far from the counter (86236) — mixing them made a run jump.
         _repo.Setup(r => r.GetUnusedRefsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<HistologyRef>)[new HistologyRef { Ref = $"{ThisYear}/60000" }]);
-        _repo.Setup(r => r.DrawNextRefRunAsync(HistologyRefTypeCode.MouseProjects, 3, It.IsAny<CancellationToken>()))
+        _repo.Setup(r => r.DrawNextRefRunAsync(HistologyRefTypeCode.MouseProjects, 3, 60000, 90000, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<string>)["86236", "86237", "86238"]);
 
         var result = await CreateSut().GetNextAvailableRefRunAsync(HistologyRefTypeCode.MouseProjects, 3);
@@ -122,14 +122,14 @@ public class HistologyRefServiceTests
         Assert.Equal([$"{ThisYear}/86236", $"{ThisYear}/86237", $"{ThisYear}/86238"], result);
         _repo.Verify(r => r.GetUnusedRefsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         // The whole run is reserved in ONE repository call — never one draw per number.
-        _repo.Verify(r => r.DrawNextRefRunAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+        _repo.Verify(r => r.DrawNextRefRunAsync(It.IsAny<int>(), It.IsAny<int>(), 60000, 90000, It.IsAny<CancellationToken>()), Times.Once);
         _repo.Verify(r => r.DrawNextRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task GetNextAvailableRefRunAsync_RunLeavesTheRange_ReturnsNothing()
     {
-        _repo.Setup(r => r.DrawNextRefRunAsync(HistologyRefTypeCode.MouseProjects, 2, It.IsAny<CancellationToken>()))
+        _repo.Setup(r => r.DrawNextRefRunAsync(HistologyRefTypeCode.MouseProjects, 2, 60000, 90000, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<string>)["89999", "90000"]);
 
         var result = await CreateSut().GetNextAvailableRefRunAsync(HistologyRefTypeCode.MouseProjects, 2);
@@ -140,7 +140,7 @@ public class HistologyRefServiceTests
     [Fact]
     public async Task GetNextAvailableRefRunAsync_RepositoryReturnsAShortRun_ReturnsNothing()
     {
-        _repo.Setup(r => r.DrawNextRefRunAsync(HistologyRefTypeCode.MouseProjects, 3, It.IsAny<CancellationToken>()))
+        _repo.Setup(r => r.DrawNextRefRunAsync(HistologyRefTypeCode.MouseProjects, 3, 60000, 90000, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<string>)["86236", "86237"]);
 
         var result = await CreateSut().GetNextAvailableRefRunAsync(HistologyRefTypeCode.MouseProjects, 3);

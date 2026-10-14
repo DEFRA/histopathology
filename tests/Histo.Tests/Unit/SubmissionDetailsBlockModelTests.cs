@@ -291,6 +291,20 @@ public class SubmissionDetailsBlockModelTests
     }
 
     [Fact]
+    public async Task OnPostDeleteAsync_BlockIdOutsideTheBatch_DeletesNothing()
+    {
+        var sut = CreateSut(1, new Animal { ID = 1, SenderRef = "S1" }, null);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 100, BatchID = 5, AnimalID = 1, BlockRef = "01", Status = BlockStatus.Used }]);
+        _blocks.Setup(b => b.DeleteBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        await sut.OnPostDeleteAsync([100, 999]);
+
+        _blocks.Verify(b => b.DeleteBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Contains("do not belong", sut.TempData["SubmissionDetailsBlock_Error"]?.ToString());
+    }
+
+    [Fact]
     public async Task OnPostDeleteAsync_PreBookedBlock_DoesNotAdvanceTheCounter()
     {
         // Pre-cassetted refs come from the pre-booked pool, never from NextBlockRef.

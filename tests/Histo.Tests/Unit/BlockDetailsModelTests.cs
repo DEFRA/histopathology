@@ -49,7 +49,8 @@ public class BlockDetailsModelTests
     }
 
     private BlockDetailsModel CreateSut(int animalId, int blockId) =>
-        new(_session.Object, _submissions.Object, _blocks.Object, _batches.Object, _lookups.Object, _blockTests.Object, _histologyRefs.Object)
+        new(_session.Object, _submissions.Object, _blocks.Object, _batches.Object, _lookups.Object, _blockTests.Object, _histologyRefs.Object,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<BlockDetailsModel>.Instance)
         {
             PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
             TempData = new TempDataDictionary(new Microsoft.AspNetCore.Http.DefaultHttpContext(), Mock.Of<ITempDataProvider>()),
@@ -267,6 +268,59 @@ public class BlockDetailsModelTests
             It.Is<IReadOnlyList<string>>(codes => codes.SequenceEqual(new[] { "ST01" })),
             7,
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_AddMode_DefaultSaveFails_DeletesTheNewBlockAndShowsAnError()
+    {
+        _session.Setup(s => s.UserArea).Returns("Neuropath");
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2", HistoRefSet = false }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(400);
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Histo.Submissions.Models.BatchTestSelections
+        {
+            Histology = [new BatchTestSelectionRow { ID = 1, BatchID = 5, Code = HistologyCode.HAndE }],
+        });
+        _blockTests.Setup(t => t.SaveTestSelectionsAsync(5, 400, It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<IReadOnlyList<string>>(), 7, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("db down"));
+        var sut = CreateSut(animalId: 2, blockId: 0);
+
+        var result = await sut.OnGetAsync();
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RazorPages.PageResult>(result);
+        Assert.NotNull(sut.ErrorMessage);
+        _blocks.Verify(b => b.DeleteBlockAsync(400, 7, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostNextBlockAsync_NewBlockRef_NeverGoesBelowTheAnimalsStoredNextBlockRef()
+    {
+        // 01/02 remain after 03 was deleted, and the animal's counter says 04: the next block must be 04.
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2", NextBlockRef = "04" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 1, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+            new Block { ID = 2, BatchID = 5, AnimalID = 2, BlockRef = "02" },
+        ]);
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(9);
+        var sut = CreateSut(animalId: 2, blockId: 2);
+        sut.SelectedHistologyCodes = [HistologyCode.EO];
+
+        await sut.OnPostNextBlockAsync();
+
+        _blocks.Verify(b => b.AddBlockAsync(5, 2, "04", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

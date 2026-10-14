@@ -207,7 +207,7 @@ public sealed class HistologyRefService : IHistologyRefService
                 return [];
 
             // Reserved in one repository call so nothing can interleave with the run.
-            var numbers = await _repo.DrawNextRefRunAsync(histologyType, count, ct);
+            var numbers = await _repo.DrawNextRefRunAsync(histologyType, count, lower, upper, ct);
             if (numbers.Count != count) return [];
 
             // The counter is unconstrained, so refuse a run that isn't wholly inside the type's range.

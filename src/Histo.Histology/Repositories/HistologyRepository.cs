@@ -132,7 +132,7 @@ public sealed class HistologyRepository : IHistologyRepository
     }
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<string>> DrawNextRefRunAsync(int histologyType, int count, CancellationToken ct = default)
+    public async Task<IReadOnlyList<string>> DrawNextRefRunAsync(int histologyType, int count, int lowerInclusive, int upperExclusive, CancellationToken ct = default)
     {
         if (count <= 0) return [];
 
@@ -140,18 +140,19 @@ public sealed class HistologyRepository : IHistologyRepository
         for (var attempt = 0; attempt < MaxRunAttempts; attempt++)
         {
             // One statement: the row lock it holds reserves the whole run, so no other request can
-            // draw between its numbers. TRY_CONVERT skips a non-numeric counter (e.g. the stray 'df')
-            // and the ceiling keeps the new value inside varchar(5).
+            // draw between its numbers. TRY_CONVERT skips a non-numeric counter (e.g. the stray 'df');
+            // the bounds mean a run that would leave the type's range never touches the counter.
             var start = await conn.ExecuteScalarAsync<int?>(
                 """
                 UPDATE HistologyRef
                    SET NextHistologyRef = CONVERT(varchar(5), CONVERT(int, NextHistologyRef) + @Count)
                 OUTPUT CONVERT(int, DELETED.NextHistologyRef)
                  WHERE [Type] = @Type
-                   AND TRY_CONVERT(int, NextHistologyRef) IS NOT NULL
+                   AND TRY_CONVERT(int, NextHistologyRef) >= @Lower
+                   AND TRY_CONVERT(int, NextHistologyRef) + @Count <= @Upper
                    AND TRY_CONVERT(int, NextHistologyRef) + @Count <= 99999
                 """,
-                new { Type = histologyType, Count = count });
+                new { Type = histologyType, Count = count, Lower = lowerInclusive, Upper = upperExclusive });
             if (start is null) return [];
 
             var numbers = Enumerable.Range(start.Value, count).Select(n => n.ToString("D5")).ToList();

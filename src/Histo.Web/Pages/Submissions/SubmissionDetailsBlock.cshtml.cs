@@ -364,17 +364,31 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
     /// </summary>
     public async Task<IActionResult> OnPostDeleteAsync(List<int>? blockIds)
     {
+        var redirect = await LoadAnimalAsync();
+        if (redirect is not null) return redirect;
+
         var failedIds = new List<int>();
         if (blockIds is not null)
         {
             var batchBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
+
+            // blockIds are client-controlled and DeleteBlock deletes by ID alone, so every ID must
+            // belong to the authorised batch before anything is deleted.
+            var batchBlockIds = batchBlocks.Select(b => b.ID).ToHashSet();
+            if (blockIds.Any(id => !batchBlockIds.Contains(id)))
+            {
+                _logger.LogWarning("SubmissionDetailsBlock: delete rejected — block ID(s) not in batch {BatchId}.", BatchId);
+                TempData["SubmissionDetailsBlock_Error"] = "One or more selected blocks do not belong to this submission. No blocks were deleted.";
+                return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
+            }
+
             foreach (var id in blockIds)
             {
                 // The counter moves past the ref BEFORE the block goes, and a failure stops the delete:
                 // doing it afterwards would leave a window where the deleted ref is reissued. If the
                 // delete then fails, the counter has only skipped a number, which is harmless.
                 // Pre-booked blocks are excluded: their refs come from the pre-booked pool, not the counter.
-                var existing = batchBlocks.FirstOrDefault(b => b.ID == id);
+                var existing = batchBlocks.First(b => b.ID == id);
                 if (existing is { Status: BlockStatus.Used } && BlockHelpers.NextRefAfter(existing.BlockRef) is { } next
                     && !await _submissions.AdvanceNextBlockRefAsync(existing.AnimalID, next))
                 {

@@ -68,7 +68,8 @@ public interface IHistologyRepository
     /// server-side statement, so no other request can draw between them, and returns them as 5-digit
     /// strings. A run containing a number already held by a sample is discarded whole and a fresh run
     /// reserved, so the result is always consecutive. Empty when the counter is missing, non-numeric,
-    /// would overflow, or no clean run was found.
+    /// or the run would leave [lowerInclusive, upperExclusive) — the counter is then left untouched —
+    /// or no clean run was found.
     /// </summary>
-    Task<IReadOnlyList<string>> DrawNextRefRunAsync(int histologyType, int count, CancellationToken ct = default);
+    Task<IReadOnlyList<string>> DrawNextRefRunAsync(int histologyType, int count, int lowerInclusive, int upperExclusive, CancellationToken ct = default);
 }

@@ -34,9 +34,11 @@ public class BlockDetailsModel : HistoPageModel
     private readonly ILookupService _lookups;
     private readonly IBlockTestService _blockTests;
     private readonly IHistologyRefService _histologyRefs;
+    private readonly ILogger<BlockDetailsModel> _logger;
 
     public BlockDetailsModel(ISessionService session, ISubmissionService submissions, IBlockService blocks,
-        IBatchService batches, ILookupService lookups, IBlockTestService blockTests, IHistologyRefService histologyRefs)
+        IBatchService batches, ILookupService lookups, IBlockTestService blockTests, IHistologyRefService histologyRefs,
+        ILogger<BlockDetailsModel> logger)
         : base(session)
     {
         _submissions = submissions;
@@ -45,6 +47,7 @@ public class BlockDetailsModel : HistoPageModel
         _lookups = lookups;
         _blockTests = blockTests;
         _histologyRefs = histologyRefs;
+        _logger = logger;
     }
 
     [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
@@ -298,7 +301,20 @@ public class BlockDetailsModel : HistoPageModel
                     return Page();
                 }
 
-                await SaveBatchDefaultsForNewBlockAsync(newId);
+                try
+                {
+                    await SaveBatchDefaultsForNewBlockAsync(newId);
+                }
+                catch (Exception ex)
+                {
+                    // The block is already committed; without cleanup a retry would leave an unreachable orphan.
+                    _logger.LogError(ex, "BlockDetails: failed to save batch default tests for new block {BlockId}; removing it.", newId);
+                    try { await _blockTests.SaveTestSelectionsAsync(BatchId ?? 0, newId, [], [], [], Session.UserID); }
+                    catch (Exception clearEx) { _logger.LogError(clearEx, "BlockDetails: failed to clear partial test selections for block {BlockId}.", newId); }
+                    await _blocks.DeleteBlockAsync(newId, Session.UserID);
+                    ErrorMessage = "Could not create the block. Please try again or contact support if the problem continues.";
+                    return Page();
+                }
             }
 
             return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = newId, isAddFlow = true });
@@ -480,7 +496,7 @@ public class BlockDetailsModel : HistoPageModel
                 }
                 else
                 {
-                    blockRef = BlockHelpers.ComputeNextBlockRef(existingRefs);
+                    blockRef = BlockHelpers.ComputeNextBlockRef(existingRefs, Animal.NextBlockRef);
                     siblingId = await _blocks.AddBlockAsync(
                         BatchId ?? 0, Animal.ID, blockRef, existingOrders, Session.UserID,
                         customerRef: NewCustomerRef, comment: NewComment, repeatBlock: NewRepeatBlock);
@@ -627,7 +643,8 @@ public class BlockDetailsModel : HistoPageModel
         }
         else
         {
-            var nextRef = BlockHelpers.ComputeNextBlockRef(allBlocks.Where(b => b.AnimalID == Animal.ID).Select(b => b.BlockRef));
+            var nextRef = BlockHelpers.ComputeNextBlockRef(
+                allBlocks.Where(b => b.AnimalID == Animal.ID).Select(b => b.BlockRef), Animal.NextBlockRef);
             newBlockId = await _blocks.AddBlockAsync(BatchId ?? 0, Animal.ID, nextRef, existingOrders, Session.UserID,
                 customerRef: null, comment: null, repeatBlock: false);
         }
