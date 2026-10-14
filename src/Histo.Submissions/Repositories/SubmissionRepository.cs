@@ -717,16 +717,12 @@ public sealed class SubmissionRepository : ISubmissionRepository
     public async Task AdvanceNextBlockRefAsync(int animalId, string nextBlockRef, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        // Direct UPDATE rather than EditAnimal: the counter only moves forward, so no RowStamp
-        // check is needed, and EditAnimal would silently drop it on a stale RowStamp.
+        // The counter only moves forward, so no RowStamp check is needed (EditAnimal would silently
+        // drop it on a stale RowStamp).
         await conn.ExecuteAsync(
-            """
-            UPDATE Animal
-               SET NextBlockRef = @NextBlockRef
-             WHERE ID = @AnimalID
-               AND ISNULL(TRY_CAST(NextBlockRef AS INT), 0) < TRY_CAST(@NextBlockRef AS INT)
-            """,
-            new { AnimalID = animalId, NextBlockRef = nextBlockRef });
+            "AdvanceAnimalNextBlockRef",
+            new { AnimalID = animalId, NextBlockRef = nextBlockRef },
+            commandType: System.Data.CommandType.StoredProcedure);
     }
 
     /// <inheritdoc/>

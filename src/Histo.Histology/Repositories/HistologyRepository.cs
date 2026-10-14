@@ -123,8 +123,9 @@ public sealed class HistologyRepository : IHistologyRepository
 
             var drawn = next.Trim();
             var taken = await conn.ExecuteScalarAsync<int>(
-                "SELECT COUNT(1) FROM Animal WHERE RTRIM(HistologyRef) = @Ref",
-                new { Ref = Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(drawn) });
+                "CountAnimalsByHistologyRef",
+                new { HistologyRef = Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(drawn) },
+                commandType: System.Data.CommandType.StoredProcedure);
             if (taken == 0) return drawn;
         }
 
@@ -137,36 +138,24 @@ public sealed class HistologyRepository : IHistologyRepository
         if (count <= 0) return [];
 
         using var conn = _db.CreateConnection();
-        for (var attempt = 0; attempt < MaxRunAttempts; attempt++)
-        {
-            // One statement: the row lock it holds reserves the whole run, so no other request can
-            // draw between its numbers. TRY_CONVERT skips a non-numeric counter (e.g. the stray 'df');
-            // the bounds mean a run that would leave the type's range never touches the counter.
-            var start = await conn.ExecuteScalarAsync<int?>(
-                """
-                UPDATE HistologyRef
-                   SET NextHistologyRef = CONVERT(varchar(5), CONVERT(int, NextHistologyRef) + @Count)
-                OUTPUT CONVERT(int, DELETED.NextHistologyRef)
-                 WHERE [Type] = @Type
-                   AND TRY_CONVERT(int, NextHistologyRef) >= @Lower
-                   AND TRY_CONVERT(int, NextHistologyRef) + @Count <= @Upper
-                   AND TRY_CONVERT(int, NextHistologyRef) + @Count <= 99999
-                """,
-                new { Type = histologyType, Count = count, Lower = lowerInclusive, Upper = upperExclusive });
-            if (start is null) return [];
 
-            var numbers = Enumerable.Range(start.Value, count).Select(n => n.ToString("D5")).ToList();
-            var withYear = numbers.Select(Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear).ToList();
+        // The SP reserves the run atomically, skips runs containing a number a sample already holds,
+        // and leaves the counter untouched when the run would leave the type's range.
+        var start = await conn.ExecuteScalarAsync<int?>(
+            "DrawNextHistologyRefRun",
+            new
+            {
+                Type = histologyType,
+                Count = count,
+                Lower = lowerInclusive,
+                Upper = upperExclusive,
+                RefPrefix = Histo.Core.Domain.HistologyRefHelpers.CurrentYearPrefix,
+                MaxAttempts = MaxRunAttempts,
+            },
+            commandType: System.Data.CommandType.StoredProcedure);
+        if (start is null) return [];
 
-            // A number already on a sample can't be part of a consecutive run, so discard this whole
-            // run and reserve a fresh one rather than skipping inside it.
-            var taken = await conn.ExecuteScalarAsync<int>(
-                "SELECT COUNT(1) FROM Animal WHERE RTRIM(HistologyRef) IN @Refs",
-                new { Refs = withYear });
-            if (taken == 0) return numbers;
-        }
-
-        return [];
+        return Enumerable.Range(start.Value, count).Select(n => n.ToString("D5")).ToList();
     }
 
     private const int MaxDrawAttempts = 1000;
