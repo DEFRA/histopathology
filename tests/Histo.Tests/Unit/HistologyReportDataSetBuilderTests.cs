@@ -512,6 +512,38 @@ public class HistologyReportDataSetBuilderTests
         Assert.Equal("visc 1",  row["CustomerRef"]);
     }
 
+    [Theory]
+    [InlineData(true, "01", "Viscera")]
+    [InlineData(false, "", "Lung")]
+    public void BuildSubmissionTable_BothSourcesPresent_PicksSourceByBlocksAssigned(bool blocksAssigned, string expectedBlockRef, string expectedTissue)
+    {
+        var block  = Row(("ID", (object)900), ("AnimalID", (object)42), ("BlockRef", "01"), ("RepeatBlock", (object)false));
+        var bTiss  = Row(("BlockID", (object)900), ("ID", (object)1), ("TissueCode", "Viscera"), ("Comment", ""));
+        var sTiss  = Row(("AnimalID", (object)42), ("ID", (object)2), ("TissueCode", "Lung"), ("Comment", ""));
+        var animal = Row(("ID", (object)42), ("SenderRef", "S-001"), ("HistologyRef", "11/999"));
+
+        var table = HistologyReportDataSetBuilder.BuildSubmissionTable(
+            [], [sTiss], [animal], [block], [bTiss], 7, blocksAssigned);
+
+        Assert.Single(table.Rows);
+        Assert.Equal(expectedBlockRef, table.Rows[0]["BlockRef"]);
+        Assert.Equal(expectedTissue, table.Rows[0]["TissueDetails"]);
+    }
+
+    [Fact]
+    public void BuildSubmissionTable_NotBlocked_OnlyBlockTissues_FallsBackToBlocks()
+    {
+        var block  = Row(("ID", (object)900), ("AnimalID", (object)42), ("BlockRef", "01"), ("RepeatBlock", (object)false));
+        var bTiss  = Row(("BlockID", (object)900), ("ID", (object)1), ("TissueCode", "Viscera"), ("Comment", ""));
+        var animal = Row(("ID", (object)42), ("SenderRef", "S-001"), ("HistologyRef", "11/999"));
+
+        var table = HistologyReportDataSetBuilder.BuildSubmissionTable(
+            [], [], [animal], [block], [bTiss], 7, blocksAssigned: false);
+
+        Assert.Single(table.Rows);
+        Assert.Equal("01", table.Rows[0]["BlockRef"]);
+    }
+
     [Fact]
     public void BuildSubmissionTable_BlocksOfInterleavedSamples_GroupedPerSampleAndBlock()
     {
