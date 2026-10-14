@@ -714,6 +714,22 @@ public sealed class SubmissionRepository : ISubmissionRepository
     }
 
     /// <inheritdoc/>
+    public async Task AdvanceNextBlockRefAsync(int animalId, string nextBlockRef, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        // Direct UPDATE rather than EditAnimal: the counter only moves forward, so no RowStamp
+        // check is needed, and EditAnimal would silently drop it on a stale RowStamp.
+        await conn.ExecuteAsync(
+            """
+            UPDATE Animal
+               SET NextBlockRef = @NextBlockRef
+             WHERE ID = @AnimalID
+               AND ISNULL(TRY_CAST(NextBlockRef AS INT), 0) < TRY_CAST(@NextBlockRef AS INT)
+            """,
+            new { AnimalID = animalId, NextBlockRef = nextBlockRef });
+    }
+
+    /// <inheritdoc/>
     public async Task DeleteSampleFromBatchAsync(int batchId, int animalId, int userId, CancellationToken ct = default)
     {
         // Done as one transactional set-based statement batch rather than via the per-row Delete*

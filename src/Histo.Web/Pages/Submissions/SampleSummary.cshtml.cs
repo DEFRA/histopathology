@@ -137,13 +137,10 @@ public class SampleSummaryModel : HistoPageModel
             ? animals
             : [.. animals.OrderBy(a => a.SenderRef).ThenBy(a => a.HistologyRef)];
 
-        // Load submissions upfront — needed for tissue resolution fallback (mirrors CopyBatch which uses
-        // firstSubmId when BatchSubmissionID is 0 or the column wasn't returned by the block-animal SP).
         var submissions  = await _submissions.GetSubmissionsByBatchAsync(batchIdValue);
         var firstSubmId  = submissions.Count > 0 ? submissions[0].ID : 0;
-        var submissionIds = submissions.Select(s => s.ID).ToHashSet();
 
-        // Load tissue details for the Tissue Details column, mirroring CopyBatch tissue resolution.
+        // Legacy source: clsBatchSummary.CreateBatchSummaryData — "N x Tissue" per tissue under each sample.
         var tissueTypes = await _lookups.GetLookupDataAsync(9); // 9 = LOOKUP_TISSUE_CODE
         var tissueNames = tissueTypes
             .Where(t => t.Code != null)
@@ -156,18 +153,21 @@ public class SampleSummaryModel : HistoPageModel
                 g => (IReadOnlyList<string>)g
                     .Select(t => $"{t.NoPieces} x {tissueNames.GetValueOrDefault(t.TissueCode, t.TissueCode)}")
                     .ToList());
-        var allTissueStrings = tissuesBySubmId.TryGetValue(0, out var zeroGroup) ? zeroGroup : (IReadOnlyList<string>)[];
 
-        // Exact same fallback chain as CopyBatch.ResolveTissues: BatchSubmissionID → firstSubmId → key-0.
-        IReadOnlyList<string> ResolveTissues(int batchSubmissionId)
-        {
-            var submId = batchSubmissionId > 0 && submissionIds.Contains(batchSubmissionId)
-                ? batchSubmissionId : firstSubmId;
-            if (submId > 0 && tissuesBySubmId.TryGetValue(submId, out var td)) return td;
-            return allTissueStrings.Count > 0 ? allTissueStrings : [];
-        }
+        // A sample's tissues hang off its OWN BatchSubmission row. The animal SPs never return
+        // BatchSubmissionID (always 0), and every batch starts with an empty "Default" submission
+        // (AnimalID 0, Order 1) — falling back to the batch's first submission therefore showed no
+        // tissues at all, or another sample's. Same resolution as SubmissionDetails.LoadAnimalAsync.
+        var submissionByAnimalId = submissions
+            .Where(s => s.AnimalID > 0)
+            .GroupBy(s => s.AnimalID)
+            .ToDictionary(g => g.Key, g => g.First().ID);
 
-        TissuesByAnimalId = Animals.ToDictionary(a => a.ID, a => ResolveTissues(a.BatchSubmissionID));
+        TissuesByAnimalId = Animals.ToDictionary(
+            a => a.ID,
+            a => submissionByAnimalId.TryGetValue(a.ID, out var submId) && tissuesBySubmId.TryGetValue(submId, out var td)
+                ? td
+                : (IReadOnlyList<string>)[]);
 
         // Populate session BatchSubmissionID using already-loaded submissions (no second query needed).
         var firstAnimalSubId = Animals.FirstOrDefault(a => a.BatchSubmissionID > 0)?.BatchSubmissionID;

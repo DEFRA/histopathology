@@ -423,8 +423,10 @@ public class HistologyReportDataSetBuilderTests
     }
 
     [Fact]
-    public void BuildSubmissionTable_BlockRef_SequentialPerAnimal()
+    public void BuildSubmissionTable_TissuesNotYetInBlocks_HaveNoBlockRef()
     {
+        // Legacy CreateBatchSubmissionDataTable never sets BlockRef: a tissue that hasn't been put
+        // into a block has no block ref, so none is invented (previously "01", "02", ... per tissue).
         var tissue1 = Row(("AnimalID", (object)5), ("ID", (object)10), ("BatchSubmissionID", (object)1), ("TissueCode", "Lung"),  ("Comment", ""));
         var tissue2 = Row(("AnimalID", (object)5), ("ID", (object)11), ("BatchSubmissionID", (object)1), ("TissueCode", "Liver"), ("Comment", ""));
         var animal  = Row(("ID", (object)5), ("SenderRef", "REF-1"), ("HistologyRef", "25/001"));
@@ -438,8 +440,60 @@ public class HistologyReportDataSetBuilderTests
             batchId: 1);
 
         Assert.Equal(2, table.Rows.Count);
-        Assert.Equal("01", table.Rows[0]["BlockRef"]);
-        Assert.Equal("02", table.Rows[1]["BlockRef"]);
+        Assert.All(table.Rows.Cast<DataRow>(), r => Assert.Equal(string.Empty, (string)r["BlockRef"]));
+    }
+
+    [Fact]
+    public void BuildSubmissionTable_SeveralPiecesOfOneTissue_PrintsOneRowPerPiece()
+    {
+        // Legacy loops NoPieces - 1 extra rows for the same tissue code; the submission-tissue
+        // listing used to emit a single row however many pieces there were.
+        var tissue = Row(("AnimalID", (object)5), ("ID", (object)10), ("TissueCode", "Brain"), ("NoPieces", (object)3), ("Comment", ""));
+        var other  = Row(("AnimalID", (object)5), ("ID", (object)11), ("TissueCode", "Liver"), ("NoPieces", (object)1), ("Comment", ""));
+        var animal = Row(("ID", (object)5), ("SenderRef", "REF-1"), ("HistologyRef", "25/001"));
+
+        var table = HistologyReportDataSetBuilder.BuildSubmissionTable([], [tissue, other], [animal], [], [], 1);
+
+        Assert.Equal(["Brain", "Brain", "Brain", "Liver"], table.Rows.Cast<DataRow>().Select(r => (string)r["TissueDetails"]));
+    }
+
+    [Fact]
+    public void BuildSubmissionTable_TwoSeparateTissuesOfTheSameType_BothPrint()
+    {
+        var t1 = Row(("AnimalID", (object)5), ("ID", (object)10), ("TissueCode", "Brain"), ("NoPieces", (object)1), ("Comment", "left"));
+        var t2 = Row(("AnimalID", (object)5), ("ID", (object)11), ("TissueCode", "Brain"), ("NoPieces", (object)1), ("Comment", "right"));
+        var animal = Row(("ID", (object)5), ("SenderRef", "REF-1"), ("HistologyRef", "25/001"));
+
+        var table = HistologyReportDataSetBuilder.BuildSubmissionTable([], [t1, t2], [animal], [], [], 1);
+
+        Assert.Equal(["left", "right"], table.Rows.Cast<DataRow>().Select(r => (string)r["CustomerRef"]));
+    }
+
+    [Fact]
+    public void BuildSubmissionTable_BlocksNotAssigned_ListsSubmissionTissuesEvenIfProvisionalBlocksExist()
+    {
+        // Provisional blocks created while the user is mid "Add block" must not replace the
+        // submission's tissues (and invent block refs) until blocks have actually been assigned.
+        var animal = Row(("ID", (object)5), ("SenderRef", "S-1"), ("HistologyRef", "26/40001"));
+        var subTissue = Row(("AnimalID", (object)5), ("ID", (object)1), ("TissueCode", "Obex"), ("NoPieces", (object)1), ("Comment", ""));
+        var block = Row(("ID", (object)900), ("AnimalID", (object)5), ("BlockRef", "01"), ("RepeatBlock", (object)false));
+        var blockTissue = Row(("BlockID", (object)900), ("ID", (object)10), ("TissueCode", "Obex"), ("NoPieces", (object)1), ("Comment", ""));
+
+        var table = HistologyReportDataSetBuilder.BuildSubmissionTable([], [subTissue], [animal], [block], [blockTissue], 7, blocksAssigned: false);
+
+        Assert.Single(table.Rows);
+        Assert.Equal(string.Empty, (string)table.Rows[0]["BlockRef"]);
+    }
+
+    [Fact]
+    public void BuildSubmissionTable_BlocksAssignedButNoBlockTissues_FallsBackToSubmissionTissues()
+    {
+        var animal = Row(("ID", (object)5), ("SenderRef", "S-1"), ("HistologyRef", "26/40001"));
+        var subTissue = Row(("AnimalID", (object)5), ("ID", (object)1), ("TissueCode", "Obex"), ("NoPieces", (object)1), ("Comment", ""));
+
+        var table = HistologyReportDataSetBuilder.BuildSubmissionTable([], [subTissue], [animal], [], [], 7, blocksAssigned: true);
+
+        Assert.Single(table.Rows);
     }
 
     [Fact]
@@ -460,7 +514,7 @@ public class HistologyReportDataSetBuilderTests
         Assert.Equal("7",      row["BatchID"]);
         Assert.Equal("S-001",  row["SenderRef"]);
         Assert.Equal("11/999", row["HistologyRef"]);
-        Assert.Equal("01",     row["BlockRef"]);
+        Assert.Equal("",       row["BlockRef"]);
         Assert.Equal("Kidney", row["TissueDetails"]);
         Assert.Equal("",       row["RepeatBlock"]);
         Assert.Equal("c-ref",  row["CustomerRef"]);

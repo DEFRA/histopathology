@@ -182,6 +182,13 @@ public sealed class SubmissionService : ISubmissionService
         catch (Exception ex) { _logger.LogError("Failed to delete sample {AnimalId} from submission {BatchId}.", ex, animalId, batchId); return false; }
     }
 
+    /// <summary>Advances an animal's persisted NextBlockRef so a deleted block's ref is not reissued.</summary>
+    public async Task<bool> AdvanceNextBlockRefAsync(int animalId, string nextBlockRef, CancellationToken ct = default)
+    {
+        try { await _repo.AdvanceNextBlockRefAsync(animalId, nextBlockRef, ct); return true; }
+        catch (Exception ex) { _logger.LogError("Failed to advance NextBlockRef for animal {AnimalId}.", ex, animalId); return false; }
+    }
+
     /// <summary>
     /// Renames the Sender Ref of an existing sample. Throws
     /// <see cref="AnimalRefUpdateException"/> when the original Sender Ref is not

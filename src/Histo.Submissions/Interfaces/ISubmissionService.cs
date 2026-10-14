@@ -46,6 +46,12 @@ public interface ISubmissionService
     Task<bool> DeleteSampleFromBatchAsync(int batchId, int animalId, int userId, CancellationToken ct = default);
 
     /// <summary>
+    /// Moves the animal's persisted <c>NextBlockRef</c> forward (never back) so a deleted block's ref
+    /// is not issued to the next block added for the sample. Returns <see langword="false"/> on failure.
+    /// </summary>
+    Task<bool> AdvanceNextBlockRefAsync(int animalId, string nextBlockRef, CancellationToken ct = default);
+
+    /// <summary>
     /// Returns the single animal that exactly matches the given Sender Ref.
     /// Uses <c>GetAnimalBySender</c> SP (exact match). Returns empty list when not found.
     /// </summary>
