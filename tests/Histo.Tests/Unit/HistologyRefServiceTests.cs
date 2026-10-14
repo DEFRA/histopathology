@@ -108,6 +108,41 @@ public class HistologyRefServiceTests
         Assert.Null(result);
     }
 
+    [Fact]
+    public async Task GetNextAvailableRefRunAsync_DrawsConsecutiveRefsFromTheCounter_IgnoringThePool()
+    {
+        // A pooled ref (26/60000) sits far from the counter (86236) — mixing them made a run jump.
+        _repo.Setup(r => r.GetUnusedRefsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<HistologyRef>)[new HistologyRef { Ref = $"{ThisYear}/60000" }]);
+        _repo.SetupSequence(r => r.DrawNextRefAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()))
+            .ReturnsAsync("86236").ReturnsAsync("86237").ReturnsAsync("86238");
+
+        var result = await CreateSut().GetNextAvailableRefRunAsync(HistologyRefTypeCode.MouseProjects, 3);
+
+        Assert.Equal([$"{ThisYear}/86236", $"{ThisYear}/86237", $"{ThisYear}/86238"], result);
+        _repo.Verify(r => r.GetUnusedRefsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetNextAvailableRefRunAsync_CounterLeavesTheRangeMidRun_ReturnsNothing()
+    {
+        _repo.SetupSequence(r => r.DrawNextRefAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()))
+            .ReturnsAsync("89999").ReturnsAsync("90000");
+
+        var result = await CreateSut().GetNextAvailableRefRunAsync(HistologyRefTypeCode.MouseProjects, 2);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetNextAvailableRefRunAsync_ZeroCount_DrawsNothing()
+    {
+        var result = await CreateSut().GetNextAvailableRefRunAsync(HistologyRefTypeCode.MouseProjects, 0);
+
+        Assert.Empty(result);
+        _repo.Verify(r => r.DrawNextRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Theory]
     [InlineData("40000")]
     [InlineData("59999")]
