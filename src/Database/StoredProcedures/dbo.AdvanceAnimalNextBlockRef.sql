@@ -28,3 +28,6 @@ BEGIN
            AND ISNULL(TRY_CAST(NextBlockRef AS INT), 0) < TRY_CAST(@NextBlockRef AS INT);
 END
 GO
+
+PRINT 'Deployed stored procedure dbo.AdvanceAnimalNextBlockRef';
+GO

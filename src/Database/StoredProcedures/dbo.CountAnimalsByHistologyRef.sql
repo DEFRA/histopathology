@@ -23,3 +23,6 @@ BEGIN
         SELECT COUNT(1) FROM dbo.Animal WHERE RTRIM(HistologyRef) = @HistologyRef;
 END
 GO
+
+PRINT 'Deployed stored procedure dbo.CountAnimalsByHistologyRef';
+GO

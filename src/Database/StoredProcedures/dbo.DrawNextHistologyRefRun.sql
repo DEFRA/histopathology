@@ -71,3 +71,6 @@ BEGIN
         END
 END
 GO
+
+PRINT 'Deployed stored procedure dbo.DrawNextHistologyRefRun';
+GO
