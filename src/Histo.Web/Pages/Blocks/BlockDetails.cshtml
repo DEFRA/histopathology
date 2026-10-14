@@ -245,7 +245,11 @@ else
             <input type="hidden" asp-for="UseWholeTissueList" />
             <div class="govuk-form-group">
                 <label class="govuk-label" for="NewTissueCode">Tissue type</label>
-                @if (Model.UseWholeTissueList)
+                @if (Model.IsAssignTissueMode)
+                {
+                    <div class="govuk-hint">Showing only tissue types found in this submission.</div>
+                }
+                else if (Model.UseWholeTissueList)
                 {
                     <div class="govuk-hint">
                         Showing every tissue type.

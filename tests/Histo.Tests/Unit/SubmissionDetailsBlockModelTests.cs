@@ -260,6 +260,47 @@ public class SubmissionDetailsBlockModelTests
     }
 
     [Fact]
+    public async Task OnPostDeleteAsync_DeletedBlock_AdvancesTheAnimalsNextBlockRefPastIt()
+    {
+        // Add block (BR 01), delete it, add another => BR 02: the deleted ref must not come back.
+        var sut = CreateSut(1, new Animal { ID = 1, SenderRef = "S1" }, null);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 100, BatchID = 5, AnimalID = 1, BlockRef = "01", Status = BlockStatus.Used }]);
+        _blocks.Setup(b => b.DeleteBlockAsync(100, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        await sut.OnPostDeleteAsync([100]);
+
+        _submissions.Verify(s => s.AdvanceNextBlockRefAsync(1, "02", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostDeleteAsync_FailedDelete_DoesNotAdvanceTheCounter()
+    {
+        var sut = CreateSut(1, new Animal { ID = 1, SenderRef = "S1" }, null);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 100, BatchID = 5, AnimalID = 1, BlockRef = "01", Status = BlockStatus.Used }]);
+        _blocks.Setup(b => b.DeleteBlockAsync(100, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
+
+        await sut.OnPostDeleteAsync([100]);
+
+        _submissions.Verify(s => s.AdvanceNextBlockRefAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostDeleteAsync_PreBookedBlock_DoesNotAdvanceTheCounter()
+    {
+        // Pre-cassetted refs come from the pre-booked pool, never from NextBlockRef.
+        var sut = CreateSut(1, new Animal { ID = 1, SenderRef = "S1" }, null);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 100, BatchID = 5, AnimalID = 1, BlockRef = "03", Status = BlockStatus.PreBookedUsed }]);
+        _blocks.Setup(b => b.DeleteBlockAsync(100, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        await sut.OnPostDeleteAsync([100]);
+
+        _submissions.Verify(s => s.AdvanceNextBlockRefAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task OnPostGetNextHistologyRefAsync_RefAlreadySet_CanStillBeChanged()
     {
         var animal = new Animal { ID = 1, SenderRef = "S1", HistologyRef = "16/40135" };

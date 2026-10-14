@@ -90,6 +90,17 @@ public class BlockDetailsModel : HistoPageModel
     /// to filtering the dropdown down to codes already used on this submission.</summary>
     [BindProperty(SupportsGet = true)] public bool UseWholeTissueList { get; set; } = true;
 
+    /// <summary>
+    /// True when reached via the batch-wide "Assign Tissues to Blocks" journey (BatchBlocks) — same
+    /// breadcrumb test as <c>SubmissionDetailsBlockModel.IsAssignTissueMode</c>. There the tissue
+    /// list is always limited to the submission's own tissues, with no option to widen it.
+    /// </summary>
+    public bool IsAssignTissueMode => (Session.SampleDetailReturnPage ?? string.Empty)
+        .Contains("/Batches/BatchBlocks", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Whether the tissue dropdown shows the entire lookup rather than the submission's tissues.</summary>
+    public bool ShowWholeTissueList => UseWholeTissueList && !IsAssignTissueMode;
+
     [BindProperty] public List<string> SelectedHistologyCodes { get; set; } = [];
     [BindProperty] public List<string> SelectedAntibodyCodes { get; set; } = [];
     [BindProperty] public List<string> SelectedStainCodes { get; set; } = [];
@@ -227,7 +238,7 @@ public class BlockDetailsModel : HistoPageModel
             var usedRefs = animalBlocks.Where(b => batchTissues.Any(t => t.OwnerID == b.ID)).Select(b => b.BlockRef);
             NewBlockRef = IsPreCassetted
                 ? PreBookedBlockRefs.FirstOrDefault()?.BlockRef
-                : BlockHelpers.ComputeNextBlockRef(usedRefs);
+                : BlockHelpers.ComputeNextBlockRef(usedRefs, Animal.NextBlockRef);
 
             if (string.IsNullOrWhiteSpace(NewBlockRef))
             {
@@ -662,7 +673,7 @@ public class BlockDetailsModel : HistoPageModel
 
         var fullTissueList = await _lookups.GetLookupDataAsync(LookupTissueCode);
         EditTissueOptions = fullTissueList;
-        if (UseWholeTissueList || Animal is null)
+        if (ShowWholeTissueList || Animal is null)
         {
             TissueOptions = fullTissueList;
         }
