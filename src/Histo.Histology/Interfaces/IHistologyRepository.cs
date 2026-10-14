@@ -58,7 +58,18 @@ public interface IHistologyRepository
     /// SP (<c>@Type</c> in, <c>@NextHistologyRef</c>/<c>@RowStamp</c> out), returning the claimed
     /// (pre-increment) 5-digit number, or <see langword="null"/> if the type has no counter row.
     /// This is the one draw legacy uses (clsHistology.vb::GetNextAvailableHistologyRef) — the
-    /// read and the increment happen inside the SP, not across two round trips.
+    /// read and the increment happen inside the SP, not across two round trips. Numbers already held
+    /// by a sample this year are skipped (and so consumed from the counter) rather than returned.
     /// </summary>
     Task<string?> DrawNextRefAsync(int histologyType, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reserves <paramref name="count"/> consecutive numbers from a type's counter in a single
+    /// server-side statement, so no other request can draw between them, and returns them as 5-digit
+    /// strings. A run containing a number already held by a sample is discarded whole and a fresh run
+    /// reserved, so the result is always consecutive. Empty when the counter is missing, non-numeric,
+    /// or the run would leave [lowerInclusive, upperExclusive) — the counter is then left untouched —
+    /// or no clean run was found.
+    /// </summary>
+    Task<IReadOnlyList<string>> DrawNextRefRunAsync(int histologyType, int count, int lowerInclusive, int upperExclusive, CancellationToken ct = default);
 }

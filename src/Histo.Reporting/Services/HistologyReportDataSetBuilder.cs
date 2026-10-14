@@ -171,7 +171,11 @@ public sealed class HistologyReportDataSetBuilder
         ds.Tables.Add(BuildPostFixationTable(rawPostFix, batchId));
         ds.Tables.Add(BuildHistologyTable(rawHistology, batchId, rawAntibodies, rawStains, batchType,
             histologyByCode, specialStainByCode, tseAntibodiesByCode, nonTseAntibodiesByCode));
-        ds.Tables.Add(BuildSubmissionTable(rawBatchSubmissions, rawTissues, rawAnimals, rawBlocks, rawBlockTissues, batchId));
+        // Legacy prints the block listing only once blocks are assigned (IsBlocked) or the batch is
+        // Cassetted; otherwise the submission's own tissues.
+        var blocksAssigned = rawBatch.Count > 0 && (Bool(rawBatch[0], "IsBlocked") || Bool(rawBatch[0], "Cassetted"));
+
+        ds.Tables.Add(BuildSubmissionTable(rawBatchSubmissions, rawTissues, rawAnimals, rawBlocks, rawBlockTissues, batchId, blocksAssigned));
         ds.Tables.Add(BuildVersionTable(rawBatch));
 
         return ds;
@@ -403,7 +407,8 @@ public sealed class HistologyReportDataSetBuilder
         IList<IDictionary<string, object>> rawAnimals,
         IList<IDictionary<string, object>> rawBlocks,
         IList<IDictionary<string, object>> rawBlockTissues,
-        int batchId)
+        int batchId,
+        bool blocksAssigned = true)
     {
         var dt = new DataTable("BatchSubmission");
         dt.Columns.Add("BatchID");
@@ -427,13 +432,12 @@ public sealed class HistologyReportDataSetBuilder
 
         // Legacy SubmissionForm.aspx.vb picks ONE source: block-owned tissues once blocks are
         // assigned (CreateBatchBlocksDataTable), else submission tissues. Emitting both listed every
-        // tissue twice — once as a numbered pseudo-block per tissue, once under its real block.
-        if (rawTissues.Count > 0 && rawBlockTissues.Count == 0)
-        {
-            // Track per-animal block ref counter (1-based, zero-padded to 2 digits) — Wet Tissue
-            // has no real BlockRef of its own, legacy numbers each tissue within its animal.
-            var blockCounter = new Dictionary<int, int>();
+        // tissue twice. Falls back to block tissues when there are no submission tissues, so the
+        // table is never empty.
+        var useBlocks = rawBlockTissues.Count > 0 && (blocksAssigned || rawTissues.Count == 0);
 
+        if (!useBlocks && rawTissues.Count > 0)
+        {
             // Sort tissues by AnimalID then tissue ID for stable ordering
             var sortedTissues = rawTissues
                 .OrderBy(t => t.TryGetValue("AnimalID", out var aid) ? Convert.ToInt32(aid) : 0)
@@ -447,23 +451,25 @@ public sealed class HistologyReportDataSetBuilder
 
                 animalById.TryGetValue(animalId, out var animal);
 
-                blockCounter.TryGetValue(animalId, out var counter);
-                counter++;
-                blockCounter[animalId] = counter;
-
-                var dr = dt.NewRow();
-                dr["BatchID"]       = batchId.ToString();
-                dr["SenderRef"]     = animal is not null ? Str(animal, "SenderRef")    : string.Empty;
-                dr["HistologyRef"]  = animal is not null ? Str(animal, "HistologyRef") : string.Empty;
-                dr["BlockRef"]      = counter.ToString("D2");
-                dr["TissueDetails"] = Str(tissue, "TissueCode");
-                dr["RepeatBlock"]   = string.Empty;
-                dr["CustomerRef"]   = Str(tissue, "Comment");
-                dt.Rows.Add(dr);
+                // Legacy never sets BlockRef here and lists one row per piece (NoPieces).
+                var pieces = tissue.TryGetValue("NoPieces", out var npVal) && npVal is not null and not DBNull
+                    ? Math.Max(1, Convert.ToInt32(npVal)) : 1;
+                for (var p = 0; p < pieces; p++)
+                {
+                    var dr = dt.NewRow();
+                    dr["BatchID"]       = batchId.ToString();
+                    dr["SenderRef"]     = animal is not null ? Str(animal, "SenderRef")    : string.Empty;
+                    dr["HistologyRef"]  = animal is not null ? Str(animal, "HistologyRef") : string.Empty;
+                    dr["BlockRef"]      = string.Empty;
+                    dr["TissueDetails"] = Str(tissue, "TissueCode");
+                    dr["RepeatBlock"]   = string.Empty;
+                    dr["CustomerRef"]   = Str(tissue, "Comment");
+                    dt.Rows.Add(dr);
+                }
             }
         }
 
-        if (rawBlockTissues.Count > 0)
+        if (useBlocks)
         {
             // Block-type submission (Cassetted/Wax Block/Stained/Unstained Section) — BlockRef is
             // a real, already-allocated value on the block itself (not a running counter), and the

@@ -714,6 +714,18 @@ public sealed class SubmissionRepository : ISubmissionRepository
     }
 
     /// <inheritdoc/>
+    public async Task AdvanceNextBlockRefAsync(int animalId, string nextBlockRef, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        // The counter only moves forward, so no RowStamp check is needed (EditAnimal would silently
+        // drop it on a stale RowStamp).
+        await conn.ExecuteAsync(
+            "AdvanceAnimalNextBlockRef",
+            new { AnimalID = animalId, NextBlockRef = nextBlockRef },
+            commandType: System.Data.CommandType.StoredProcedure);
+    }
+
+    /// <inheritdoc/>
     public async Task DeleteSampleFromBatchAsync(int batchId, int animalId, int userId, CancellationToken ct = default)
     {
         // Done as one transactional set-based statement batch rather than via the per-row Delete*

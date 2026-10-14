@@ -520,8 +520,8 @@ public sealed class HistologyReportRenderer
                             {
                                 // Legacy: further tissues of the same block leave Sender/Histology/Block Ref
                                 // blank so the block reads as one group; refs repeat at the top of each page.
+                                // Tissues not yet in a block have no Block Ref, so they group per sample.
                                 var continuesBlock = prevRow is not null
-                                    && Field(row, "BlockRef").Length > 0
                                     && Field(row, "BlockRef") == Field(prevRow, "BlockRef")
                                     && Field(row, "SenderRef") == Field(prevRow, "SenderRef")
                                     && Field(row, "HistologyRef") == Field(prevRow, "HistologyRef");

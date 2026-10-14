@@ -503,6 +503,9 @@ public class BatchDetailsModel : HistoPageModel
         int firstSubmId)
     {
         return submissions.FirstOrDefault(s => s.ID == pending.SubmissionId && BelongsToAnimal(s, animal))
+            // The animal SPs never return BatchSubmissionID, so the sample's own submission row is
+            // found by AnimalID; the first-submission fallback below is the empty default row.
+            ?? submissions.FirstOrDefault(s => s.AnimalID == animal.ID)
             ?? submissions.FirstOrDefault(s => s.ID == animal.BatchSubmissionID)
             ?? (animal.BatchSubmissionID == 0 ? submissions.FirstOrDefault(s => s.ID == firstSubmId) : null);
     }

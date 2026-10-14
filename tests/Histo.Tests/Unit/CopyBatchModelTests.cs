@@ -146,6 +146,45 @@ public class CopyBatchModelTests
     }
 
     [Fact]
+    public async Task OnGetAsync_WetTissue_ShowsEachSamplesOwnTissues_PastTheEmptyDefaultSubmission()
+    {
+        // Every batch starts with an empty default submission (AnimalID 0, Order 1) and the animal SPs
+        // never return BatchSubmissionID, so resolving via the first submission listed no tissues and
+        // staged the empty default row's id for the copy.
+        _batches.Setup(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(MakeSourceBatch());
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)
+            [
+                new BatchSubmission { ID = 900, BatchID = 10, AnimalID = 0, Order = 1 },
+                new BatchSubmission { ID = 901, BatchID = 10, AnimalID = 1, Order = 2 },
+                new BatchSubmission { ID = 902, BatchID = 10, AnimalID = 2, Order = 3 },
+            ]);
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1, SenderRef = "A" }, new Animal { ID = 2, SenderRef = "B" }]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Tissue>)
+            [
+                new Tissue { ID = 1, OwnerID = 901, Owner = TissueOwner.Submission, TissueCode = "BRN", NoPieces = 2 },
+                new Tissue { ID = 2, OwnerID = 902, Owner = TissueOwner.Submission, TissueCode = "LVR", NoPieces = 1 },
+            ]);
+        _lookups.Setup(l => l.GetLookupDataAsync(9, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Histo.Administration.Models.LookupItem>)
+            [
+                new() { Code = "BRN", Name = "Brain" },
+                new() { Code = "LVR", Name = "Liver" },
+            ]);
+
+        var sut = CreateSut();
+        await sut.OnGetAsync(10);
+
+        Assert.Equal(["2 x Brain"], sut.Animals[0].TissueDetails);
+        Assert.Equal(901, sut.Animals[0].SubmissionId);
+        Assert.Equal(["1 x Liver"], sut.Animals[1].TissueDetails);
+        Assert.Equal(902, sut.Animals[1].SubmissionId);
+    }
+
+    [Fact]
     public async Task OnPostAsync_SourceBatchNotFound_DoesNotStage()
     {
         _batches.Setup(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
