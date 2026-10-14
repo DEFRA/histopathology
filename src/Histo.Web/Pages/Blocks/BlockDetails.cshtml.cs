@@ -175,11 +175,22 @@ public class BlockDetailsModel : HistoPageModel
 
     public bool IsViewMode => Session.IsViewSubmissionMode;
 
+    private async Task SaveBatchDefaultsForNewBlockAsync(int blockId)
+    {
+        var defaults = await _batches.GetBatchTestSelectionsAsync(BatchId ?? 0);
+        if (!defaults.HasAny) return;
+
+        await _blockTests.SaveTestSelectionsAsync(
+            BatchId ?? 0,
+            blockId,
+            defaults.Histology.Select(r => r.Code).ToList(),
+            defaults.Antibodies.Select(r => r.Code).ToList(),
+            defaults.Stains.Select(r => r.Code).ToList(),
+            Session.UserID);
+    }
+
     public async Task<IActionResult> OnGetAsync()
     {
-        // TEMPORARY diagnostic
-        Console.WriteLine($"[DIAG OnGetAsync] (bound-at-entry) BatchId={BatchId} AnimalId={AnimalId} BlockId={BlockId} IsAddFlow={IsAddFlow}");
-
         ViewData["Title"] = IsEditMode ? "Edit block" : "Add block";
         ViewData["PageTitle"] = IsEditMode ? "Edit block" : "Add block";
 
@@ -286,6 +297,8 @@ public class BlockDetailsModel : HistoPageModel
                     ErrorMessage = "Could not create the block. Please try again or contact support if the problem continues.";
                     return Page();
                 }
+
+                await SaveBatchDefaultsForNewBlockAsync(newId);
             }
 
             return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = newId, isAddFlow = true });

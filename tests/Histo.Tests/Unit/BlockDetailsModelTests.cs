@@ -239,6 +239,37 @@ public class BlockDetailsModelTests
     }
 
     [Fact]
+    public async Task OnGetAsync_AddMode_PersistsBatchDefaultsForTheNewBlock()
+    {
+        _session.Setup(s => s.UserArea).Returns("Neuropath");
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2", HistoRefSet = false }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(400);
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Histo.Submissions.Models.BatchTestSelections
+        {
+            Histology = [new BatchTestSelectionRow { ID = 1, BatchID = 5, Code = HistologyCode.EO }, new BatchTestSelectionRow { ID = 2, BatchID = 5, Code = HistologyCode.HAndE }],
+            Antibodies = [new BatchTestSelectionRow { ID = 3, BatchID = 5, Code = "AB01" }],
+            Stains = [new BatchTestSelectionRow { ID = 4, BatchID = 5, Code = "ST01" }],
+        });
+
+        await CreateSut(animalId: 2, blockId: 0).OnGetAsync();
+
+        _blockTests.Verify(t => t.SaveTestSelectionsAsync(
+            5, 400,
+            It.Is<IReadOnlyList<string>>(codes => codes.SequenceEqual(new[] { HistologyCode.EO, HistologyCode.HAndE })),
+            It.Is<IReadOnlyList<string>>(codes => codes.SequenceEqual(new[] { "AB01" })),
+            It.Is<IReadOnlyList<string>>(codes => codes.SequenceEqual(new[] { "ST01" })),
+            7,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task OnPostCancelAsync_StillInAddFlow_DeletesTheProvisionalBlock()
     {
         // Regression: clicking "Add block" auto-provisions a real DB row on first load (see
