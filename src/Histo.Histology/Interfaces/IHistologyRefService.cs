@@ -40,4 +40,13 @@ public interface IHistologyRefService
     /// Legacy source: <c>clsHistology.GetNextAvailableHistologyRef</c> (SP <c>GetNextHistologyRef</c>).
     /// </summary>
     Task<string?> GetNextAvailableRefAsync(int histologyType, CancellationToken ct = default);
+
+    /// <summary>
+    /// Draws <paramref name="count"/> refs for one run of samples (e.g. a mouse-number range copy),
+    /// all from the type's counter so they are consecutive: starting at 26/60001 a run of three is
+    /// 60001, 60002, 60003. The pre-booked pool is deliberately NOT used — a pooled ref sits far from
+    /// the counter, so mixing the two made a run jump (60000, then 86236). Returns an empty list when
+    /// the run cannot be drawn in full (no range, no counter row, or a counter outside the range).
+    /// </summary>
+    Task<IReadOnlyList<string>> GetNextAvailableRefRunAsync(int histologyType, int count, CancellationToken ct = default);
 }

@@ -361,7 +361,9 @@ public class AddSubmissionModel : HistoPageModel
     /// Shared per-sample copy step: blocks (with tissues and test ticks), then the histology ref,
     /// saved in one update so the advanced NextBlockRef goes with it.
     /// </summary>
-    private async Task CopySourceSampleToTargetAsync(int batchId, IReadOnlyList<Block> allBlocks, Animal source, Animal target)
+    private async Task CopySourceSampleToTargetAsync(
+        int batchId, IReadOnlyList<Block> allBlocks, Animal source, Animal target,
+        string? histologyRef = null, bool drawHistologyRef = true)
     {
         var sourceBlocks = allBlocks.Where(b => b.AnimalID == source.ID).ToList();
         if (sourceBlocks.Count > 0)
@@ -373,7 +375,10 @@ public class AddSubmissionModel : HistoPageModel
 
         if (!target.HistoRefSet)
         {
-            var nextRef = await SampleCopyHelper.DrawRefMatchingAsync(_histologyRefs, source.HistologyRef);
+            // A range copy supplies its own pre-drawn, consecutive ref (and never draws per sample);
+            // a single copy draws one.
+            var nextRef = histologyRef
+                ?? (drawHistologyRef ? await SampleCopyHelper.DrawRefMatchingAsync(_histologyRefs, source.HistologyRef) : null);
             if (nextRef is not null)
             {
                 target.HistologyRef = nextRef;
@@ -652,8 +657,24 @@ public class AddSubmissionModel : HistoPageModel
         if (source is null) return;
 
         var allBlocks = await _blocks.GetByBatchAsync(batchId);
-        var wanted = rangeRefs.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var target in animals.Where(a => wanted.Contains(a.SenderRef)))
-            await CopySourceSampleToTargetAsync(batchId, allBlocks, source, target);
+        var targets = rangeRefs
+            .Select(r => animals.FirstOrDefault(a => string.Equals(a.SenderRef, r, StringComparison.OrdinalIgnoreCase)))
+            .OfType<Animal>()
+            .ToList();
+
+        // One consecutive run drawn up front, handed out in mouse-number order: copying three samples
+        // from 26/60001 gives 60001, 60002, 60003 rather than a ref per sample drawn independently.
+        var histologyType = HistologyRefTypeCode.FromExistingRef(source.HistologyRef);
+        var run = histologyType is null || targets.All(t => t.HistoRefSet)
+            ? []
+            : await _histologyRefs.GetNextAvailableRefRunAsync(histologyType.Value, targets.Count(t => !t.HistoRefSet));
+
+        var runIndex = 0;
+        foreach (var target in targets)
+        {
+            string? histologyRef = null;
+            if (!target.HistoRefSet && runIndex < run.Count) histologyRef = run[runIndex++];
+            await CopySourceSampleToTargetAsync(batchId, allBlocks, source, target, histologyRef, drawHistologyRef: false);
+        }
     }
 }

@@ -104,14 +104,32 @@ public sealed class HistologyRepository : IHistologyRepository
     public async Task<string?> DrawNextRefAsync(int histologyType, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var p = new DynamicParameters();
-        p.Add("Type", histologyType, dbType: System.Data.DbType.Int32);
-        p.Add("NextHistologyRef", dbType: System.Data.DbType.String, size: 5, direction: System.Data.ParameterDirection.Output);
-        p.Add("RowStamp", dbType: System.Data.DbType.Binary, size: 8, direction: System.Data.ParameterDirection.Output);
 
-        await conn.ExecuteAsync("GetNextHistologyRef", p, commandType: System.Data.CommandType.StoredProcedure);
+        // The SP's own "already used" check builds the year with convert(varchar(2), datepart(yy, ...)),
+        // which overflows to "*" for a 4-digit year and so never matches a real "26/NNNNN" ref — it
+        // cannot be relied on. A counter sitting at or below a number already issued would otherwise
+        // hand that number out again, so skip any number a sample already holds.
+        for (var attempt = 0; attempt < MaxDrawAttempts; attempt++)
+        {
+            var p = new DynamicParameters();
+            p.Add("Type", histologyType, dbType: System.Data.DbType.Int32);
+            p.Add("NextHistologyRef", dbType: System.Data.DbType.String, size: 5, direction: System.Data.ParameterDirection.Output);
+            p.Add("RowStamp", dbType: System.Data.DbType.Binary, size: 8, direction: System.Data.ParameterDirection.Output);
 
-        var next = p.Get<string?>("NextHistologyRef");
-        return string.IsNullOrWhiteSpace(next) ? null : next.Trim();
+            await conn.ExecuteAsync("GetNextHistologyRef", p, commandType: System.Data.CommandType.StoredProcedure);
+
+            var next = p.Get<string?>("NextHistologyRef");
+            if (string.IsNullOrWhiteSpace(next)) return null;
+
+            var drawn = next.Trim();
+            var taken = await conn.ExecuteScalarAsync<int>(
+                "SELECT COUNT(1) FROM Animal WHERE RTRIM(HistologyRef) = @Ref",
+                new { Ref = Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(drawn) });
+            if (taken == 0) return drawn;
+        }
+
+        return null;
     }
+
+    private const int MaxDrawAttempts = 1000;
 }
