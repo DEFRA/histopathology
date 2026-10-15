@@ -12,6 +12,7 @@
 <partial name="_ErrorSummary" model="Model.Errors" />
 
 <form method="post" asp-page-handler="Search">
+    <input type="hidden" asp-for="ReturnPage" />
     <div class="govuk-grid-row">
         <div class="govuk-grid-column-one-half">
             <div class="govuk-form-group @(Model.Errors.ContainsKey("SubmissionNumber") ? "govuk-form-group--error" : "")">
@@ -185,6 +186,7 @@
            SelectedBatchId is NOT included here — the per-row Select buttons
            supply it directly via name/value, avoiding a duplicate-binding clash. *@
         <form id="submission-action-form" method="post" asp-page="/Search/SearchSubmissions">
+            <input type="hidden" asp-for="ReturnPage" />
             <input type="hidden" name="SubmissionNumber"    value="@Model.SubmissionNumber" />
             <input type="hidden" name="Status"              value="@Model.Status" />
             <input type="hidden" name="ProjectContractCode" value="@Model.ProjectContractCode" />
