@@ -75,6 +75,9 @@ public class SampleSummaryModel : HistoPageModel
 
     public bool CanModifySamples => Batch?.Status is BatchStatus.Submitted or BatchStatus.Rejected;
 
+    /// <summary>Add sample/Finish are also offered once a submission is Received or In progress; Copy/Delete stay limited to <see cref="CanModifySamples"/>.</summary>
+    public bool CanAddSamples => CanModifySamples || Batch?.Status is BatchStatus.Received or BatchStatus.InProgress;
+
     /// <summary>
     /// Wet Tissue routes Edit sample to SubmissionDetails (tissue-only view); all other types
     /// (Wax Block, Pre-Cassetted, Stained/Unstained Section) route to SubmissionDetailsBlock.
