@@ -233,6 +233,23 @@ public class SampleSummaryModelTests
         Assert.Equal(expected, sut.CanModifySamples);
     }
 
+    [Theory]
+    [InlineData(BatchStatus.Submitted, true)]
+    [InlineData(BatchStatus.Rejected, true)]
+    [InlineData(BatchStatus.Received, true)]
+    [InlineData(BatchStatus.InProgress, true)]
+    [InlineData(BatchStatus.Completed, false)]
+    public async Task CanAddSamples_ReflectsBatchStatus(string status, bool expected)
+    {
+        _batches.Setup(b => b.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 1, Status = status });
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        await sut.OnGetAsync();
+
+        Assert.Equal(expected, sut.CanAddSamples);
+    }
+
     [Fact]
     public void IsViewMode_ReflectsSessionFlag()
     {
