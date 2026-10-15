@@ -1,4 +1,4 @@
-using Dapper;
+﻿using Dapper;
 using Histo.Core.Domain;
 using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
@@ -28,6 +28,17 @@ public sealed class BlockRepository : IBlockRepository
     }
 
     /// <inheritdoc/>
+    public async Task<IReadOnlyList<string>> GetBlockRefsOnOtherBatchesAsync(int animalId, int excludeBatchId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<string>(
+            "GetAnimalBlockRefsOnOtherBatches",
+            new { AnimalID = animalId, BatchID = excludeBatchId },
+            commandType: System.Data.CommandType.StoredProcedure);
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<Block>> GetPreBookedByAnimalAsync(int animalId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
@@ -43,54 +54,132 @@ public sealed class BlockRepository : IBlockRepository
     {
         using var conn = _db.CreateConnection();
 
-        if (block.ID == 0)
+        // Ordinary (non-repeat) blocks on a submission are guarded against another submission's
+        // refs under the sender-ref lock; placeholders, repeat blocks and the batch-less rows skip it.
+        var guarded = block.Status == BlockStatus.Used && block.BatchID > 0 && !block.RepeatBlock;
+        if (guarded)
         {
-            // Insert — real AddBlock signature (confirmed against the database directly) has no
-            // @UserID and returns the new ID via @NewID output, not a RETURN value.
-            var parameters = new DynamicParameters();
-            parameters.Add("ID", 0);
-            parameters.Add("BatchID",     block.BatchID);
-            parameters.Add("AnimalID",    block.AnimalID);
-            parameters.Add("BlockRef",    block.BlockRef);
-            parameters.Add("CustomerRef", block.CustomerRef);
-            parameters.Add("RepeatBlock", block.RepeatBlock);
-            parameters.Add("Comment",     block.Comment);
-            parameters.Add("Status",      block.Status);
-            parameters.Add("Order",       block.Order);
-            parameters.Add("OldID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
-            parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
-
-            await conn.ExecuteAsync("AddBlock", parameters,
-                commandType: System.Data.CommandType.StoredProcedure);
-            return parameters.Get<int>("NewID");
-        }
-        else
-        {
-            // Update — real EditBlock signature (confirmed against the database directly) has no
-            // @RowStamp (full-row replace, no optimistic concurrency) and requires the 3 archive
-            // columns on every call.
-            await conn.ExecuteAsync(
-                "EditBlock",
-                new
+            await conn.OpenAsync(ct);
+            using var tx = await conn.BeginTransactionAsync(ct);
+            try
+            {
+                await LockForAnimalAsync(conn, tx, block.AnimalID);
+                int id;
+                if (block.ID == 0)
                 {
-                    block.ID,
-                    block.BatchID,
-                    block.AnimalID,
-                    block.BlockRef,
-                    block.CustomerRef,
-                    block.RepeatBlock,
-                    ArchiveLocation = (object?)block.ArchiveLocation ?? DBNull.Value,
-                    ArchivedDate = (object?)block.ArchivedDate ?? DBNull.Value,
-                    ArchiveComment = (object?)block.ArchiveComment ?? DBNull.Value,
-                    block.Comment,
-                    block.Status,
-                    UserID = userId,
-                    block.Order,
-                },
-                commandType: System.Data.CommandType.StoredProcedure);
-            return block.ID;
+                    var blockRef = await ResolveFreeRefAsync(conn, tx, block);
+                    id = await InsertBlockAsync(conn, tx, block, blockRef);
+                }
+                else
+                {
+                    await EnsureRefNotUsedElsewhereAsync(conn, tx, block);
+                    await UpdateBlockRowAsync(conn, tx, block, userId);
+                    id = block.ID;
+                }
+                await tx.CommitAsync(ct);
+                return id;
+            }
+            catch
+            {
+                await tx.RollbackAsync(ct);
+                throw;
+            }
         }
+
+        if (block.ID == 0)
+            return await InsertBlockAsync(conn, null, block, block.BlockRef);
+
+        await UpdateBlockRowAsync(conn, null, block, userId);
+        return block.ID;
     }
+
+    /// <summary>Takes the same per-sender-ref lock as <see cref="BookPreBookedBlocksAsync"/>.</summary>
+    private static async Task LockForAnimalAsync(IDbConnection conn, IDbTransaction tx, int animalId)
+    {
+        var senderRef = await conn.ExecuteScalarAsync<string?>(
+            "SELECT RTRIM(SenderRef) FROM Animal WHERE ID = @AnimalID", new { AnimalID = animalId }, tx);
+        if (!string.IsNullOrWhiteSpace(senderRef))
+            await AcquireSenderRefLockAsync(conn, tx, senderRef);
+    }
+
+    /// <summary>Refs held by the animal on other submissions, including unclaimed pre-booked placeholders.</summary>
+    private static async Task<List<string>> OtherBatchRefsAsync(IDbConnection conn, IDbTransaction tx, int animalId, int batchId) =>
+        (await conn.QueryAsync<string>(
+            "GetAnimalBlockRefsOnOtherBatches",
+            new { AnimalID = animalId, BatchID = batchId }, tx,
+            commandType: System.Data.CommandType.StoredProcedure)).ToList();
+
+    /// <summary>Returns the requested ref, or the next free one in sequence if another submission took it first.</summary>
+    private static async Task<string> ResolveFreeRefAsync(IDbConnection conn, IDbTransaction tx, Block block)
+    {
+        var other = await OtherBatchRefsAsync(conn, tx, block.AnimalID, block.BatchID);
+        if (!other.Contains(block.BlockRef.Trim(), StringComparer.OrdinalIgnoreCase))
+            return block.BlockRef;
+
+        var all = (await conn.QueryAsync<string>(
+            "SELECT RTRIM(BlockRef) FROM BatchBlock WHERE AnimalID = @AnimalID AND BlockRef IS NOT NULL",
+            new { AnimalID = block.AnimalID }, tx)).ToList();
+        return BlockHelpers.ComputeNextBlockRef(all, null, block.BlockRef);
+    }
+
+    /// <summary>Rejects an edit that changes the ref to one another submission holds (placeholders excluded: a pre-cassetted claim changes to one).</summary>
+    private static async Task EnsureRefNotUsedElsewhereAsync(IDbConnection conn, IDbTransaction tx, Block block)
+    {
+        var current = await conn.ExecuteScalarAsync<string?>(
+            "SELECT RTRIM(BlockRef) FROM BatchBlock WHERE ID = @ID", new { block.ID }, tx);
+        if (string.Equals(current, block.BlockRef.Trim(), StringComparison.OrdinalIgnoreCase)) return;
+
+        var taken = await conn.QueryAsync<string>(
+            "SELECT RTRIM(BlockRef) FROM BatchBlock WHERE AnimalID = @AnimalID AND BatchID IS NOT NULL AND BatchID <> @BatchID AND BlockRef IS NOT NULL",
+            new { block.AnimalID, block.BatchID }, tx);
+        if (taken.Contains(block.BlockRef.Trim(), StringComparer.OrdinalIgnoreCase))
+            throw new DuplicateBlockRefException(block.BlockRef);
+    }
+
+    // Real AddBlock signature (confirmed against the database directly) has no @UserID and
+    // returns the new ID via @NewID output, not a RETURN value.
+    private static async Task<int> InsertBlockAsync(IDbConnection conn, IDbTransaction? tx, Block block, string blockRef)
+    {
+        var parameters = new DynamicParameters();
+        parameters.Add("ID", 0);
+        parameters.Add("BatchID",     block.BatchID);
+        parameters.Add("AnimalID",    block.AnimalID);
+        parameters.Add("BlockRef",    blockRef);
+        parameters.Add("CustomerRef", block.CustomerRef);
+        parameters.Add("RepeatBlock", block.RepeatBlock);
+        parameters.Add("Comment",     block.Comment);
+        parameters.Add("Status",      block.Status);
+        parameters.Add("Order",       block.Order);
+        parameters.Add("OldID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+        parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+
+        await conn.ExecuteAsync("AddBlock", parameters, tx, commandType: System.Data.CommandType.StoredProcedure);
+        return parameters.Get<int>("NewID");
+    }
+
+    // Real EditBlock signature (confirmed against the database directly) has no @RowStamp
+    // (full-row replace, no optimistic concurrency) and requires the 3 archive columns on every call.
+    private static Task UpdateBlockRowAsync(IDbConnection conn, IDbTransaction? tx, Block block, int userId) =>
+        conn.ExecuteAsync(
+            "EditBlock",
+            new
+            {
+                block.ID,
+                block.BatchID,
+                block.AnimalID,
+                block.BlockRef,
+                block.CustomerRef,
+                block.RepeatBlock,
+                ArchiveLocation = (object?)block.ArchiveLocation ?? DBNull.Value,
+                ArchivedDate = (object?)block.ArchivedDate ?? DBNull.Value,
+                ArchiveComment = (object?)block.ArchiveComment ?? DBNull.Value,
+                block.Comment,
+                block.Status,
+                UserID = userId,
+                block.Order,
+            },
+            tx,
+            commandType: System.Data.CommandType.StoredProcedure);
 
     /// <inheritdoc/>
     public async Task DeleteAsync(int blockId, int userId, CancellationToken ct = default)
@@ -98,7 +187,7 @@ public sealed class BlockRepository : IBlockRepository
         using var conn = _db.CreateConnection();
         await conn.ExecuteAsync(
             "DeleteBlock",
-            new { ID = blockId }, // DeleteBlock has no @UserID parameter — confirmed via sys.parameters.
+            new { ID = blockId }, // DeleteBlock has no @UserID parameter â€” confirmed via sys.parameters.
             commandType: System.Data.CommandType.StoredProcedure);
     }
 
@@ -212,7 +301,7 @@ public sealed class BlockRepository : IBlockRepository
                 return Convert.ToInt32(id);
         }
 
-        // AddAnimal's insert signature — matches SubmissionRepository.AddAnimalAsync.
+        // AddAnimal's insert signature â€” matches SubmissionRepository.AddAnimalAsync.
         var parameters = new DynamicParameters();
         parameters.Add("SenderRef", senderRef);
         parameters.Add("HistologyRef", null, dbType: System.Data.DbType.String);
@@ -297,7 +386,7 @@ public sealed class BlockRepository : IBlockRepository
 
         // Legacy (clsAnimal.GetAnimalSlideArchiveInformation) also merges in Antibodies archive
         // data per batch/submission-type, and Histology archive data (excluding the descriptions
-        // already covered by the Stain/Antibodies calls above) — Special Stain rows alone are only
+        // already covered by the Stain/Antibodies calls above) â€” Special Stain rows alone are only
         // a subset of everything archived against a submission.
         var batches = await conn.QueryAsync<AnimalBatch>(
             "GetAnimalBatches",
@@ -330,7 +419,7 @@ public sealed class BlockRepository : IBlockRepository
         return results.OrderBy(r => r.BlockRef, StringComparer.Ordinal).ToList();
     }
 
-    /// <summary>Row shape of <c>GetAnimalBatches</c> — the batch/submission-type list a slide archive search fans out over.</summary>
+    /// <summary>Row shape of <c>GetAnimalBatches</c> â€” the batch/submission-type list a slide archive search fans out over.</summary>
     private sealed class AnimalBatch
     {
         public int BatchID { get; init; }

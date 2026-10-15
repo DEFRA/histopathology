@@ -56,4 +56,40 @@ public class BlockHelperTests
         var result = BlockHelpers.ComputeNextOrder([10, 20, 15]);
         Assert.Equal(21, result);
     }
+
+    [Theory]
+    [InlineData(new string[0], null, "01")]
+    [InlineData(new[] { "01" }, null, "02")]
+    [InlineData(new[] { "01", "09" }, null, "10")]
+    [InlineData(new string[0], "01", "01")]
+    // The user's case: block 01 was added and then deleted, so the animal's counter was advanced.
+    [InlineData(new string[0], "02", "02")]
+    [InlineData(new[] { "01", "02" }, "02", "03")]
+    [InlineData(new[] { "01" }, "05", "05")]
+    [InlineData(new string[0], "garbage", "01")]
+    public void ComputeNextBlockRef_NeverGoesBelowTheStoredCounter(string[] existing, string? stored, string expected)
+    {
+        Assert.Equal(expected, BlockHelpers.ComputeNextBlockRef(existing, stored));
+    }
+
+    [Theory]
+    [InlineData(new[] { "01" }, "01", "02")]
+    [InlineData(new[] { "01", "02" }, "02", "03")]
+    [InlineData(new[] { "01", "02", "03" }, "02", "04")]
+    [InlineData(new[] { "01", "03" }, "01", "02")]
+    public void ComputeNextBlockRef_AfterBlock_TakesNextFreeNumberInSequence(string[] existing, string after, string expected)
+    {
+        Assert.Equal(expected, BlockHelpers.ComputeNextBlockRef(existing, null, after));
+    }
+
+    [Theory]
+    [InlineData("01", "02")]
+    [InlineData("09", "10")]
+    [InlineData("99", "100")]
+    [InlineData("xx", null)]
+    [InlineData(null, null)]
+    public void NextRefAfter_FormatsTheFollowingRef(string? blockRef, string? expected)
+    {
+        Assert.Equal(expected, BlockHelpers.NextRefAfter(blockRef));
+    }
 }

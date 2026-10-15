@@ -34,9 +34,11 @@ public class BlockDetailsModel : HistoPageModel
     private readonly ILookupService _lookups;
     private readonly IBlockTestService _blockTests;
     private readonly IHistologyRefService _histologyRefs;
+    private readonly ILogger<BlockDetailsModel> _logger;
 
     public BlockDetailsModel(ISessionService session, ISubmissionService submissions, IBlockService blocks,
-        IBatchService batches, ILookupService lookups, IBlockTestService blockTests, IHistologyRefService histologyRefs)
+        IBatchService batches, ILookupService lookups, IBlockTestService blockTests, IHistologyRefService histologyRefs,
+        ILogger<BlockDetailsModel> logger)
         : base(session)
     {
         _submissions = submissions;
@@ -45,6 +47,7 @@ public class BlockDetailsModel : HistoPageModel
         _lookups = lookups;
         _blockTests = blockTests;
         _histologyRefs = histologyRefs;
+        _logger = logger;
     }
 
     [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
@@ -89,6 +92,17 @@ public class BlockDetailsModel : HistoPageModel
     /// <summary>Legacy: chkUseWholeTissueList. Defaults to the full lookup list; the user opts in
     /// to filtering the dropdown down to codes already used on this submission.</summary>
     [BindProperty(SupportsGet = true)] public bool UseWholeTissueList { get; set; } = true;
+
+    /// <summary>
+    /// True when reached via the batch-wide "Assign Tissues to Blocks" journey (BatchBlocks) — same
+    /// breadcrumb test as <c>SubmissionDetailsBlockModel.IsAssignTissueMode</c>. There the tissue
+    /// list is always limited to the submission's own tissues, with no option to widen it.
+    /// </summary>
+    public bool IsAssignTissueMode => (Session.SampleDetailReturnPage ?? string.Empty)
+        .Contains("/Batches/BatchBlocks", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Whether the tissue dropdown shows the entire lookup rather than the submission's tissues.</summary>
+    public bool ShowWholeTissueList => UseWholeTissueList && !IsAssignTissueMode;
 
     [BindProperty] public List<string> SelectedHistologyCodes { get; set; } = [];
     [BindProperty] public List<string> SelectedAntibodyCodes { get; set; } = [];
@@ -164,11 +178,22 @@ public class BlockDetailsModel : HistoPageModel
 
     public bool IsViewMode => Session.IsViewSubmissionMode;
 
+    private async Task SaveBatchDefaultsForNewBlockAsync(int blockId)
+    {
+        var defaults = await _batches.GetBatchTestSelectionsAsync(BatchId ?? 0);
+        if (!defaults.HasAny) return;
+
+        await _blockTests.SaveTestSelectionsAsync(
+            BatchId ?? 0,
+            blockId,
+            defaults.Histology.Select(r => r.Code).ToList(),
+            defaults.Antibodies.Select(r => r.Code).ToList(),
+            defaults.Stains.Select(r => r.Code).ToList(),
+            Session.UserID);
+    }
+
     public async Task<IActionResult> OnGetAsync()
     {
-        // TEMPORARY diagnostic
-        Console.WriteLine($"[DIAG OnGetAsync] (bound-at-entry) BatchId={BatchId} AnimalId={AnimalId} BlockId={BlockId} IsAddFlow={IsAddFlow}");
-
         ViewData["Title"] = IsEditMode ? "Edit block" : "Add block";
         ViewData["PageTitle"] = IsEditMode ? "Edit block" : "Add block";
 
@@ -213,10 +238,11 @@ public class BlockDetailsModel : HistoPageModel
             // A block with no tissues was never actually used — exclude it from the "existing
             // refs" the next ref is computed from, so an abandoned/never-finished block's ref
             // becomes available again instead of being permanently skipped over.
-            var usedRefs = animalBlocks.Where(b => batchTissues.Any(t => t.OwnerID == b.ID)).Select(b => b.BlockRef);
+            var usedRefs = animalBlocks.Where(b => batchTissues.Any(t => t.OwnerID == b.ID)).Select(b => b.BlockRef)
+                .Concat(await GetOtherBatchRefsAsync(Animal.ID));
             NewBlockRef = IsPreCassetted
                 ? PreBookedBlockRefs.FirstOrDefault()?.BlockRef
-                : BlockHelpers.ComputeNextBlockRef(usedRefs);
+                : BlockHelpers.ComputeNextBlockRef(usedRefs, Animal.NextBlockRef);
 
             if (string.IsNullOrWhiteSpace(NewBlockRef))
             {
@@ -272,6 +298,21 @@ public class BlockDetailsModel : HistoPageModel
                     // without this, the page silently re-rendered the "Add block" form with no Tissues/
                     // Add tissue section and no visible error, making a genuine DB failure look like a
                     // missing feature. Surface it so the real cause shows up instead of a blank result.
+                    ErrorMessage = "Could not create the block. Please try again or contact support if the problem continues.";
+                    return Page();
+                }
+
+                try
+                {
+                    await SaveBatchDefaultsForNewBlockAsync(newId);
+                }
+                catch (Exception ex)
+                {
+                    // The block is already committed; without cleanup a retry would leave an unreachable orphan.
+                    _logger.LogError(ex, "BlockDetails: failed to save batch default tests for new block {BlockId}; removing it.", newId);
+                    try { await _blockTests.SaveTestSelectionsAsync(BatchId ?? 0, newId, [], [], [], Session.UserID); }
+                    catch (Exception clearEx) { _logger.LogError(clearEx, "BlockDetails: failed to clear partial test selections for block {BlockId}.", newId); }
+                    await _blocks.DeleteBlockAsync(newId, Session.UserID);
                     ErrorMessage = "Could not create the block. Please try again or contact support if the problem continues.";
                     return Page();
                 }
@@ -400,32 +441,41 @@ public class BlockDetailsModel : HistoPageModel
             }
         }
 
-        if (!CanUseAdditionalRequest)
+        if (!CanUseAdditionalRequest) NewRepeatBlock = false;
+
+        // Legacy: ValidateRequiredData "You can only enter a used Block Ref if you tick the additional
+        // request box". Excludes this block's own row; the cross-submission check is skipped for
+        // pre-cassetted, whose ref is a claimed pre-booked placeholder.
+        if (!NewRepeatBlock
+            && (allBlocks.Any(b => b.ID != BlockId && b.AnimalID == Animal.ID && b.BlockRef == NewBlockRef)
+                || (refChanged && !IsPreCassetted
+                    && (await GetOtherBatchRefsAsync(Animal.ID)).Contains(NewBlockRef, StringComparer.OrdinalIgnoreCase))))
         {
-            NewRepeatBlock = false;
-            // Legacy: ValidateRequiredData "You can only enter a used Block Ref if you tick the
-            // additional request box" — collapses to a plain duplicate check for submission types
-            // where Additional Request is never offered. Excludes this block's own (unchanged) row.
-            if (allBlocks.Any(b => b.ID != BlockId && b.AnimalID == Animal.ID && b.BlockRef == NewBlockRef))
-            {
-                ErrorMessage = "This block reference has already been used for this sample.";
-                return Page();
-            }
+            ErrorMessage = "This block reference has already been used for this sample.";
+            return Page();
         }
 
-        await _blocks.UpdateBlockAsync(new Block
+        try
         {
-            ID = current.ID,
-            BatchID = current.BatchID,
-            AnimalID = current.AnimalID,
-            BlockRef = NewBlockRef,
-            CustomerRef = NewCustomerRef,
-            Comment = NewComment,
-            RepeatBlock = NewRepeatBlock,
-            Status = current.Status,
-            Order = current.Order,
-            RowStamp = current.RowStamp,
-        }, Session.UserID);
+            await _blocks.UpdateBlockAsync(new Block
+            {
+                ID = current.ID,
+                BatchID = current.BatchID,
+                AnimalID = current.AnimalID,
+                BlockRef = NewBlockRef,
+                CustomerRef = NewCustomerRef,
+                Comment = NewComment,
+                RepeatBlock = NewRepeatBlock,
+                Status = current.Status,
+                Order = current.Order,
+                RowStamp = current.RowStamp,
+            }, Session.UserID);
+        }
+        catch (DuplicateBlockRefException)
+        {
+            ErrorMessage = "This block reference has already been used for this sample.";
+            return Page();
+        }
         await _blockTests.SaveTestSelectionsAsync(
             BatchId ?? 0, current.ID, SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes, Session.UserID);
 
@@ -434,6 +484,7 @@ public class BlockDetailsModel : HistoPageModel
             var existingOrders = allBlocks.Select(b => b.Order).ToList();
             var existingRefs = allBlocks.Where(b => b.ID != current.ID).Select(b => b.BlockRef).ToList();
             existingRefs.Add(NewBlockRef);
+            existingRefs.AddRange(await GetOtherBatchRefsAsync(Animal.ID));
             var preBookedBlocksForCreate = IsPreCassetted ? PreBookedBlockRefs.ToList() : null;
             var blockRef = NewBlockRef;
 
@@ -456,7 +507,7 @@ public class BlockDetailsModel : HistoPageModel
                 }
                 else
                 {
-                    blockRef = BlockHelpers.ComputeNextBlockRef(existingRefs);
+                    blockRef = BlockHelpers.ComputeNextBlockRef(existingRefs, Animal.NextBlockRef, blockRef);
                     siblingId = await _blocks.AddBlockAsync(
                         BatchId ?? 0, Animal.ID, blockRef, existingOrders, Session.UserID,
                         customerRef: NewCustomerRef, comment: NewComment, repeatBlock: NewRepeatBlock);
@@ -603,7 +654,10 @@ public class BlockDetailsModel : HistoPageModel
         }
         else
         {
-            var nextRef = BlockHelpers.ComputeNextBlockRef(allBlocks.Where(b => b.AnimalID == Animal.ID).Select(b => b.BlockRef));
+            var nextRef = BlockHelpers.ComputeNextBlockRef(
+                allBlocks.Where(b => b.AnimalID == Animal.ID).Select(b => b.BlockRef)
+                    .Concat(await GetOtherBatchRefsAsync(Animal.ID)), Animal.NextBlockRef,
+                allBlocks.FirstOrDefault(b => b.ID == BlockId)?.BlockRef);
             newBlockId = await _blocks.AddBlockAsync(BatchId ?? 0, Animal.ID, nextRef, existingOrders, Session.UserID,
                 customerRef: null, comment: null, repeatBlock: false);
         }
@@ -639,6 +693,9 @@ public class BlockDetailsModel : HistoPageModel
         return null;
     }
 
+    private async Task<IReadOnlyList<string>> GetOtherBatchRefsAsync(int animalId) =>
+        await _blocks.GetBlockRefsOnOtherBatchesAsync(animalId, BatchId ?? 0) ?? [];
+
     private async Task LoadSupportingDataAsync()
     {
         Batch = await _batches.GetByIdAsync(BatchId ?? 0);
@@ -649,7 +706,7 @@ public class BlockDetailsModel : HistoPageModel
 
         var fullTissueList = await _lookups.GetLookupDataAsync(LookupTissueCode);
         EditTissueOptions = fullTissueList;
-        if (UseWholeTissueList || Animal is null)
+        if (ShowWholeTissueList || Animal is null)
         {
             TissueOptions = fullTissueList;
         }
@@ -660,27 +717,21 @@ public class BlockDetailsModel : HistoPageModel
             // Legacy source: BlockDetails.aspx.vb::LoadLookupTypeList ->
             // clsTissue.GetBatchAnimalTissues(BatchID, AnimalID) -> SP GetBatchSampleTissues.
             var submissions = await _submissions.GetSubmissionsByBatchAsync(BatchId ?? 0);
-            var submissionIds = submissions.Select(s => s.ID).ToHashSet();
-            var firstSubmId = submissions.Count > 0 ? submissions[0].ID : 0;
 
             var bySubmission = (await _submissions.GetBatchSubmissionTissuesAsync(BatchId ?? 0))
                 .GroupBy(t => t.OwnerID)
                 .ToDictionary(g => g.Key, g => g.Select(t => t.TissueCode).ToList());
 
-            // Same fallback chain as SampleSummary/CopyBatch: this animal's own BatchSubmission row
-            // → BatchSubmissionID → the batch's first submission → the unkeyed (0) group.
-            // Neither GetBatchAnimal nor GetBatchBlocksByID's animal result-set ever returns
-            // BatchSubmissionID (verified against the actual SP output), so Animal.BatchSubmissionID
-            // is always 0 here — relying on it alone silently matched nothing and fell through to
-            // firstSubmId, which is wrong for every animal except the batch's very first submission
-            // (reproduced live: batch 33425/animal 103547 is submission order 2, so its real tissue
-            // list at submission 69945 was skipped entirely in favour of submission 69944's empty one).
-            var ownSubmissionId = submissions.FirstOrDefault(s => s.AnimalID == Animal.ID)?.ID;
-            var submId = ownSubmissionId
-                ?? (Animal.BatchSubmissionID > 0 && submissionIds.Contains(Animal.BatchSubmissionID) ? Animal.BatchSubmissionID : firstSubmId);
-            var sampleCodes = (bySubmission.TryGetValue(submId, out var codes) ? codes
-                    : bySubmission.TryGetValue(0, out var unkeyed) ? unkeyed
-                    : [])
+            // Only this sample's OWN submission rows count (all of them, if it has several). The animal
+            // SPs never return BatchSubmissionID (always 0) and every batch starts with an empty default
+            // submission (AnimalID 0, Order 1), so there is deliberately no fallback to the batch's first
+            // submission or an unkeyed group: a sample with no row of its own must offer nothing rather
+            // than another sample's tissues.
+            var ownSubmissionIds = submissions
+                .Where(s => s.AnimalID == Animal.ID || (Animal.BatchSubmissionID > 0 && s.ID == Animal.BatchSubmissionID))
+                .Select(s => s.ID);
+            var sampleCodes = ownSubmissionIds
+                .SelectMany(id => bySubmission.GetValueOrDefault(id) ?? [])
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             // Anything already assigned to this sample's blocks must stay selectable even if it

@@ -11,6 +11,9 @@ public interface IBlockService
     Task<IReadOnlyList<Block>> GetByBatchAsync(int batchId, CancellationToken ct = default);
     Task<IReadOnlyList<Block>> GetPreBookedByAnimalAsync(int animalId, CancellationToken ct = default);
 
+    /// <summary>Block refs the animal already holds on other submissions — a new block must not reuse them.</summary>
+    Task<IReadOnlyList<string>> GetBlockRefsOnOtherBatchesAsync(int animalId, int excludeBatchId, CancellationToken ct = default);
+
     Task<int> AddBlockAsync(int batchId, int animalId, string blockRef, IEnumerable<int> existingOrders, int userId,
         string? customerRef = null, string? comment = null, bool repeatBlock = false, CancellationToken ct = default);
 

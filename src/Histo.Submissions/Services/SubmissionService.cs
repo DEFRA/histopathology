@@ -172,14 +172,25 @@ public sealed class SubmissionService : ISubmissionService
         catch (Exception ex) { _logger.LogError("Failed to delete animal {AnimalId}.", ex, animalId); return false; }
     }
 
-    /// <summary>
-    /// Removes a sample and everything recorded against it (blocks, block tissues/tests, batch
-    /// submissions and their tissues) from one submission, keeping the shared animal record.
-    /// </summary>
+    /// <summary>Removes a sample's blocks and block data from one submission, keeping its submission link and tissues.</summary>
     public async Task<bool> DeleteSampleFromBatchAsync(int batchId, int animalId, int userId, CancellationToken ct = default)
     {
         try { await _repo.DeleteSampleFromBatchAsync(batchId, animalId, userId, ct); return true; }
         catch (Exception ex) { _logger.LogError("Failed to delete sample {AnimalId} from submission {BatchId}.", ex, animalId, batchId); return false; }
+    }
+
+    /// <summary>Removes a sample from one submission entirely (blocks, submission link, submitted tissues), keeping the shared animal.</summary>
+    public async Task<bool> DeleteSampleSubmissionFromBatchAsync(int batchId, int animalId, int userId, CancellationToken ct = default)
+    {
+        try { await _repo.DeleteSampleSubmissionFromBatchAsync(batchId, animalId, userId, ct); return true; }
+        catch (Exception ex) { _logger.LogError("Failed to remove sample {AnimalId} from submission {BatchId}.", ex, animalId, batchId); return false; }
+    }
+
+    /// <summary>Advances an animal's persisted NextBlockRef so a deleted block's ref is not reissued.</summary>
+    public async Task<bool> AdvanceNextBlockRefAsync(int animalId, string nextBlockRef, CancellationToken ct = default)
+    {
+        try { await _repo.AdvanceNextBlockRefAsync(animalId, nextBlockRef, ct); return true; }
+        catch (Exception ex) { _logger.LogError("Failed to advance NextBlockRef for animal {AnimalId}.", ex, animalId); return false; }
     }
 
     /// <summary>

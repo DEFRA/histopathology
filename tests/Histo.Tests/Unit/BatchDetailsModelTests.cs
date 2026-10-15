@@ -498,6 +498,47 @@ public class BatchDetailsModelTests
     }
 
     [Fact]
+    public async Task OnPostCreateAsync_StagedSubmissionIsTheEmptyDefaultRow_CopiesTheSamplesOwnTissues()
+    {
+        // The animal SPs never return BatchSubmissionID (0), and every batch starts with an empty
+        // default submission (AnimalID 0, Order 1): resolving via the first submission copied the
+        // sample with no tissues at all.
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[
+                new() { ID = 49, BatchID = 10, AnimalID = 0, Order = 1 },
+                new() { ID = 50, BatchID = 10, AnimalID = 1, Order = 2 },
+            ]);
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1, SenderRef = "S1", BatchSubmissionID = 0 }]);
+        _submissions.Setup(s => s.GetTissuesBySubmissionAsync(10, 50, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Tissue>)[new Tissue { ID = 10, TissueCode = "LIVER" }]);
+
+        CopiedSamplePlan? captured = null;
+        _submissions.Setup(s => s.CreateBatchWithCopiedSamplesAsync(
+                It.IsAny<Batch>(), It.IsAny<SelectedTestCodes>(),
+                It.IsAny<string?>(), It.IsAny<IReadOnlyList<CopiedSamplePlan>>(), 7, It.IsAny<CancellationToken>()))
+            .Callback((Batch _, SelectedTestCodes _,
+                       string? _, IReadOnlyList<CopiedSamplePlan> p, int _, CancellationToken _) => captured = p.Single())
+            .ReturnsAsync(100);
+
+        var sut = CreateSut();
+        sut.Create_SelectedHistologyCodes = [HistologyCode.EO];
+        sut.CopyToken = "tok-1";
+        var pending = new CopyBatchModel.PendingCopy(10, [
+            new CopyBatchModel.AnimalRow { AnimalId = 1, SubmissionId = 49, SenderRef = "S1", NewSenderRef = "S1-NEW" }
+        ], "tok-1");
+        sut.TempData["CopyBatch_PendingCopy"] = System.Text.Json.JsonSerializer.Serialize(pending);
+
+        await sut.OnPostCreateAsync();
+
+        Assert.NotNull(captured);
+        Assert.Equal(50, captured!.SourceSubmission.ID);
+        Assert.Equal("LIVER", captured.Tissues.Single().TissueCode);
+    }
+
+    [Fact]
     public async Task OnPostCreateAsync_StagedSampleNoLongerInSourceBatch_FailsInsteadOfCopyingPartially()
     {
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(10, It.IsAny<CancellationToken>()))
@@ -527,8 +568,10 @@ public class BatchDetailsModelTests
     [Fact]
     public async Task OnPostCreateAsync_StagedSampleSubmissionCannotBeMatched_FailsInsteadOfCopyingPartially()
     {
+        // The only submission belongs to another animal, and BatchSubmissionID 77 matches nothing and
+        // isn't 0, so neither the own-submission lookup nor the firstSubmId fallback can apply.
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(10, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 50, BatchID = 10, AnimalID = 1, Order = 1 }]);
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 50, BatchID = 10, AnimalID = 2, Order = 1 }]);
         _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(10, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[]);
         // BatchSubmissionID 77 matches no submission, and isn't 0 so the firstSubmId fallback can't apply.

@@ -92,29 +92,35 @@ public class CopyBatchModel : HistoPageModel
             .ToDictionary(
                 g => g.Key,
                 g => g.Select(t => $"{t.NoPieces} x {tissueNames.GetValueOrDefault(t.TissueCode, t.TissueCode)}").ToList());
-        // Fallback: if all OwnerID = 0 (column name mismatch), all tissues land under key 0.
-        var allTissueStrings = tissuesBySubmId.TryGetValue(0, out var zeroTd) ? zeroTd : [];
         var firstSubmId = submissions.Count > 0 ? submissions[0].ID : 0;
         var submissionIds = submissions.Select(s => s.ID).ToHashSet();
 
-        List<string> ResolveTissues(int batchSubmissionId)
-        {
-            var submId = batchSubmissionId > 0 && submissionIds.Contains(batchSubmissionId)
-                ? batchSubmissionId : firstSubmId;
-            if (submId > 0 && tissuesBySubmId.TryGetValue(submId, out var td)) return td;
-            // All tissues keyed under 0 when BatchSubmissionID column wasn't mapped.
-            return allTissueStrings.Count > 0 ? allTissueStrings : [];
-        }
+        // A sample's tissues hang off its OWN BatchSubmission row. The animal SPs never return
+        // BatchSubmissionID (always 0) and every batch starts with an empty default submission
+        // (AnimalID 0, Order 1), so falling back to the first submission listed no tissues and staged
+        // the wrong submission id for the copy.
+        var submissionByAnimalId = submissions
+            .Where(s => s.AnimalID > 0)
+            .GroupBy(s => s.AnimalID)
+            .ToDictionary(g => g.Key, g => g.First().ID);
+
+        int OwnSubmissionId(Animal a) =>
+            submissionByAnimalId.TryGetValue(a.ID, out var own) ? own
+            : a.BatchSubmissionID > 0 && submissionIds.Contains(a.BatchSubmissionID) ? a.BatchSubmissionID
+            : firstSubmId;
+
+        List<string> ResolveTissues(Animal a) =>
+            submissionByAnimalId.TryGetValue(a.ID, out var own) && tissuesBySubmId.TryGetValue(own, out var td) ? td : [];
 
         if (IsCassetted)
         {
             Animals = blockAnimals.OrderBy(a => a.SenderRef).Select(a => new AnimalRow
             {
                 AnimalId = a.ID,
-                SubmissionId = a.BatchSubmissionID > 0 ? a.BatchSubmissionID : firstSubmId,
+                SubmissionId = OwnSubmissionId(a),
                 SenderRef = a.SenderRef,
                 NewSenderRef = string.Empty,
-                TissueDetails = ResolveTissues(a.BatchSubmissionID),
+                TissueDetails = ResolveTissues(a),
             }).ToList();
         }
         else
@@ -123,15 +129,13 @@ public class CopyBatchModel : HistoPageModel
             Animals = animals.OrderBy(a => a.SenderRef).Select(a => new AnimalRow
             {
                 AnimalId = a.ID,
-                SubmissionId = a.BatchSubmissionID > 0 && submissionIds.Contains(a.BatchSubmissionID)
-                    ? a.BatchSubmissionID : firstSubmId,
+                SubmissionId = OwnSubmissionId(a),
                 SenderRef = a.SenderRef,
                 NewSenderRef = string.Empty,
-                TissueDetails = ResolveTissues(a.BatchSubmissionID),
+                TissueDetails = ResolveTissues(a),
             }).ToList();
         }
 
-        _ = submissions;
         return Page();
     }
 

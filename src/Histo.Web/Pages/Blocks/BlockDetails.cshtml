@@ -245,7 +245,11 @@ else
             <input type="hidden" asp-for="UseWholeTissueList" />
             <div class="govuk-form-group">
                 <label class="govuk-label" for="NewTissueCode">Tissue type</label>
-                @if (Model.UseWholeTissueList)
+                @if (Model.IsAssignTissueMode)
+                {
+                    <div class="govuk-hint">Showing only tissue types found in this submission.</div>
+                }
+                else if (Model.UseWholeTissueList)
                 {
                     <div class="govuk-hint">
                         Showing every tissue type.
@@ -279,6 +283,7 @@ else
         </form>
 
         <h2 class="govuk-heading-m">Tests</h2>
+        <p class="govuk-hint">New blocks start with the tests selected for this submission. Any changes are saved when you select Done or Next block.</p>
         <div>
         @{
             // Fields below use form="block-details-form" so they submit together with the block
@@ -378,7 +383,7 @@ else
                         <label class="govuk-label govuk-checkboxes__label" for="CarryTestsToNextBlock">Use these tests for the next block?</label>
                     </div>
                 </div>
-                <div class="govuk-hint">Saves this block's tests (as currently saved), then creates the next block for this sample.</div>
+                <div class="govuk-hint">Saves this block's tests, then creates the next block for this sample.</div>
             </div>
         </form>
 

@@ -26,6 +26,9 @@ public interface IBlockRepository
     /// </summary>
     Task<IReadOnlyList<Block>> GetPreBookedByAnimalAsync(int animalId, CancellationToken ct = default);
 
+    /// <summary>Block refs the animal already holds on batches other than <paramref name="excludeBatchId"/> (the animal is shared across submissions).</summary>
+    Task<IReadOnlyList<string>> GetBlockRefsOnOtherBatchesAsync(int animalId, int excludeBatchId, CancellationToken ct = default);
+
     /// <summary>
     /// Saves (inserts or updates) a block record.
     /// Maps to <c>AddBlock</c> / <c>EditBlock</c> stored procedures.

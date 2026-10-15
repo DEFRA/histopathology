@@ -34,6 +34,14 @@ GO
 GO
 :r ../StoredProcedures/dbo.GetSearchBatchDetails.sql
 GO
+:r ../StoredProcedures/dbo.AdvanceAnimalNextBlockRef.sql
+GO
+:r ../StoredProcedures/dbo.GetAnimalBlockRefsOnOtherBatches.sql
+GO
+:r ../StoredProcedures/dbo.CountAnimalsByHistologyRef.sql
+GO
+:r ../StoredProcedures/dbo.DrawNextHistologyRefRun.sql
+GO
 
 -- Step 2: Deployment script to used to alter/create tables, columns etc
 PRINT '--- Create or Alter Table, Column  ---';

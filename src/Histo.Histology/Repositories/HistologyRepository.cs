@@ -104,14 +104,60 @@ public sealed class HistologyRepository : IHistologyRepository
     public async Task<string?> DrawNextRefAsync(int histologyType, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        var p = new DynamicParameters();
-        p.Add("Type", histologyType, dbType: System.Data.DbType.Int32);
-        p.Add("NextHistologyRef", dbType: System.Data.DbType.String, size: 5, direction: System.Data.ParameterDirection.Output);
-        p.Add("RowStamp", dbType: System.Data.DbType.Binary, size: 8, direction: System.Data.ParameterDirection.Output);
 
-        await conn.ExecuteAsync("GetNextHistologyRef", p, commandType: System.Data.CommandType.StoredProcedure);
+        // The SP's own "already used" check builds the year with convert(varchar(2), datepart(yy, ...)),
+        // which overflows to "*" for a 4-digit year and so never matches a real "26/NNNNN" ref — it
+        // cannot be relied on. A counter sitting at or below a number already issued would otherwise
+        // hand that number out again, so skip any number a sample already holds.
+        for (var attempt = 0; attempt < MaxDrawAttempts; attempt++)
+        {
+            var p = new DynamicParameters();
+            p.Add("Type", histologyType, dbType: System.Data.DbType.Int32);
+            p.Add("NextHistologyRef", dbType: System.Data.DbType.String, size: 5, direction: System.Data.ParameterDirection.Output);
+            p.Add("RowStamp", dbType: System.Data.DbType.Binary, size: 8, direction: System.Data.ParameterDirection.Output);
 
-        var next = p.Get<string?>("NextHistologyRef");
-        return string.IsNullOrWhiteSpace(next) ? null : next.Trim();
+            await conn.ExecuteAsync("GetNextHistologyRef", p, commandType: System.Data.CommandType.StoredProcedure);
+
+            var next = p.Get<string?>("NextHistologyRef");
+            if (string.IsNullOrWhiteSpace(next)) return null;
+
+            var drawn = next.Trim();
+            var taken = await conn.ExecuteScalarAsync<int>(
+                "CountAnimalsByHistologyRef",
+                new { HistologyRef = Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(drawn) },
+                commandType: System.Data.CommandType.StoredProcedure);
+            if (taken == 0) return drawn;
+        }
+
+        return null;
     }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<string>> DrawNextRefRunAsync(int histologyType, int count, int lowerInclusive, int upperExclusive, CancellationToken ct = default)
+    {
+        if (count <= 0) return [];
+
+        using var conn = _db.CreateConnection();
+
+        // The SP reserves the run atomically, skips runs containing a number a sample already holds,
+        // and leaves the counter untouched when the run would leave the type's range.
+        var start = await conn.ExecuteScalarAsync<int?>(
+            "DrawNextHistologyRefRun",
+            new
+            {
+                Type = histologyType,
+                Count = count,
+                Lower = lowerInclusive,
+                Upper = upperExclusive,
+                RefPrefix = Histo.Core.Domain.HistologyRefHelpers.CurrentYearPrefix,
+                MaxAttempts = MaxRunAttempts,
+            },
+            commandType: System.Data.CommandType.StoredProcedure);
+        if (start is null) return [];
+
+        return Enumerable.Range(start.Value, count).Select(n => n.ToString("D5")).ToList();
+    }
+
+    private const int MaxDrawAttempts = 1000;
+    private const int MaxRunAttempts = 50;
 }

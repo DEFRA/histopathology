@@ -555,9 +555,8 @@ public class AddSubmissionModelTests
             .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 70, BatchID = 5, AnimalID = 42, BlockRef = "01" }]);
         _blocks.Setup(b => b.CopyBlockAsync(It.IsAny<Block>(), 5, It.IsAny<int>(), It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(300);
-        _histologyRefs.SetupSequence(h => h.GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()))
-            .ReturnsAsync("26/60002")
-            .ReturnsAsync("26/60003");
+        _histologyRefs.Setup(h => h.GetNextAvailableRefRunAsync(HistologyRefTypeCode.MouseProjects, 2, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<string>)["26/60002", "26/60003"]);
 
         var sut = CreateSut(returnPage: null);
         sut.BatchSubmissionId = 99;
@@ -569,10 +568,43 @@ public class AddSubmissionModelTests
 
         _blocks.Verify(b => b.CopyBlockAsync(It.IsAny<Block>(), 5, 51, It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
         _blocks.Verify(b => b.CopyBlockAsync(It.IsAny<Block>(), 5, 52, It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
-        // One ref identifies one sample, so each target must get its own draw.
-        _histologyRefs.Verify(h => h.GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()), Times.Exactly(2));
+        // One run of consecutive refs, handed out in mouse-number order — never one independent draw per sample.
+        _histologyRefs.Verify(h => h.GetNextAvailableRefRunAsync(HistologyRefTypeCode.MouseProjects, 2, It.IsAny<CancellationToken>()), Times.Once);
+        _histologyRefs.Verify(h => h.GetNextAvailableRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         _submissions.Verify(s => s.UpdateAnimalAsync(It.Is<Animal>(a => a.ID == 51 && a.HistologyRef == "26/60002"), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
         _submissions.Verify(s => s.UpdateAnimalAsync(It.Is<Animal>(a => a.ID == 52 && a.HistologyRef == "26/60003"), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_CopySampleRange_RunCannotBeDrawn_LeavesRefsBlankInsteadOfDrawingIndependently()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        _submissions.Setup(s => s.GetExistingSenderRefsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<string>)[]);
+        _submissions.Setup(s => s.CreateMouseRangeAsync(5, 42, "MC000001", "MC000002", 7, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[
+                new Animal { ID = 42, SenderRef = "SRC", HistologyRef = "26/60001", HistoRefSet = true },
+                new Animal { ID = 51, SenderRef = "MC000001" },
+                new Animal { ID = 52, SenderRef = "MC000002" }]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
+        _histologyRefs.Setup(h => h.GetNextAvailableRefRunAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<string>)[]);
+
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SourceAnimalId = 42;
+        sut.MouseNumberFrom = "MC000001";
+        sut.MouseNumberTo = "MC000002";
+
+        await sut.OnPostAsync();
+
+        // Independent per-sample draws are what made a run jump (60000 then 86236) — never fall back to them.
+        _histologyRefs.Verify(h => h.GetNextAvailableRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.Is<Animal>(a => a.HistoRefSet), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

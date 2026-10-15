@@ -189,26 +189,61 @@ public sealed class HistologyRefService : IHistologyRefService
 
             // Legacy clsHistology.vb::GetNextAvailableHistologyRef — the GetNextHistologyRef SP
             // reads and advances the counter itself.
-            var claimed = await _repo.DrawNextRefAsync(histologyType, ct);
-            if (claimed is null) return null;
-
-            // The counter is an unconstrained varchar(5), so it can hold a non-numeric or
-            // out-of-range value. Minting from one produces a ref of the wrong type (or literal
-            // garbage), so refuse rather than write it.
-            if (!int.TryParse(claimed, out var number) || number < lowerBoundInclusive || number >= upperBoundExclusive)
-            {
-                _logger.LogError(
-                    "Histology ref counter for type {HistologyType} holds '{Claimed}', which is not a number in the range {Lower}-{Upper}. No ref was drawn.",
-                    null, histologyType, claimed, lowerBoundInclusive, upperBoundExclusive - 1);
-                return null;
-            }
-
-            return Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(claimed);
+            return await DrawFromCounterAsync(histologyType, lowerBoundInclusive, upperBoundExclusive, ct);
         }
         catch (Exception ex)
         {
             _logger.LogError("Failed to draw the next available histology ref for type {HistologyType}.", ex, histologyType);
             return null;
         }
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<string>> GetNextAvailableRefRunAsync(int histologyType, int count, CancellationToken ct = default)
+    {
+        try
+        {
+            if (count <= 0 || !HistologyRefTypeCode.TryGetRange(histologyType, out var lower, out var upper))
+                return [];
+
+            // Reserved in one repository call so nothing can interleave with the run.
+            var numbers = await _repo.DrawNextRefRunAsync(histologyType, count, lower, upper, ct);
+            if (numbers.Count != count) return [];
+
+            // The counter is unconstrained, so refuse a run that isn't wholly inside the type's range.
+            if (numbers.Any(n => !int.TryParse(n, out var v) || v < lower || v >= upper))
+            {
+                _logger.LogError(
+                    "Histology ref run {First}-{Last} for type {HistologyType} is outside the range {Lower}-{Upper}. No refs were assigned.",
+                    null, numbers[0], numbers[^1], histologyType, lower, upper - 1);
+                return [];
+            }
+
+            return [.. numbers.Select(Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear)];
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to draw a run of histology refs for type {HistologyType}.", ex, histologyType);
+            return [];
+        }
+    }
+
+    private async Task<string?> DrawFromCounterAsync(int histologyType, int lowerInclusive, int upperExclusive, CancellationToken ct)
+    {
+        var claimed = await _repo.DrawNextRefAsync(histologyType, ct);
+        if (claimed is null) return null;
+
+        // The counter is an unconstrained varchar(5), so it can hold a non-numeric or
+        // out-of-range value. Minting from one produces a ref of the wrong type (or literal
+        // garbage), so refuse rather than write it.
+        if (!int.TryParse(claimed, out var number) || number < lowerInclusive || number >= upperExclusive)
+        {
+            _logger.LogError(
+                "Histology ref counter for type {HistologyType} holds '{Claimed}', which is not a number in the range {Lower}-{Upper}. No ref was drawn.",
+                null, histologyType, claimed, lowerInclusive, upperExclusive - 1);
+            return null;
+        }
+
+        return Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(claimed);
     }
 }

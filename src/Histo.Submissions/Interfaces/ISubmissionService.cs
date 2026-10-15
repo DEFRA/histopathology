@@ -39,11 +39,22 @@ public interface ISubmissionService
     Task<bool> DeleteAnimalAsync(int animalId, int userId, CancellationToken ct = default);
 
     /// <summary>
-    /// Removes a sample from one submission along with its blocks (and each block's tissues,
-    /// histology, antibody and special-stain rows), its batch submission rows and their tissues.
-    /// Pre-booked blocks are released back to the pool; the shared animal record is kept.
+    /// Removes a sample's blocks (and their tissues/tests) from one submission, keeping its
+    /// batch submission link and submitted tissues so it can be assigned again.
     /// </summary>
     Task<bool> DeleteSampleFromBatchAsync(int batchId, int animalId, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Removes a sample from one submission entirely: blocks, block tissues/tests, batch
+    /// submission rows and their tissues. The shared animal record and other batches are kept.
+    /// </summary>
+    Task<bool> DeleteSampleSubmissionFromBatchAsync(int batchId, int animalId, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Moves the animal's persisted <c>NextBlockRef</c> forward (never back) so a deleted block's ref
+    /// is not issued to the next block added for the sample. Returns <see langword="false"/> on failure.
+    /// </summary>
+    Task<bool> AdvanceNextBlockRefAsync(int animalId, string nextBlockRef, CancellationToken ct = default);
 
     /// <summary>
     /// Returns the single animal that exactly matches the given Sender Ref.

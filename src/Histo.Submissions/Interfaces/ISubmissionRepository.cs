@@ -87,6 +87,20 @@ public interface ISubmissionRepository
     Task DeleteSampleFromBatchAsync(int batchId, int animalId, int userId, CancellationToken ct = default);
 
     /// <summary>
+    /// As <see cref="DeleteSampleFromBatchAsync"/>, and also removes the sample's <c>BatchSubmission</c>
+    /// link and submitted <c>BatchTissues</c> for that batch, so it leaves the submission entirely.
+    /// The shared <c>Animal</c> and other batches are untouched.
+    /// </summary>
+    Task DeleteSampleSubmissionFromBatchAsync(int batchId, int animalId, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Moves the animal's persisted <c>NextBlockRef</c> forward to <paramref name="nextBlockRef"/>.
+    /// A no-op when the stored value is already that high, so the counter never goes backwards and a
+    /// ref freed by deleting a block is never issued again (legacy: <c>Animal.NextBlockRef</c>).
+    /// </summary>
+    Task AdvanceNextBlockRefAsync(int animalId, string nextBlockRef, CancellationToken ct = default);
+
+    /// <summary>
     /// Returns the animal record that exactly matches the given Sender Ref.
     /// Maps to <c>GetAnimalBySender</c> (legacy source: <c>clsAnimal.vb::GetAnimalBySender</c>).
     ///
