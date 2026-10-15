@@ -233,6 +233,49 @@ public class SampleSummaryModelTests
         Assert.Equal(expected, sut.CanModifySamples);
     }
 
+    [Theory]
+    [InlineData(BatchStatus.Submitted, true)]
+    [InlineData(BatchStatus.Rejected, true)]
+    [InlineData(BatchStatus.Received, true)]
+    [InlineData(BatchStatus.InProgress, true)]
+    [InlineData(BatchStatus.Completed, false)]
+    public async Task CanAddSamples_ReflectsBatchStatus(string status, bool expected)
+    {
+        _batches.Setup(b => b.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 1, Status = status });
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        await sut.OnGetAsync();
+
+        Assert.Equal(expected, sut.CanAddSamples);
+    }
+
+    [Fact]
+    public async Task OnPostDeleteAsync_RemovesSampleFromBatchAndRefreshesTissueFlag()
+    {
+        _submissions.Setup(s => s.DeleteSampleSubmissionFromBatchAsync(1, 5, 99, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        var result = await sut.OnPostDeleteAsync(5);
+
+        Assert.IsType<RedirectToPageResult>(result);
+        _submissions.Verify(s => s.DeleteSampleSubmissionFromBatchAsync(1, 5, 99, It.IsAny<CancellationToken>()), Times.Once);
+        _batches.Verify(b => b.RefreshAllTissuesAssignedAsync(1, 99, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostDeleteAsync_WhenDeleteFails_DoesNotRefreshTissueFlag()
+    {
+        _submissions.Setup(s => s.DeleteSampleSubmissionFromBatchAsync(1, 5, 99, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        await sut.OnPostDeleteAsync(5);
+
+        _batches.Verify(b => b.RefreshAllTissuesAssignedAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Fact]
     public void IsViewMode_ReflectsSessionFlag()
     {
