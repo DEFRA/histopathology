@@ -36,6 +36,20 @@ public sealed class BlockService : IBlockService
         }
     }
 
+    /// <summary>Block refs the animal holds on other batches.</summary>
+    public async Task<IReadOnlyList<string>> GetBlockRefsOnOtherBatchesAsync(int animalId, int excludeBatchId, CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repo.GetBlockRefsOnOtherBatchesAsync(animalId, excludeBatchId, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to retrieve block refs for animal {AnimalId}.", ex, animalId);
+            return [];
+        }
+    }
+
     /// <summary>Returns pre-booked blocks for an animal.</summary>
     public async Task<IReadOnlyList<Block>> GetPreBookedByAnimalAsync(int animalId, CancellationToken ct = default)
     {

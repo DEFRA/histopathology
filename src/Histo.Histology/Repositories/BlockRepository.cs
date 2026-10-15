@@ -28,6 +28,16 @@ public sealed class BlockRepository : IBlockRepository
     }
 
     /// <inheritdoc/>
+    public async Task<IReadOnlyList<string>> GetBlockRefsOnOtherBatchesAsync(int animalId, int excludeBatchId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync<string>(
+            "SELECT RTRIM(BlockRef) FROM BatchBlock WHERE AnimalID = @AnimalID AND BatchID <> @BatchID AND BlockRef IS NOT NULL",
+            new { AnimalID = animalId, BatchID = excludeBatchId });
+        return rows.ToList();
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<Block>> GetPreBookedByAnimalAsync(int animalId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();

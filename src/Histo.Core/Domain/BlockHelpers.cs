@@ -34,13 +34,22 @@ public static class BlockHelpers
     /// high-water mark that only ever moves forward, so a ref freed by deleting a block is not
     /// handed out again. The result is never lower than it (legacy: <c>Animal.NextBlockRef</c>).
     /// </summary>
-    public static string ComputeNextBlockRef(IEnumerable<string> existingBlockRefs, string? storedNextBlockRef = null)
+    public static string ComputeNextBlockRef(IEnumerable<string> existingBlockRefs, string? storedNextBlockRef = null, string? afterBlockRef = null)
     {
-        var max = existingBlockRefs
+        var used = existingBlockRefs
             .Select(r => int.TryParse(r, out var n) ? n : 0)
-            .DefaultIfEmpty(0)
-            .Max();
+            .ToHashSet();
         var stored = int.TryParse(storedNextBlockRef, out var s) ? s : 0;
+
+        // Continuing from a known block: next number in sequence after it that is still free.
+        if (int.TryParse(afterBlockRef, out var after))
+        {
+            var candidate = Math.Max(after + 1, stored);
+            while (used.Contains(candidate)) candidate++;
+            return FormatBlockRef(candidate);
+        }
+
+        var max = used.DefaultIfEmpty(0).Max();
         return FormatBlockRef(Math.Max(max + 1, stored));
     }
 

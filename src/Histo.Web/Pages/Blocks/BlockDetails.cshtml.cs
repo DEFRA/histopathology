@@ -238,7 +238,8 @@ public class BlockDetailsModel : HistoPageModel
             // A block with no tissues was never actually used — exclude it from the "existing
             // refs" the next ref is computed from, so an abandoned/never-finished block's ref
             // becomes available again instead of being permanently skipped over.
-            var usedRefs = animalBlocks.Where(b => batchTissues.Any(t => t.OwnerID == b.ID)).Select(b => b.BlockRef);
+            var usedRefs = animalBlocks.Where(b => batchTissues.Any(t => t.OwnerID == b.ID)).Select(b => b.BlockRef)
+                .Concat(await GetOtherBatchRefsAsync(Animal.ID));
             NewBlockRef = IsPreCassetted
                 ? PreBookedBlockRefs.FirstOrDefault()?.BlockRef
                 : BlockHelpers.ComputeNextBlockRef(usedRefs, Animal.NextBlockRef);
@@ -446,7 +447,8 @@ public class BlockDetailsModel : HistoPageModel
             // Legacy: ValidateRequiredData "You can only enter a used Block Ref if you tick the
             // additional request box" — collapses to a plain duplicate check for submission types
             // where Additional Request is never offered. Excludes this block's own (unchanged) row.
-            if (allBlocks.Any(b => b.ID != BlockId && b.AnimalID == Animal.ID && b.BlockRef == NewBlockRef))
+            if (allBlocks.Any(b => b.ID != BlockId && b.AnimalID == Animal.ID && b.BlockRef == NewBlockRef)
+                || (refChanged && (await GetOtherBatchRefsAsync(Animal.ID)).Contains(NewBlockRef, StringComparer.OrdinalIgnoreCase)))
             {
                 ErrorMessage = "This block reference has already been used for this sample.";
                 return Page();
@@ -474,6 +476,7 @@ public class BlockDetailsModel : HistoPageModel
             var existingOrders = allBlocks.Select(b => b.Order).ToList();
             var existingRefs = allBlocks.Where(b => b.ID != current.ID).Select(b => b.BlockRef).ToList();
             existingRefs.Add(NewBlockRef);
+            existingRefs.AddRange(await GetOtherBatchRefsAsync(Animal.ID));
             var preBookedBlocksForCreate = IsPreCassetted ? PreBookedBlockRefs.ToList() : null;
             var blockRef = NewBlockRef;
 
@@ -496,7 +499,7 @@ public class BlockDetailsModel : HistoPageModel
                 }
                 else
                 {
-                    blockRef = BlockHelpers.ComputeNextBlockRef(existingRefs, Animal.NextBlockRef);
+                    blockRef = BlockHelpers.ComputeNextBlockRef(existingRefs, Animal.NextBlockRef, blockRef);
                     siblingId = await _blocks.AddBlockAsync(
                         BatchId ?? 0, Animal.ID, blockRef, existingOrders, Session.UserID,
                         customerRef: NewCustomerRef, comment: NewComment, repeatBlock: NewRepeatBlock);
@@ -644,7 +647,9 @@ public class BlockDetailsModel : HistoPageModel
         else
         {
             var nextRef = BlockHelpers.ComputeNextBlockRef(
-                allBlocks.Where(b => b.AnimalID == Animal.ID).Select(b => b.BlockRef), Animal.NextBlockRef);
+                allBlocks.Where(b => b.AnimalID == Animal.ID).Select(b => b.BlockRef)
+                    .Concat(await GetOtherBatchRefsAsync(Animal.ID)), Animal.NextBlockRef,
+                allBlocks.FirstOrDefault(b => b.ID == BlockId)?.BlockRef);
             newBlockId = await _blocks.AddBlockAsync(BatchId ?? 0, Animal.ID, nextRef, existingOrders, Session.UserID,
                 customerRef: null, comment: null, repeatBlock: false);
         }
@@ -679,6 +684,9 @@ public class BlockDetailsModel : HistoPageModel
             return "IHC selected — at least one antibody test must be selected.";
         return null;
     }
+
+    private async Task<IReadOnlyList<string>> GetOtherBatchRefsAsync(int animalId) =>
+        await _blocks.GetBlockRefsOnOtherBatchesAsync(animalId, BatchId ?? 0) ?? [];
 
     private async Task LoadSupportingDataAsync()
     {
