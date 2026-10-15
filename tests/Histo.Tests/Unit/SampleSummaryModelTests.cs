@@ -251,6 +251,32 @@ public class SampleSummaryModelTests
     }
 
     [Fact]
+    public async Task OnPostDeleteAsync_RemovesSampleFromBatchAndRefreshesTissueFlag()
+    {
+        _submissions.Setup(s => s.DeleteSampleSubmissionFromBatchAsync(1, 5, 99, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        var result = await sut.OnPostDeleteAsync(5);
+
+        Assert.IsType<RedirectToPageResult>(result);
+        _submissions.Verify(s => s.DeleteSampleSubmissionFromBatchAsync(1, 5, 99, It.IsAny<CancellationToken>()), Times.Once);
+        _batches.Verify(b => b.RefreshAllTissuesAssignedAsync(1, 99, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostDeleteAsync_WhenDeleteFails_DoesNotRefreshTissueFlag()
+    {
+        _submissions.Setup(s => s.DeleteSampleSubmissionFromBatchAsync(1, 5, 99, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        await sut.OnPostDeleteAsync(5);
+
+        _batches.Verify(b => b.RefreshAllTissuesAssignedAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public void IsViewMode_ReflectsSessionFlag()
     {
         _session.Setup(s => s.IsViewSubmissionMode).Returns(true);

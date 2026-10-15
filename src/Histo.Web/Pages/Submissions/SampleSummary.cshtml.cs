@@ -75,7 +75,7 @@ public class SampleSummaryModel : HistoPageModel
 
     public bool CanModifySamples => Batch?.Status is BatchStatus.Submitted or BatchStatus.Rejected;
 
-    /// <summary>Add sample/Finish are also offered once a submission is Received or In progress; Copy/Delete stay limited to <see cref="CanModifySamples"/>.</summary>
+    /// <summary>Add/Copy/Delete sample and Finish are also offered once a submission is Received or In progress.</summary>
     public bool CanAddSamples => CanModifySamples || Batch?.Status is BatchStatus.Received or BatchStatus.InProgress;
 
     /// <summary>
@@ -238,9 +238,21 @@ public class SampleSummaryModel : HistoPageModel
     /// </summary>
     public async Task<IActionResult> OnPostDeleteAsync(int animalId)
     {
-        if (!await _submissions.DeleteAnimalAsync(animalId, Session.UserID))
+        // Cascade delete scoped to this submission; DeleteAnimal would remove the shared Animal row and orphan other submissions' blocks.
+        var batchId = BatchId ?? Session.BatchID;
+        if (batchId is null or <= 0) return RedirectToPage("/Index");
+
+        var forbidden = await CheckBatchAccessAsync(_batches, batchId.Value);
+        if (forbidden is not null) return forbidden;
+
+        if (!await _submissions.DeleteSampleSubmissionFromBatchAsync(batchId.Value, animalId, Session.UserID))
+        {
             TempData["SampleSummary_Error"] = "Could not delete this sample. It may still have blocks or tissues recorded against it.";
-        return RedirectToPage(new { batchId = BatchId ?? Session.BatchID });
+            return RedirectToPage(new { batchId });
+        }
+
+        await _batches.RefreshAllTissuesAssignedAsync(batchId.Value, Session.UserID);
+        return RedirectToPage(new { batchId });
     }
 
     /// <summary>
