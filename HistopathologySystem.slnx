@@ -12,13 +12,28 @@
   </Folder>
   <Folder Name="/src/Database/" />
   <Folder Name="/src/Database/Migrations/">
+    <File Path="src/Database/Migrations/picklist-species-changes.sql" />
     <File Path="src/Database/Migrations/V20260914_01_User_Email_NotNull_NTLogin_Nullable.sql" />
     <File Path="src/Database/Migrations/V20260917_01_Deactivate_MouseBioassay_Neuropath_UserAreas.sql" />
+    <File Path="src/Database/Migrations/V20260928_01_Fix_Empty_String_NTLogin_To_Null.sql" />
   </Folder>
   <Folder Name="/src/Database/Deploy/">
     <File Path="src/Database/Deploy/Deploy.sql" />
   </Folder>
   <Folder Name="/src/Database/StoredProcedures/">
+    <File Path="src/Database/StoredProcedures/dbo.AddtlkpSpecies.sql" />
+    <File Path="src/Database/StoredProcedures/dbo.AddUser.sql" />
+    <File Path="src/Database/StoredProcedures/dbo.AdvanceAnimalNextBlockRef.sql" />
+    <File Path="src/Database/StoredProcedures/dbo.CountAnimalsByHistologyRef.sql" />
+    <File Path="src/Database/StoredProcedures/dbo.DeletetlkpSpecies.sql" />
+    <File Path="src/Database/StoredProcedures/dbo.DrawNextHistologyRefRun.sql" />
+    <File Path="src/Database/StoredProcedures/dbo.EditResetHistologyRef.sql" />
+    <File Path="src/Database/StoredProcedures/dbo.EdittlkpSpecies.sql" />
+    <File Path="src/Database/StoredProcedures/dbo.EditUser.sql" />
+    <File Path="src/Database/StoredProcedures/dbo.GetAnimalBlockArchiveInformation.sql" />
+    <File Path="src/Database/StoredProcedures/dbo.GetAnimalBlockRefsOnOtherBatches.sql" />
+    <File Path="src/Database/StoredProcedures/dbo.GetSearchBatchDetails.sql" />
+    <File Path="src/Database/StoredProcedures/dbo.GettlkpSpecies.sql" />
     <File Path="src/Database/StoredProcedures/dbo.GetUserByEmail.sql" />
   </Folder>
   <Folder Name="/tests/">
