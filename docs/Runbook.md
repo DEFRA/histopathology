@@ -77,7 +77,19 @@ msbuild HistopathologySystem\HistopathologySystem.sln /p:Configuration=Release /
 | `EditHistologyRefValidation` | `<appSettings>` | `True` | Enables validation on histology reference edits |
 | `compilation debug` | `<system.web>` | `true` | **Must be set to `false` for production** |
 | `authentication mode` | `<system.web>` | `Windows` | IIS Windows Authentication |
-| `sessionState timeout` | `<system.web>` | `90` | Session timeout in minutes |
+| `sessionState timeout` | `<system.web>` | `90` | **Legacy (.NET Framework) only.** Replaced in ASP.NET Core by `Session:IdleTimeoutMinutes` — see *Session idle timeout* below |
+
+### Session idle timeout (ASP.NET Core)
+
+One setting controls both the auth cookie (`Histo.Auth`) and the server-side session (`Histo.Session`):
+
+| Key | Default | Description |
+|---|---|---|
+| `Session:IdleTimeoutMinutes` | `20` | Idle timeout in minutes (minimum `1`). `appsettings.Development.json` uses a smaller value for testing; override per environment with `Session__IdleTimeoutMinutes` |
+| `Saml2:ForceAuthn` | `false` (`true` in `appsettings.json`) | When `true`, the SAML request forces Entra ID to ask for credentials again, so signing in after a timeout is not silent SSO |
+| `DataProtection:KeysPath` | _(unset)_ | Optional shared path for data-protection keys so cookies survive restarts and scale-out |
+
+After the timeout the user lands on `/SessionError` ("Your session has timed out"); the **Sign in again** button goes to `/signin`, which clears both cookies and starts the SAML sign-in, returning to the home page.
 
 ### Changing the database connection (local development)
 

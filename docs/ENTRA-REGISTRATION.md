@@ -55,6 +55,9 @@ After registration, populate these values in each environment's `appsettings.{en
 | `Saml2:SingleLogoutDestination` | Entra ID SLO URL — from SAML SSO setup page |
 | `Saml2:IdPSigningCertificate` | Base64-encoded Entra ID signing certificate (`.cer` → base64) |
 | `Saml2:SPCertificateThumbprint` | SP signing cert thumbprint — from IIS/Key Vault cert store |
+| `Saml2:ForceAuthn` | `true` to make Entra ID re-prompt for credentials on every sign-in (e.g. after a session timeout); default `false` |
+| `Session:IdleTimeoutMinutes` | Idle timeout for the auth cookie and session (default `20`, minimum `1`) |
+| `DataProtection:KeysPath` | Optional shared path for data-protection keys (cookies survive restarts/scale-out) |
 
 ---
 
