@@ -240,8 +240,18 @@ public class SampleSummaryModel : HistoPageModel
     {
         // Cascade delete scoped to this submission; DeleteAnimal would remove the shared Animal row and orphan other submissions' blocks.
         var batchId = BatchId ?? Session.BatchID;
-        if (batchId is null or <= 0 || !await _submissions.DeleteSampleFromBatchAsync(batchId.Value, animalId, Session.UserID))
+        if (batchId is null or <= 0) return RedirectToPage("/Index");
+
+        var forbidden = await CheckBatchAccessAsync(_batches, batchId.Value);
+        if (forbidden is not null) return forbidden;
+
+        if (!await _submissions.DeleteSampleSubmissionFromBatchAsync(batchId.Value, animalId, Session.UserID))
+        {
             TempData["SampleSummary_Error"] = "Could not delete this sample. It may still have blocks or tissues recorded against it.";
+            return RedirectToPage(new { batchId });
+        }
+
+        await _batches.RefreshAllTissuesAssignedAsync(batchId.Value, Session.UserID);
         return RedirectToPage(new { batchId });
     }
 
