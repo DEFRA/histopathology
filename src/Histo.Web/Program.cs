@@ -19,6 +19,7 @@ using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Localization;
@@ -64,6 +65,21 @@ try
     // -- Strongly-typed options -----------------------------------------------
     builder.Services.Configure<AppOptions>(
         builder.Configuration.GetSection(AppOptions.SectionName));
+
+    // One idle timeout drives both the auth cookie and the server-side session.
+    const string AuthCookieName = "Histo.Auth";
+    const string SessionCookieName = "Histo.Session";
+    const string SessionMarkerKey = "SessionStarted";
+    var idleTimeout = TimeSpan.FromMinutes(Math.Max(1, builder.Configuration.GetValue("Session:IdleTimeoutMinutes", 20)));
+
+    // Optional shared key ring so auth/session cookies survive restarts and scale-out.
+    var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
+    if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+    {
+        builder.Services.AddDataProtection()
+            .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath))
+            .SetApplicationName("Histo.Web");
+    }
 
     // -- Forwarded headers (reverse proxy / edge in front of App Service) -----
     // dev-cde.azure.defra.cloud terminates TLS and forwards to the App Service's
@@ -159,6 +175,10 @@ try
 
     builder.Services.AddSaml2(loginPath: "/Saml2/login", slidingExpiration: true, accessDeniedPath: "/AccessDenied");
 
+    // Challenge via the cookie scheme so an expired cookie reaches OnRedirectToLogin (and the
+    // /SessionError page) instead of going straight to Entra ID.
+    builder.Services.AddAuthentication(o => o.DefaultChallengeScheme = "saml2");
+
     // The default cookie challenge/forbid handlers build an ABSOLUTE redirect URI from
     // Request.Scheme/Request.Host. Behind a reverse proxy that doesn't forward a trusted
     // X-Forwarded-Host (or forwards headers UseForwardedHeaders isn't picking up), that
@@ -167,11 +187,33 @@ try
     // resolves it against whatever host is currently in the address bar.
     builder.Services.PostConfigure<CookieAuthenticationOptions>("saml2", options =>
     {
+        options.Cookie.Name = AuthCookieName;
+        options.Cookie.HttpOnly = true;
+        options.ExpireTimeSpan = idleTimeout;
+        options.SlidingExpiration = true;
+
         var originalRedirectToLogin = options.Events.OnRedirectToLogin;
         options.Events.OnRedirectToLogin = context =>
         {
+            var request = context.Request;
+
+            // A leftover auth cookie means the user was signed in and timed out, not a first visit.
+            // /signin is exempt: it deletes the stale cookie but this request still carries it.
+            if (request.Headers.Accept.ToString().Contains("text/html", StringComparison.OrdinalIgnoreCase)
+                && request.Cookies.ContainsKey(AuthCookieName)
+                && !request.Path.StartsWithSegments("/signin"))
+            {
+                context.Response.Redirect("/SessionError");
+                return Task.CompletedTask;
+            }
+
             if (Uri.TryCreate(context.RedirectUri, UriKind.Absolute, out var absoluteUri))
                 context.RedirectUri = absoluteUri.PathAndQuery;
+
+            // Only GET requests can be replayed after sign-in; anything else returns to the home page.
+            if (!HttpMethods.IsGet(request.Method))
+                context.RedirectUri = $"{options.LoginPath}?{options.ReturnUrlParameter}={Uri.EscapeDataString("/Index")}";
+
             return originalRedirectToLogin(context);
         };
 
@@ -191,7 +233,8 @@ try
     builder.Services.AddDistributedMemoryCache();
     builder.Services.AddSession(o =>
     {
-        o.IdleTimeout = TimeSpan.FromMinutes(30);
+        o.IdleTimeout = idleTimeout;
+        o.Cookie.Name = SessionCookieName;
         o.Cookie.HttpOnly = true;
         o.Cookie.IsEssential = true;
     });
@@ -335,11 +378,50 @@ try
     app.UseSession();
     app.UseAuthentication();
     app.UseSaml2();         // ITfoxtec SAML2 middleware — must follow UseAuthentication
+
+    // The auth cookie can outlive the server-side session (restart, idle expiry). A request that
+    // arrives signed in with a session cookie but no marker means the session expired -> timeout page.
+    // Static files are served earlier by UseStaticFiles and non-HTML requests are ignored.
+    string[] sessionExpirySkippedPaths = ["/health", "/Saml2", "/Errors", "/AccessDenied", "/SessionError", "/signin"];
+    app.Use(async (context, next) =>
+    {
+        if (context.User.Identity?.IsAuthenticated == true
+            && context.Request.Headers.Accept.ToString().Contains("text/html", StringComparison.OrdinalIgnoreCase)
+            && !sessionExpirySkippedPaths.Any(p => context.Request.Path.StartsWithSegments(p)))
+        {
+            await context.Session.LoadAsync();
+            if (context.Session.GetString(SessionMarkerKey) is null)
+            {
+                context.Session.SetString(SessionMarkerKey, "1");
+                if (context.Request.Cookies.ContainsKey(SessionCookieName))
+                {
+                    context.Response.Redirect("/SessionError");
+                    return;
+                }
+            }
+        }
+
+        await next();
+    });
+
     app.UseAuthorization();
 
     app.MapHealthChecks("/health");
     app.MapControllers(); // AuthController — SAML2 /Saml2/* endpoints
     app.MapRazorPages();
+
+    // Re-sign-in after a timeout: drop the stale cookies, then challenge the cookie scheme, which
+    // routes to /Saml2/login with a return to the home page (locally the dev bypass skips this).
+    app.MapGet("/signin", (HttpContext context) =>
+    {
+        context.Response.Cookies.Delete(AuthCookieName);
+        context.Response.Cookies.Delete(SessionCookieName);
+
+        if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("DevAuth:BypassEntraId"))
+            return Results.Redirect("/Index");
+
+        return Results.Challenge(new AuthenticationProperties { RedirectUri = "/Index" }, ["saml2"]);
+    }).AllowAnonymous();
 
     // Renamed to /Submissions/SampleSummary — "Block" is meaningless for Wet Tissue submissions.
     app.MapGet("/Submissions/BatchBlockSummary", (HttpRequest request) =>

@@ -29,15 +29,18 @@ public sealed class AuthController : ControllerBase
     private readonly Saml2Configuration _saml2Config;
     private readonly IUserService _users;
     private readonly ILogger<AuthController> _logger;
+    private readonly bool _forceAuthn;
 
     public AuthController(
         Saml2Configuration saml2Config,
         IUserService users,
-        ILogger<AuthController> logger)
+        ILogger<AuthController> logger,
+        IConfiguration configuration)
     {
         _saml2Config = saml2Config;
         _users       = users;
         _logger      = logger;
+        _forceAuthn  = configuration.GetValue<bool>("Saml2:ForceAuthn");
     }
 
     // ── SP-initiated login ──────────────────────────────────────────────────
@@ -55,7 +58,7 @@ public sealed class AuthController : ControllerBase
         if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
             binding.RelayState = returnUrl;
 
-        return binding.Bind(new Saml2AuthnRequest(_saml2Config)).ToActionResult();
+        return binding.Bind(new Saml2AuthnRequest(_saml2Config) { ForceAuthn = _forceAuthn }).ToActionResult();
     }
 
     // ── Assertion Consumer Service ──────────────────────────────────────────
