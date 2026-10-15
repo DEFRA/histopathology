@@ -33,7 +33,7 @@
 </form>
 
 @* "Add sample"/"Finish" — grouped so GDS renders them on one line (govuk-button-group). *@
-@if (Model.CanModifySamples && !Model.IsViewMode)
+@if (Model.CanAddSamples && !Model.IsViewMode)
 {
     <div class="govuk-button-group">
         <a asp-page="/Submissions/AddSubmission" asp-route-BatchId="@Model.BatchId" asp-route-batchSubmissionId="@Model.BatchSubmissionId"
