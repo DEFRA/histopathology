@@ -32,8 +32,9 @@ public sealed class BlockRepository : IBlockRepository
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<string>(
-            "SELECT RTRIM(BlockRef) FROM BatchBlock WHERE AnimalID = @AnimalID AND (BatchID IS NULL OR BatchID <> @BatchID) AND BlockRef IS NOT NULL",
-            new { AnimalID = animalId, BatchID = excludeBatchId });
+            "GetAnimalBlockRefsOnOtherBatches",
+            new { AnimalID = animalId, BatchID = excludeBatchId },
+            commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
 
@@ -104,8 +105,9 @@ public sealed class BlockRepository : IBlockRepository
     /// <summary>Refs held by the animal on other submissions, including unclaimed pre-booked placeholders.</summary>
     private static async Task<List<string>> OtherBatchRefsAsync(IDbConnection conn, IDbTransaction tx, int animalId, int batchId) =>
         (await conn.QueryAsync<string>(
-            "SELECT RTRIM(BlockRef) FROM BatchBlock WHERE AnimalID = @AnimalID AND (BatchID IS NULL OR BatchID <> @BatchID) AND BlockRef IS NOT NULL",
-            new { AnimalID = animalId, BatchID = batchId }, tx)).ToList();
+            "GetAnimalBlockRefsOnOtherBatches",
+            new { AnimalID = animalId, BatchID = batchId }, tx,
+            commandType: System.Data.CommandType.StoredProcedure)).ToList();
 
     /// <summary>Returns the requested ref, or the next free one in sequence if another submission took it first.</summary>
     private static async Task<string> ResolveFreeRefAsync(IDbConnection conn, IDbTransaction tx, Block block)
