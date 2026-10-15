@@ -264,14 +264,34 @@ public class QualityDataModel : GridPageModel
         var selected = all.Where(t => selectedIds.Contains(t.ID)).ToList();
         var concurrencyCount = 0;
 
+        // Legacy's iQCNoteID (declared once before the row loop in btnEdit_Click, reused for every
+        // row needing a note) creates exactly one new QC note per Edit click no matter how many rows
+        // are selected — the per-test _qc.AddAsync call below must mirror that same shared scope,
+        // not create a fresh note for every selected test that lacks one.
+        int? sharedNewQcNoteId = null;
+        var sharedNoteComments = new List<(BlockTest Test, string Comment)>();
+
         foreach (var test in selected)
         {
             var applyQcNote = isSingle ? QCNote : QCNote || test.QCNote;
             var qcNoteRef = test.QCNoteRef;
+            var joinedSharedNote = false;
             if (applyQcNote && qcNoteRef is null or 0)
             {
-                var newId = await _qc.AddAsync(batchId, Session.UserID);
-                if (newId > 0) qcNoteRef = newId;
+                if (!isSingle && sharedNewQcNoteId is > 0)
+                {
+                    qcNoteRef = sharedNewQcNoteId;
+                }
+                else
+                {
+                    var newId = await _qc.AddAsync(batchId, Session.UserID);
+                    if (newId > 0)
+                    {
+                        qcNoteRef = newId;
+                        if (!isSingle) sharedNewQcNoteId = newId;
+                    }
+                }
+                joinedSharedNote = !isSingle && qcNoteRef == sharedNewQcNoteId;
             }
             else if (!applyQcNote)
             {
@@ -280,6 +300,7 @@ public class QualityDataModel : GridPageModel
 
             var newArchiveLocation = Pick(isSingle, ArchiveLocationCode, test.ArchiveLocation);
             var newArchivedDate = isSingle ? ArchivedDate : ArchivedDate ?? test.ArchivedDate;
+            var newComment = Pick(isSingle, Comment, test.Comment);
 
             var updated = new BlockTest
             {
@@ -302,7 +323,7 @@ public class QualityDataModel : GridPageModel
                 DispatchedBy = Pick(isSingle, DispatchedBy, test.DispatchedBy),
                 PremiumCharge = test.PremiumCharge, // pass-through, not edited here
                 DispatchedTo = Pick(isSingle, DispatchedTo, test.DispatchedTo),
-                Comment = Pick(isSingle, Comment, test.Comment),
+                Comment = newComment,
                 RemedialAction = Pick(isSingle, RemedialAction, test.RemedialAction),
                 ArchiveLocation = newArchiveLocation,
                 ArchivedDate = newArchivedDate,
@@ -321,10 +342,28 @@ public class QualityDataModel : GridPageModel
                 // multi-row save; a single-row save always writes it, so unticking all clears them.
                 if (isSingle || SelectedCharges.Count > 0)
                     await _tests.SaveTCCodesAsync(batchId, test.ID, test.TestType, test.TCCodes, SelectedCharges, Session.UserID);
+
+                if (joinedSharedNote && !string.IsNullOrWhiteSpace(newComment))
+                    sharedNoteComments.Add((updated, newComment));
             }
             catch (BlockTestConcurrencyException)
             {
                 concurrencyCount++;
+            }
+        }
+
+        // New QC notes are created blank (legacy clsQCNote.NewQCNote sets only CreatedBy/DateCreated)
+        // — write every test comment onto the shared note now so it is immediately useful without a
+        // separate manual Edit QC Note step.
+        if (sharedNewQcNoteId is > 0 && sharedNoteComments.Count > 0)
+        {
+            var note = await _qc.GetByIdAsync(sharedNewQcNoteId.Value);
+            if (note is not null)
+            {
+                var text = string.Join(Environment.NewLine, sharedNoteComments
+                    .Select(c => $"{GetTestName(c.Test)} ({c.Test.HistologyRef} / {c.Test.BlockRef}): {c.Comment}"));
+                try { await _qc.UpdateAsync(sharedNewQcNoteId.Value, text, note.RowStamp ?? [], Session.UserID); }
+                catch (Histo.QualityControl.Models.QCNoteConcurrencyException) { /* test rows are already saved; note text is best-effort */ }
             }
         }
 

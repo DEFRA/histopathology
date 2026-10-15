@@ -19,10 +19,9 @@
 //     │     QC Note Ref | Submission Number | Project | Species | Stain Ref
 //     └── Body bordered box — fills remaining page height
 //           TestSummary (Sender Ref/Histo Ref/Block Ref/Test, monospaced — built by the
-//           DataSetBuilder from live SP row data, always present regardless of QCText),
-//           then QCText (the free-form note) below it. QCText alone cannot be trusted to
-//           contain the headings — it is copied verbatim from the SP and can be pure free
-//           text for a genuinely saved note.
+//           DataSetBuilder from live SP row data), then QCText (the free-form note) below it —
+//           TestSummary is skipped if QCText itself already starts with that same table (can
+//           happen if a user saved the Edit screen's auto-filled default verbatim).
 //   Footer (pinned): CreatedBy left  /  DateCreated right
 
 using System.Data;
@@ -37,7 +36,7 @@ namespace Histo.Reporting.Reports;
 /// Layout matches the legacy Crystal Reports A4 portrait QC Note form:
 /// <list type="bullet">
 ///   <item><description><b>Top bordered box</b>: 5 label/value rows — QCNoteRef, SubmissionNumber, Project, Species, StainRef.</description></item>
-///   <item><description><b>Body bordered box</b>: <c>TestSummary</c> (always present) followed by <c>QCText</c>, both monospaced. Expands to fill remaining page height.</description></item>
+///   <item><description><b>Body bordered box</b>: <c>TestSummary</c> (skipped if <c>QCText</c> already starts with the same table) followed by <c>QCText</c>, both monospaced. Expands to fill remaining page height.</description></item>
 ///   <item><description><b>Footer</b>: CreatedBy left, DateCreated right.</description></item>
 /// </list>
 /// <para>
@@ -45,8 +44,8 @@ namespace Histo.Reporting.Reports;
 /// QCNoteRef, SubmissionNumber, Project, Species, StainRef, QCText, TestSummary, CreatedBy, DateCreated.
 /// DateCreated is pre-formatted as "dd MMMM yyyy" by the DataSetBuilder — no parsing needed here.
 /// <c>TestSummary</c> is the Sender Ref/Histo Ref/Block Ref/Test table built directly from the SP's
-/// row data — it is always shown, because <c>QCText</c> alone is not a reliable source of these
-/// headings (a genuinely saved note can be pure free text with no such table embedded in it).
+/// row data. It is shown unless <c>QCText</c> already begins with that same table (e.g. a user saved
+/// the Edit screen's auto-filled default verbatim) — otherwise it would print twice.
 /// </para>
 /// </summary>
 public sealed class QCNoteRenderer
@@ -134,13 +133,16 @@ public sealed class QCNoteRenderer
                     // SECTION 2 — Detail / Body
                     // Bordered box that fills the remaining page height (Extend()).
                     // TestSummary (Sender Ref/Histo Ref/Block Ref/Test, built by the
-                    // DataSetBuilder from live SP data) is always shown first, followed by
-                    // QCText — QCText alone cannot be relied on to contain the headings.
+                    // DataSetBuilder from live SP data) is shown first, followed by QCText —
+                    // unless QCText itself already starts with that same table (a user can save
+                    // the Edit screen's auto-filled default table verbatim, or on top of their own
+                    // text), in which case showing TestSummary too would print it twice.
                     // ════════════════════════════════════════════════════════════
                     col.Item().Extend().Border(1).Padding(4).Column(body =>
                     {
                         body.Spacing(4);
-                        if (!string.IsNullOrEmpty(testSummary))
+                        var qcTextHasEmbeddedSummary = qcText.TrimStart().StartsWith("Sender Ref", StringComparison.Ordinal);
+                        if (!string.IsNullOrEmpty(testSummary) && !qcTextHasEmbeddedSummary)
                             body.Item().Text(testSummary).FontFamily("Consolas").FontSize(9);
                         body.Item().Text(qcText).FontFamily("Consolas").FontSize(9);
                     });
