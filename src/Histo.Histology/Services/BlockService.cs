@@ -36,19 +36,9 @@ public sealed class BlockService : IBlockService
         }
     }
 
-    /// <summary>Block refs the animal holds on other batches.</summary>
-    public async Task<IReadOnlyList<string>> GetBlockRefsOnOtherBatchesAsync(int animalId, int excludeBatchId, CancellationToken ct = default)
-    {
-        try
-        {
-            return await _repo.GetBlockRefsOnOtherBatchesAsync(animalId, excludeBatchId, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Failed to retrieve block refs for animal {AnimalId}.", ex, animalId);
-            return [];
-        }
-    }
+    /// <summary>Block refs the animal holds on other batches. Failures propagate: an unknown set must not read as "all free".</summary>
+    public Task<IReadOnlyList<string>> GetBlockRefsOnOtherBatchesAsync(int animalId, int excludeBatchId, CancellationToken ct = default) =>
+        _repo.GetBlockRefsOnOtherBatchesAsync(animalId, excludeBatchId, ct);
 
     /// <summary>Returns pre-booked blocks for an animal.</summary>
     public async Task<IReadOnlyList<Block>> GetPreBookedByAnimalAsync(int animalId, CancellationToken ct = default)
@@ -113,6 +103,10 @@ public sealed class BlockService : IBlockService
         {
             await _repo.SaveAsync(block, userId, ct);
             return true;
+        }
+        catch (DuplicateBlockRefException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

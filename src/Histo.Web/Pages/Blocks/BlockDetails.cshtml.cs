@@ -441,33 +441,41 @@ public class BlockDetailsModel : HistoPageModel
             }
         }
 
-        if (!CanUseAdditionalRequest)
+        if (!CanUseAdditionalRequest) NewRepeatBlock = false;
+
+        // Legacy: ValidateRequiredData "You can only enter a used Block Ref if you tick the additional
+        // request box". Excludes this block's own row; the cross-submission check is skipped for
+        // pre-cassetted, whose ref is a claimed pre-booked placeholder.
+        if (!NewRepeatBlock
+            && (allBlocks.Any(b => b.ID != BlockId && b.AnimalID == Animal.ID && b.BlockRef == NewBlockRef)
+                || (refChanged && !IsPreCassetted
+                    && (await GetOtherBatchRefsAsync(Animal.ID)).Contains(NewBlockRef, StringComparer.OrdinalIgnoreCase))))
         {
-            NewRepeatBlock = false;
-            // Legacy: ValidateRequiredData "You can only enter a used Block Ref if you tick the
-            // additional request box" — collapses to a plain duplicate check for submission types
-            // where Additional Request is never offered. Excludes this block's own (unchanged) row.
-            if (allBlocks.Any(b => b.ID != BlockId && b.AnimalID == Animal.ID && b.BlockRef == NewBlockRef)
-                || (refChanged && (await GetOtherBatchRefsAsync(Animal.ID)).Contains(NewBlockRef, StringComparer.OrdinalIgnoreCase)))
-            {
-                ErrorMessage = "This block reference has already been used for this sample.";
-                return Page();
-            }
+            ErrorMessage = "This block reference has already been used for this sample.";
+            return Page();
         }
 
-        await _blocks.UpdateBlockAsync(new Block
+        try
         {
-            ID = current.ID,
-            BatchID = current.BatchID,
-            AnimalID = current.AnimalID,
-            BlockRef = NewBlockRef,
-            CustomerRef = NewCustomerRef,
-            Comment = NewComment,
-            RepeatBlock = NewRepeatBlock,
-            Status = current.Status,
-            Order = current.Order,
-            RowStamp = current.RowStamp,
-        }, Session.UserID);
+            await _blocks.UpdateBlockAsync(new Block
+            {
+                ID = current.ID,
+                BatchID = current.BatchID,
+                AnimalID = current.AnimalID,
+                BlockRef = NewBlockRef,
+                CustomerRef = NewCustomerRef,
+                Comment = NewComment,
+                RepeatBlock = NewRepeatBlock,
+                Status = current.Status,
+                Order = current.Order,
+                RowStamp = current.RowStamp,
+            }, Session.UserID);
+        }
+        catch (DuplicateBlockRefException)
+        {
+            ErrorMessage = "This block reference has already been used for this sample.";
+            return Page();
+        }
         await _blockTests.SaveTestSelectionsAsync(
             BatchId ?? 0, current.ID, SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes, Session.UserID);
 
