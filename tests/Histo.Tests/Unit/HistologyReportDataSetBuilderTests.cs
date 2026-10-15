@@ -214,6 +214,23 @@ public class HistologyReportDataSetBuilderTests
         Assert.Equal("before 11.00", table.Rows[0]["TimeReceived"]);
     }
 
+    [Theory]
+    [InlineData("0")]
+    [InlineData("")]
+    public void BuildBatchTable_TimeReceivedNotSet_IsBlankNotZero(string rawCode)
+    {
+        // tblBatch.TimeReceived defaults to 0 (not NULL) before a batch is received — "0" is not
+        // a real LOOKUP_TIME_RECEIVED code, so it must print blank, not the literal code "0".
+        var timeReceivedByCode = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["2"] = "before 11.00" };
+        var row = DefaultBatchRow();
+        row["TimeReceived"] = rawCode;
+
+        var table = HistologyReportDataSetBuilder.BuildBatchTable(
+            rawBatch: [row], rawSubmittedAs: [], batchId: 99, timeReceivedByCode: timeReceivedByCode);
+
+        Assert.Equal(string.Empty, table.Rows[0]["TimeReceived"]);
+    }
+
     [Fact]
     public void BuildBatchTable_UnresolvedFixationCode_FallsBackToRawCode()
     {
