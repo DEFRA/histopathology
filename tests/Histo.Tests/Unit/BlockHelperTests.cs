@@ -73,6 +73,16 @@ public class BlockHelperTests
     }
 
     [Theory]
+    [InlineData(new[] { "01" }, "01", "02")]
+    [InlineData(new[] { "01", "02" }, "02", "03")]
+    [InlineData(new[] { "01", "02", "03" }, "02", "04")]
+    [InlineData(new[] { "01", "03" }, "01", "02")]
+    public void ComputeNextBlockRef_AfterBlock_TakesNextFreeNumberInSequence(string[] existing, string after, string expected)
+    {
+        Assert.Equal(expected, BlockHelpers.ComputeNextBlockRef(existing, null, after));
+    }
+
+    [Theory]
     [InlineData("01", "02")]
     [InlineData("09", "10")]
     [InlineData("99", "100")]

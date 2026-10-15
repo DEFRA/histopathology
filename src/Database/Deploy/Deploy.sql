@@ -36,6 +36,8 @@ GO
 GO
 :r ../StoredProcedures/dbo.AdvanceAnimalNextBlockRef.sql
 GO
+:r ../StoredProcedures/dbo.GetAnimalBlockRefsOnOtherBatches.sql
+GO
 :r ../StoredProcedures/dbo.CountAnimalsByHistologyRef.sql
 GO
 :r ../StoredProcedures/dbo.DrawNextHistologyRefRun.sql
