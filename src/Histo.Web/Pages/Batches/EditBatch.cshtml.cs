@@ -1,6 +1,8 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
 using Histo.Core.Domain;
+using Histo.Histology.Interfaces;
+using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -28,13 +30,18 @@ public class EditBatchModel : HistoPageModel
     private readonly IBatchService   _batches;
     private readonly ILookupService  _lookups;
     private readonly IUserService    _users;
+    private readonly IBlockService   _blocks;
+    private readonly IBlockTestService _blockTests;
 
-    public EditBatchModel(ISessionService session, IBatchService batches, ILookupService lookups, IUserService users)
+    public EditBatchModel(ISessionService session, IBatchService batches, ILookupService lookups, IUserService users,
+        IBlockService blocks, IBlockTestService blockTests)
         : base(session)
     {
         _batches = batches;
         _lookups = lookups;
         _users   = users;
+        _blocks  = blocks;
+        _blockTests = blockTests;
     }
 
     // ---- Required editable fields ----
@@ -355,13 +362,86 @@ public class EditBatchModel : HistoPageModel
         // Clear stain/antibody selections if their triggering histology codes aren't selected.
         var cleanedStainCodes    = ShowStains     ? SelectedStainCodes    : (IReadOnlyList<string>)[];
         var cleanedAntibodyCodes = ihcSelected     ? SelectedAntibodyCodes : (IReadOnlyList<string>)[];
+        var previousTests = await _batches.GetBatchTestSelectionsAsync(Batch.ID);
         if (!await _batches.SaveBatchTestSelectionsAsync(Batch.ID, SelectedHistologyCodes, cleanedAntibodyCodes, cleanedStainCodes, Session.UserID))
         {
             SaveError = "Submission saved, but failed to save test types. Please try again.";
             return Page();
         }
 
+        try
+        {
+            await AddNewTestsToExistingBlocksAsync(Batch.ID, previousTests, SelectedHistologyCodes, cleanedAntibodyCodes, cleanedStainCodes);
+        }
+        catch (Exception)
+        {
+            SaveError = "Submission saved, but the new tests could not be added to the existing blocks. Add them on each block instead.";
+            return Page();
+        }
+
         return RedirectToPage(ReturnPage, ParseReturnQuery());
+    }
+
+    /// <summary>
+    /// Ticks tests newly added to the submission on every block it already has, so the sample and
+    /// block pages show them. Deliberate enhancement: legacy only offered them unticked on each block.
+    /// </summary>
+    private async Task AddNewTestsToExistingBlocksAsync(int batchId, BatchTestSelections previous,
+        IReadOnlyList<string> histology, IReadOnlyList<string> antibodies, IReadOnlyList<string> stains)
+    {
+        static List<string> Added(IReadOnlyList<string> now, IReadOnlyList<BatchTestSelectionRow> before) =>
+            now.Except(before.Select(r => r.Code), StringComparer.OrdinalIgnoreCase).ToList();
+
+        var addedHistology  = Added(histology, previous.Histology);
+        var addedAntibodies = Added(antibodies, previous.Antibodies);
+        var addedStains     = Added(stains, previous.Stains);
+        if (addedHistology.Count == 0 && addedAntibodies.Count == 0 && addedStains.Count == 0) return;
+
+        var blocks = (await _blocks.GetByBatchAsync(batchId)).Where(b => b.Status == BlockStatus.Used).ToList();
+        if (blocks.Count == 0) return;
+
+        // Every code, not the QC worklist subset — the save below is a delta sync against these.
+        var tests = await _blockTests.GetAllSelectionsByBatchAsync(batchId);
+        foreach (var block in blocks)
+        {
+            List<string> Codes(string type) => tests.Where(t => t.BlockID == block.ID && t.TestType == type).Select(t => t.Code).ToList();
+            var merged = MergeAddedTests(
+                Codes(BlockTestType.Histology), Codes(BlockTestType.Antibodies), Codes(BlockTestType.Stain),
+                addedHistology, addedAntibodies, addedStains);
+            if (merged is null) continue;
+
+            await _blockTests.SaveTestSelectionsAsync(batchId, block.ID, merged.Value.Histology, merged.Value.Antibodies, merged.Value.Stains, Session.UserID);
+        }
+    }
+
+    /// <summary>
+    /// A block's tests plus the newly added ones, honouring the block rules: EO and Archive can't be
+    /// combined with other histology, antibodies need IHC and stains need Special Stain. Null when nothing changes.
+    /// </summary>
+    public static (List<string> Histology, List<string> Antibodies, List<string> Stains)? MergeAddedTests(
+        IReadOnlyList<string> histology, IReadOnlyList<string> antibodies, IReadOnlyList<string> stains,
+        IReadOnlyList<string> addedHistology, IReadOnlyList<string> addedAntibodies, IReadOnlyList<string> addedStains)
+    {
+        static bool IsExclusive(string code) => code == HistologyCode.EO || code == HistologyCode.Archive;
+
+        var mergedHistology = histology.ToList();
+        if (!mergedHistology.Any(IsExclusive))
+        {
+            mergedHistology.AddRange(addedHistology.Where(c => !IsExclusive(c) && !mergedHistology.Contains(c)));
+            if (mergedHistology.Count == 0)
+                mergedHistology.AddRange(addedHistology.Where(IsExclusive).Take(1));
+        }
+
+        var mergedAntibodies = antibodies.ToList();
+        if (mergedHistology.Contains(HistologyCode.IhcPrp) || mergedHistology.Contains(HistologyCode.IhcOther))
+            mergedAntibodies.AddRange(addedAntibodies.Where(c => !mergedAntibodies.Contains(c)));
+
+        var mergedStains = stains.ToList();
+        if (mergedHistology.Contains(HistologyCode.SpecialStain))
+            mergedStains.AddRange(addedStains.Where(c => !mergedStains.Contains(c)));
+
+        var changed = mergedHistology.Count != histology.Count || mergedAntibodies.Count != antibodies.Count || mergedStains.Count != stains.Count;
+        return changed ? (mergedHistology, mergedAntibodies, mergedStains) : null;
     }
 
     /// <summary>Parses <see cref="ISessionService.ReturnPageQuery"/> into route values so a

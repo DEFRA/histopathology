@@ -102,7 +102,11 @@ else
                     {
                         <div class="govuk-hint">Pre-cassetted submission — defaults to the next pre-booked block reference. Change it if you need to use a different pre-booked reference.</div>
                     }
-                    <input class="govuk-input govuk-input--width-3" asp-for="NewBlockRef" maxlength="3" />
+                    else if (!Model.IsPreCassetted)
+                    {
+                        <div id="NewBlockRef-hint" class="govuk-hint">To re-use blocks this sender ref already has on another submission, enter the first block ref and the number of blocks.</div>
+                    }
+                    <input class="govuk-input govuk-input--width-3" asp-for="NewBlockRef" maxlength="3" aria-describedby="@(Model.IsPreCassetted ? null : "NewBlockRef-hint")" />
                 </div>
                 <div class="govuk-form-group">
                     <label class="govuk-label" for="NewNumberOfBlocks">Number of blocks</label>

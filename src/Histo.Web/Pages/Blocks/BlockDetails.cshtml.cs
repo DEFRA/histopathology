@@ -523,45 +523,39 @@ public class BlockDetailsModel : HistoPageModel
         if (!CanUseAdditionalRequest) NewRepeatBlock = false;
 
         // Legacy: ValidateRequiredData "You can only enter a used Block Ref if you tick the additional
-        // request box". Excludes this block's own row; the cross-submission check is skipped for
-        // pre-cassetted, whose ref is a claimed pre-booked placeholder.
+        // request box" — checked against THIS submission's blocks only. A ref the sample holds on another
+        // submission may be entered again (re-using existing blocks), exactly as legacy allowed.
         if (!NewRepeatBlock
-            && (allBlocks.Any(b => b.ID != current.ID && b.AnimalID == current.AnimalID && b.BlockRef == NewBlockRef)
-                || (refChanged && !IsPreCassetted
-                    && (await GetOtherBatchRefsAsync(animal.ID)).Contains(NewBlockRef, StringComparer.OrdinalIgnoreCase))))
+            && allBlocks.Any(b => b.ID != current.ID && b.AnimalID == current.AnimalID && b.BlockRef == NewBlockRef))
         {
-            return "This block reference has already been used for this sample.";
+            return "This block reference has already been used for this sample on this submission.";
         }
 
-        try
+        await _blocks.UpdateBlockAsync(new Block
         {
-            await _blocks.UpdateBlockAsync(new Block
-            {
-                ID = current.ID,
-                BatchID = current.BatchID,
-                AnimalID = current.AnimalID,
-                BlockRef = NewBlockRef!,
-                CustomerRef = NewCustomerRef,
-                Comment = NewComment,
-                RepeatBlock = NewRepeatBlock,
-                Status = current.Status,
-                Order = current.Order,
-                RowStamp = current.RowStamp,
-            }, Session.UserID);
-        }
-        catch (DuplicateBlockRefException)
-        {
-            return "This block reference has already been used for this sample.";
-        }
+            ID = current.ID,
+            BatchID = current.BatchID,
+            AnimalID = current.AnimalID,
+            BlockRef = NewBlockRef!,
+            CustomerRef = NewCustomerRef,
+            Comment = NewComment,
+            RepeatBlock = NewRepeatBlock,
+            Status = current.Status,
+            Order = current.Order,
+            RowStamp = current.RowStamp,
+        }, Session.UserID);
         await _blockTests.SaveTestSelectionsAsync(
             BatchId ?? 0, current.ID, SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes, Session.UserID);
 
         if (count > 1)
         {
             var existingOrders = allBlocks.Select(b => b.Order).ToList();
-            var existingRefs = allBlocks.Where(b => b.ID != current.ID).Select(b => b.BlockRef).ToList();
+            // Legacy CreateMultiBlocks: count on from the entered ref, skipping refs this sample already has
+            // on this submission and its pre-booked refs — refs from other submissions are re-used.
+            var existingRefs = allBlocks.Where(b => b.ID != current.ID && b.AnimalID == current.AnimalID).Select(b => b.BlockRef).ToList();
             existingRefs.Add(NewBlockRef!);
-            existingRefs.AddRange(await GetOtherBatchRefsAsync(animal.ID));
+            if (!IsPreCassetted)
+                existingRefs.AddRange((await _blocks.GetPreBookedByAnimalAsync(animal.ID) ?? []).Select(b => b.BlockRef));
             var preBookedBlocksForCreate = IsPreCassetted ? PreBookedBlockRefs.ToList() : null;
             var blockRef = NewBlockRef!;
 
@@ -584,8 +578,8 @@ public class BlockDetailsModel : HistoPageModel
                 }
                 else
                 {
-                    blockRef = BlockHelpers.ComputeNextBlockRef(existingRefs, animal.NextBlockRef, blockRef);
-                    siblingId = await _blocks.AddBlockAsync(
+                    blockRef = BlockHelpers.ComputeNextBlockRef(existingRefs, null, blockRef);
+                    siblingId = await _blocks.AddBlockKeepingRefAsync(
                         BatchId ?? 0, current.AnimalID, blockRef, existingOrders, Session.UserID,
                         customerRef: NewCustomerRef, comment: NewComment, repeatBlock: NewRepeatBlock);
                 }
