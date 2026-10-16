@@ -46,6 +46,20 @@ public sealed class QCNoteService : IQCNoteService
         await _repo.UpdateAsync(qcNoteId, text, rowStamp, userId, ct);
     }
 
+    /// <inheritdoc/>
+    public async Task<SubmissionQCNote?> GetOrCreateForSubmissionAsync(int batchId, int testId, string testType, int userId, CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repo.GetOrCreateForSubmissionAsync(batchId, testId, testType, userId, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get or create the QC note for submission {SubmissionId}.", ex, batchId);
+            return null;
+        }
+    }
+
     /// <summary>Matches the <c>QCNotes.QCText</c> / <c>EditQCNote @QCText</c> size.</summary>
     public const int MaxTextLength = 4000;
 
@@ -57,8 +71,12 @@ public sealed class QCNoteService : IQCNoteService
 
         // A never-edited note's Text is the generated test table, so appending persists that table too.
         var existing = (note.Text ?? string.Empty).TrimEnd();
+        var existingLines = existing.Replace("\r\n", "\n").Split('\n')
+            .Select(l => l.Trim())
+            .ToHashSet(StringComparer.Ordinal);
         var toAdd = lines
-            .Where(l => !string.IsNullOrWhiteSpace(l) && !existing.Contains(l, StringComparison.Ordinal))
+            .Select(l => l?.Trim() ?? string.Empty)
+            .Where(l => l.Length > 0 && !existingLines.Contains(l))
             .Distinct(StringComparer.Ordinal)
             .ToList();
         if (toAdd.Count == 0) return QCNoteAppendResult.NothingToAppend;

@@ -160,14 +160,18 @@ public class EditQualityDataTestModel : HistoPageModel
 
         // One QC note per submission; the checkbox is disabled (so not posted) once it exists.
         var qcNoteRef = Test.QCNoteRef is > 0 ? Test.QCNoteRef : SubmissionQCNoteRef;
+        var rowStamp = Test.RowStamp;
+        string? noteWarning = null;
         if (qcNoteRef is > 0)
         {
             QCNote = true;
         }
         else if (QCNote)
         {
-            var newId = await _qc.AddAsync(Session.BatchID.Value, Session.UserID);
-            qcNoteRef = newId > 0 ? newId : null;
+            var note = await _qc.GetOrCreateForSubmissionAsync(Session.BatchID.Value, Test.ID, Test.TestType, Session.UserID);
+            qcNoteRef = note?.QCNoteRef;
+            if (note is null) noteWarning = QCNoteText.CreateFailedWarning;
+            if (note?.LinkedTestRowStamp is not null) rowStamp = note.LinkedTestRowStamp;
         }
         else
         {
@@ -201,7 +205,7 @@ public class EditQualityDataTestModel : HistoPageModel
             NumberOfSlides = NumberOfSlides,
             OnHold = Test.OnHold,
             Archived = !string.IsNullOrWhiteSpace(ArchiveLocation) && ArchivedDate is not null,
-            RowStamp = Test.RowStamp,
+            RowStamp = rowStamp,
         };
 
         try
@@ -211,10 +215,15 @@ public class EditQualityDataTestModel : HistoPageModel
                 Session.BatchID.Value, TestId, Test.TestType,
                 Test.TCCodes, SelectedCharges, Session.UserID);
             if (qcNoteRef is > 0 && !string.IsNullOrWhiteSpace(Comment))
-                await _qc.AppendAsync(qcNoteRef.Value,
-                    [$"{Test.TestDetails ?? Test.Code} ({Test.HistologyRef} / {Test.BlockRef}): {Comment.Trim()}"],
-                    Session.UserID);
+            {
+                var batch = await _batches.GetByIdAsync(Session.BatchID.Value);
+                var names = await QCNoteText.LoadTestNamesAsync(_lookups, batch?.BatchType ?? Histo.Submissions.Models.BatchTypeConstants.Tse);
+                var outcome = await _qc.AppendAsync(qcNoteRef.Value,
+                    [QCNoteText.Line(Test, QCNoteText.TestName(names, Test), Comment)], Session.UserID);
+                noteWarning ??= QCNoteText.AppendWarning(outcome, qcNoteRef.Value);
+            }
             await CompleteBatchIfAllTestsDispatchedAsync(Session.BatchID.Value);
+            if (noteWarning is not null) TempData[QCNoteText.WarningTempDataKey] = noteWarning;
             return RedirectToPage("/QC/QualityData");
         }
         catch (BlockTestConcurrencyException)

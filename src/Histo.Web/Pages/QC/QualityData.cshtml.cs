@@ -32,9 +32,6 @@ public class QualityDataModel : GridPageModel
     private readonly IUserService _users;
     private readonly IQCNoteService _qc;
 
-    private const int LookupAntibodiesTse    = 4;
-    private const int LookupAntibodiesNonTse = 5;
-    private const int LookupSpecialStain     = 6;
     private const int LookupHistologyTse     = 7;
     private const int LookupHistologyNonTse  = 8;
     private const int LookupQcCode           = 14;
@@ -134,6 +131,20 @@ public class QualityDataModel : GridPageModel
     public static int? SubmissionQCNoteRefOf(IEnumerable<BlockTest> tests) =>
         tests.Where(t => t.QCNoteRef is > 0).Select(t => t.QCNoteRef).Max();
 
+    /// <summary>Every ref on the submission, newest first; usually one.</summary>
+    public IReadOnlyList<int> SubmissionQCNoteRefs { get; private set; } = [];
+
+    /// <summary>Refs the selection is (or will be) linked to: each row's own ref, else the latest one.</summary>
+    public string QCNoteRefDisplay()
+    {
+        var selected = Tests.Where(t => SelectedIds.Contains(t.ID)).ToList();
+        if (selected.Count == 0) return SubmissionQCNoteRefs.Count == 1 ? SubmissionQCNoteRefs[0].ToString() : string.Empty;
+
+        var refs = selected.Select(t => t.QCNoteRef is > 0 ? t.QCNoteRef : SubmissionQCNoteRef)
+            .Where(r => r is > 0).Distinct().OrderBy(r => r);
+        return string.Join(", ", refs);
+    }
+
     /// <summary>Tests were saved but their comments could not be added to the QC note.</summary>
     public string? NoteWarning { get; private set; }
 
@@ -149,8 +160,7 @@ public class QualityDataModel : GridPageModel
     // Resolved code→name map keyed as "TestType|Code"
     private IReadOnlyDictionary<string, string> _testNameMap = new Dictionary<string, string>();
 
-    public string GetTestName(BlockTest t) =>
-        _testNameMap.TryGetValue($"{t.TestType}|{t.Code}", out var n) ? n : t.Code;
+    public string GetTestName(BlockTest t) => QCNoteText.TestName(_testNameMap, t);
 
     public IReadOnlyList<BlockTest> PagedEntries =>
         (SortColumn switch
@@ -211,6 +221,8 @@ public class QualityDataModel : GridPageModel
 
         Tests = ApplyCurrentFilter(allTests).ToList();
         SubmissionQCNoteRef = SubmissionQCNoteRefOf(allTests);
+        SubmissionQCNoteRefs = RefsOf(allTests, null);
+        NoteWarning = TempData[QCNoteText.WarningTempDataKey] as string;
 
         await LoadEditLookupsAsync();
         PopulateGridViewData(Tests.Count);
@@ -275,6 +287,8 @@ public class QualityDataModel : GridPageModel
 
         var selected = all.Where(t => selectedIds.Contains(t.ID)).ToList();
         var concurrencyCount = 0;
+        // Names must be loaded before note lines are built; otherwise GetTestName falls back to raw codes.
+        await ResolveTestNamesAsync((await _batches.GetByIdAsync(batchId))?.BatchType ?? Histo.Submissions.Models.BatchTypeConstants.Tse);
 
         // One QC note per submission: once any test has a ref, every later update is linked to it.
         var submissionRef = SubmissionQCNoteRefOf(all);
@@ -283,10 +297,21 @@ public class QualityDataModel : GridPageModel
         var anyNeedsRef = selected.Any(t => AppliesQcNote(t) && t.QCNoteRef is null or 0);
 
         int? targetRef = submissionRef;
+        BlockTest? linkedTest = null;
+        byte[]? linkedRowStamp = null;
         if (anyNeedsRef && targetRef is null)
         {
-            var newId = await _qc.AddAsync(batchId, Session.UserID);
-            if (newId > 0) targetRef = newId;
+            var first = selected.First(t => AppliesQcNote(t) && t.QCNoteRef is null or 0);
+            var note = await _qc.GetOrCreateForSubmissionAsync(batchId, first.ID, first.TestType, Session.UserID);
+            if (note is null)
+            {
+                NoteWarning = "The QC note could not be created, so the tests were saved without one.";
+            }
+            else
+            {
+                targetRef = note.QCNoteRef;
+                if (note.LinkedTestRowStamp is not null) (linkedTest, linkedRowStamp) = (first, note.LinkedTestRowStamp);
+            }
         }
 
         var noteLines = new Dictionary<int, List<string>>();
@@ -330,7 +355,7 @@ public class QualityDataModel : GridPageModel
                 NumberOfSlides = isSingle ? NumberOfSlides : NumberOfSlides ?? test.NumberOfSlides,
                 OnHold = test.OnHold,
                 Archived = !string.IsNullOrWhiteSpace(newArchiveLocation) && newArchivedDate is not null,
-                RowStamp = test.RowStamp,
+                RowStamp = ReferenceEquals(test, linkedTest) ? linkedRowStamp : test.RowStamp,
             };
 
             try
@@ -346,7 +371,7 @@ public class QualityDataModel : GridPageModel
                 if (qcNoteRef is > 0 && !string.IsNullOrWhiteSpace(newComment))
                 {
                     if (!noteLines.TryGetValue(qcNoteRef.Value, out var lines)) noteLines[qcNoteRef.Value] = lines = [];
-                    lines.Add($"{GetTestName(test)} ({test.HistologyRef} / {test.BlockRef}): {newComment.Trim()}");
+                    lines.Add(QCNoteText.Line(test, GetTestName(test), newComment));
                 }
             }
             catch (BlockTestConcurrencyException)
@@ -358,13 +383,7 @@ public class QualityDataModel : GridPageModel
         foreach (var (noteRef, lines) in noteLines)
         {
             var outcome = await _qc.AppendAsync(noteRef, lines, Session.UserID);
-            NoteWarning ??= outcome switch
-            {
-                QCNoteAppendResult.TooLong => $"QC note {noteRef} is full, so the comments were not added to it. Edit the note to make room.",
-                QCNoteAppendResult.Concurrency => $"QC note {noteRef} was changed by another user, so the comments were not added to it.",
-                QCNoteAppendResult.NotFound => $"QC note {noteRef} could not be found, so the comments were not added to it.",
-                _ => null,
-            };
+            NoteWarning ??= QCNoteText.AppendWarning(outcome, noteRef);
         }
 
         if (linkedAny) SubmissionQCNoteRef = targetRef;
@@ -455,10 +474,15 @@ public class QualityDataModel : GridPageModel
 
         Tests = ApplyCurrentFilter(allTests).ToList();
         SubmissionQCNoteRef ??= SubmissionQCNoteRefOf(allTests);
+        SubmissionQCNoteRefs = RefsOf(allTests, SubmissionQCNoteRef);
 
         await LoadEditLookupsAsync();
         PopulateGridViewData(Tests.Count);
     }
+
+    private static IReadOnlyList<int> RefsOf(IEnumerable<BlockTest> tests, int? alsoInclude) =>
+        tests.Select(t => t.QCNoteRef).Append(alsoInclude)
+            .Where(r => r is > 0).Select(r => r!.Value).Distinct().OrderByDescending(r => r).ToList();
 
     private async Task LoadEditLookupsAsync()
     {
@@ -469,21 +493,8 @@ public class QualityDataModel : GridPageModel
         Users            = await _users.GetAllUsersAsync();
     }
 
-    private async Task ResolveTestNamesAsync(int batchType)
-    {
-        var antibodyId = batchType == Histo.Submissions.Models.BatchTypeConstants.Tse ? LookupAntibodiesTse : LookupAntibodiesNonTse;
-
-        var histTask     = _lookups.GetHistologyTypesAsync();
-        var antibodyTask = _lookups.GetLookupDataAsync(antibodyId);
-        var stainTask    = _lookups.GetLookupDataAsync(LookupSpecialStain);
-        await Task.WhenAll(histTask, antibodyTask, stainTask);
-
-        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var i in histTask.Result)     map[$"Histology|{i.Code ?? i.ID.ToString()}"]  = i.Name;
-        foreach (var i in antibodyTask.Result) map[$"Antibodies|{i.Code ?? i.ID.ToString()}"] = i.Name;
-        foreach (var i in stainTask.Result)    map[$"Stain|{i.Code ?? i.ID.ToString()}"]      = i.Name;
-        _testNameMap = map;
-    }
+    private async Task ResolveTestNamesAsync(int batchType) =>
+        _testNameMap = await QCNoteText.LoadTestNamesAsync(_lookups, batchType);
 
     private async Task ResolveBatchSummaryAsync(Batch batch)
     {

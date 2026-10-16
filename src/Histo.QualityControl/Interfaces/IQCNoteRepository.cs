@@ -33,6 +33,12 @@ public interface IQCNoteRepository
     Task<int> AddAsync(int submissionId, int createdByUserId, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns the submission's QC note, creating it and linking <paramref name="testId"/> to it if none exists.
+    /// Serialised per submission with <c>sp_getapplock</c> so concurrent saves can't create two notes.
+    /// </summary>
+    Task<SubmissionQCNote> GetOrCreateForSubmissionAsync(int batchId, int testId, string testType, int userId, CancellationToken ct = default);
+
+    /// <summary>
     /// Returns all QC notes system-wide (no batch filter).
     /// Maps to <c>GetBatchQCNotes</c> with no ID parameter — matches legacy <c>QCNotes.aspx</c>
     /// global load behaviour.

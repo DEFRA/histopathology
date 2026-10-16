@@ -62,6 +62,19 @@ public class QCNoteServiceTests
     }
 
     [Fact]
+    public async Task AppendAsync_ShorterCommentThatIsPrefixOfExistingLine_IsStillAppended()
+    {
+        SetupNote("H&E (26/1 / 01): repeat stain\r\nOther line");
+
+        var result = await BuildSut().AppendAsync(5, ["H&E (26/1 / 01): repeat"], 99);
+
+        Assert.Equal(QCNoteAppendResult.Appended, result);
+        _repoMock.Verify(r => r.UpdateAsync(5,
+            It.Is<string>(s => s.EndsWith(Environment.NewLine + "H&E (26/1 / 01): repeat")),
+            It.IsAny<byte[]>(), 99, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task AppendAsync_AllLinesAlreadyPresent_DoesNotWrite()
     {
         SetupNote("H&E (26/1 / 01): first");

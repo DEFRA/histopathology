@@ -44,6 +44,7 @@ public class QualityDataModelTests
                 ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()),
                 HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext(),
             },
+            TempData = new TempDataDictionary(new Microsoft.AspNetCore.Http.DefaultHttpContext(), Mock.Of<ITempDataProvider>()),
         };
 
     [Fact]
@@ -233,7 +234,7 @@ public class QualityDataModelTests
             .ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1), MakeTest(2)]);
         _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
         var saved = CaptureSaves();
-        _qc.Setup(q => q.AddAsync(42, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(500);
+        _qc.Setup(AnyNoteCreation).ReturnsAsync(new SubmissionQCNote(500, null));
         var sut = CreateSut();
         sut.SelectedIds = [1, 2];
         sut.QCNote = true;
@@ -241,7 +242,7 @@ public class QualityDataModelTests
 
         await sut.OnPostUpdateAsync();
 
-        _qc.Verify(q => q.AddAsync(42, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+        _qc.Verify(AnyNoteCreation, Times.Once);
         Assert.Equal(2, saved.Count);
         Assert.All(saved, bt => Assert.Equal(500, bt.QCNoteRef));
         Assert.Equal(500, sut.SubmissionQCNoteRef);
@@ -259,6 +260,9 @@ public class QualityDataModelTests
         return saved;
     }
 
+    private static readonly System.Linq.Expressions.Expression<Func<IQCNoteService, Task<SubmissionQCNote?>>> AnyNoteCreation =
+        q => q.GetOrCreateForSubmissionAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>());
+
     private static BlockTest WithNote(BlockTest t, int? noteRef) => new()
     {
         ID = t.ID, BlockID = t.BlockID, TestType = t.TestType, Code = t.Code, HistologyRef = t.HistologyRef,
@@ -271,7 +275,8 @@ public class QualityDataModelTests
         _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1)]);
         _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
         var saved = CaptureSaves();
-        _qc.Setup(q => q.AddAsync(42, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(700);
+        _qc.Setup(q => q.GetOrCreateForSubmissionAsync(42, 1, "Histology", It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SubmissionQCNote(700, [9, 9, 9]));
         var sut = CreateSut();
         sut.SelectedIds = [1];
         sut.QCNote = true;
@@ -279,9 +284,29 @@ public class QualityDataModelTests
 
         await sut.OnPostUpdateAsync();
 
-        _qc.Verify(q => q.AddAsync(42, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
-        Assert.Equal(700, Assert.Single(saved).QCNoteRef);
+        _qc.Verify(AnyNoteCreation, Times.Once);
+        var row = Assert.Single(saved);
+        Assert.Equal(700, row.QCNoteRef);
+        Assert.Equal(new byte[] { 9, 9, 9 }, row.RowStamp); // the link bumped the row's rowstamp inside the note transaction
         Assert.Equal(700, sut.SubmissionQCNoteRef);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_NoteCreationFails_TestsSavedWithoutRef_WarningShown()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var saved = CaptureSaves();
+        _qc.Setup(AnyNoteCreation).ReturnsAsync((SubmissionQCNote?)null);
+        var sut = CreateSut();
+        sut.SelectedIds = [1];
+        sut.QCNote = true;
+        sut.NumberOfSlides = 1;
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Null(Assert.Single(saved).QCNoteRef);
+        Assert.Contains("could not be created", sut.NoteWarning);
     }
 
     [Fact]
@@ -299,11 +324,11 @@ public class QualityDataModelTests
 
         await sut.OnPostUpdateAsync();
 
-        _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _qc.Verify(AnyNoteCreation, Times.Never);
         Assert.Equal(321, Assert.Single(saved).QCNoteRef);
         Assert.Equal(321, sut.SubmissionQCNoteRef);
         _qc.Verify(q => q.AppendAsync(321,
-            It.Is<IReadOnlyList<string>>(l => l.Single() == "1 (24/001 / 01): second update"),
+            It.Is<IReadOnlyList<string>>(l => l.Single() == "Histology - 1 (24/001 / 01): second update"),
             It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -340,7 +365,7 @@ public class QualityDataModelTests
 
         await sut.OnPostUpdateAsync();
 
-        _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _qc.Verify(AnyNoteCreation, Times.Never);
         Assert.Equal(3, saved.Count);
         Assert.All(saved, bt => Assert.Equal(321, bt.QCNoteRef));
         Assert.Equal(321, sut.SubmissionQCNoteRef);
@@ -359,7 +384,7 @@ public class QualityDataModelTests
 
         await sut.OnPostUpdateAsync();
 
-        _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _qc.Verify(AnyNoteCreation, Times.Never);
         Assert.Equal(321, saved.Single(t => t.ID == 1).QCNoteRef);
         Assert.Equal(322, saved.Single(t => t.ID == 2).QCNoteRef);
         Assert.Equal(322, saved.Single(t => t.ID == 3).QCNoteRef);
@@ -381,7 +406,7 @@ public class QualityDataModelTests
 
         await sut.OnPostUpdateAsync();
 
-        _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _qc.Verify(AnyNoteCreation, Times.Never);
         var row = Assert.Single(saved);
         Assert.Equal(321, row.QCNoteRef);
         Assert.True(row.QCNote);
@@ -400,6 +425,69 @@ public class QualityDataModelTests
         await sut.OnGetAsync();
 
         Assert.Equal(321, sut.SubmissionQCNoteRef);
+        Assert.Equal("321", sut.QCNoteRefDisplay());
+    }
+
+    [Fact]
+    public async Task OnGetAsync_WarningFromSingleTestEditor_IsShown()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var sut = CreateSut();
+        sut.TempData[QCNoteText.WarningTempDataKey] = "QC note 5 is full";
+
+        await sut.OnGetAsync();
+
+        Assert.Equal("QC note 5 is full", sut.NoteWarning);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_OlderSubmissionWithTwoRefs_DisplaysEachSelectedTestsOwnRef()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[WithNote(MakeTest(1), 321), WithNote(MakeTest(2), 322), MakeTest(3)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        CaptureSaves();
+        var sut = CreateSut();
+        sut.SelectedIds = [1];
+        sut.NumberOfSlides = 1;
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Equal("321", sut.QCNoteRefDisplay());
+        Assert.Equal(new[] { 322, 321 }, sut.SubmissionQCNoteRefs);
+
+        sut.SelectedIds = [1, 3]; // 3 has no ref, so it goes to the latest
+        Assert.Equal("321, 322", sut.QCNoteRefDisplay());
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_NoteLinesUseResolvedNameAndTestType_SoSameCodeDifferentTypeIsNotDeduped()
+    {
+        var histology = WithNote(MakeTest(1), 321);
+        var antibody = new BlockTest
+        {
+            ID = 2, BlockID = 1, TestType = BlockTestType.Antibodies, Code = "1", HistologyRef = "24/001",
+            BlockRef = "01", QCNote = true, QCNoteRef = 321, RowStamp = [1],
+        };
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[histology, antibody]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        _lookups.Setup(l => l.GetHistologyTypesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 1, Code = "1", Name = "EO" }]);
+        CaptureSaves();
+        IReadOnlyList<string>? appended = null;
+        _qc.Setup(q => q.AppendAsync(321, It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<int, IReadOnlyList<string>, int, CancellationToken>((_, l, _, _) => appended = l)
+            .ReturnsAsync(QCNoteAppendResult.Appended);
+        var sut = CreateSut();
+        sut.SelectedIds = [1, 2];
+        sut.Comment = "same comment";
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Equal(
+            new[] { "Histology - EO (24/001 / 01): same comment", "Antibodies - 1 (24/001 / 01): same comment" },
+            appended);
     }
 
     [Fact]
@@ -420,7 +508,7 @@ public class QualityDataModelTests
         Assert.Equal(321, row.QCNoteRef);
         Assert.True(row.QCNote);
         Assert.Equal(321, sut.SubmissionQCNoteRef);
-        _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _qc.Verify(AnyNoteCreation, Times.Never);
     }
 
     [Fact]
