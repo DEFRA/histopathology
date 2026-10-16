@@ -1,4 +1,5 @@
 using Dapper;
+using Histo.Core.Domain;
 using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
 using Histo.Infrastructure;
@@ -282,6 +283,54 @@ public sealed class BlockTestRepository : IBlockTestRepository
             current.Where(t => t.TestType == BlockTestType.Antibodies).ToList(), antibodyCodes, "AddBlockAntibodies", "DeleteBlockAntibodies");
         await ApplyBlockTestDeltaAsync(conn, batchId, blockId, userId,
             current.Where(t => t.TestType == BlockTestType.Stain).ToList(), stainCodes, "AddBlockStain", "DeleteBlockStain");
+    }
+
+    /// <inheritdoc/>
+    public async Task AddTestsToBatchBlocksAsync(int batchId,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        int userId, CancellationToken ct = default)
+    {
+        if (histologyCodes.Count == 0 && antibodyCodes.Count == 0 && stainCodes.Count == 0) return;
+
+        using var conn = _db.CreateConnection();
+        await conn.OpenAsync(ct);
+        using var tx = await conn.BeginTransactionAsync(ct);
+        try
+        {
+            // Reads every block's current tests for the batch.
+            using var multi = await conn.QueryMultipleAsync("GetBatchBlockTests", new { BatchID = batchId }, tx,
+                commandType: System.Data.CommandType.StoredProcedure);
+            var blockIds = (await multi.ReadAsync<int>()).ToList();
+            var currentHistology  = (await multi.ReadAsync<(int BlockID, string Code)>()).ToLookup(r => r.BlockID, r => r.Code);
+            var currentAntibodies = (await multi.ReadAsync<(int BlockID, string Code)>()).ToLookup(r => r.BlockID, r => r.Code);
+            var currentStains     = (await multi.ReadAsync<(int BlockID, string Code)>()).ToLookup(r => r.BlockID, r => r.Code);
+
+            foreach (var blockId in blockIds)
+            {
+                var additions = BlockTestSelectionRules.ComputeAdditions(
+                    currentHistology[blockId], currentAntibodies[blockId], currentStains[blockId],
+                    histologyCodes, antibodyCodes, stainCodes);
+
+                await InsertCodesAsync(conn, tx, "AddBlockHistology", blockId, batchId, userId, additions.Histology);
+                await InsertCodesAsync(conn, tx, "AddBlockAntibodies", blockId, batchId, userId, additions.Antibodies);
+                await InsertCodesAsync(conn, tx, "AddBlockStain", blockId, batchId, userId, additions.Stains);
+            }
+            await tx.CommitAsync(ct);
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    private static async Task InsertCodesAsync(System.Data.IDbConnection conn, System.Data.IDbTransaction tx,
+        string addSp, int blockId, int batchId, int userId, IEnumerable<string> codes)
+    {
+        foreach (var code in codes)
+            await conn.ExecuteAsync(addSp,
+                new { BlockID = blockId, Code = code, Comment = (string?)null, UserID = userId, BatchID = batchId },
+                tx, commandType: System.Data.CommandType.StoredProcedure);
     }
 
     /// <summary>Mirrors BatchRepository.ApplyTestSelectionDeltaAsync, scoped to one block.</summary>

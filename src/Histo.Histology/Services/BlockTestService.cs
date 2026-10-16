@@ -100,4 +100,20 @@ public sealed class BlockTestService : IBlockTestService
             throw;
         }
     }
+
+    /// <inheritdoc/>
+    public async Task AddTestsToBatchBlocksAsync(int batchId,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        int userId, CancellationToken ct = default)
+    {
+        try
+        {
+            await _repo.AddTestsToBatchBlocksAsync(batchId, histologyCodes, antibodyCodes, stainCodes, userId, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to add new tests to the blocks of batch {BatchId}.", ex, batchId);
+            throw;
+        }
+    }
 }

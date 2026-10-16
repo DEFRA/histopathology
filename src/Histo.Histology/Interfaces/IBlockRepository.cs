@@ -33,8 +33,10 @@ public interface IBlockRepository
     /// Saves (inserts or updates) a block record.
     /// Maps to <c>AddBlock</c> / <c>EditBlock</c> stored procedures.
     /// Returns the new block ID on insert; returns the existing ID on update.
+    /// A new block's ref is moved to the next free one if another submission holds it, unless
+    /// <paramref name="keepRefUsedOnOtherSubmissions"/> (the user deliberately re-used it, as legacy allows).
     /// </summary>
-    Task<int> SaveAsync(Block block, int userId, CancellationToken ct = default);
+    Task<int> SaveAsync(Block block, int userId, bool keepRefUsedOnOtherSubmissions = false, CancellationToken ct = default);
 
     /// <summary>
     /// Marks a block as deleted.

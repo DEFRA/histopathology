@@ -25,6 +25,41 @@
         <p class="govuk-panel__body">@Model.SuccessMessage</p>
     </div>
 }
+@if (Model.NoteWarning is not null)
+{
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <strong class="govuk-warning-text__text"><span class="govuk-visually-hidden">Warning</span> @Model.NoteWarning</strong>
+    </div>
+}
+@if (Model.SubmissionQCNoteRefs.Count == 1)
+{
+    var noteRef = Model.SubmissionQCNoteRefs[0];
+    <div class="govuk-inset-text">
+        This submission's QC note is @noteRef. Every test you update here is added to it.
+        <a asp-page="/QC/EditQCNote" asp-route-noteId="@noteRef" class="govuk-link">Edit QC note @noteRef</a>
+        or <a asp-page="/Reports/QCNote" asp-route-qcNoteRef="@noteRef" class="govuk-link">print it</a>.
+    </div>
+}
+else if (Model.SubmissionQCNoteRefs.Count > 1)
+{
+    <div class="govuk-inset-text">
+        <p class="govuk-body">
+            This submission has @Model.SubmissionQCNoteRefs.Count QC notes. Tests already on a note stay on it;
+            other tests you update are added to QC note @Model.SubmissionQCNoteRef.
+        </p>
+        <ul class="govuk-list">
+            @foreach (var noteRef in Model.SubmissionQCNoteRefs)
+            {
+                <li>
+                    QC note @noteRef:
+                    <a asp-page="/QC/EditQCNote" asp-route-noteId="@noteRef" class="govuk-link">edit<span class="govuk-visually-hidden"> QC note @noteRef</span></a>
+                    or <a asp-page="/Reports/QCNote" asp-route-qcNoteRef="@noteRef" class="govuk-link">print<span class="govuk-visually-hidden"> QC note @noteRef</span></a>
+                </li>
+            }
+        </ul>
+    </div>
+}
 
 @* Batch summary — mirrors legacy Batch.ascx header *@
 <dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-4">
@@ -338,7 +373,7 @@
                 <div class="govuk-form-group">
                     <div class="govuk-checkboxes govuk-checkboxes--small">
                         <div class="govuk-checkboxes__item">
-                            <input class="govuk-checkboxes__input" type="checkbox" id="QCNote" name="QCNote" value="true" @(Model.QCNote ? "checked" : "") @(viewOnly ? "disabled" : "") />
+                            <input class="govuk-checkboxes__input" type="checkbox" id="QCNote" name="QCNote" value="true" @(Model.QCNote || Model.SubmissionQCNoteRef is > 0 ? "checked" : "") @(viewOnly || Model.SubmissionQCNoteRef is > 0 ? "disabled" : "") />
                             <label class="govuk-label govuk-checkboxes__label" for="QCNote">QC Note</label>
                         </div>
                     </div>
@@ -347,8 +382,8 @@
                     <label class="govuk-label" for="QCNoteRef">QC Note Ref</label>
                     @* Read-only in legacy too — the reference is allocated by the system when a QC
                        note is first raised for the test, never typed in. *@
-                    <input class="govuk-input govuk-input--width-10" id="QCNoteRef" type="text" readonly disabled aria-describedby="QCNoteRef-hint" />
-                    <div id="QCNoteRef-hint" class="govuk-hint govuk-!-font-size-16">Allocated automatically when a QC note is raised.</div>
+                    <input class="govuk-input govuk-input--width-20" id="QCNoteRef" type="text" value="@Model.QCNoteRefDisplay()" readonly disabled aria-describedby="QCNoteRef-hint" />
+                    <div id="QCNoteRef-hint" class="govuk-hint govuk-!-font-size-16">One QC note per submission, allocated the first time a QC note is raised. Every later update is added to it.</div>
                 </div>
             </div>
             <div class="govuk-grid-column-one-half">
@@ -455,11 +490,11 @@ else
                 Result: 'result', QCCode: 'qccode', StainRef: 'stainref', DispatchedDate: 'dispatcheddate',
                 DispatchedBy: 'dispatchedby', DispatchedTo: 'dispatchedto', RemedialAction: 'remedialaction',
                 ArchiveLocationCode: 'archivelocation', ArchivedDate: 'archiveddate',
-                ArchiveComment: 'archivecomment', NumberOfSlides: 'numberofslides', Comment: 'comment',
-                QCNoteRef: 'qcnoteref'
+                ArchiveComment: 'archivecomment', NumberOfSlides: 'numberofslides', Comment: 'comment'
             };
             var dispatched = document.getElementById('Dispatched');
             var qcNote = document.getElementById('QCNote');
+            var submissionRef = @Json.Serialize(Model.SubmissionQCNoteRef is > 0);
             var charges = Array.prototype.slice.call(document.querySelectorAll('input[name="SelectedCharges"]'));
 
             function setFields(source) {
@@ -472,7 +507,7 @@ else
                     if (slides) slides.value = '1'; // legacy InitialiseControls default
                 }
                 if (dispatched) dispatched.checked = !!(source && source.dataset.dispatched);
-                if (qcNote) qcNote.checked = !!(source && source.dataset.qcnote);
+                if (qcNote) qcNote.checked = submissionRef || !!(source && source.dataset.qcnote);
 
                 var selectedCharges = source ? (source.dataset.charges || '').split(',').filter(Boolean) : [];
                 charges.forEach(function (cb) { cb.checked = selectedCharges.indexOf(cb.value) !== -1; });
@@ -481,6 +516,23 @@ else
             function applySelection() {
                 var checked = rows.filter(function (cb) { return cb.checked; });
                 setFields(checked.length === 1 && (!selectAll || !selectAll.checked) ? checked[0] : null);
+                showNoteRefs(checked);
+            }
+
+            // Mirrors QualityDataModel.QCNoteRefDisplay: each row's own ref, else the latest submission ref.
+            var latestRef = @Json.Serialize(Model.SubmissionQCNoteRef?.ToString() ?? "");
+            var singleRef = @Json.Serialize(Model.SubmissionQCNoteRefs.Count == 1 ? Model.SubmissionQCNoteRefs[0].ToString() : "");
+            var refBox = document.getElementById('QCNoteRef');
+            function showNoteRefs(checked) {
+                if (!refBox) return;
+                if (!checked.length) { refBox.value = singleRef; return; }
+                var refs = [];
+                checked.forEach(function (cb) {
+                    var r = cb.dataset.qcnoteref || latestRef;
+                    if (r && refs.indexOf(r) === -1) refs.push(r);
+                });
+                refs.sort(function (a, b) { return a - b; });
+                refBox.value = refs.join(', ');
             }
 
             rows.forEach(function (cb) {

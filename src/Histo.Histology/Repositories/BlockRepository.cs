@@ -50,13 +50,14 @@ public sealed class BlockRepository : IBlockRepository
     }
 
     /// <inheritdoc/>
-    public async Task<int> SaveAsync(Block block, int userId, CancellationToken ct = default)
+    public async Task<int> SaveAsync(Block block, int userId, bool keepRefUsedOnOtherSubmissions = false, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
 
-        // Ordinary (non-repeat) blocks on a submission are guarded against another submission's
-        // refs under the sender-ref lock; placeholders, repeat blocks and the batch-less rows skip it.
-        var guarded = block.Status == BlockStatus.Used && block.BatchID > 0 && !block.RepeatBlock;
+        // Auto-allocated refs for new ordinary blocks are kept clear of other submissions' refs under the
+        // sender-ref lock. Edits and deliberately re-used refs are not: legacy only checks the current submission.
+        var guarded = block.ID == 0 && !keepRefUsedOnOtherSubmissions
+            && block.Status == BlockStatus.Used && block.BatchID > 0 && !block.RepeatBlock;
         if (guarded)
         {
             await conn.OpenAsync(ct);
@@ -64,18 +65,8 @@ public sealed class BlockRepository : IBlockRepository
             try
             {
                 await LockForAnimalAsync(conn, tx, block.AnimalID);
-                int id;
-                if (block.ID == 0)
-                {
-                    var blockRef = await ResolveFreeRefAsync(conn, tx, block);
-                    id = await InsertBlockAsync(conn, tx, block, blockRef);
-                }
-                else
-                {
-                    await EnsureRefNotUsedElsewhereAsync(conn, tx, block);
-                    await UpdateBlockRowAsync(conn, tx, block, userId);
-                    id = block.ID;
-                }
+                var blockRef = await ResolveFreeRefAsync(conn, tx, block);
+                var id = await InsertBlockAsync(conn, tx, block, blockRef);
                 await tx.CommitAsync(ct);
                 return id;
             }
@@ -120,20 +111,6 @@ public sealed class BlockRepository : IBlockRepository
             "SELECT RTRIM(BlockRef) FROM BatchBlock WHERE AnimalID = @AnimalID AND BlockRef IS NOT NULL",
             new { AnimalID = block.AnimalID }, tx)).ToList();
         return BlockHelpers.ComputeNextBlockRef(all, null, block.BlockRef);
-    }
-
-    /// <summary>Rejects an edit that changes the ref to one another submission holds (placeholders excluded: a pre-cassetted claim changes to one).</summary>
-    private static async Task EnsureRefNotUsedElsewhereAsync(IDbConnection conn, IDbTransaction tx, Block block)
-    {
-        var current = await conn.ExecuteScalarAsync<string?>(
-            "SELECT RTRIM(BlockRef) FROM BatchBlock WHERE ID = @ID", new { block.ID }, tx);
-        if (string.Equals(current, block.BlockRef.Trim(), StringComparison.OrdinalIgnoreCase)) return;
-
-        var taken = await conn.QueryAsync<string>(
-            "SELECT RTRIM(BlockRef) FROM BatchBlock WHERE AnimalID = @AnimalID AND BatchID IS NOT NULL AND BatchID <> @BatchID AND BlockRef IS NOT NULL",
-            new { block.AnimalID, block.BatchID }, tx);
-        if (taken.Contains(block.BlockRef.Trim(), StringComparer.OrdinalIgnoreCase))
-            throw new DuplicateBlockRefException(block.BlockRef);
     }
 
     // Real AddBlock signature (confirmed against the database directly) has no @UserID and

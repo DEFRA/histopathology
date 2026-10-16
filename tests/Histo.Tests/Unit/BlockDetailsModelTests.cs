@@ -91,6 +91,108 @@ public class BlockDetailsModelTests
         Assert.DoesNotContain(sut.TissueOptions, o => o.Code == "OTHER");
     }
 
+    private void SetupExistingBlock()
+    {
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+        ]);
+    }
+
+    [Fact]
+    public async Task AddTissue_KeepsTheTypedBlockFieldsAcrossTheRedirect()
+    {
+        SetupExistingBlock();
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.IsAddFlow = true;
+        sut.BlockFieldsPosted = true;
+        sut.NewTissueCode = "AGAR";
+        sut.NewBlockRef = "07";
+        sut.NewNumberOfBlocks = 3;
+        sut.NewCustomerRef = "CUST";
+        sut.NewComment = "typed";
+        sut.NewRepeatBlock = true;
+        sut.SelectedHistologyCodes = [HistologyCode.HAndE];
+
+        var result = await sut.OnPostAddTissueAsync();
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+
+        // The follow-up GET shows the typed values, not the saved block's ("01").
+        var next = CreateSut(animalId: 2, blockId: 319181);
+        next.TempData = sut.TempData;
+        next.IsAddFlow = true;
+        await next.OnGetAsync();
+
+        Assert.Equal("07", next.NewBlockRef);
+        Assert.Equal(3, next.NewNumberOfBlocks);
+        Assert.Equal("CUST", next.NewCustomerRef);
+        Assert.Equal("typed", next.NewComment);
+        Assert.True(next.NewRepeatBlock);
+        Assert.Equal(new[] { HistologyCode.HAndE }, next.ExistingHistologyCodes);
+    }
+
+    [Fact]
+    public async Task AddTissue_BlockRefClearedByUser_StillKeepsTheOtherTypedFields()
+    {
+        // An emptied Block ref posts "" and binds to null; that must not look like "no fields posted".
+        SetupExistingBlock();
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.BlockFieldsPosted = true;
+        sut.NewTissueCode = "AGAR";
+        sut.NewBlockRef = null;
+        sut.NewCustomerRef = "CUST";
+        sut.NewComment = "typed";
+        sut.SelectedHistologyCodes = [HistologyCode.HAndE];
+
+        await sut.OnPostAddTissueAsync();
+
+        var next = CreateSut(animalId: 2, blockId: 319181);
+        next.TempData = sut.TempData;
+        await next.OnGetAsync();
+
+        Assert.Null(next.NewBlockRef);
+        Assert.Equal("CUST", next.NewCustomerRef);
+        Assert.Equal("typed", next.NewComment);
+        Assert.Equal(new[] { HistologyCode.HAndE }, next.ExistingHistologyCodes);
+    }
+
+    [Fact]
+    public async Task AddTissue_WithoutPostedBlockFields_ShowsTheSavedBlock()
+    {
+        SetupExistingBlock();
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewTissueCode = "AGAR";
+
+        await sut.OnPostAddTissueAsync();
+
+        var next = CreateSut(animalId: 2, blockId: 319181);
+        next.TempData = sut.TempData;
+        await next.OnGetAsync();
+
+        Assert.Equal("01", next.NewBlockRef);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_DraftForAnotherBlock_IsIgnored()
+    {
+        SetupExistingBlock();
+        var other = CreateSut(animalId: 2, blockId: 999);
+        other.BlockFieldsPosted = true;
+        other.NewBlockRef = "99";
+        await other.OnPostDeleteTissueAsync(1);
+
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.TempData = other.TempData;
+        await sut.OnGetAsync();
+
+        Assert.Equal("01", sut.NewBlockRef);
+    }
+
     [Fact]
     public async Task LoadSupportingData_DefaultsToTheWholeTissueList()
     {
@@ -665,6 +767,81 @@ public class BlockDetailsModelTests
         _blocks.Verify(b => b.UpdateBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    private void SetupReuseScenario(IReadOnlyList<Block> batchBlocks)
+    {
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2", NextBlockRef = "06" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(batchBlocks);
+        // The sample already has blocks 01-05 on an earlier submission.
+        _blocks.Setup(b => b.GetBlockRefsOnOtherBatchesAsync(2, 5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<string>)["01", "02", "03", "04", "05"]);
+        _blocks.Setup(b => b.GetPreBookedByAnimalAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
+        _blocks.Setup(b => b.UpdateBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+    }
+
+    [Fact]
+    public async Task OnPostDoneAsync_RefHeldOnAnotherSubmission_IsReused()
+    {
+        // Legacy ValidateRequiredData only checks the current submission's blocks.
+        SetupReuseScenario([new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "06" }]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.IsAddFlow = false;
+        sut.NewBlockRef = "01";
+        sut.SelectedHistologyCodes = [HistologyCode.EO];
+
+        var result = await sut.OnPostDoneAsync();
+
+        Assert.IsNotType<PageResult>(result);
+        _blocks.Verify(b => b.UpdateBlockAsync(It.Is<Block>(blk => blk.BlockRef == "01"), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostDoneAsync_ReuseWithNumberOfBlocks_SiblingsTakeTheFollowingExistingRefs()
+    {
+        SetupReuseScenario([new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "06", Order = 1 }]);
+        _blocks.Setup(b => b.AddBlockKeepingRefAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(400);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.IsAddFlow = false;
+        sut.NewBlockRef = "01";
+        sut.NewNumberOfBlocks = 5;
+        sut.SelectedHistologyCodes = [HistologyCode.EO];
+
+        await sut.OnPostDoneAsync();
+
+        // Not floored on the sample's NextBlockRef (06) and not pushed past the earlier submission's refs.
+        foreach (var r in new[] { "02", "03", "04", "05" })
+            _blocks.Verify(b => b.AddBlockKeepingRefAsync(5, 2, r, It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
+            It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostDoneAsync_RefAlreadyOnThisSubmissionForTheSample_IsRejected()
+    {
+        SetupReuseScenario([
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "06" },
+            new Block { ID = 319182, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+        ]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.IsAddFlow = false;
+        sut.NewBlockRef = "01";
+        sut.SelectedHistologyCodes = [HistologyCode.EO];
+
+        var result = await sut.OnPostDoneAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("This block reference has already been used for this sample on this submission.", sut.ErrorMessage);
+        _blocks.Verify(b => b.UpdateBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Fact]
     public async Task OnPostNextBlockAsync_Success_NewBlockIsCancellableViaBack()
     {
@@ -872,7 +1049,7 @@ public class BlockDetailsModelTests
             new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
         ]);
         // "02" is the sibling duplicated by SaveCurrentBlockDetailsAsync; "03" is the actual next block.
-        _blocks.Setup(b => b.AddBlockAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, "CUST", null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.AddBlockKeepingRefAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, "CUST", null, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(400);
         _blocks.Setup(b => b.AddBlockAsync(5, 2, "03", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(500);
@@ -884,7 +1061,7 @@ public class BlockDetailsModelTests
 
         var result = await sut.OnPostNextBlockAsync();
 
-        _blocks.Verify(b => b.AddBlockAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, "CUST", null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _blocks.Verify(b => b.AddBlockKeepingRefAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, "CUST", null, false, It.IsAny<CancellationToken>()), Times.Once);
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
         Assert.Equal(500, redirect.RouteValues?["blockId"]);
     }

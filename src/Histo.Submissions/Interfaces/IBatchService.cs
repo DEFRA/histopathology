@@ -104,6 +104,9 @@ public interface IBatchService
     /// </summary>
     Task<BatchTestSelections> GetBatchTestSelectionsAsync(int batchId, CancellationToken ct = default);
 
+    /// <summary>As <see cref="GetBatchTestSelectionsAsync"/>, but returns <see langword="null"/> when the read fails, so a failure isn't mistaken for "no tests selected".</summary>
+    Task<BatchTestSelections?> TryGetBatchTestSelectionsAsync(int batchId, CancellationToken ct = default);
+
     /// <summary>
     /// Persists the batch-level test type selections.  Existing rows whose code is absent
     /// from the new selection are deleted; new codes are inserted.

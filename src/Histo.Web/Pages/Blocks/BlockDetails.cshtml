@@ -102,7 +102,11 @@ else
                     {
                         <div class="govuk-hint">Pre-cassetted submission — defaults to the next pre-booked block reference. Change it if you need to use a different pre-booked reference.</div>
                     }
-                    <input class="govuk-input govuk-input--width-3" asp-for="NewBlockRef" maxlength="3" />
+                    else if (!Model.IsPreCassetted)
+                    {
+                        <div id="NewBlockRef-hint" class="govuk-hint">To re-use blocks this sender ref already has on another submission, enter the first block ref and the number of blocks.</div>
+                    }
+                    <input class="govuk-input govuk-input--width-3" asp-for="NewBlockRef" maxlength="3" aria-describedby="@(Model.IsPreCassetted ? null : "NewBlockRef-hint")" />
                 </div>
                 <div class="govuk-form-group">
                     <label class="govuk-label" for="NewNumberOfBlocks">Number of blocks</label>
@@ -146,14 +150,13 @@ else
 
     @if (Model.Block is not null)
     {
-        @* Add/Edit/Delete tissue, Next block and the inline tissue edit row all save immediately
-           and reload the page — they submit their own separate <form>, not block-details-form, so
-           any not-yet-saved Comments/Tests edits below are discarded unless Done is clicked first. *@
+        @* Add and Delete tissue keep the block fields typed above (see the script below). Edit tissue,
+           Save tissue and Cancel reload from the saved block, so unsaved changes are discarded there. *@
         <div class="govuk-warning-text">
             <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
             <strong class="govuk-warning-text__text">
                 <span class="govuk-visually-hidden">Warning</span>
-                Adding, editing or deleting a tissue, or starting the next block, saves straight away. Any unsaved changes to Block ref, Number of blocks, Customer reference, Comments or Tests will be lost unless you select Done first.
+                Adding or deleting a tissue keeps your changes to this block. Editing a tissue, or selecting a link that reloads the page, discards unsaved changes to Block ref, Number of blocks, Customer reference, Comments or Tests unless you select Done first.
             </strong>
         </div>
 
@@ -219,7 +222,7 @@ else
                                        asp-route-EditTissueId="@t.ID" asp-route-IsAddFlow="@Model.IsAddFlow" asp-route-IsFromNextBlock="@Model.IsFromNextBlock" asp-route-UseWholeTissueList="@Model.UseWholeTissueList" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Edit</a>
                                     @* display:contents removes the form from the flex layout so the button
                                        itself is the flex item, aligning it with the Edit link. *@
-                                    <form method="post" asp-page-handler="DeleteTissue" style="display:contents">
+                                    <form method="post" asp-page-handler="DeleteTissue" style="display:contents" data-keep-block-fields>
                                         <input type="hidden" name="BatchId" value="@Model.BatchId" />
                                         <input type="hidden" name="AnimalId" value="@Model.AnimalId" />
                                         <input type="hidden" name="BlockId" value="@Model.BlockId" />
@@ -241,7 +244,7 @@ else
             </tbody>
         </table>
 
-        <form method="post" asp-page-handler="AddTissue" class="govuk-!-margin-bottom-6">
+        <form method="post" asp-page-handler="AddTissue" class="govuk-!-margin-bottom-6" data-keep-block-fields>
             <input type="hidden" asp-for="BatchId" />
             <input type="hidden" asp-for="AnimalId" />
             <input type="hidden" asp-for="BlockId" />
@@ -412,6 +415,34 @@ else
     }
 
 @section Scripts {
+    <script>
+        // Add/Delete tissue are separate forms from block-details-form, so copy the block fields the
+        // user has typed into them on submit; BlockDetailsModel stashes them and restores them after the redirect.
+        (function () {
+            var main = document.getElementById('block-details-form');
+            if (!main) return;
+            var names = ['NewBlockRef', 'NewNumberOfBlocks', 'NewCustomerRef', 'NewRepeatBlock', 'NewComment',
+                'SelectedHistologyCodes', 'SelectedAntibodyCodes', 'SelectedStainCodes', 'CarryTestsToNextBlock'];
+            document.querySelectorAll('form[data-keep-block-fields]').forEach(function (form) {
+                form.addEventListener('submit', function () {
+                    var marker = document.createElement('input');
+                    marker.type = 'hidden';
+                    marker.name = 'BlockFieldsPosted';
+                    marker.value = 'true';
+                    form.appendChild(marker);
+                    Array.prototype.forEach.call(main.elements, function (el) {
+                        if (names.indexOf(el.name) === -1 || el.disabled) return;
+                        if ((el.type === 'checkbox' || el.type === 'radio') && !el.checked) return;
+                        var copy = document.createElement('input');
+                        copy.type = 'hidden';
+                        copy.name = el.name;
+                        copy.value = el.value;
+                        form.appendChild(copy);
+                    });
+                });
+            });
+        })();
+    </script>
     <script>
         // Legacy-matching behaviour (BlockDetails.aspx.vb chkblHistology_SelectedIndexChanged):
         // EO and Archive are mutually exclusive with every other Histology test. Selecting either
