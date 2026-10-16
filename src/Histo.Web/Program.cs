@@ -24,6 +24,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Localization;
 using Serilog;
 using Serilog.Sinks.ApplicationInsights.TelemetryConverters;
+using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
 
 // Bootstrap Serilog before the host is built so startup errors are captured.
@@ -335,6 +336,33 @@ try
     app.UseSession();
     app.UseAuthentication();
     app.UseSaml2();         // ITfoxtec SAML2 middleware — must follow UseAuthentication
+
+    // LOCAL-DEV-ONLY: skips the real Entra ID SAML round trip. Gated on both
+    // ASPNETCORE_ENVIRONMENT=Development and an explicit opt-in flag (appsettings.Development.json,
+    // gitignored) so it can never run anywhere else by accident. Reuses the same
+    // IClaimsTransformation/IUserService lookup SAML uses, so the signed-in principal is a genuine
+    // active [User] row rather than a fake one — keeping FK-dependent writes (e.g. AuditLog.UserID)
+    // working exactly as they do in production.
+    if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("Authentication:DevAuthBypass"))
+    {
+        var bypassEmail = app.Configuration["Authentication:DevAuthBypassEmail"]
+            ?? throw new InvalidOperationException("Authentication:DevAuthBypassEmail must be set when Authentication:DevAuthBypass is enabled.");
+        Log.Warning("Authentication:DevAuthBypass is ENABLED — every request will sign in as {Email}. Development only.", bypassEmail);
+
+        app.Use(async (context, next) =>
+        {
+            if (context.User.Identity?.IsAuthenticated != true)
+            {
+                var unresolved = new ClaimsPrincipal(new ClaimsIdentity(
+                    [new Claim(ClaimTypes.Email, bypassEmail)], authenticationType: "DevAuthBypass"));
+
+                var transform = context.RequestServices.GetRequiredService<IClaimsTransformation>();
+                context.User = await transform.TransformAsync(unresolved);
+            }
+            await next();
+        });
+    }
+
     app.UseAuthorization();
 
     app.MapHealthChecks("/health");

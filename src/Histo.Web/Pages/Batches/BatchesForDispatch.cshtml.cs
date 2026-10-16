@@ -80,6 +80,7 @@ public class BatchesForDispatchModel : GridPageModel
         }
 
         Session.BatchID = QuickGoId.Value;
+        Session.IsViewSubmissionMode = false;
         Session.ReturnPage = "/Batches/BatchesForDispatch";
         return RedirectToPage("/QC/QualityData");
     }

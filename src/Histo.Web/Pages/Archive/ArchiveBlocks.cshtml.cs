@@ -133,6 +133,10 @@ public class ArchiveBlocksModel : GridPageModel
         if (BatchId is > 0)
         {
             Session.BatchID = BatchId;
+            // The only entry point is the BatchesForArchiving row link — an editing action, never
+            // a View/Search Submissions visit, so a flag left over from an earlier, unrelated visit
+            // must not make OnPostUpdateAsync's save silently no-op.
+            Session.IsViewSubmissionMode = false;
             // Only the BatchesForArchiving grid link reaches here with no ReturnPage — ArchiveMenu
             // always supplies its own resolved back link, so this fallback never overrides it.
             Session.ReturnPage = string.IsNullOrWhiteSpace(ReturnPage) ? "/Batches/BatchesForArchiving" : ReturnPage;

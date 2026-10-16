@@ -132,6 +132,7 @@ public class BookBlockRefModel : HistoPageModel
         }
 
         var requestedRefs = Enumerable.Range(blockRefFrom, blockRefTo - blockRefFrom + 1).ToList();
+        var anyFailed = false;
         foreach (var senderRef in senderRefs)
         {
             // One atomic call: the duplicate check, sample resolution and inserts all run on a
@@ -140,6 +141,7 @@ public class BookBlockRefModel : HistoPageModel
             if (results is null)
             {
                 ResultMessages.Add($"Sample: {senderRef} — booking failed, so no blocks were booked.");
+                anyFailed = true;
                 continue;
             }
 
@@ -166,12 +168,15 @@ public class BookBlockRefModel : HistoPageModel
             }
 
             ResultMessages.Add($"Sample: {senderRef} {numberSuccess} blocks booked, {numberFails} blocks not booked.");
+            if (numberFails > 0) anyFailed = true;
         }
 
+        // Tracked directly above rather than re-derived from ResultMessages text — the normal
+        // per-sender summary line always contains the substring "not booked" (e.g. "3 blocks
+        // booked, 0 blocks not booked"), which previously made a Contains("not booked") check
+        // match on every fully-successful run too, so "Blocks booked successfully." could never
+        // actually be shown.
         var requested = (senderRefs?.Count ?? 0) * (blockRefTo - blockRefFrom + 1);
-        var anyFailed = ResultMessages.Exists(m =>
-            m.Contains("not booked", StringComparison.OrdinalIgnoreCase)
-            || m.Contains("failed", StringComparison.OrdinalIgnoreCase));
         SuccessMessage = requested == 0 ? "No blocks were requested." : (anyFailed ? null : "Blocks booked successfully.");
         return Page();
     }
