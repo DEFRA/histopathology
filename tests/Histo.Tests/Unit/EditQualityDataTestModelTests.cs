@@ -205,4 +205,53 @@ public class EditQualityDataTestModelTests
         Assert.False(string.IsNullOrEmpty(sut.ConcurrencyError));
         Assert.Empty(sut.Errors);
     }
+
+    [Fact]
+    public async Task OnPostAsync_ExistingRef_UntickedBoxNotPosted_KeepsRefAndAppendsComment()
+    {
+        var test = new BlockTest
+        {
+            ID = 1, BlockID = 1, TestType = BlockTestType.Histology, Code = "1", HistologyRef = "26/001",
+            BlockRef = "01", QCNote = true, QCNoteRef = 321, RowStamp = [1, 2, 3],
+        };
+        _tests.Setup(t => t.GetByIdAsync(42, 1, It.IsAny<CancellationToken>())).ReturnsAsync(test);
+        BlockTest? saved = null;
+        _tests.Setup(t => t.UpdateAsync(It.IsAny<BlockTest>(), 7, It.IsAny<CancellationToken>()))
+            .Callback<BlockTest, int, CancellationToken>((bt, _, _) => saved = bt)
+            .Returns(Task.CompletedTask);
+        var sut = CreateSut();
+        sut.TestId = 1;
+        sut.RemedialAction = "1";
+        sut.QCNote = false;
+        sut.Comment = "re-cut";
+
+        await sut.OnPostAsync();
+
+        Assert.Equal(321, saved!.QCNoteRef);
+        Assert.True(saved.QCNote);
+        _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _qc.Verify(q => q.AppendAsync(321, It.Is<IReadOnlyList<string>>(l => l.Single() == "1 (26/001 / 01): re-cut"), 7, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_SubmissionHasNote_TestWithoutRefIsLinkedToIt()
+    {
+        _tests.Setup(t => t.GetByIdAsync(42, 1, It.IsAny<CancellationToken>())).ReturnsAsync(MakeTest());
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)
+        [
+            new BlockTest { ID = 9, BlockID = 2, TestType = BlockTestType.Histology, Code = "1", QCNote = true, QCNoteRef = 555, RowStamp = [1] },
+        ]);
+        BlockTest? saved = null;
+        _tests.Setup(t => t.UpdateAsync(It.IsAny<BlockTest>(), 7, It.IsAny<CancellationToken>()))
+            .Callback<BlockTest, int, CancellationToken>((bt, _, _) => saved = bt)
+            .Returns(Task.CompletedTask);
+        var sut = CreateSut();
+        sut.TestId = 1;
+        sut.RemedialAction = "1";
+
+        await sut.OnPostAsync();
+
+        Assert.Equal(555, saved!.QCNoteRef);
+        _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

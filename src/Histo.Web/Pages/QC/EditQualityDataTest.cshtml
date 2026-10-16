@@ -47,7 +47,7 @@
                 <div class="govuk-radios__conditional govuk-radios__conditional--hidden" id="conditional-qc-note">
                     <div class="govuk-checkboxes" data-module="govuk-checkboxes">
                         <div class="govuk-checkboxes__item">
-                            <input class="govuk-checkboxes__input" type="checkbox" asp-for="QCNote" id="QCNote">
+                            <input class="govuk-checkboxes__input" type="checkbox" asp-for="QCNote" id="QCNote" disabled="@(Model.Test?.QCNoteRef is > 0 || Model.SubmissionQCNoteRef is > 0)">
                             <label class="govuk-label govuk-checkboxes__label" for="QCNote">Raise a QC note</label>
                         </div>
                     </div>
@@ -66,9 +66,10 @@
 
     <div class="govuk-form-group">
         <p class="govuk-body govuk-!-margin-bottom-1"><strong>QC note ref:</strong>
-            @if (Model.Test?.QCNoteRef is > 0)
+            @{ var noteRef = Model.Test?.QCNoteRef is > 0 ? Model.Test.QCNoteRef : Model.SubmissionQCNoteRef; }
+            @if (noteRef is > 0)
             {
-                <a asp-page="/Reports/QCNote" asp-route-qcNoteRef="@Model.Test.QCNoteRef" class="govuk-link">@Model.Test.QCNoteRef</a>
+                <a asp-page="/Reports/QCNote" asp-route-qcNoteRef="@noteRef" class="govuk-link">@noteRef</a>
             }
             else
             {

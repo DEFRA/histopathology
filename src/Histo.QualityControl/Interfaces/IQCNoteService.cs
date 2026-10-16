@@ -16,4 +16,7 @@ public interface IQCNoteService
 
     /// <summary>Updates a QC note. Throws <see cref="QCNoteConcurrencyException"/> on concurrent modification.</summary>
     Task UpdateAsync(int qcNoteId, string text, byte[] rowStamp, int userId, CancellationToken ct = default);
+
+    /// <summary>Appends each line not already in the note's text; never truncates (QCText is varchar(4000)).</summary>
+    Task<QCNoteAppendResult> AppendAsync(int qcNoteId, IReadOnlyList<string> lines, int userId, CancellationToken ct = default);
 }

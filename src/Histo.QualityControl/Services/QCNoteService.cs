@@ -46,6 +46,39 @@ public sealed class QCNoteService : IQCNoteService
         await _repo.UpdateAsync(qcNoteId, text, rowStamp, userId, ct);
     }
 
+    /// <summary>Matches the <c>QCNotes.QCText</c> / <c>EditQCNote @QCText</c> size.</summary>
+    public const int MaxTextLength = 4000;
+
+    /// <inheritdoc/>
+    public async Task<QCNoteAppendResult> AppendAsync(int qcNoteId, IReadOnlyList<string> lines, int userId, CancellationToken ct = default)
+    {
+        var note = await GetByIdAsync(qcNoteId, ct);
+        if (note is null) return QCNoteAppendResult.NotFound;
+
+        // A never-edited note's Text is the generated test table, so appending persists that table too.
+        var existing = (note.Text ?? string.Empty).TrimEnd();
+        var toAdd = lines
+            .Where(l => !string.IsNullOrWhiteSpace(l) && !existing.Contains(l, StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (toAdd.Count == 0) return QCNoteAppendResult.NothingToAppend;
+
+        var text = existing.Length == 0
+            ? string.Join(Environment.NewLine, toAdd)
+            : existing + Environment.NewLine + string.Join(Environment.NewLine, toAdd);
+        if (text.Length > MaxTextLength) return QCNoteAppendResult.TooLong;
+
+        try
+        {
+            await _repo.UpdateAsync(qcNoteId, text, note.RowStamp ?? [], userId, ct);
+            return QCNoteAppendResult.Appended;
+        }
+        catch (QCNoteConcurrencyException)
+        {
+            return QCNoteAppendResult.Concurrency;
+        }
+    }
+
     /// <summary>Creates a new QC note and returns the new ID.</summary>
     public async Task<int> AddAsync(int submissionId, int createdByUserId, CancellationToken ct = default)
     {

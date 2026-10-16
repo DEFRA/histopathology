@@ -226,7 +226,7 @@ public class QualityDataModelTests
     }
 
     [Fact]
-    public async Task OnPostUpdateAsync_MultiSelectWithQcNoteTicked_CreatesOnlyOneSharedNote_AndLeavesNoteTextAlone()
+    public async Task OnPostUpdateAsync_MultiSelectWithQcNoteTicked_CreatesOnlyOneSharedNote_AndAppendsComments()
     {
         // Legacy's iQCNoteID: exactly one new QC note per Edit click, not one per selected test.
         _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
@@ -244,8 +244,10 @@ public class QualityDataModelTests
         _qc.Verify(q => q.AddAsync(42, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(2, saved.Count);
         Assert.All(saved, bt => Assert.Equal(500, bt.QCNoteRef));
-        Assert.Equal(500, sut.AllocatedQCNoteRef);
-        _qc.Verify(q => q.UpdateAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal(500, sut.SubmissionQCNoteRef);
+        _qc.Verify(q => q.AppendAsync(500,
+            It.Is<IReadOnlyList<string>>(l => l.Count == 2 && l.All(s => s.EndsWith(": needs repeat"))),
+            It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private List<BlockTest> CaptureSaves()
@@ -279,7 +281,7 @@ public class QualityDataModelTests
 
         _qc.Verify(q => q.AddAsync(42, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(700, Assert.Single(saved).QCNoteRef);
-        Assert.Equal(700, sut.AllocatedQCNoteRef);
+        Assert.Equal(700, sut.SubmissionQCNoteRef);
     }
 
     [Fact]
@@ -299,7 +301,30 @@ public class QualityDataModelTests
 
         _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         Assert.Equal(321, Assert.Single(saved).QCNoteRef);
-        Assert.Equal(321, sut.AllocatedQCNoteRef);
+        Assert.Equal(321, sut.SubmissionQCNoteRef);
+        _qc.Verify(q => q.AppendAsync(321,
+            It.Is<IReadOnlyList<string>>(l => l.Single() == "1 (24/001 / 01): second update"),
+            It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_NoteFull_TestsSaved_WarningShown()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[WithNote(MakeTest(1), 321)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var saved = CaptureSaves();
+        _qc.Setup(q => q.AppendAsync(321, It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(QCNoteAppendResult.TooLong);
+        var sut = CreateSut();
+        sut.SelectedIds = [1];
+        sut.NumberOfSlides = 1;
+        sut.Comment = "x";
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Single(saved);
+        Assert.Contains("QC note 321 is full", sut.NoteWarning);
     }
 
     [Fact]
@@ -318,28 +343,67 @@ public class QualityDataModelTests
         _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         Assert.Equal(3, saved.Count);
         Assert.All(saved, bt => Assert.Equal(321, bt.QCNoteRef));
-        Assert.Equal(321, sut.AllocatedQCNoteRef);
+        Assert.Equal(321, sut.SubmissionQCNoteRef);
     }
 
     [Fact]
-    public async Task OnPostUpdateAsync_MultiSelectSpanningTwoNotes_WithUnreferencedRow_IsRejected()
+    public async Task OnPostUpdateAsync_OlderSubmissionWithTwoRefs_NewRowsJoinTheLatest_ExistingKeepTheirs()
     {
         _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BlockTest>)[WithNote(MakeTest(1), 321), WithNote(MakeTest(2), 322), MakeTest(3)]);
         _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var saved = CaptureSaves();
         var sut = CreateSut();
         sut.SelectedIds = [1, 2, 3];
-        sut.QCNote = true;
+        sut.StainRef = "S1";
 
         await sut.OnPostUpdateAsync();
 
-        Assert.Contains("different QC notes", sut.Error);
         _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
-        _tests.Verify(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal(321, saved.Single(t => t.ID == 1).QCNoteRef);
+        Assert.Equal(322, saved.Single(t => t.ID == 2).QCNoteRef);
+        Assert.Equal(322, saved.Single(t => t.ID == 3).QCNoteRef);
+        Assert.Equal(322, sut.SubmissionQCNoteRef);
     }
 
     [Fact]
-    public async Task OnPostUpdateAsync_SingleSelectQcNoteUnticked_ClearsRef_WithoutNoteCalls()
+    public async Task OnPostUpdateAsync_SubmissionAlreadyHasNote_UnselectedRefRowStillDrivesTheLink()
+    {
+        // Test 1 (not selected) already carries the submission's note; test 2 is updated with the box not posted.
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[WithNote(MakeTest(1), 321), MakeTest(2)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var saved = CaptureSaves();
+        var sut = CreateSut();
+        sut.SelectedIds = [2];
+        sut.NumberOfSlides = 1;
+        sut.Comment = "later finding";
+
+        await sut.OnPostUpdateAsync();
+
+        _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        var row = Assert.Single(saved);
+        Assert.Equal(321, row.QCNoteRef);
+        Assert.True(row.QCNote);
+        _qc.Verify(q => q.AppendAsync(321, It.Is<IReadOnlyList<string>>(l => l.Single().EndsWith(": later finding")),
+            It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_SubmissionWithNote_ExposesItsRef()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1), WithNote(MakeTest(2), 321)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var sut = CreateSut();
+
+        await sut.OnGetAsync();
+
+        Assert.Equal(321, sut.SubmissionQCNoteRef);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_SingleSelectWithRef_DisabledBoxNotPosted_KeepsRef()
     {
         _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BlockTest>)[WithNote(MakeTest(1), 321)]);
@@ -353,10 +417,28 @@ public class QualityDataModelTests
         await sut.OnPostUpdateAsync();
 
         var row = Assert.Single(saved);
-        Assert.Null(row.QCNoteRef);
-        Assert.False(row.QCNote);
-        Assert.Null(sut.AllocatedQCNoteRef);
+        Assert.Equal(321, row.QCNoteRef);
+        Assert.True(row.QCNote);
+        Assert.Equal(321, sut.SubmissionQCNoteRef);
         _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_SingleSelectNoRef_QcNoteUnticked_LeavesNoRef()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var saved = CaptureSaves();
+        var sut = CreateSut();
+        sut.SelectedIds = [1];
+        sut.NumberOfSlides = 1;
+        sut.Comment = "no note";
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Null(Assert.Single(saved).QCNoteRef);
+        Assert.Null(sut.SubmissionQCNoteRef);
+        _qc.Verify(q => q.AppendAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
