@@ -56,6 +56,18 @@
             <input class="govuk-input govuk-input--width-20" asp-for="SenderRef" />
         }
     </div>
+    @if (!Model.IsAssignTissueMode && Model.IsTBDiagnosticsArea)
+    {
+        <div class="govuk-form-group">
+            <div class="govuk-checkboxes govuk-checkboxes--small">
+                <div class="govuk-checkboxes__item">
+                    <input class="govuk-checkboxes__input" type="checkbox" id="UseSenderRefValidation" name="UseSenderRefValidation" value="true" @(Model.UseSenderRefValidation ? "checked" : "") />
+                    <label class="govuk-label govuk-checkboxes__label" for="UseSenderRefValidation">Validate Sender Ref?</label>
+                </div>
+            </div>
+            <div class="govuk-hint">When checked, Sender ref must be in the format NN/NNNNN/YY.</div>
+        </div>
+    }
     @if (!Model.IsAssignTissueMode)
     {
         <p class="govuk-body">
