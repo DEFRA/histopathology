@@ -8,12 +8,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.AspNetCore.Hosting;
-
 namespace Histo.Web.Pages;
 
 /// <summary>
@@ -40,54 +34,10 @@ public abstract class HistoPageModel : PageModel
         Session = session;
     }
 
-    /// <summary>Dev sign-in bypass: only when hosted as Development AND the config flag is on.</summary>
-    public static bool IsDevAuthBypassEnabled(HttpContext httpContext)
-    {
-        var services = httpContext.RequestServices;
-        var flag = services.GetRequiredService<IConfiguration>().GetValue<bool>("DevAuthBypass");
-        if (!flag) return false;
-
-        if (services.GetRequiredService<IWebHostEnvironment>().IsDevelopment()) return true;
-
-        services.GetService<ILoggerFactory>()?.CreateLogger<HistoPageModel>()
-            .LogWarning("DevAuthBypass is set but the environment is not Development; ignoring it and requiring sign-in.");
-        return false;
-    }
-
     public override async Task OnPageHandlerExecutionAsync(
         PageHandlerExecutingContext context,
         PageHandlerExecutionDelegate next)
     {
-
-        // LOCAL-DEV-ONLY: skips Entra ID sign-in entirely. Needs BOTH the Development environment and the
-        // "DevAuthBypass" flag (appsettings.Development.json, gitignored), so a stray flag in a deployed
-        // environment is ignored. Fully hardcoded — no DB/IUserService lookup.
-        if (IsDevAuthBypassEnabled(context.HttpContext))
-        {
-            // Re-signs in whenever the GroupName claim is missing/empty — covers both the
-            // "never signed in" case AND a stale cookie from an earlier real SAML attempt
-            // that authenticated but never got app claims (e.g. email didn't match tblUser).
-            if (string.IsNullOrEmpty(User.FindFirst(AppClaimTypes.GroupName)?.Value))
-            {
-                // Bakes the same claims AuthController's ACS handler would, so _Layout.cshtml's
-                // User.Identity.IsAuthenticated checks (nav, user context) behave identically.
-                // GroupName = "Histopathology User" grants area-unrestricted access (IsHistoUser)
-                // and shows nearly all nav links — change to "Maintenance" for the admin-only pages.
-                var identity = new System.Security.Claims.ClaimsIdentity("saml2");
-                identity.AddClaim(new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "Silambarasan Duraiswamy"));
-                identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.GroupName, "Maintenance"));
-                identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.UserDbId, "243"));
-                identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.GroupId, "3"));
-                identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.UserArea, "Histopath"));
-                identity.AddClaim(new System.Security.Claims.Claim(AppClaimTypes.UserAreaId, "5"));
-                var principal = new System.Security.Claims.ClaimsPrincipal(identity);
-                await context.HttpContext.SignInAsync("saml2", principal);
-                context.HttpContext.User = principal;
-                Session.PopulateFromClaims(principal);
-            }
-            await next();
-            return;
-        }
 
         // Gate 1 — Authentication: redirect to Entra ID via SAML if not signed in.
         if (User.Identity?.IsAuthenticated != true)
@@ -110,26 +60,6 @@ public abstract class HistoPageModel : PageModel
         Session.PopulateFromClaims(User);
 
         await next();
-    }
-
-    /// <summary>
-    /// <c>RedirectToPage</c> needs a bare page name, but a stored return page can carry its own query string
-    /// (e.g. Search submissions' <c>?ReturnPage=...</c>). Splits it and merges that query with the saved sort/page query.
-    /// </summary>
-    protected RedirectToPageResult RedirectToReturnPage(string returnPage, string? returnPageQuery)
-    {
-        var split = returnPage.IndexOf('?');
-        var path = split < 0 ? returnPage : returnPage[..split];
-
-        var values = new Microsoft.AspNetCore.Routing.RouteValueDictionary();
-        foreach (var query in new[] { split < 0 ? null : returnPage[split..], returnPageQuery })
-        {
-            if (string.IsNullOrEmpty(query)) continue;
-            foreach (var pair in Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(query))
-                values[pair.Key] = pair.Value.ToString();
-        }
-
-        return RedirectToPage(path, values);
     }
 
     /// <summary>

@@ -1,10 +1,4 @@
 using Histo.Core.Domain;
-using Histo.Web.Pages;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Moq;
 
 namespace Histo.Tests.Unit;
 
@@ -52,38 +46,4 @@ public class BlockTestSelectionRulesTests
         Assert.Equal(new[] { "1" }, Compute([], [], [], ["1"], [], []).Histology);
         Assert.Equal(new[] { "2" }, Compute([], [], [], ["1", "2"], [], []).Histology);
     }
-}
-
-public class DevAuthBypassTests
-{
-    private static HttpContext ContextFor(string environment, bool? flag)
-    {
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(flag is null ? [] : new Dictionary<string, string?> { ["DevAuthBypass"] = flag.Value.ToString() })
-            .Build();
-        var env = new Mock<IWebHostEnvironment>();
-        env.SetupGet(e => e.EnvironmentName).Returns(environment);
-        var services = new ServiceCollection()
-            .AddSingleton<IConfiguration>(config)
-            .AddSingleton(env.Object)
-            .BuildServiceProvider();
-        return new DefaultHttpContext { RequestServices = services };
-    }
-
-    [Fact]
-    public void FlagOnInDevelopment_IsEnabled() =>
-        Assert.True(HistoPageModel.IsDevAuthBypassEnabled(ContextFor("Development", true)));
-
-    [Theory]
-    [InlineData("Production")]
-    [InlineData("Staging")]
-    [InlineData("Test")]
-    public void FlagOnOutsideDevelopment_IsIgnored(string environment) =>
-        Assert.False(HistoPageModel.IsDevAuthBypassEnabled(ContextFor(environment, true)));
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(null)]
-    public void FlagOffOrMissing_IsDisabledEvenInDevelopment(bool? flag) =>
-        Assert.False(HistoPageModel.IsDevAuthBypassEnabled(ContextFor("Development", flag)));
 }
