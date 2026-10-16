@@ -241,6 +241,7 @@ public class BlockDetailsModel : HistoPageModel
         if (IsEditMode)
         {
             if (!await LoadEditModeDataAsync()) return Page();
+            RestoreDraft();
         }
         else
         {
@@ -630,6 +631,7 @@ public class BlockDetailsModel : HistoPageModel
             await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
         }
 
+        StashDraft();
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow, isFromNextBlock = IsFromNextBlock, useWholeTissueList = UseWholeTissueList });
     }
 
@@ -637,7 +639,47 @@ public class BlockDetailsModel : HistoPageModel
     {
         await _submissions.DeleteTissueAsync(tissueId, TissueOwner.Block, Session.UserID);
         await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
+        StashDraft();
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow, isFromNextBlock = IsFromNextBlock, useWholeTissueList = UseWholeTissueList });
+    }
+
+    private const string DraftKey = "BlockDetails_Draft";
+
+    private sealed record BlockDraft(
+        int BlockId, string? BlockRef, int NumberOfBlocks, string? CustomerRef, bool RepeatBlock, string? Comment,
+        List<string> Histology, List<string> Antibodies, List<string> Stains, bool CarryTests);
+
+    /// <summary>
+    /// Keeps the block fields the user has typed but not saved across a tissue action's redirect.
+    /// Skipped when none were posted (no JavaScript), so the saved values are shown as before.
+    /// </summary>
+    private void StashDraft()
+    {
+        if (BlockId is not > 0 || NewBlockRef is null) return;
+
+        TempData[DraftKey] = System.Text.Json.JsonSerializer.Serialize(new BlockDraft(
+            BlockId.Value, NewBlockRef, NewNumberOfBlocks, NewCustomerRef, NewRepeatBlock, NewComment,
+            SelectedHistologyCodes, SelectedAntibodyCodes, SelectedStainCodes, CarryTestsToNextBlock));
+    }
+
+    private void RestoreDraft()
+    {
+        if (TempData[DraftKey] is not string json) return;
+
+        BlockDraft? draft;
+        try { draft = System.Text.Json.JsonSerializer.Deserialize<BlockDraft>(json); }
+        catch (System.Text.Json.JsonException) { return; }
+        if (draft is null || draft.BlockId != BlockId) return;
+
+        NewBlockRef = draft.BlockRef;
+        NewNumberOfBlocks = Math.Max(1, draft.NumberOfBlocks);
+        NewCustomerRef = draft.CustomerRef;
+        NewRepeatBlock = draft.RepeatBlock;
+        NewComment = draft.Comment;
+        ExistingHistologyCodes = draft.Histology;
+        ExistingAntibodyCodes = draft.Antibodies;
+        ExistingStainCodes = draft.Stains;
+        CarryTestsToNextBlock = draft.CarryTests;
     }
 
     public async Task<IActionResult> OnPostUpdateTissueAsync()

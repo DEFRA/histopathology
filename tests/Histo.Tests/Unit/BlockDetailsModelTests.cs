@@ -91,6 +91,81 @@ public class BlockDetailsModelTests
         Assert.DoesNotContain(sut.TissueOptions, o => o.Code == "OTHER");
     }
 
+    private void SetupExistingBlock()
+    {
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+        ]);
+    }
+
+    [Fact]
+    public async Task AddTissue_KeepsTheTypedBlockFieldsAcrossTheRedirect()
+    {
+        SetupExistingBlock();
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.IsAddFlow = true;
+        sut.NewTissueCode = "AGAR";
+        sut.NewBlockRef = "07";
+        sut.NewNumberOfBlocks = 3;
+        sut.NewCustomerRef = "CUST";
+        sut.NewComment = "typed";
+        sut.NewRepeatBlock = true;
+        sut.SelectedHistologyCodes = [HistologyCode.HAndE];
+
+        var result = await sut.OnPostAddTissueAsync();
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+
+        // The follow-up GET shows the typed values, not the saved block's ("01").
+        var next = CreateSut(animalId: 2, blockId: 319181);
+        next.TempData = sut.TempData;
+        next.IsAddFlow = true;
+        await next.OnGetAsync();
+
+        Assert.Equal("07", next.NewBlockRef);
+        Assert.Equal(3, next.NewNumberOfBlocks);
+        Assert.Equal("CUST", next.NewCustomerRef);
+        Assert.Equal("typed", next.NewComment);
+        Assert.True(next.NewRepeatBlock);
+        Assert.Equal(new[] { HistologyCode.HAndE }, next.ExistingHistologyCodes);
+    }
+
+    [Fact]
+    public async Task AddTissue_WithoutPostedBlockFields_ShowsTheSavedBlock()
+    {
+        SetupExistingBlock();
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewTissueCode = "AGAR";
+
+        await sut.OnPostAddTissueAsync();
+
+        var next = CreateSut(animalId: 2, blockId: 319181);
+        next.TempData = sut.TempData;
+        await next.OnGetAsync();
+
+        Assert.Equal("01", next.NewBlockRef);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_DraftForAnotherBlock_IsIgnored()
+    {
+        SetupExistingBlock();
+        var other = CreateSut(animalId: 2, blockId: 999);
+        other.NewBlockRef = "99";
+        await other.OnPostDeleteTissueAsync(1);
+
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.TempData = other.TempData;
+        await sut.OnGetAsync();
+
+        Assert.Equal("01", sut.NewBlockRef);
+    }
+
     [Fact]
     public async Task LoadSupportingData_DefaultsToTheWholeTissueList()
     {
