@@ -94,8 +94,8 @@ public class EditBatchModel : HistoPageModel
 
     /// <summary>
     /// <see cref="ReturnPage"/> plus the sort/page query string captured when the user left the
-    /// list, so Back/Cancel restore the exact filter/sort/page state. Hrefs only — never pass to
-    /// <c>RedirectToPage</c>, which requires a bare page name.
+    /// list, so Back/Cancel restore the exact filter/sort/page state. Hrefs only — a redirect goes through
+    /// <see cref="HistoPageModel.RedirectToReturnPage"/>, because <c>RedirectToPage</c> requires a bare page name.
     /// </summary>
     public string ReturnUrl => ReturnPage + (Session.ReturnPageQuery ?? string.Empty);
 
@@ -378,7 +378,7 @@ public class EditBatchModel : HistoPageModel
             return Page();
         }
 
-        return RedirectToPage(ReturnPage, ParseReturnQuery());
+        return RedirectToReturnPage(ReturnPage, Session.ReturnPageQuery);
     }
 
     /// <summary>
@@ -398,19 +398,6 @@ public class EditBatchModel : HistoPageModel
         if (addedHistology.Count == 0 && addedAntibodies.Count == 0 && addedStains.Count == 0) return;
 
         await _blockTests.AddTestsToBatchBlocksAsync(batchId, addedHistology, addedAntibodies, addedStains, Session.UserID);
-    }
-
-    /// <summary>Parses <see cref="ISessionService.ReturnPageQuery"/> into route values so a
-    /// post-save redirect restores the list's sort/page state, not just its bare page name.</summary>
-    private Microsoft.AspNetCore.Routing.RouteValueDictionary ParseReturnQuery()
-    {
-        var result = new Microsoft.AspNetCore.Routing.RouteValueDictionary();
-        var query = Session.ReturnPageQuery;
-        if (string.IsNullOrEmpty(query)) return result;
-
-        foreach (var pair in Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(query))
-            result[pair.Key] = pair.Value.ToString();
-        return result;
     }
 
     private async Task LoadLookupsAsync()

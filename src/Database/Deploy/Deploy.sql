@@ -42,6 +42,10 @@ GO
 GO
 :r ../StoredProcedures/dbo.DrawNextHistologyRefRun.sql
 GO
+:r ../StoredProcedures/dbo.GetOrCreateSubmissionQCNote.sql
+GO
+:r ../StoredProcedures/dbo.GetBatchBlockTestsForUpdate.sql
+GO
 
 -- Step 2: Deployment script to used to alter/create tables, columns etc
 PRINT '--- Create or Alter Table, Column  ---';

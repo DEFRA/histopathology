@@ -297,23 +297,13 @@ public sealed class BlockTestRepository : IBlockTestRepository
         using var tx = await conn.BeginTransactionAsync(ct);
         try
         {
-            // Assigned pre-cassetted blocks are PreBookedUsed; unclaimed placeholders (PreBooked) are excluded.
-            const string BatchBlockIds = "SELECT ID FROM BatchBlock WHERE BatchID = @BatchID AND Status IN (@Used, @PreBookedUsed)";
-            var args = new { BatchID = batchId, Used = BlockStatus.Used, PreBookedUsed = BlockStatus.PreBookedUsed };
-
-            var blockIds = (await conn.QueryAsync<int>(BatchBlockIds, args, tx)).ToList();
-
-            // One locked read per table for ALL the batch's blocks (not per block). UPDLOCK + HOLDLOCK covers the
-            // key ranges, so a concurrent save for these blocks waits instead of reading the same "current" rows
-            // and then deleting our additions.
-            async Task<ILookup<int, string>> ReadAsync(string table) =>
-                (await conn.QueryAsync<(int BlockID, string Code)>(
-                    $"SELECT BlockID, RTRIM(Code) AS Code FROM {table} WITH (UPDLOCK, HOLDLOCK) WHERE BlockID IN ({BatchBlockIds})",
-                    args, tx)).ToLookup(r => r.BlockID, r => r.Code);
-
-            var currentHistology  = await ReadAsync("BlockHistology");
-            var currentAntibodies = await ReadAsync("BlockAntibodies");
-            var currentStains     = await ReadAsync("BlockStain");
+            // Reads (and locks) every block's current tests for the batch; the SQL lives in GetBatchBlockTestsForUpdate.
+            using var multi = await conn.QueryMultipleAsync("GetBatchBlockTestsForUpdate", new { BatchID = batchId }, tx,
+                commandType: System.Data.CommandType.StoredProcedure);
+            var blockIds = (await multi.ReadAsync<int>()).ToList();
+            var currentHistology  = (await multi.ReadAsync<(int BlockID, string Code)>()).ToLookup(r => r.BlockID, r => r.Code);
+            var currentAntibodies = (await multi.ReadAsync<(int BlockID, string Code)>()).ToLookup(r => r.BlockID, r => r.Code);
+            var currentStains     = (await multi.ReadAsync<(int BlockID, string Code)>()).ToLookup(r => r.BlockID, r => r.Code);
 
             foreach (var blockId in blockIds)
             {
@@ -325,7 +315,6 @@ public sealed class BlockTestRepository : IBlockTestRepository
                 await InsertCodesAsync(conn, tx, "AddBlockAntibodies", blockId, batchId, userId, additions.Antibodies);
                 await InsertCodesAsync(conn, tx, "AddBlockStain", blockId, batchId, userId, additions.Stains);
             }
-
             await tx.CommitAsync(ct);
         }
         catch

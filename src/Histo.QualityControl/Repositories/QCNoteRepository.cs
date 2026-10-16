@@ -163,75 +163,33 @@ public sealed class QCNoteRepository : IQCNoteRepository
     }
 
     /// <inheritdoc/>
+    /// <remarks>All the locking, lookup, create and link work is in <c>GetOrCreateSubmissionQCNote</c> (see its header for the return codes).</remarks>
     public async Task<SubmissionQCNote> GetOrCreateForSubmissionAsync(int batchId, int testId, string testType, byte[] expectedRowStamp, int userId, CancellationToken ct = default)
     {
-        var table = testType switch
-        {
-            "Histology"  => "BlockHistology",
-            "Antibodies" => "BlockAntibodies",
-            "Stain"      => "BlockStain",
-            _ => throw new ArgumentOutOfRangeException(nameof(testType), testType, "Unknown test type."),
-        };
-
         using var conn = _db.CreateConnection();
-        await conn.OpenAsync(ct);
-        using var tx = await conn.BeginTransactionAsync(ct);
-        try
+
+        var parameters = new DynamicParameters();
+        parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
+        parameters.Add("BatchID", batchId);
+        parameters.Add("TestID", testId);
+        parameters.Add("TestType", testType, System.Data.DbType.AnsiString, size: 20);
+        parameters.Add("RowStamp", expectedRowStamp, System.Data.DbType.Binary, size: 8);
+        parameters.Add("UserID", userId);
+        parameters.Add("DateCreated", DateTime.Now);
+        parameters.Add("QCNoteRef", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+        parameters.Add("LinkedRowStamp", dbType: System.Data.DbType.Binary, direction: System.Data.ParameterDirection.Output, size: 8);
+
+        await conn.ExecuteAsync("GetOrCreateSubmissionQCNote", parameters, commandType: System.Data.CommandType.StoredProcedure);
+
+        return parameters.Get<int>("RETURN_VALUE") switch
         {
-            var lockResult = await conn.ExecuteScalarAsync<int>(
-                "DECLARE @r int; EXEC @r = sp_getapplock @Resource = @Resource, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 15000; SELECT @r;",
-                new { Resource = $"Histo:QCNote:Batch:{batchId}" }, tx);
-            if (lockResult < 0)
-                throw new TimeoutException($"Timed out waiting to allocate the QC note for submission {batchId}.");
-
-            var existing = await conn.ExecuteScalarAsync<int?>(SubmissionNoteRefSql, new { BatchID = batchId }, tx);
-            if (existing is > 0)
-            {
-                await tx.CommitAsync(ct);
-                return new SubmissionQCNote(existing.Value, null);
-            }
-
-            var parameters = new DynamicParameters();
-            parameters.Add("CreatedBy",   userId);
-            parameters.Add("DateCreated", DateTime.Now);
-            parameters.Add("NewID",       dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
-            await conn.ExecuteAsync("AddQCNote", parameters, tx, commandType: System.Data.CommandType.StoredProcedure);
-            var newId = parameters.Get<int>("NewID");
-
-            // Linking inside the lock is what makes the note visible to the next caller's lookup. The RowStamp
-            // match is what stops the caller's later full-row save overwriting a change made since it read the test.
-            var link = new DynamicParameters();
-            link.Add("Ref", newId);
-            link.Add("ID", testId);
-            link.Add("RowStamp", expectedRowStamp, System.Data.DbType.Binary);
-            var rowStamp = await conn.ExecuteScalarAsync<byte[]?>(
-                $"UPDATE {table} SET QCNote = 1, QCNoteRef = @Ref OUTPUT inserted.RowStamp WHERE ID = @ID AND RowStamp = @RowStamp",
-                link, tx);
-            if (rowStamp is null)
-                throw new QCNoteLinkConflictException();
-
-            await tx.CommitAsync(ct);
-            return new SubmissionQCNote(newId, rowStamp);
-        }
-        catch
-        {
-            await tx.RollbackAsync(ct);
-            throw;
-        }
+            0 => new SubmissionQCNote(parameters.Get<int>("QCNoteRef"), null),
+            1 => new SubmissionQCNote(parameters.Get<int>("QCNoteRef"), parameters.Get<byte[]>("LinkedRowStamp")),
+            2 => throw new QCNoteLinkConflictException(),
+            3 => throw new TimeoutException($"Timed out waiting to allocate the QC note for submission {batchId}."),
+            var other => throw new InvalidOperationException($"GetOrCreateSubmissionQCNote returned {other}."),
+        };
     }
-
-    // Same rows as BlockTestRepository.GetByBatchAsync (histology worklist codes only), latest ref wins.
-    private const string SubmissionNoteRefSql = """
-        SELECT MAX(r) FROM (
-            SELECT h.QCNoteRef AS r FROM BlockHistology h JOIN BatchBlock b ON b.ID = h.BlockID
-             WHERE b.BatchID = @BatchID AND RTRIM(h.Code) IN ('1','2','5','7')
-            UNION ALL
-            SELECT a.QCNoteRef FROM BlockAntibodies a JOIN BatchBlock b ON b.ID = a.BlockID WHERE b.BatchID = @BatchID
-            UNION ALL
-            SELECT s.QCNoteRef FROM BlockStain s JOIN BatchBlock b ON b.ID = s.BlockID WHERE b.BatchID = @BatchID
-        ) x WHERE r > 0
-        """;
-
     /// <inheritdoc/>
     public async Task<IReadOnlyList<QCNote>> GetAllAsync(CancellationToken ct = default)
     {

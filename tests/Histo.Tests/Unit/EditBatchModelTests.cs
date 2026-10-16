@@ -386,6 +386,24 @@ _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(It.IsAny<int>(), It.IsAny<
     }
 
     [Fact]
+    public async Task OnPostAsync_ReturnPageCarriesItsOwnQuery_RedirectsWithThatQueryAsRouteValues()
+    {
+        // Search submissions stores "/Search/SearchSubmissions?ReturnPage=%2FIndex" as the return page.
+        SetupSuccessfulSave(new BatchTestSelections());
+        _session.Object.ReturnPage = "/Search/SearchSubmissions?ReturnPage=%2FIndex";
+        _session.Object.ReturnPageQuery = null;
+        var sut = CreateSut();
+        sut.SelectedHistologyCodes = [HistologyCode.HAndE];
+        sut.SafeToHandle = true;
+
+        var result = await sut.OnPostAsync();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Search/SearchSubmissions", redirect.PageName);
+        Assert.Equal("/Index", redirect.RouteValues!["ReturnPage"]);
+    }
+
+    [Fact]
     public async Task OnPostAsync_HappyPath_RedirectsToReturnPageWithParsedQuery()
     {
         _session.Object.BatchID = 10;
