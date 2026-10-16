@@ -69,6 +69,9 @@ public class EditQualityDataTestModel : HistoPageModel
     [BindProperty] public List<string> SelectedCharges { get; set; } = [];
 
     public BlockTest? Test { get; private set; }
+
+    /// <summary>The submission's QC note; when set the test is always linked to it on save.</summary>
+    public int? SubmissionQCNoteRef { get; private set; }
     public IReadOnlyList<LookupItem> QCCodes { get; private set; } = [];
     public IReadOnlyList<LookupItem> RemedialActions { get; private set; } = [];
     public IReadOnlyList<LookupItem> ArchiveLocations { get; private set; } = [];
@@ -88,6 +91,7 @@ public class EditQualityDataTestModel : HistoPageModel
 
         Test = await _tests.GetByIdAsync(Session.BatchID.Value, TestId);
         if (Test is null) return RedirectToPage("/QC/QualityData");
+        SubmissionQCNoteRef = QualityDataModel.SubmissionQCNoteRefOf(await _tests.GetByBatchAsync(Session.BatchID.Value));
 
         Result = Test.Result;
         StainRef = Test.StainRef;
@@ -96,7 +100,7 @@ public class EditQualityDataTestModel : HistoPageModel
         DispatchedBy = Test.DispatchedBy;
         DispatchedTo = Test.DispatchedTo;
         QCCode = Test.QCCode;
-        QCNote = Test.QCNote;
+        QCNote = Test.QCNote || Test.QCNoteRef is > 0 || SubmissionQCNoteRef is > 0;
         RemedialAction = Test.RemedialAction;
         ArchiveLocation = Test.ArchiveLocation;
         ArchivedDate = Test.ArchivedDate;
@@ -116,6 +120,7 @@ public class EditQualityDataTestModel : HistoPageModel
 
         Test = await _tests.GetByIdAsync(Session.BatchID.Value, TestId);
         if (Test?.RowStamp is null) return RedirectToPage("/QC/QualityData");
+        SubmissionQCNoteRef = QualityDataModel.SubmissionQCNoteRefOf(await _tests.GetByBatchAsync(Session.BatchID.Value));
 
         if (Result == Histo.Histology.Models.BlockTestResult.Failed && string.IsNullOrWhiteSpace(QCCode))
         {
@@ -153,14 +158,32 @@ public class EditQualityDataTestModel : HistoPageModel
             return Page();
         }
 
-        // Create a QC note the first time the box is ticked for this test.
-        var qcNoteRef = Test.QCNoteRef;
-        if (QCNote && qcNoteRef is null or 0)
+        // One QC note per submission; the checkbox is disabled (so not posted) once it exists.
+        var qcNoteRef = Test.QCNoteRef is > 0 ? Test.QCNoteRef : SubmissionQCNoteRef;
+        var rowStamp = Test.RowStamp;
+        string? noteWarning = null;
+        if (qcNoteRef is > 0)
         {
-            var newId = await _qc.AddAsync(Session.BatchID.Value, Session.UserID);
-            if (newId > 0) qcNoteRef = newId;
+            QCNote = true;
         }
-        else if (!QCNote)
+        else if (QCNote)
+        {
+            Histo.QualityControl.Models.SubmissionQCNote? note;
+            try
+            {
+                note = await _qc.GetOrCreateForSubmissionAsync(Session.BatchID.Value, Test.ID, Test.TestType, Test.RowStamp ?? [], Session.UserID);
+            }
+            catch (Histo.QualityControl.Models.QCNoteLinkConflictException)
+            {
+                ConcurrencyError = "Another user has modified this test. Please reload and try again.";
+                await LoadLookupsAsync();
+                return Page();
+            }
+            qcNoteRef = note?.QCNoteRef;
+            if (note is null) noteWarning = QCNoteText.CreateFailedWarning;
+            if (note?.LinkedTestRowStamp is not null) rowStamp = note.LinkedTestRowStamp;
+        }
+        else
         {
             qcNoteRef = null;
         }
@@ -192,7 +215,7 @@ public class EditQualityDataTestModel : HistoPageModel
             NumberOfSlides = NumberOfSlides,
             OnHold = Test.OnHold,
             Archived = !string.IsNullOrWhiteSpace(ArchiveLocation) && ArchivedDate is not null,
-            RowStamp = Test.RowStamp,
+            RowStamp = rowStamp,
         };
 
         try
@@ -201,7 +224,16 @@ public class EditQualityDataTestModel : HistoPageModel
             await _tests.SaveTCCodesAsync(
                 Session.BatchID.Value, TestId, Test.TestType,
                 Test.TCCodes, SelectedCharges, Session.UserID);
+            if (qcNoteRef is > 0 && !string.IsNullOrWhiteSpace(Comment))
+            {
+                var batch = await _batches.GetByIdAsync(Session.BatchID.Value);
+                var names = await QCNoteText.LoadTestNamesAsync(_lookups, batch?.BatchType ?? Histo.Submissions.Models.BatchTypeConstants.Tse);
+                var outcome = await _qc.AppendAsync(qcNoteRef.Value,
+                    [QCNoteText.Line(Test, QCNoteText.TestName(names, Test), Comment)], Session.UserID);
+                noteWarning ??= QCNoteText.AppendWarning(outcome, qcNoteRef.Value);
+            }
             await CompleteBatchIfAllTestsDispatchedAsync(Session.BatchID.Value);
+            if (noteWarning is not null) TempData[QCNoteText.WarningTempDataKey] = noteWarning;
             return RedirectToPage("/QC/QualityData");
         }
         catch (BlockTestConcurrencyException)

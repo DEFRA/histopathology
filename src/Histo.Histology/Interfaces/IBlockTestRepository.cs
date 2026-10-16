@@ -51,4 +51,14 @@ public interface IBlockTestRepository
     Task SaveTestSelectionsAsync(int batchId, int blockId,
         IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
         int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Adds newly selected tests to every block the batch already has, never removing anything. Each block's
+    /// current tests are read and the additions inserted in ONE transaction (rows locked), so a concurrent
+    /// edit can't be overwritten and a failed read can't be mistaken for an empty selection — any failure throws
+    /// and rolls everything back. Uses the same <c>AddBlock*</c> stored procedures as <see cref="SaveTestSelectionsAsync"/>.
+    /// </summary>
+    Task AddTestsToBatchBlocksAsync(int batchId,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        int userId, CancellationToken ct = default);
 }

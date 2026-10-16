@@ -1,6 +1,7 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
 using Histo.Core.Domain;
+using Histo.Histology.Interfaces;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -28,13 +29,16 @@ public class EditBatchModel : HistoPageModel
     private readonly IBatchService   _batches;
     private readonly ILookupService  _lookups;
     private readonly IUserService    _users;
+    private readonly IBlockTestService _blockTests;
 
-    public EditBatchModel(ISessionService session, IBatchService batches, ILookupService lookups, IUserService users)
+    public EditBatchModel(ISessionService session, IBatchService batches, ILookupService lookups, IUserService users,
+        IBlockTestService blockTests)
         : base(session)
     {
         _batches = batches;
         _lookups = lookups;
         _users   = users;
+        _blockTests = blockTests;
     }
 
     // ---- Required editable fields ----
@@ -90,8 +94,8 @@ public class EditBatchModel : HistoPageModel
 
     /// <summary>
     /// <see cref="ReturnPage"/> plus the sort/page query string captured when the user left the
-    /// list, so Back/Cancel restore the exact filter/sort/page state. Hrefs only — never pass to
-    /// <c>RedirectToPage</c>, which requires a bare page name.
+    /// list, so Back/Cancel restore the exact filter/sort/page state. Hrefs only — a redirect goes through
+    /// <see cref="ReturnPageRedirect.RedirectToReturnPage"/>, because <c>RedirectToPage</c> requires a bare page name.
     /// </summary>
     public string ReturnUrl => ReturnPage + (Session.ReturnPageQuery ?? string.Empty);
 
@@ -355,26 +359,45 @@ public class EditBatchModel : HistoPageModel
         // Clear stain/antibody selections if their triggering histology codes aren't selected.
         var cleanedStainCodes    = ShowStains     ? SelectedStainCodes    : (IReadOnlyList<string>)[];
         var cleanedAntibodyCodes = ihcSelected     ? SelectedAntibodyCodes : (IReadOnlyList<string>)[];
+        // Read before the save below overwrites it; null means the read failed, which must not look like "nothing selected".
+        var previousTests = await _batches.TryGetBatchTestSelectionsAsync(Batch.ID);
         if (!await _batches.SaveBatchTestSelectionsAsync(Batch.ID, SelectedHistologyCodes, cleanedAntibodyCodes, cleanedStainCodes, Session.UserID))
         {
             SaveError = "Submission saved, but failed to save test types. Please try again.";
             return Page();
         }
 
-        return RedirectToPage(ReturnPage, ParseReturnQuery());
+        try
+        {
+            if (previousTests is null) throw new InvalidOperationException("Previous test selections could not be read.");
+            await AddNewTestsToExistingBlocksAsync(Batch.ID, previousTests, SelectedHistologyCodes, cleanedAntibodyCodes, cleanedStainCodes);
+        }
+        catch (Exception)
+        {
+            SaveError = "Submission saved, but the new tests could not be added to the existing blocks. Add them on each block instead.";
+            return Page();
+        }
+
+        return this.RedirectToReturnPage(ReturnPage, Session.ReturnPageQuery);
     }
 
-    /// <summary>Parses <see cref="ISessionService.ReturnPageQuery"/> into route values so a
-    /// post-save redirect restores the list's sort/page state, not just its bare page name.</summary>
-    private Microsoft.AspNetCore.Routing.RouteValueDictionary ParseReturnQuery()
+    /// <summary>
+    /// Adds tests newly selected for the submission to every block it already has, so the sample and
+    /// block pages show them. Deliberate enhancement: legacy only offered them unticked on each block.
+    /// Add-only and atomic (see <see cref="IBlockTestRepository.AddTestsToBatchBlocksAsync"/>): it can't remove or overwrite block tests.
+    /// </summary>
+    private async Task AddNewTestsToExistingBlocksAsync(int batchId, BatchTestSelections previous,
+        IReadOnlyList<string> histology, IReadOnlyList<string> antibodies, IReadOnlyList<string> stains)
     {
-        var result = new Microsoft.AspNetCore.Routing.RouteValueDictionary();
-        var query = Session.ReturnPageQuery;
-        if (string.IsNullOrEmpty(query)) return result;
+        static List<string> Added(IReadOnlyList<string> now, IReadOnlyList<BatchTestSelectionRow> before) =>
+            now.Except(before.Select(r => r.Code), StringComparer.OrdinalIgnoreCase).ToList();
 
-        foreach (var pair in Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(query))
-            result[pair.Key] = pair.Value.ToString();
-        return result;
+        var addedHistology  = Added(histology, previous.Histology);
+        var addedAntibodies = Added(antibodies, previous.Antibodies);
+        var addedStains     = Added(stains, previous.Stains);
+        if (addedHistology.Count == 0 && addedAntibodies.Count == 0 && addedStains.Count == 0) return;
+
+        await _blockTests.AddTestsToBatchBlocksAsync(batchId, addedHistology, addedAntibodies, addedStains, Session.UserID);
     }
 
     private async Task LoadLookupsAsync()

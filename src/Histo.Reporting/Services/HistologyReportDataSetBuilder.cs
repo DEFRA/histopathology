@@ -243,13 +243,9 @@ public sealed class HistologyReportDataSetBuilder
         dr["DateReceived"]     = Str(src, "DateReceived");
         // TimeReceived is a Code (foreign key to LOOKUP_TIME_RECEIVED = 3) — resolve to its
         // display text (e.g. "before 11.00"); falls back to the raw code when unresolved.
-        // tblBatch.TimeReceived is a non-nullable int defaulting to 0 (not NULL) for a batch not
-        // yet received — "0" is not a real lookup code, so it must print blank, not literal "0".
         var rawTimeReceived   = Str(src, "TimeReceived");
-        dr["TimeReceived"]     = rawTimeReceived is "" or "0"
-            ? string.Empty
-            : timeReceivedByCode is not null && timeReceivedByCode.TryGetValue(rawTimeReceived, out var trn)
-                ? trn : rawTimeReceived;
+        dr["TimeReceived"]     = timeReceivedByCode is not null && timeReceivedByCode.TryGetValue(rawTimeReceived, out var trn)
+            ? trn : rawTimeReceived;
         dr["SafeToHandle"]     = Bool(src, "SafeToHandle");
         dr["Comments"]         = Str(src, "Comments");
         // Fixation is a Code (foreign key to LOOKUP_FIXATION = 10, keyed on Code not ID) —

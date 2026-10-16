@@ -61,7 +61,7 @@ public sealed class BlockService : IBlockService
     /// blocks in the batch — used by <see cref="BlockHelpers.ComputeNextOrder"/> to
     /// replicate the legacy <c>GetOrder()</c> logic.
     /// </summary>
-    public async Task<int> AddBlockAsync(
+    public Task<int> AddBlockAsync(
         int batchId,
         int animalId,
         string blockRef,
@@ -70,7 +70,24 @@ public sealed class BlockService : IBlockService
         string? customerRef = null,
         string? comment = null,
         bool repeatBlock = false,
-        CancellationToken ct = default)
+        CancellationToken ct = default) =>
+        AddAsync(batchId, animalId, blockRef, existingOrders, userId, customerRef, comment, repeatBlock, keepRef: false, ct);
+
+    /// <inheritdoc/>
+    public Task<int> AddBlockKeepingRefAsync(
+        int batchId,
+        int animalId,
+        string blockRef,
+        IEnumerable<int> existingOrders,
+        int userId,
+        string? customerRef = null,
+        string? comment = null,
+        bool repeatBlock = false,
+        CancellationToken ct = default) =>
+        AddAsync(batchId, animalId, blockRef, existingOrders, userId, customerRef, comment, repeatBlock, keepRef: true, ct);
+
+    private async Task<int> AddAsync(int batchId, int animalId, string blockRef, IEnumerable<int> existingOrders, int userId,
+        string? customerRef, string? comment, bool repeatBlock, bool keepRef, CancellationToken ct)
     {
         var order = BlockHelpers.ComputeNextOrder(existingOrders);
         var block = new Block
@@ -87,7 +104,7 @@ public sealed class BlockService : IBlockService
 
         try
         {
-            return await _repo.SaveAsync(block, userId, ct);
+            return await _repo.SaveAsync(block, userId, keepRef, ct);
         }
         catch (Exception ex)
         {
@@ -101,12 +118,8 @@ public sealed class BlockService : IBlockService
     {
         try
         {
-            await _repo.SaveAsync(block, userId, ct);
+            await _repo.SaveAsync(block, userId, ct: ct);
             return true;
-        }
-        catch (DuplicateBlockRefException)
-        {
-            throw;
         }
         catch (Exception ex)
         {
@@ -172,7 +185,7 @@ public sealed class BlockService : IBlockService
 
         try
         {
-            await _repo.SaveAsync(block, userId, ct);
+            await _repo.SaveAsync(block, userId, ct: ct);
             return true;
         }
         catch (Exception ex)
