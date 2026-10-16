@@ -65,6 +65,41 @@ public class SearchSubmissionsModelTests
     }
 
     [Fact]
+    public async Task OnPostSelectAsync_WithReturnPage_ForwardsItOnSessionReturnPage()
+    {
+        var sut = CreateSut();
+        sut.SelectedBatchId = 42;
+        sut.ReturnPage = "/Index";
+
+        await sut.OnPostSelectAsync();
+
+        _session.VerifySet(s => s.ReturnPage = "/Search/SearchSubmissions?ReturnPage=%2FIndex", Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostSelectAsync_NoReturnPage_SessionReturnPageHasNoQueryString()
+    {
+        var sut = CreateSut();
+        sut.SelectedBatchId = 42;
+
+        await sut.OnPostSelectAsync();
+
+        _session.VerifySet(s => s.ReturnPage = "/Search/SearchSubmissions", Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostSelectAsync_ClearsStaleReturnPageQuery_SoItCantBeConcatenatedOntoOurReturnPage()
+    {
+        var sut = CreateSut();
+        sut.SelectedBatchId = 42;
+        sut.ReturnPage = "/Index";
+
+        await sut.OnPostSelectAsync();
+
+        _session.VerifySet(s => s.ReturnPageQuery = null, Times.Once);
+    }
+
+    [Fact]
     public async Task OnPostSelectAsync_HeaderCommentOnly_EnablesPrintSubmissionNotes()
     {
         _batches.Setup(b => b.GetByIdAsync(7, It.IsAny<CancellationToken>()))

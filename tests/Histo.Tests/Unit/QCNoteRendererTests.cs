@@ -114,4 +114,22 @@ public class QCNoteRendererTests
 
         Assert.True(pdf.Length > 0, "PDF should render even with empty StainRef.");
     }
+
+    [Fact]
+    public async Task RenderAsync_QCTextAlreadyEmbedsSenderRefTable_StillProducesPdf()
+    {
+        // Reproduces a saved note whose QCText already starts with the same
+        // Sender Ref/Histo Ref/Block Ref/Test table TestSummary would otherwise repeat.
+        var renderer = new QCNoteRenderer();
+        var ds       = BuildTestDataSet();
+
+        ds.Tables["Header"]!.Rows[0]["QCText"] =
+            "Sender Ref            Histo Ref             Block Ref      Test\r\n" +
+            "CHECBOXBOOL           26/20020              02             Giesma\r\n" +
+            "DEVQA testing\r\nDEVQA testing tworow\r\n";
+
+        var pdf = await renderer.RenderAsync(ds);
+
+        Assert.True(pdf.Length > 0, "PDF should still render when QCText already embeds the table.");
+    }
 }

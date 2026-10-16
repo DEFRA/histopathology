@@ -3,6 +3,7 @@ using Histo.Administration.Models;
 using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
 using Histo.QualityControl.Interfaces;
+using Histo.QualityControl.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.QC;
@@ -222,6 +223,36 @@ public class QualityDataModelTests
         Assert.Equal(2, saved.Count);
         Assert.All(saved, bt => Assert.Equal("S1", bt.StainRef));
         Assert.All(saved, bt => Assert.Equal(Histo.Histology.Models.BlockTestResult.Failed, bt.Result)); // untouched
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_MultiSelectWithQcNoteTicked_CreatesOnlyOneSharedNote_AndAppendsEachTestComment()
+    {
+        // Legacy's iQCNoteID is declared once before the row loop and reused for every row needing
+        // a note — exactly one new QC note per Edit click, not one per selected test.
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1), MakeTest(2)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var saved = new List<BlockTest>();
+        _tests.Setup(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<BlockTest, int, CancellationToken>((bt, _, _) => saved.Add(bt))
+            .Returns(Task.CompletedTask);
+        _qc.Setup(q => q.AddAsync(42, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(500);
+        _qc.Setup(q => q.GetByIdAsync(500, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new QCNote { ID = 42, QCNoteRef = 500, Text = string.Empty, RowStamp = [9, 9] });
+        var sut = CreateSut();
+        sut.SelectedIds = [1, 2];
+        sut.QCNote = true;
+        sut.Comment = "needs repeat";
+
+        await sut.OnPostUpdateAsync();
+
+        _qc.Verify(q => q.AddAsync(42, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(2, saved.Count);
+        Assert.All(saved, bt => Assert.Equal(500, bt.QCNoteRef));
+        _qc.Verify(q => q.UpdateAsync(500,
+            It.Is<string>(s => s.Contains("needs repeat") && s.Split(Environment.NewLine).Length == 2),
+            It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
