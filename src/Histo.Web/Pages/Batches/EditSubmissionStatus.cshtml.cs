@@ -149,7 +149,7 @@ public class EditSubmissionStatusModel : HistoPageModel
             return Page();
         }
 
-        return RedirectToReturnPage(ReturnPage, Session.ReturnPageQuery);
+        return this.RedirectToReturnPage(ReturnPage, Session.ReturnPageQuery);
     }
 
     /// <summary>

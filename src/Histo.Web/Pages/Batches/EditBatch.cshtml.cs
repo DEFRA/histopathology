@@ -95,7 +95,7 @@ public class EditBatchModel : HistoPageModel
     /// <summary>
     /// <see cref="ReturnPage"/> plus the sort/page query string captured when the user left the
     /// list, so Back/Cancel restore the exact filter/sort/page state. Hrefs only — a redirect goes through
-    /// <see cref="HistoPageModel.RedirectToReturnPage"/>, because <c>RedirectToPage</c> requires a bare page name.
+    /// <see cref="ReturnPageRedirect.RedirectToReturnPage"/>, because <c>RedirectToPage</c> requires a bare page name.
     /// </summary>
     public string ReturnUrl => ReturnPage + (Session.ReturnPageQuery ?? string.Empty);
 
@@ -378,7 +378,7 @@ public class EditBatchModel : HistoPageModel
             return Page();
         }
 
-        return RedirectToReturnPage(ReturnPage, Session.ReturnPageQuery);
+        return this.RedirectToReturnPage(ReturnPage, Session.ReturnPageQuery);
     }
 
     /// <summary>
