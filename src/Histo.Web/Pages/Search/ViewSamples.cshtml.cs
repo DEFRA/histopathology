@@ -90,21 +90,26 @@ public class ViewSamplesModel : GridPageModel
         !string.IsNullOrWhiteSpace(ReturnPage) && Url.IsLocalUrl(ReturnPage) ? ReturnPage : "/Search/SearchMenu";
 
     public IReadOnlyList<AnimalTissueSearchResult> PagedResults =>
-        (SortColumn switch
-        {
-            "DateSubmitted"  => SortDesc ? Results.OrderByDescending(r => r.DateSubmitted)  : Results.OrderBy(r => r.DateSubmitted),
-            "DateReceived"   => SortDesc ? Results.OrderByDescending(r => r.DateReceived)   : Results.OrderBy(r => r.DateReceived),
-            "TimeReceived" => SortDesc ? Results.OrderByDescending(r => r.TimeReceived) : Results.OrderBy(r => r.TimeReceived),
-            "DateCompleted"  => SortDesc ? Results.OrderByDescending(r => r.DateCompleted)  : Results.OrderBy(r => r.DateCompleted),
-            "SubmittedAs"    => SortDesc ? Results.OrderByDescending(r => r.SubmittedAs)    : Results.OrderBy(r => r.SubmittedAs),
-            "NoPieces" => SortDesc ? Results.OrderByDescending(r => r.NoPieces) : Results.OrderBy(r => r.NoPieces),
-            "CustomerReceivedDate" => SortDesc ? Results.OrderByDescending(r => r.CustomerReceivedDate) : Results.OrderBy(r => r.CustomerReceivedDate),
-            "TissueDescription" => SortDesc ? Results.OrderByDescending(r => r.TissueDescription) : Results.OrderBy(r => r.TissueDescription),
-            _                => SortDesc ? Results.OrderByDescending(r => r.ID) : Results.OrderBy(r => r.ID),
-        })
+        SortResults(Results)
         .Skip((PageNumber - 1) * PageSize)
         .Take(PageSize)
         .ToList();
+
+    // Shared by PagedResults (on-screen grid) and OnGetExportExcelAsync so the exported
+    // file matches whatever sort the user applied, instead of the raw stored-proc order.
+    private IOrderedEnumerable<AnimalTissueSearchResult> SortResults(IReadOnlyList<AnimalTissueSearchResult> results) =>
+        SortColumn switch
+        {
+            "DateSubmitted"  => SortDesc ? results.OrderByDescending(r => r.DateSubmitted)  : results.OrderBy(r => r.DateSubmitted),
+            "DateReceived"   => SortDesc ? results.OrderByDescending(r => r.DateReceived)   : results.OrderBy(r => r.DateReceived),
+            "TimeReceived" => SortDesc ? results.OrderByDescending(r => r.TimeReceived) : results.OrderBy(r => r.TimeReceived),
+            "DateCompleted"  => SortDesc ? results.OrderByDescending(r => r.DateCompleted)  : results.OrderBy(r => r.DateCompleted),
+            "SubmittedAs"    => SortDesc ? results.OrderByDescending(r => r.SubmittedAs)    : results.OrderBy(r => r.SubmittedAs),
+            "NoPieces" => SortDesc ? results.OrderByDescending(r => r.NoPieces) : results.OrderBy(r => r.NoPieces),
+            "CustomerReceivedDate" => SortDesc ? results.OrderByDescending(r => r.CustomerReceivedDate) : results.OrderBy(r => r.CustomerReceivedDate),
+            "TissueDescription" => SortDesc ? results.OrderByDescending(r => r.TissueDescription) : results.OrderBy(r => r.TissueDescription),
+            _                => SortDesc ? results.OrderByDescending(r => r.ID) : results.OrderBy(r => r.ID),
+        };
 
     public async Task OnGetAsync()
     {
@@ -157,13 +162,14 @@ public class ViewSamplesModel : GridPageModel
             return RedirectToPage("/Search/ViewSamples");
 
         var results = await SearchAsync();
+        var sortedResults = SortResults(results);
         var isBlockMode = Mode == "Block";
 
         var headers = isBlockMode
             ? (IReadOnlyList<string>)new[] { "Sub. number", "Date submitted", "Date received", "Time received", "Date completed", "Customer received date", "Block ref", "Tissue description", "No pieces", "Histology ref", "Sender ref", "Submitted as" }
             : (IReadOnlyList<string>)new[] { "Sub. number", "Date submitted", "Date received", "Time received", "Date completed", "Customer received date", "Tissue description", "No pieces", "Histology ref", "Sender ref", "Submitted as" };
 
-        var rows = results.Select(r => isBlockMode
+        var rows = sortedResults.Select(r => isBlockMode
             ? (IReadOnlyList<object?>)new object?[]
               {
                   r.ID, r.DateSubmitted, r.DateReceived, r.TimeReceived,

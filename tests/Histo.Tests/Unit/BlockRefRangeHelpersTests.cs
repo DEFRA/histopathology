@@ -60,4 +60,14 @@ public class BlockRefRangeHelpersTests
 
         Assert.Contains(rows, r => r.UnusedBlockRefs == "02+");
     }
+
+    // Two Animal records can share one Sender Ref, each with its own Block 01 — the SP then
+    // returns two rows for BlockRef 1. Legacy's drFoundBlock(0) always takes the first match.
+    [Fact]
+    public void DuplicateBlockRef_DoesNotThrow_FirstOccurrenceWins()
+    {
+        var rows = BlockRefRangeHelpers.ComputeRanges([(1, 1), (1, 2)]);
+
+        Assert.Contains(rows, r => r.UsedBlockRefs == "01");
+    }
 }

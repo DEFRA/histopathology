@@ -99,6 +99,7 @@
             <a asp-page="/Search/ViewSamples" asp-page-handler="ExportExcel"
                asp-route-SenderRef="@Model.SenderRef" asp-route-HistologyRef="@Model.HistologyRef"
                asp-route-TissueCode="@Model.TissueCode" asp-route-ProjectDesc="@Model.ProjectDesc" asp-route-Mode="@Model.Mode"
+               asp-route-SortColumn="@Model.SortColumn" asp-route-SortDesc="@Model.SortDesc"
                class="govuk-button govuk-button--secondary" data-module="govuk-button">Export to excel</a>
         }
     </div>

@@ -36,6 +36,11 @@ public class BookBlockRefModel : HistoPageModel
         ViewData["PageTitle"] = "Book blocks";
     }
 
+    // Legacy source: BookBlockRef.aspx.vb::lbSearchBlockRefs_Click — a full postback that
+    // carries whatever is currently typed in SenderRefFrom, even if "Book" was never clicked.
+    public IActionResult OnPostCheckUsedBlockRefs() =>
+        RedirectToPage("/Search/SearchBlockRefs", new { SenderRef = SenderRefFrom, ReturnPage = "/Bookings/BookBlockRef" });
+
     public async Task<IActionResult> OnPostAsync()
     {
         ViewData["Title"] = "Book blocks";

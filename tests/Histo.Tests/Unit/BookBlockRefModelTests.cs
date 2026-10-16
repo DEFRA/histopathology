@@ -160,4 +160,18 @@ public class BookBlockRefModelTests
         _blocks.Verify(b => b.BookPreBookedBlocksAsync("MC000001", It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Once);
         _blocks.Verify(b => b.BookPreBookedBlocksAsync("MC000002", It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public void OnPostCheckUsedBlockRefs_RedirectsToSearchBlockRefs_WithLiveSenderRefAndReturnPage()
+    {
+        var sut = CreateSut();
+        sut.SenderRefFrom = "S1";
+
+        var result = sut.OnPostCheckUsedBlockRefs();
+
+        var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+        Assert.Equal("/Search/SearchBlockRefs", redirect.PageName);
+        Assert.Equal("S1", redirect.RouteValues?["SenderRef"]);
+        Assert.Equal("/Bookings/BookBlockRef", redirect.RouteValues?["ReturnPage"]);
+    }
 }
