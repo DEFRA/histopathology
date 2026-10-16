@@ -425,6 +425,11 @@ else
                 'SelectedHistologyCodes', 'SelectedAntibodyCodes', 'SelectedStainCodes', 'CarryTestsToNextBlock'];
             document.querySelectorAll('form[data-keep-block-fields]').forEach(function (form) {
                 form.addEventListener('submit', function () {
+                    var marker = document.createElement('input');
+                    marker.type = 'hidden';
+                    marker.name = 'BlockFieldsPosted';
+                    marker.value = 'true';
+                    form.appendChild(marker);
                     Array.prototype.forEach.call(main.elements, function (el) {
                         if (names.indexOf(el.name) === -1 || el.disabled) return;
                         if ((el.type === 'checkbox' || el.type === 'radio') && !el.checked) return;

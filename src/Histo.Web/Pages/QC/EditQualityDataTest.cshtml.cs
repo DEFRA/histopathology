@@ -168,7 +168,17 @@ public class EditQualityDataTestModel : HistoPageModel
         }
         else if (QCNote)
         {
-            var note = await _qc.GetOrCreateForSubmissionAsync(Session.BatchID.Value, Test.ID, Test.TestType, Session.UserID);
+            Histo.QualityControl.Models.SubmissionQCNote? note;
+            try
+            {
+                note = await _qc.GetOrCreateForSubmissionAsync(Session.BatchID.Value, Test.ID, Test.TestType, Test.RowStamp ?? [], Session.UserID);
+            }
+            catch (Histo.QualityControl.Models.QCNoteLinkConflictException)
+            {
+                ConcurrencyError = "Another user has modified this test. Please reload and try again.";
+                await LoadLookupsAsync();
+                return Page();
+            }
             qcNoteRef = note?.QCNoteRef;
             if (note is null) noteWarning = QCNoteText.CreateFailedWarning;
             if (note?.LinkedTestRowStamp is not null) rowStamp = note.LinkedTestRowStamp;

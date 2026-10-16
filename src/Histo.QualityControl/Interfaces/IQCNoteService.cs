@@ -14,8 +14,11 @@ public interface IQCNoteService
     /// <summary>Creates a new QC note. Returns the new ID, or 0 on failure.</summary>
     Task<int> AddAsync(int submissionId, int createdByUserId, CancellationToken ct = default);
 
-    /// <summary>Atomically finds or creates the submission's QC note (linking the test on create). Null on failure.</summary>
-    Task<SubmissionQCNote?> GetOrCreateForSubmissionAsync(int batchId, int testId, string testType, int userId, CancellationToken ct = default);
+    /// <summary>
+    /// Atomically finds or creates the submission's QC note, linking the test on create only if its RowStamp still matches.
+    /// Throws <see cref="QCNoteLinkConflictException"/> (nothing created) when it doesn't; returns null on any other failure.
+    /// </summary>
+    Task<SubmissionQCNote?> GetOrCreateForSubmissionAsync(int batchId, int testId, string testType, byte[] expectedRowStamp, int userId, CancellationToken ct = default);
 
     /// <summary>Updates a QC note. Throws <see cref="QCNoteConcurrencyException"/> on concurrent modification.</summary>
     Task UpdateAsync(int qcNoteId, string text, byte[] rowStamp, int userId, CancellationToken ct = default);

@@ -261,7 +261,7 @@ public class QualityDataModelTests
     }
 
     private static readonly System.Linq.Expressions.Expression<Func<IQCNoteService, Task<SubmissionQCNote?>>> AnyNoteCreation =
-        q => q.GetOrCreateForSubmissionAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>());
+        q => q.GetOrCreateForSubmissionAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<CancellationToken>());
 
     private static BlockTest WithNote(BlockTest t, int? noteRef) => new()
     {
@@ -270,12 +270,31 @@ public class QualityDataModelTests
     };
 
     [Fact]
+    public async Task OnPostUpdateAsync_NoteLinkRowStampConflict_SavesNothingAndReportsIt()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1), MakeTest(2)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var saved = CaptureSaves();
+        _qc.Setup(AnyNoteCreation).ThrowsAsync(new QCNoteLinkConflictException());
+        var sut = CreateSut();
+        sut.SelectedIds = [1, 2];
+        sut.QCNote = true;
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Contains("modified by another user", sut.Error);
+        Assert.Empty(saved);
+        // The RowStamp the grid was read with is what guards the link.
+        _qc.Verify(q => q.GetOrCreateForSubmissionAsync(42, 1, "Histology", It.Is<byte[]>(b => b.SequenceEqual(new byte[] { 1, 2, 3 })), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task OnPostUpdateAsync_SingleSelectNoRef_QcNoteTicked_CreatesNote_AndExposesRef()
     {
         _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1)]);
         _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
         var saved = CaptureSaves();
-        _qc.Setup(q => q.GetOrCreateForSubmissionAsync(42, 1, "Histology", It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        _qc.Setup(q => q.GetOrCreateForSubmissionAsync(42, 1, "Histology", It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new SubmissionQCNote(700, [9, 9, 9]));
         var sut = CreateSut();
         sut.SelectedIds = [1];

@@ -26,4 +26,9 @@ public interface IBlockTestService
     Task SaveTestSelectionsAsync(int batchId, int blockId,
         IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
         int userId, CancellationToken ct = default);
+
+    /// <summary>Add-only propagation of newly selected tests to the batch's existing blocks; throws on any failure (see the repository).</summary>
+    Task AddTestsToBatchBlocksAsync(int batchId,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        int userId, CancellationToken ct = default);
 }

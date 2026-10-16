@@ -230,7 +230,7 @@ public class EditQualityDataTestModelTests
 
         Assert.Equal(321, saved!.QCNoteRef);
         Assert.True(saved.QCNote);
-        _qc.Verify(q => q.GetOrCreateForSubmissionAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _qc.Verify(q => q.GetOrCreateForSubmissionAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         _qc.Verify(q => q.AppendAsync(321, It.Is<IReadOnlyList<string>>(l => l.Single() == "Histology - 1 (26/001 / 01): re-cut"), 7, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -258,10 +258,28 @@ public class EditQualityDataTestModelTests
     }
 
     [Fact]
+    public async Task OnPostAsync_NoteLinkRowStampConflict_SavesNothingAndReportsConflict()
+    {
+        _tests.Setup(t => t.GetByIdAsync(42, 1, It.IsAny<CancellationToken>())).ReturnsAsync(MakeTest());
+        _qc.Setup(q => q.GetOrCreateForSubmissionAsync(42, 1, BlockTestType.Histology, It.IsAny<byte[]>(), 7, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Histo.QualityControl.Models.QCNoteLinkConflictException());
+        var sut = CreateSut();
+        sut.TestId = 1;
+        sut.RemedialAction = "1";
+        sut.QCNote = true;
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.False(string.IsNullOrEmpty(sut.ConcurrencyError));
+        _tests.Verify(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task OnPostAsync_NoteCreationFails_WarningCarriedThroughRedirect()
     {
         _tests.Setup(t => t.GetByIdAsync(42, 1, It.IsAny<CancellationToken>())).ReturnsAsync(MakeTest());
-        _qc.Setup(q => q.GetOrCreateForSubmissionAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        _qc.Setup(q => q.GetOrCreateForSubmissionAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Histo.QualityControl.Models.SubmissionQCNote?)null);
         var sut = CreateSut();
         sut.TestId = 1;
@@ -292,14 +310,14 @@ public class EditQualityDataTestModelTests
         await sut.OnPostAsync();
 
         Assert.Equal(555, saved!.QCNoteRef);
-        _qc.Verify(q => q.GetOrCreateForSubmissionAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _qc.Verify(q => q.GetOrCreateForSubmissionAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task OnPostAsync_FirstNoteOnSubmission_UsesAtomicCreate_AndLinkedRowStamp()
     {
         _tests.Setup(t => t.GetByIdAsync(42, 1, It.IsAny<CancellationToken>())).ReturnsAsync(MakeTest());
-        _qc.Setup(q => q.GetOrCreateForSubmissionAsync(42, 1, BlockTestType.Histology, 7, It.IsAny<CancellationToken>()))
+        _qc.Setup(q => q.GetOrCreateForSubmissionAsync(42, 1, BlockTestType.Histology, It.IsAny<byte[]>(), 7, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Histo.QualityControl.Models.SubmissionQCNote(800, [8, 8]));
         BlockTest? saved = null;
         _tests.Setup(t => t.UpdateAsync(It.IsAny<BlockTest>(), 7, It.IsAny<CancellationToken>()))

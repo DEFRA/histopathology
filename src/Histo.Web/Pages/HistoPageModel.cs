@@ -10,6 +10,9 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Hosting;
 
 namespace Histo.Web.Pages;
 
@@ -37,16 +40,29 @@ public abstract class HistoPageModel : PageModel
         Session = session;
     }
 
+    /// <summary>Dev sign-in bypass: only when hosted as Development AND the config flag is on.</summary>
+    public static bool IsDevAuthBypassEnabled(HttpContext httpContext)
+    {
+        var services = httpContext.RequestServices;
+        var flag = services.GetRequiredService<IConfiguration>().GetValue<bool>("DevAuthBypass");
+        if (!flag) return false;
+
+        if (services.GetRequiredService<IWebHostEnvironment>().IsDevelopment()) return true;
+
+        services.GetService<ILoggerFactory>()?.CreateLogger<HistoPageModel>()
+            .LogWarning("DevAuthBypass is set but the environment is not Development; ignoring it and requiring sign-in.");
+        return false;
+    }
+
     public override async Task OnPageHandlerExecutionAsync(
         PageHandlerExecutingContext context,
         PageHandlerExecutionDelegate next)
     {
 
-        // LOCAL-DEV-ONLY (uncommitted): skips Entra ID sign-in entirely.
-        // Enabled only via appsettings.Development.json's "DevAuthBypass" flag (gitignored).
-        // Fully hardcoded — no DB/IUserService lookup — so it never depends on GetUsers'
-        // SP column shape or a matching row actually existing.
-        if (context.HttpContext.RequestServices.GetRequiredService<IConfiguration>().GetValue<bool>("DevAuthBypass"))
+        // LOCAL-DEV-ONLY: skips Entra ID sign-in entirely. Needs BOTH the Development environment and the
+        // "DevAuthBypass" flag (appsettings.Development.json, gitignored), so a stray flag in a deployed
+        // environment is ignored. Fully hardcoded — no DB/IUserService lookup.
+        if (IsDevAuthBypassEnabled(context.HttpContext))
         {
             // Re-signs in whenever the GroupName claim is missing/empty — covers both the
             // "never signed in" case AND a stale cookie from an earlier real SAML attempt

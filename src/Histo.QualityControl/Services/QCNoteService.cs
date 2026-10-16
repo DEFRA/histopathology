@@ -47,11 +47,15 @@ public sealed class QCNoteService : IQCNoteService
     }
 
     /// <inheritdoc/>
-    public async Task<SubmissionQCNote?> GetOrCreateForSubmissionAsync(int batchId, int testId, string testType, int userId, CancellationToken ct = default)
+    public async Task<SubmissionQCNote?> GetOrCreateForSubmissionAsync(int batchId, int testId, string testType, byte[] expectedRowStamp, int userId, CancellationToken ct = default)
     {
         try
         {
-            return await _repo.GetOrCreateForSubmissionAsync(batchId, testId, testType, userId, ct);
+            return await _repo.GetOrCreateForSubmissionAsync(batchId, testId, testType, expectedRowStamp, userId, ct);
+        }
+        catch (QCNoteLinkConflictException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -71,13 +75,15 @@ public sealed class QCNoteService : IQCNoteService
 
         // A never-edited note's Text is the generated test table, so appending persists that table too.
         var existing = (note.Text ?? string.Empty).TrimEnd();
-        var existingLines = existing.Replace("\r\n", "\n").Split('\n')
-            .Select(l => l.Trim())
-            .ToHashSet(StringComparer.Ordinal);
+
+        // Whole entries on line boundaries: a multiline comment is one entry, and a shorter line that is only
+        // a prefix of an existing line is not a duplicate.
+        var padded = "\n" + NormalizeEntry(existing) + "\n";
         var toAdd = lines
-            .Select(l => l?.Trim() ?? string.Empty)
-            .Where(l => l.Length > 0 && !existingLines.Contains(l))
+            .Select(NormalizeEntry)
+            .Where(e => e.Length > 0 && !padded.Contains("\n" + e + "\n", StringComparison.Ordinal))
             .Distinct(StringComparer.Ordinal)
+            .Select(e => e.Replace("\n", Environment.NewLine))
             .ToList();
         if (toAdd.Count == 0) return QCNoteAppendResult.NothingToAppend;
 
@@ -96,6 +102,10 @@ public sealed class QCNoteService : IQCNoteService
             return QCNoteAppendResult.Concurrency;
         }
     }
+
+    /// <summary>\n line endings, each line trimmed, outer blank lines removed.</summary>
+    private static string NormalizeEntry(string? text) =>
+        string.Join('\n', (text ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n').Split('\n').Select(l => l.Trim())).Trim('\n');
 
     /// <summary>Creates a new QC note and returns the new ID.</summary>
     public async Task<int> AddAsync(int submissionId, int createdByUserId, CancellationToken ct = default)

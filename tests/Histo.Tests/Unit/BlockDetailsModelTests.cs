@@ -110,6 +110,7 @@ public class BlockDetailsModelTests
         SetupExistingBlock();
         var sut = CreateSut(animalId: 2, blockId: 319181);
         sut.IsAddFlow = true;
+        sut.BlockFieldsPosted = true;
         sut.NewTissueCode = "AGAR";
         sut.NewBlockRef = "07";
         sut.NewNumberOfBlocks = 3;
@@ -136,6 +137,31 @@ public class BlockDetailsModelTests
     }
 
     [Fact]
+    public async Task AddTissue_BlockRefClearedByUser_StillKeepsTheOtherTypedFields()
+    {
+        // An emptied Block ref posts "" and binds to null; that must not look like "no fields posted".
+        SetupExistingBlock();
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.BlockFieldsPosted = true;
+        sut.NewTissueCode = "AGAR";
+        sut.NewBlockRef = null;
+        sut.NewCustomerRef = "CUST";
+        sut.NewComment = "typed";
+        sut.SelectedHistologyCodes = [HistologyCode.HAndE];
+
+        await sut.OnPostAddTissueAsync();
+
+        var next = CreateSut(animalId: 2, blockId: 319181);
+        next.TempData = sut.TempData;
+        await next.OnGetAsync();
+
+        Assert.Null(next.NewBlockRef);
+        Assert.Equal("CUST", next.NewCustomerRef);
+        Assert.Equal("typed", next.NewComment);
+        Assert.Equal(new[] { HistologyCode.HAndE }, next.ExistingHistologyCodes);
+    }
+
+    [Fact]
     public async Task AddTissue_WithoutPostedBlockFields_ShowsTheSavedBlock()
     {
         SetupExistingBlock();
@@ -156,6 +182,7 @@ public class BlockDetailsModelTests
     {
         SetupExistingBlock();
         var other = CreateSut(animalId: 2, blockId: 999);
+        other.BlockFieldsPosted = true;
         other.NewBlockRef = "99";
         await other.OnPostDeleteTissueAsync(1);
 

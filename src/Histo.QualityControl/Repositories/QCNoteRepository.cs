@@ -163,7 +163,7 @@ public sealed class QCNoteRepository : IQCNoteRepository
     }
 
     /// <inheritdoc/>
-    public async Task<SubmissionQCNote> GetOrCreateForSubmissionAsync(int batchId, int testId, string testType, int userId, CancellationToken ct = default)
+    public async Task<SubmissionQCNote> GetOrCreateForSubmissionAsync(int batchId, int testId, string testType, byte[] expectedRowStamp, int userId, CancellationToken ct = default)
     {
         var table = testType switch
         {
@@ -176,34 +176,48 @@ public sealed class QCNoteRepository : IQCNoteRepository
         using var conn = _db.CreateConnection();
         await conn.OpenAsync(ct);
         using var tx = await conn.BeginTransactionAsync(ct);
-
-        var lockResult = await conn.ExecuteScalarAsync<int>(
-            "DECLARE @r int; EXEC @r = sp_getapplock @Resource = @Resource, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 15000; SELECT @r;",
-            new { Resource = $"Histo:QCNote:Batch:{batchId}" }, tx);
-        if (lockResult < 0)
-            throw new TimeoutException($"Timed out waiting to allocate the QC note for submission {batchId}.");
-
-        var existing = await conn.ExecuteScalarAsync<int?>(SubmissionNoteRefSql, new { BatchID = batchId }, tx);
-        if (existing is > 0)
+        try
         {
+            var lockResult = await conn.ExecuteScalarAsync<int>(
+                "DECLARE @r int; EXEC @r = sp_getapplock @Resource = @Resource, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 15000; SELECT @r;",
+                new { Resource = $"Histo:QCNote:Batch:{batchId}" }, tx);
+            if (lockResult < 0)
+                throw new TimeoutException($"Timed out waiting to allocate the QC note for submission {batchId}.");
+
+            var existing = await conn.ExecuteScalarAsync<int?>(SubmissionNoteRefSql, new { BatchID = batchId }, tx);
+            if (existing is > 0)
+            {
+                await tx.CommitAsync(ct);
+                return new SubmissionQCNote(existing.Value, null);
+            }
+
+            var parameters = new DynamicParameters();
+            parameters.Add("CreatedBy",   userId);
+            parameters.Add("DateCreated", DateTime.Now);
+            parameters.Add("NewID",       dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+            await conn.ExecuteAsync("AddQCNote", parameters, tx, commandType: System.Data.CommandType.StoredProcedure);
+            var newId = parameters.Get<int>("NewID");
+
+            // Linking inside the lock is what makes the note visible to the next caller's lookup. The RowStamp
+            // match is what stops the caller's later full-row save overwriting a change made since it read the test.
+            var link = new DynamicParameters();
+            link.Add("Ref", newId);
+            link.Add("ID", testId);
+            link.Add("RowStamp", expectedRowStamp, System.Data.DbType.Binary);
+            var rowStamp = await conn.ExecuteScalarAsync<byte[]?>(
+                $"UPDATE {table} SET QCNote = 1, QCNoteRef = @Ref OUTPUT inserted.RowStamp WHERE ID = @ID AND RowStamp = @RowStamp",
+                link, tx);
+            if (rowStamp is null)
+                throw new QCNoteLinkConflictException();
+
             await tx.CommitAsync(ct);
-            return new SubmissionQCNote(existing.Value, null);
+            return new SubmissionQCNote(newId, rowStamp);
         }
-
-        var parameters = new DynamicParameters();
-        parameters.Add("CreatedBy",   userId);
-        parameters.Add("DateCreated", DateTime.Now);
-        parameters.Add("NewID",       dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
-        await conn.ExecuteAsync("AddQCNote", parameters, tx, commandType: System.Data.CommandType.StoredProcedure);
-        var newId = parameters.Get<int>("NewID");
-
-        // Linking inside the lock is what makes the note visible to the next caller's lookup.
-        var rowStamp = await conn.ExecuteScalarAsync<byte[]?>(
-            $"UPDATE {table} SET QCNote = 1, QCNoteRef = @Ref OUTPUT inserted.RowStamp WHERE ID = @ID",
-            new { Ref = newId, ID = testId }, tx);
-
-        await tx.CommitAsync(ct);
-        return new SubmissionQCNote(newId, rowStamp);
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
     }
 
     // Same rows as BlockTestRepository.GetByBatchAsync (histology worklist codes only), latest ref wins.

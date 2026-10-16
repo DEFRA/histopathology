@@ -24,14 +24,11 @@ public class EditBatchModelTests
     private readonly Mock<IBatchService> _batches = new();
     private readonly Mock<ILookupService> _lookups = new();
     private readonly Mock<IUserService> _users = new();
-    private readonly Mock<Histo.Histology.Interfaces.IBlockService> _blocks = new();
     private readonly Mock<Histo.Histology.Interfaces.IBlockTestService> _blockTests = new();
 
     public EditBatchModelTests()
     {
-        _blocks.Setup(b => b.GetByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<Histo.Histology.Models.Block>)[]);
-        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+_blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Histo.Histology.Models.BlockTest>)[]);
         _session.SetupProperty(s => s.BatchID);
         _session.SetupProperty(s => s.IsViewSubmissionMode);
@@ -52,6 +49,8 @@ public class EditBatchModelTests
         _batches.Setup(b => b.GetSubmittedAsCodeAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((string?)null);
         _batches.Setup(b => b.GetBatchTestSelectionsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new BatchTestSelections());
+        _batches.Setup(b => b.TryGetBatchTestSelectionsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BatchTestSelections());
     }
 
     private EditBatchModel CreateSut()
@@ -66,7 +65,7 @@ public class EditBatchModelTests
         url.Setup(u => u.ActionContext).Returns(actionContext);
         url.Setup(u => u.RouteUrl(It.IsAny<Microsoft.AspNetCore.Mvc.Routing.UrlRouteContext>())).Returns("/Batches/EditBatch");
 
-        return new(_session.Object, _batches.Object, _lookups.Object, _users.Object, _blocks.Object, _blockTests.Object)
+        return new(_session.Object, _batches.Object, _lookups.Object, _users.Object, _blockTests.Object)
         {
             PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
             TempData = new TempDataDictionary(new Microsoft.AspNetCore.Http.DefaultHttpContext(), Mock.Of<ITempDataProvider>()),
@@ -409,8 +408,7 @@ public class EditBatchModelTests
         Assert.Equal("2", redirect.RouteValues!["PageNumber"]);
     }
 
-    [Fact]
-    public async Task OnPostAsync_TestAddedToSubmission_IsTickedOnExistingBlocks()
+    private void SetupSuccessfulSave(BatchTestSelections previous)
     {
         _session.Object.BatchID = 10;
         _session.Object.ReturnPage = "/Search/SearchSubmissions";
@@ -419,16 +417,13 @@ public class EditBatchModelTests
         _batches.Setup(b => b.SaveBatchTestSelectionsAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(),
             It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
-        _batches.Setup(b => b.GetBatchTestSelectionsAsync(10, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new BatchTestSelections { Histology = [new BatchTestSelectionRow { Code = HistologyCode.HAndE }] });
-        _blocks.Setup(b => b.GetByBatchAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Histo.Histology.Models.Block>)[
-            new() { ID = 100, BatchID = 10, AnimalID = 1, BlockRef = "01", Status = Histo.Histology.Models.BlockStatus.Used },
-            new() { ID = 101, BatchID = 10, AnimalID = 1, BlockRef = "02", Status = Histo.Histology.Models.BlockStatus.Used },
-        ]);
-        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Histo.Histology.Models.BlockTest>)[
-            new() { BlockID = 100, TestType = Histo.Histology.Models.BlockTestType.Histology, Code = HistologyCode.HAndE },
-            new() { BlockID = 101, TestType = Histo.Histology.Models.BlockTestType.Histology, Code = HistologyCode.EO },
-        ]);
+        _batches.Setup(b => b.TryGetBatchTestSelectionsAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(previous);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_TestAddedToSubmission_IsAddedToExistingBlocksOnlyAsAdditions()
+    {
+        SetupSuccessfulSave(new BatchTestSelections { Histology = [new BatchTestSelectionRow { Code = HistologyCode.HAndE }] });
         var sut = CreateSut();
         sut.SelectedHistologyCodes = [HistologyCode.HAndE, HistologyCode.SpecialStain];
         sut.SelectedStainCodes = ["9"];
@@ -437,24 +432,63 @@ public class EditBatchModelTests
         var result = await sut.OnPostAsync();
 
         Assert.IsType<RedirectToPageResult>(result);
-        _blockTests.Verify(t => t.SaveTestSelectionsAsync(10, 100,
-            It.Is<IReadOnlyList<string>>(h => h.SequenceEqual(new[] { HistologyCode.HAndE, HistologyCode.SpecialStain })),
+        // Only what is new, and through the add-only operation — never the delete-capable per-block save.
+        _blockTests.Verify(t => t.AddTestsToBatchBlocksAsync(10,
+            It.Is<IReadOnlyList<string>>(h => h.SequenceEqual(new[] { HistologyCode.SpecialStain })),
             It.Is<IReadOnlyList<string>>(a => a.Count == 0),
             It.Is<IReadOnlyList<string>>(s => s.SequenceEqual(new[] { "9" })),
             7, It.IsAny<CancellationToken>()), Times.Once);
-        // EO can't be combined with other tests on a block, so that block is left as it was.
-        _blockTests.Verify(t => t.SaveTestSelectionsAsync(10, 101, It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
-            It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _blockTests.Verify(t => t.SaveTestSelectionsAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(),
+            It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public void MergeAddedTests_AntibodiesOnlyAddedWhenBlockHasIhc_AndUnchangedBlockReturnsNull()
+    public async Task OnPostAsync_NothingNewSelected_DoesNotTouchBlocks()
     {
-        var withIhc = EditBatchModel.MergeAddedTests([HistologyCode.IhcPrp], ["A1"], [], [], ["A2"], []);
-        Assert.Equal(new[] { "A1", "A2" }, withIhc!.Value.Antibodies);
+        SetupSuccessfulSave(new BatchTestSelections { Histology = [new BatchTestSelectionRow { Code = HistologyCode.HAndE }] });
+        var sut = CreateSut();
+        sut.SelectedHistologyCodes = [HistologyCode.HAndE];
+        sut.SafeToHandle = true;
 
-        Assert.Null(EditBatchModel.MergeAddedTests([HistologyCode.HAndE], [], [], [], ["A2"], []));
-        Assert.Null(EditBatchModel.MergeAddedTests([HistologyCode.HAndE], [], [], [HistologyCode.HAndE], [], []));
+        await sut.OnPostAsync();
+
+        _blockTests.Verify(t => t.AddTestsToBatchBlocksAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(),
+            It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_PreviousSelectionsCouldNotBeRead_DoesNotGuessAndReportsIt()
+    {
+        // A failed read must not look like "nothing was selected before" — that would treat every test as new.
+        SetupSuccessfulSave(new BatchTestSelections());
+        _batches.Setup(b => b.TryGetBatchTestSelectionsAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync((BatchTestSelections?)null);
+        var sut = CreateSut();
+        sut.SelectedHistologyCodes = [HistologyCode.HAndE];
+        sut.SafeToHandle = true;
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Contains("could not be added to the existing blocks", sut.SaveError);
+        _blockTests.Verify(t => t.AddTestsToBatchBlocksAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(),
+            It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_AddingToBlocksFails_ReportsItAfterTheSubmissionSaved()
+    {
+        SetupSuccessfulSave(new BatchTestSelections());
+        _blockTests.Setup(t => t.AddTestsToBatchBlocksAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(),
+            It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("db"));
+        var sut = CreateSut();
+        sut.SelectedHistologyCodes = [HistologyCode.HAndE];
+        sut.SafeToHandle = true;
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Contains("could not be added to the existing blocks", sut.SaveError);
     }
 
     // ── Computed properties ──────────────────────────────────────────────────────

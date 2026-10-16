@@ -302,7 +302,18 @@ public class QualityDataModel : GridPageModel
         if (anyNeedsRef && targetRef is null)
         {
             var first = selected.First(t => AppliesQcNote(t) && t.QCNoteRef is null or 0);
-            var note = await _qc.GetOrCreateForSubmissionAsync(batchId, first.ID, first.TestType, Session.UserID);
+            SubmissionQCNote? note;
+            try
+            {
+                note = await _qc.GetOrCreateForSubmissionAsync(batchId, first.ID, first.TestType, first.RowStamp ?? [], Session.UserID);
+            }
+            catch (QCNoteLinkConflictException)
+            {
+                // Nothing was created or saved: the test changed after this page read it.
+                Error = "A selected test was modified by another user, so nothing was saved. Please reload and try again.";
+                await ReloadGridAsync(batchId);
+                return Page();
+            }
             if (note is null)
             {
                 NoteWarning = "The QC note could not be created, so the tests were saved without one.";

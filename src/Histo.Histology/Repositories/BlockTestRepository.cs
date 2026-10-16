@@ -1,4 +1,5 @@
 using Dapper;
+using Histo.Core.Domain;
 using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
 using Histo.Infrastructure;
@@ -282,6 +283,65 @@ public sealed class BlockTestRepository : IBlockTestRepository
             current.Where(t => t.TestType == BlockTestType.Antibodies).ToList(), antibodyCodes, "AddBlockAntibodies", "DeleteBlockAntibodies");
         await ApplyBlockTestDeltaAsync(conn, batchId, blockId, userId,
             current.Where(t => t.TestType == BlockTestType.Stain).ToList(), stainCodes, "AddBlockStain", "DeleteBlockStain");
+    }
+
+    /// <inheritdoc/>
+    public async Task AddTestsToBatchBlocksAsync(int batchId,
+        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        int userId, CancellationToken ct = default)
+    {
+        if (histologyCodes.Count == 0 && antibodyCodes.Count == 0 && stainCodes.Count == 0) return;
+
+        using var conn = _db.CreateConnection();
+        await conn.OpenAsync(ct);
+        using var tx = await conn.BeginTransactionAsync(ct);
+        try
+        {
+            // Assigned pre-cassetted blocks are PreBookedUsed; unclaimed placeholders (PreBooked) are excluded.
+            const string BatchBlockIds = "SELECT ID FROM BatchBlock WHERE BatchID = @BatchID AND Status IN (@Used, @PreBookedUsed)";
+            var args = new { BatchID = batchId, Used = BlockStatus.Used, PreBookedUsed = BlockStatus.PreBookedUsed };
+
+            var blockIds = (await conn.QueryAsync<int>(BatchBlockIds, args, tx)).ToList();
+
+            // One locked read per table for ALL the batch's blocks (not per block). UPDLOCK + HOLDLOCK covers the
+            // key ranges, so a concurrent save for these blocks waits instead of reading the same "current" rows
+            // and then deleting our additions.
+            async Task<ILookup<int, string>> ReadAsync(string table) =>
+                (await conn.QueryAsync<(int BlockID, string Code)>(
+                    $"SELECT BlockID, RTRIM(Code) AS Code FROM {table} WITH (UPDLOCK, HOLDLOCK) WHERE BlockID IN ({BatchBlockIds})",
+                    args, tx)).ToLookup(r => r.BlockID, r => r.Code);
+
+            var currentHistology  = await ReadAsync("BlockHistology");
+            var currentAntibodies = await ReadAsync("BlockAntibodies");
+            var currentStains     = await ReadAsync("BlockStain");
+
+            foreach (var blockId in blockIds)
+            {
+                var additions = BlockTestSelectionRules.ComputeAdditions(
+                    currentHistology[blockId], currentAntibodies[blockId], currentStains[blockId],
+                    histologyCodes, antibodyCodes, stainCodes);
+
+                await InsertCodesAsync(conn, tx, "AddBlockHistology", blockId, batchId, userId, additions.Histology);
+                await InsertCodesAsync(conn, tx, "AddBlockAntibodies", blockId, batchId, userId, additions.Antibodies);
+                await InsertCodesAsync(conn, tx, "AddBlockStain", blockId, batchId, userId, additions.Stains);
+            }
+
+            await tx.CommitAsync(ct);
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    private static async Task InsertCodesAsync(System.Data.IDbConnection conn, System.Data.IDbTransaction tx,
+        string addSp, int blockId, int batchId, int userId, IEnumerable<string> codes)
+    {
+        foreach (var code in codes)
+            await conn.ExecuteAsync(addSp,
+                new { BlockID = blockId, Code = code, Comment = (string?)null, UserID = userId, BatchID = batchId },
+                tx, commandType: System.Data.CommandType.StoredProcedure);
     }
 
     /// <summary>Mirrors BatchRepository.ApplyTestSelectionDeltaAsync, scoped to one block.</summary>

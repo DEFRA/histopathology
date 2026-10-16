@@ -645,6 +645,12 @@ public class BlockDetailsModel : HistoPageModel
 
     private const string DraftKey = "BlockDetails_Draft";
 
+    /// <summary>
+    /// Set by the page script when it copies the typed block fields into a tissue form. Needed because an
+    /// emptied Block ref posts as an empty string and binds to null, which looks the same as "not posted".
+    /// </summary>
+    [BindProperty] public bool BlockFieldsPosted { get; set; }
+
     private sealed record BlockDraft(
         int BlockId, string? BlockRef, int NumberOfBlocks, string? CustomerRef, bool RepeatBlock, string? Comment,
         List<string> Histology, List<string> Antibodies, List<string> Stains, bool CarryTests);
@@ -655,7 +661,7 @@ public class BlockDetailsModel : HistoPageModel
     /// </summary>
     private void StashDraft()
     {
-        if (BlockId is not > 0 || NewBlockRef is null) return;
+        if (BlockId is not > 0 || !BlockFieldsPosted) return;
 
         TempData[DraftKey] = System.Text.Json.JsonSerializer.Serialize(new BlockDraft(
             BlockId.Value, NewBlockRef, NewNumberOfBlocks, NewCustomerRef, NewRepeatBlock, NewComment,

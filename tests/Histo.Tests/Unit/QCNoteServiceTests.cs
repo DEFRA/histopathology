@@ -75,6 +75,32 @@ public class QCNoteServiceTests
     }
 
     [Fact]
+    public async Task AppendAsync_RepeatedMultilineComment_IsNotAppendedAgain()
+    {
+        // The note already holds the whole two-line entry (stored with \r\n); the incoming one uses \n.
+        SetupNote("Intro\r\nHistology - H&E (26/1 / 01): first line\r\nsecond line\r\nOther");
+
+        var result = await BuildSut().AppendAsync(5, ["Histology - H&E (26/1 / 01): first line\nsecond line"], 99);
+
+        Assert.Equal(QCNoteAppendResult.NothingToAppend, result);
+        _repoMock.Verify(r => r.UpdateAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AppendAsync_MultilineCommentThatOnlyContainsExistingLines_IsStillAppended()
+    {
+        // Both physical lines exist separately, but not together as one entry.
+        SetupNote("T (1 / 01): first line\r\nunrelated\r\nsecond line");
+
+        var result = await BuildSut().AppendAsync(5, ["T (1 / 01): first line\r\nsecond line"], 99);
+
+        Assert.Equal(QCNoteAppendResult.Appended, result);
+        _repoMock.Verify(r => r.UpdateAsync(5,
+            It.Is<string>(s => s.EndsWith(Environment.NewLine + "T (1 / 01): first line" + Environment.NewLine + "second line")),
+            It.IsAny<byte[]>(), 99, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task AppendAsync_AllLinesAlreadyPresent_DoesNotWrite()
     {
         SetupNote("H&E (26/1 / 01): first");
