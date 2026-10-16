@@ -37,6 +37,7 @@ public sealed class SessionService : ISessionService
     private const string KeySampleDetailReturnPage = "SampleDetailReturnPage";
     private const string KeyEditBatchReturnPage = "EditBatchReturnPage";
     private const string KeyIsViewSubmissionMode = "IsViewSubmissionMode";
+    private const string KeyUseSenderRefValidation = "UseSenderRefValidation";
 
     private readonly ISession _session;
 
@@ -128,6 +129,12 @@ public sealed class SessionService : ISessionService
     {
         get => GetNullableInt(KeyIsViewSubmissionMode) == 1;
         set => SetNullableInt(KeyIsViewSubmissionMode, value ? 1 : 0);
+    }
+
+    public bool? UseSenderRefValidation
+    {
+        get => GetNullableInt(KeyUseSenderRefValidation) switch { null => null, var v => v == 1 };
+        set => SetNullableInt(KeyUseSenderRefValidation, value is null ? null : value.Value ? 1 : 0);
     }
 
     // ── Role helpers ─────────────────────────────────────────────────────────

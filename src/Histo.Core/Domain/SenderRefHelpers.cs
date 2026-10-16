@@ -66,4 +66,13 @@ public static class SenderRefHelpers
             ? System.Text.RegularExpressions.Regex.IsMatch(blockRef, "^[0-9][0-9]$")
             : System.Text.RegularExpressions.Regex.IsMatch(blockRef, "^[1-9][0-9][0-9]$");
     }
+
+    /// <summary>
+    /// TB Diagnostics area's optional Sender Ref format check: "NN/NNNNN/YY" (2 digits, slash,
+    /// 5 digits, slash, 2 digits). Legacy source: SenderRef.ascx.vb's <c>revTBSenderRef</c> regex,
+    /// gated by AddSample.aspx.vb/AddSubmission.aspx.vb's <c>cbUseValidation</c> checkbox
+    /// ("Validate Sender Ref?").
+    /// </summary>
+    public static bool IsValidTBDiagnosticsFormat(string senderRef) =>
+        System.Text.RegularExpressions.Regex.IsMatch(senderRef, "^[0-9]{2}/[0-9]{5}/[0-9]{2}$");
 }

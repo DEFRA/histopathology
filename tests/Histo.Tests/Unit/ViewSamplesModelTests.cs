@@ -4,6 +4,7 @@ using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.Search;
 using Histo.Web.Services;
+using ExcelDataReader;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
@@ -126,5 +127,34 @@ public class ViewSamplesModelTests
 
         Assert.True(sut.Errors.ContainsKey(nameof(sut.SenderRef)));
     }
+
+    [Fact]
+    public async Task OnGetExportExcelAsync_AppliesCurrentSort_NotRawStoredProcOrder()
+    {
+        // Stored-proc order is deliberately NOT alphabetical, so this only passes if the
+        // export applies the same SortColumn/SortDesc as the on-screen grid.
+        _submissions.Setup(s => s.GetAnimalTissuesAsync("S1", null, null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<AnimalTissueSearchResult>)
+            [
+                new AnimalTissueSearchResult { ID = 3, SenderRef = "S1", TissueDescription = "Charlie" },
+                new AnimalTissueSearchResult { ID = 1, SenderRef = "S1", TissueDescription = "Alice" },
+                new AnimalTissueSearchResult { ID = 2, SenderRef = "S1", TissueDescription = "Bravo" },
+            ]);
+        var sut = CreateSut();
+        sut.SenderRef = "S1";
+        sut.SortColumn = "TissueDescription";
+
+        var result = await sut.OnGetExportExcelAsync();
+
+        var file = Assert.IsType<Microsoft.AspNetCore.Mvc.FileContentResult>(result);
+        using var stream = new MemoryStream(file.FileContents);
+        using var reader = ExcelReaderFactory.CreateReader(stream);
+        var table = reader.AsDataSet().Tables[0];
+
+        Assert.Equal(
+            new[] { "Alice", "Bravo", "Charlie" },
+            new[] { table.Rows[1], table.Rows[2], table.Rows[3] }.Select(r => r[6]?.ToString()));
+    }
 }
+
 

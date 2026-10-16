@@ -44,6 +44,18 @@ public class AddSubmissionModel : HistoPageModel
 
     [BindProperty] public string SenderRef   { get; set; } = string.Empty;
 
+    /// <summary>TB Diagnostics area's "Validate Sender Ref?" checkbox (legacy <c>cbUseValidation</c>).
+    /// Only meaningful when <see cref="IsTBDiagnosticsArea"/> is true.</summary>
+    [BindProperty] public bool UseSenderRefValidation { get; set; }
+
+    /// <summary>
+    /// Gates the "Validate Sender Ref?" checkbox and its NN/NNNNN/YY format check — legacy
+    /// <c>AddSample.aspx.vb</c>/<c>AddSubmission.aspx.vb</c>'s <c>InitialiseUserAreaControls</c>
+    /// restricts this entirely to TB Diagnostics users; every other area is unaffected.
+    /// </summary>
+    public bool IsTBDiagnosticsArea =>
+        string.Equals(Session.UserArea?.Trim(), "TB Diagnostics", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Alternative to <see cref="SenderRef"/>: start of an "MC######" range (legacy AddSample.aspx/AddSubmission.aspx "Alternatively you can assign mouse ranges...").</summary>
     [BindProperty] public string MouseNumberFrom { get; set; } = string.Empty;
 
@@ -172,6 +184,14 @@ public class AddSubmissionModel : HistoPageModel
 
         if (IsAssignTissueMode && BatchId is > 0)
             AvailableAnimals = await GetAssignableAnimalsAsync(BatchId.Value);
+
+        if (IsTBDiagnosticsArea)
+        {
+            // First visit this session defaults validation ON, matching legacy's
+            // InitialiseUserAreaControls (cbUseValidation.Checked = True when SV_UseValidation is unset).
+            Session.UseSenderRefValidation ??= true;
+            UseSenderRefValidation = Session.UseSenderRefValidation.Value;
+        }
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -260,6 +280,8 @@ public class AddSubmissionModel : HistoPageModel
 
     private PageResult? ValidateSubmissionInput()
     {
+        if (IsTBDiagnosticsArea) Session.UseSenderRefValidation = UseSenderRefValidation;
+
         var hasMouseRangeInput = ShowMouseRange && (!string.IsNullOrWhiteSpace(MouseNumberFrom) || !string.IsNullOrWhiteSpace(MouseNumberTo));
         var usingMouseRange = ShowMouseRange && !string.IsNullOrWhiteSpace(MouseNumberFrom) && !string.IsNullOrWhiteSpace(MouseNumberTo);
         var usingSenderRef = !string.IsNullOrWhiteSpace(SenderRef);
@@ -274,6 +296,13 @@ public class AddSubmissionModel : HistoPageModel
         if (usingSenderRef == usingMouseRange)
         {
             ModelError = ShowMouseRange ? "Enter either the Sender ref or the mouse number ranges." : "Enter the sender reference.";
+            return Page();
+        }
+
+        if (usingSenderRef && IsTBDiagnosticsArea && UseSenderRefValidation
+            && !Histo.Core.Domain.SenderRefHelpers.IsValidTBDiagnosticsFormat(SenderRef))
+        {
+            ModelError = "Format: NN/NNNNN/YY";
             return Page();
         }
 

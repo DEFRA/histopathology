@@ -138,4 +138,14 @@ public interface ISessionService
     /// <c>SubmissionsOnHold.OnPostSelect</c>, <c>CopyBatchSummaryModel</c>).
     /// </summary>
     bool IsViewSubmissionMode { get; set; }
+
+    /// <summary>
+    /// TB Diagnostics area's "Validate Sender Ref?" checkbox choice on <c>AddSubmission.cshtml</c>
+    /// (legacy <c>SessionVars.SV_UseValidation</c>). <see langword="null"/> means the user hasn't
+    /// chosen yet this session — the page defaults it to <see langword="true"/> (validation on) the
+    /// first time a TB Diagnostics user visits, matching <c>AddSample.aspx.vb</c>/
+    /// <c>AddSubmission.aspx.vb</c>'s <c>InitialiseUserAreaControls</c>. Irrelevant for every other
+    /// user area.
+    /// </summary>
+    bool? UseSenderRefValidation { get; set; }
 }

@@ -32,7 +32,13 @@ public static class BlockRefRangeHelpers
         if (usedBlocks.Count == 0)
             return [new BlockRefRangeRow(null, "01+", null)];
 
-        var byRef = usedBlocks.ToDictionary(b => b.BlockRef, b => b.Status);
+        // Legacy source: SearchBlockRefs.aspx.vb::CreateBlockRefsGrid — dtBlockRefs.Select("BlockRef=" &
+        // iCount) can return multiple rows for the same ref (e.g. two Animal records sharing one Sender
+        // Ref each with their own Block 01) and legacy always reads drFoundBlock(0), the first match.
+        // A plain ToDictionary would throw on that duplicate key, so the first occurrence wins here too.
+        var byRef = new Dictionary<int, int>();
+        foreach (var b in usedBlocks)
+            byRef.TryAdd(b.BlockRef, b.Status);
         var maxValue = usedBlocks.Max(b => b.BlockRef);
         var rows = new List<BlockRefRangeRow>();
 

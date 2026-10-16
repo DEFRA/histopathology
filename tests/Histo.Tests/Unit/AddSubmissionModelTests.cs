@@ -880,4 +880,176 @@ public class AddSubmissionModelTests
         Assert.IsType<PageResult>(result);
         Assert.Equal("Could not add the sample range. Please try again.", sut.ModelError);
     }
+
+    // ── TB Diagnostics "Validate Sender Ref?" checkbox (ISS-R26) ────────────────────────────
+
+    [Theory]
+    [InlineData("TB Diagnostics", true)]
+    [InlineData(" TB Diagnostics ", true)]
+    [InlineData("tb diagnostics", true)]
+    [InlineData("Histopath", false)]
+    [InlineData(null, false)]
+    public void IsTBDiagnosticsArea_MatchesOnlyTheTBDiagnosticsArea(string? userArea, bool expected)
+    {
+        _session.Setup(s => s.UserArea).Returns(userArea!);
+        var sut = CreateSut(returnPage: null);
+
+        Assert.Equal(expected, sut.IsTBDiagnosticsArea);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_TBDiagnosticsFirstVisitThisSession_DefaultsValidationOn()
+    {
+        _session.Setup(s => s.UserArea).Returns("TB Diagnostics");
+        _session.SetupProperty(s => s.UseSenderRefValidation);
+        var sut = CreateSut(returnPage: null);
+
+        await sut.OnGetAsync(senderRef: null, sourceAnimalId: null);
+
+        Assert.True(sut.UseSenderRefValidation);
+        Assert.True(_session.Object.UseSenderRefValidation);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_TBDiagnosticsReturningVisit_RestoresPreviousChoice()
+    {
+        _session.Setup(s => s.UserArea).Returns("TB Diagnostics");
+        _session.SetupProperty(s => s.UseSenderRefValidation);
+        _session.Object.UseSenderRefValidation = false;
+        var sut = CreateSut(returnPage: null);
+
+        await sut.OnGetAsync(senderRef: null, sourceAnimalId: null);
+
+        Assert.False(sut.UseSenderRefValidation);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_NonTBDiagnosticsArea_NeverTouchesSessionChoice()
+    {
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _session.SetupProperty(s => s.UseSenderRefValidation);
+        var sut = CreateSut(returnPage: null);
+
+        await sut.OnGetAsync(senderRef: null, sourceAnimalId: null);
+
+        Assert.Null(_session.Object.UseSenderRefValidation);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_TBDiagnosticsValidationOn_InvalidFormat_SetsFormatErrorAndDoesNotCreateAnimal()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _session.Setup(s => s.UserArea).Returns("TB Diagnostics");
+        _session.SetupProperty(s => s.UseSenderRefValidation);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SenderRef = "NotAValidRef";
+        sut.UseSenderRefValidation = true;
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("Format: NN/NNNNN/YY", sut.ModelError);
+        _submissions.Verify(s => s.AddAnimalAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_TBDiagnosticsValidationOn_ValidFormat_CreatesAnimal()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _session.Setup(s => s.UserArea).Returns("TB Diagnostics");
+        _session.SetupProperty(s => s.UseSenderRefValidation);
+        _submissions.Setup(s => s.AddAnimalAsync(99, "12/34567/89", 7, (string?)null, false, It.IsAny<CancellationToken>())).ReturnsAsync(123);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(200);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SenderRef = "12/34567/89";
+        sut.UseSenderRefValidation = true;
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<RedirectToPageResult>(result);
+        _submissions.Verify(s => s.AddAnimalAsync(99, "12/34567/89", 7, (string?)null, false, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_TBDiagnosticsValidationOff_InvalidFormatStillAllowed()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _session.Setup(s => s.UserArea).Returns("TB Diagnostics");
+        _session.SetupProperty(s => s.UseSenderRefValidation);
+        _submissions.Setup(s => s.AddAnimalAsync(99, "NotAValidRef", 7, (string?)null, false, It.IsAny<CancellationToken>())).ReturnsAsync(123);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(200);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SenderRef = "NotAValidRef";
+        sut.UseSenderRefValidation = false;
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<RedirectToPageResult>(result);
+        _submissions.Verify(s => s.AddAnimalAsync(99, "NotAValidRef", 7, (string?)null, false, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_TBDiagnostics_PersistsCheckboxChoiceToSession()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _session.Setup(s => s.UserArea).Returns("TB Diagnostics");
+        _session.SetupProperty(s => s.UseSenderRefValidation);
+        _submissions.Setup(s => s.AddAnimalAsync(99, "12/34567/89", 7, (string?)null, false, It.IsAny<CancellationToken>())).ReturnsAsync(123);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(200);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SenderRef = "12/34567/89";
+        sut.UseSenderRefValidation = false;
+
+        await sut.OnPostAsync();
+
+        Assert.False(_session.Object.UseSenderRefValidation);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_NonTBDiagnosticsArea_FormatCheckNeverApplies_EvenWithInvalidSenderRef()
+    {
+        _session.Object.BatchSubmissionID = 99;
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _submissions.Setup(s => s.AddAnimalAsync(99, "NotAValidRef", 7, (string?)null, false, It.IsAny<CancellationToken>())).ReturnsAsync(123);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(200);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 99;
+        sut.SenderRef = "NotAValidRef";
+        sut.UseSenderRefValidation = true; // irrelevant — checkbox doesn't even render for this area
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<RedirectToPageResult>(result);
+        _submissions.Verify(s => s.AddAnimalAsync(99, "NotAValidRef", 7, (string?)null, false, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_AssignTissueMode_TBDiagnosticsArea_FormatCheckNeverApplies()
+    {
+        // Picking an existing sample from the dropdown — never a typed Sender Ref — so the
+        // TB Diagnostics format check must not run even though the area matches.
+        _session.Setup(s => s.UserArea).Returns("TB Diagnostics");
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1, SenderRef = "NotAValidRef" }]);
+        var sut = CreateSut(returnPage: "/Batches/BatchBlocks?batchId=5");
+        sut.SenderRef = "NotAValidRef";
+        sut.UseSenderRefValidation = true;
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<RedirectToPageResult>(result);
+        Assert.Null(sut.ModelError);
+    }
 }
