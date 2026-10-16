@@ -163,7 +163,7 @@ public sealed class QCNoteRepository : IQCNoteRepository
     }
 
     /// <inheritdoc/>
-    /// <remarks>All the locking, lookup, create and link work is in <c>GetOrCreateSubmissionQCNote</c> (see its header for the return codes).</remarks>
+    /// <remarks>The lookup, create and RowStamp-guarded link are in <c>GetOrCreateSubmissionQCNote</c> (see its header for the return codes).</remarks>
     public async Task<SubmissionQCNote> GetOrCreateForSubmissionAsync(int batchId, int testId, string testType, byte[] expectedRowStamp, int userId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
@@ -186,7 +186,6 @@ public sealed class QCNoteRepository : IQCNoteRepository
             0 => new SubmissionQCNote(parameters.Get<int>("QCNoteRef"), null),
             1 => new SubmissionQCNote(parameters.Get<int>("QCNoteRef"), parameters.Get<byte[]>("LinkedRowStamp")),
             2 => throw new QCNoteLinkConflictException(),
-            3 => throw new TimeoutException($"Timed out waiting to allocate the QC note for submission {batchId}."),
             var other => throw new InvalidOperationException($"GetOrCreateSubmissionQCNote returned {other}."),
         };
     }

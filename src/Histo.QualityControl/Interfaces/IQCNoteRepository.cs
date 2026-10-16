@@ -34,7 +34,8 @@ public interface IQCNoteRepository
 
     /// <summary>
     /// Returns the submission's QC note, creating it and linking <paramref name="testId"/> to it if none exists.
-    /// Serialised per submission with <c>sp_getapplock</c> so concurrent saves can't create two notes.
+    /// The link is guarded by the test's RowStamp (no locks, as in legacy); a stale stamp throws <c>QCNoteLinkConflictException</c>.
+    /// Two simultaneous first saves can still each create a note, as in legacy.
     /// </summary>
     Task<SubmissionQCNote> GetOrCreateForSubmissionAsync(int batchId, int testId, string testType, byte[] expectedRowStamp, int userId, CancellationToken ct = default);
 
