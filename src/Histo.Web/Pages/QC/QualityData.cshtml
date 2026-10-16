@@ -25,6 +25,14 @@
         <p class="govuk-panel__body">@Model.SuccessMessage</p>
     </div>
 }
+@if (Model.AllocatedQCNoteRef is > 0)
+{
+    <div class="govuk-inset-text">
+        Selected tests are linked to QC note @Model.AllocatedQCNoteRef.
+        <a asp-page="/QC/EditQCNote" asp-route-noteId="@Model.AllocatedQCNoteRef" class="govuk-link">Edit QC note @Model.AllocatedQCNoteRef</a>
+        or <a asp-page="/Reports/QCNote" asp-route-qcNoteRef="@Model.AllocatedQCNoteRef" class="govuk-link">print it</a>.
+    </div>
+}
 
 @* Batch summary — mirrors legacy Batch.ascx header *@
 <dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-4">
@@ -347,7 +355,7 @@
                     <label class="govuk-label" for="QCNoteRef">QC Note Ref</label>
                     @* Read-only in legacy too — the reference is allocated by the system when a QC
                        note is first raised for the test, never typed in. *@
-                    <input class="govuk-input govuk-input--width-10" id="QCNoteRef" type="text" readonly disabled aria-describedby="QCNoteRef-hint" />
+                    <input class="govuk-input govuk-input--width-10" id="QCNoteRef" type="text" value="@Model.AllocatedQCNoteRef" readonly disabled aria-describedby="QCNoteRef-hint" />
                     <div id="QCNoteRef-hint" class="govuk-hint govuk-!-font-size-16">Allocated automatically when a QC note is raised.</div>
                 </div>
             </div>

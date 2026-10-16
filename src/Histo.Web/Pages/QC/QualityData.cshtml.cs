@@ -126,6 +126,9 @@ public class QualityDataModel : GridPageModel
     public string? Error { get; private set; }
     public string? SuccessMessage { get; private set; }
 
+    /// <summary>QC note the last Update linked the selected tests to; shown in the read-only QC Note Ref box.</summary>
+    public int? AllocatedQCNoteRef { get; private set; }
+
     /// <summary>Field id → message, rendered via the shared clickable _ErrorSummary partial.</summary>
     public Dictionary<string, string> Errors { get; } = new();
 
@@ -264,39 +267,30 @@ public class QualityDataModel : GridPageModel
         var selected = all.Where(t => selectedIds.Contains(t.ID)).ToList();
         var concurrencyCount = 0;
 
-        // Legacy's iQCNoteID (declared once before the row loop in btnEdit_Click, reused for every
-        // row needing a note) creates exactly one new QC note per Edit click no matter how many rows
-        // are selected — the per-test _qc.AddAsync call below must mirror that same shared scope,
-        // not create a fresh note for every selected test that lacks one.
-        int? sharedNewQcNoteId = null;
-        var sharedNoteComments = new List<(BlockTest Test, string Comment)>();
+        bool AppliesQcNote(BlockTest t) => isSingle ? QCNote : QCNote || t.QCNote;
+        var noteRows = selected.Where(AppliesQcNote).ToList();
+        var existingRefs = noteRows.Where(t => t.QCNoteRef is > 0).Select(t => t.QCNoteRef!.Value).Distinct().ToList();
+        var anyNeedsRef = noteRows.Any(t => t.QCNoteRef is null or 0);
+
+        if (anyNeedsRef && existingRefs.Count > 1)
+        {
+            Error = $"The selected tests belong to different QC notes ({string.Join(", ", existingRefs.OrderBy(r => r))}). Select tests from one QC note only.";
+            await ReloadGridAsync(batchId);
+            return Page();
+        }
+
+        // One note per click (legacy iQCNoteID); a ref already on the selection is reused instead of raising another.
+        int? targetRef = existingRefs.Count == 1 ? existingRefs[0] : null;
+        if (anyNeedsRef && targetRef is null)
+        {
+            var newId = await _qc.AddAsync(batchId, Session.UserID);
+            if (newId > 0) targetRef = newId;
+        }
 
         foreach (var test in selected)
         {
-            var applyQcNote = isSingle ? QCNote : QCNote || test.QCNote;
-            var qcNoteRef = test.QCNoteRef;
-            var joinedSharedNote = false;
-            if (applyQcNote && qcNoteRef is null or 0)
-            {
-                if (!isSingle && sharedNewQcNoteId is > 0)
-                {
-                    qcNoteRef = sharedNewQcNoteId;
-                }
-                else
-                {
-                    var newId = await _qc.AddAsync(batchId, Session.UserID);
-                    if (newId > 0)
-                    {
-                        qcNoteRef = newId;
-                        if (!isSingle) sharedNewQcNoteId = newId;
-                    }
-                }
-                joinedSharedNote = !isSingle && qcNoteRef == sharedNewQcNoteId;
-            }
-            else if (!applyQcNote)
-            {
-                qcNoteRef = null;
-            }
+            var applyQcNote = AppliesQcNote(test);
+            int? qcNoteRef = !applyQcNote ? null : test.QCNoteRef is > 0 ? test.QCNoteRef : targetRef;
 
             var newArchiveLocation = Pick(isSingle, ArchiveLocationCode, test.ArchiveLocation);
             var newArchivedDate = isSingle ? ArchivedDate : ArchivedDate ?? test.ArchivedDate;
@@ -342,9 +336,6 @@ public class QualityDataModel : GridPageModel
                 // multi-row save; a single-row save always writes it, so unticking all clears them.
                 if (isSingle || SelectedCharges.Count > 0)
                     await _tests.SaveTCCodesAsync(batchId, test.ID, test.TestType, test.TCCodes, SelectedCharges, Session.UserID);
-
-                if (joinedSharedNote && !string.IsNullOrWhiteSpace(newComment))
-                    sharedNoteComments.Add((updated, newComment));
             }
             catch (BlockTestConcurrencyException)
             {
@@ -352,20 +343,8 @@ public class QualityDataModel : GridPageModel
             }
         }
 
-        // New QC notes are created blank (legacy clsQCNote.NewQCNote sets only CreatedBy/DateCreated)
-        // — write every test comment onto the shared note now so it is immediately useful without a
-        // separate manual Edit QC Note step.
-        if (sharedNewQcNoteId is > 0 && sharedNoteComments.Count > 0)
-        {
-            var note = await _qc.GetByIdAsync(sharedNewQcNoteId.Value);
-            if (note is not null)
-            {
-                var text = string.Join(Environment.NewLine, sharedNoteComments
-                    .Select(c => $"{GetTestName(c.Test)} ({c.Test.HistologyRef} / {c.Test.BlockRef}): {c.Comment}"));
-                try { await _qc.UpdateAsync(sharedNewQcNoteId.Value, text, note.RowStamp ?? [], Session.UserID); }
-                catch (Histo.QualityControl.Models.QCNoteConcurrencyException) { /* test rows are already saved; note text is best-effort */ }
-            }
-        }
+        // Note text is left alone, as in legacy: a blank note renders the table of every linked test.
+        AllocatedQCNoteRef = targetRef;
 
         await CompleteBatchIfAllTestsDispatchedAsync(batchId);
 

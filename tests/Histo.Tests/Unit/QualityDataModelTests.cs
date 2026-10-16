@@ -226,20 +226,14 @@ public class QualityDataModelTests
     }
 
     [Fact]
-    public async Task OnPostUpdateAsync_MultiSelectWithQcNoteTicked_CreatesOnlyOneSharedNote_AndAppendsEachTestComment()
+    public async Task OnPostUpdateAsync_MultiSelectWithQcNoteTicked_CreatesOnlyOneSharedNote_AndLeavesNoteTextAlone()
     {
-        // Legacy's iQCNoteID is declared once before the row loop and reused for every row needing
-        // a note — exactly one new QC note per Edit click, not one per selected test.
+        // Legacy's iQCNoteID: exactly one new QC note per Edit click, not one per selected test.
         _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1), MakeTest(2)]);
         _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
-        var saved = new List<BlockTest>();
-        _tests.Setup(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Callback<BlockTest, int, CancellationToken>((bt, _, _) => saved.Add(bt))
-            .Returns(Task.CompletedTask);
+        var saved = CaptureSaves();
         _qc.Setup(q => q.AddAsync(42, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(500);
-        _qc.Setup(q => q.GetByIdAsync(500, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new QCNote { ID = 42, QCNoteRef = 500, Text = string.Empty, RowStamp = [9, 9] });
         var sut = CreateSut();
         sut.SelectedIds = [1, 2];
         sut.QCNote = true;
@@ -250,9 +244,119 @@ public class QualityDataModelTests
         _qc.Verify(q => q.AddAsync(42, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(2, saved.Count);
         Assert.All(saved, bt => Assert.Equal(500, bt.QCNoteRef));
-        _qc.Verify(q => q.UpdateAsync(500,
-            It.Is<string>(s => s.Contains("needs repeat") && s.Split(Environment.NewLine).Length == 2),
-            It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(500, sut.AllocatedQCNoteRef);
+        _qc.Verify(q => q.UpdateAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private List<BlockTest> CaptureSaves()
+    {
+        var saved = new List<BlockTest>();
+        _tests.Setup(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<BlockTest, int, CancellationToken>((bt, _, _) => saved.Add(bt))
+            .Returns(Task.CompletedTask);
+        return saved;
+    }
+
+    private static BlockTest WithNote(BlockTest t, int? noteRef) => new()
+    {
+        ID = t.ID, BlockID = t.BlockID, TestType = t.TestType, Code = t.Code, HistologyRef = t.HistologyRef,
+        BlockRef = t.BlockRef, RowStamp = t.RowStamp, QCNote = noteRef is > 0, QCNoteRef = noteRef,
+    };
+
+    [Fact]
+    public async Task OnPostUpdateAsync_SingleSelectNoRef_QcNoteTicked_CreatesNote_AndExposesRef()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var saved = CaptureSaves();
+        _qc.Setup(q => q.AddAsync(42, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(700);
+        var sut = CreateSut();
+        sut.SelectedIds = [1];
+        sut.QCNote = true;
+        sut.NumberOfSlides = 1;
+
+        await sut.OnPostUpdateAsync();
+
+        _qc.Verify(q => q.AddAsync(42, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(700, Assert.Single(saved).QCNoteRef);
+        Assert.Equal(700, sut.AllocatedQCNoteRef);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_SingleSelectWithExistingRef_ReusesRef_NeverCreatesNote()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[WithNote(MakeTest(1), 321)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var saved = CaptureSaves();
+        var sut = CreateSut();
+        sut.SelectedIds = [1];
+        sut.QCNote = true;
+        sut.NumberOfSlides = 1;
+        sut.Comment = "second update";
+
+        await sut.OnPostUpdateAsync();
+
+        _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal(321, Assert.Single(saved).QCNoteRef);
+        Assert.Equal(321, sut.AllocatedQCNoteRef);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_MultiSelectMixed_RowsWithoutRefJoinTheExistingRef()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[WithNote(MakeTest(1), 321), MakeTest(2), MakeTest(3)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var saved = CaptureSaves();
+        var sut = CreateSut();
+        sut.SelectedIds = [1, 2, 3];
+        sut.QCNote = true;
+
+        await sut.OnPostUpdateAsync();
+
+        _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal(3, saved.Count);
+        Assert.All(saved, bt => Assert.Equal(321, bt.QCNoteRef));
+        Assert.Equal(321, sut.AllocatedQCNoteRef);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_MultiSelectSpanningTwoNotes_WithUnreferencedRow_IsRejected()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[WithNote(MakeTest(1), 321), WithNote(MakeTest(2), 322), MakeTest(3)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var sut = CreateSut();
+        sut.SelectedIds = [1, 2, 3];
+        sut.QCNote = true;
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Contains("different QC notes", sut.Error);
+        _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _tests.Verify(t => t.UpdateAsync(It.IsAny<BlockTest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_SingleSelectQcNoteUnticked_ClearsRef_WithoutNoteCalls()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[WithNote(MakeTest(1), 321)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var saved = CaptureSaves();
+        var sut = CreateSut();
+        sut.SelectedIds = [1];
+        sut.QCNote = false;
+        sut.NumberOfSlides = 1;
+
+        await sut.OnPostUpdateAsync();
+
+        var row = Assert.Single(saved);
+        Assert.Null(row.QCNoteRef);
+        Assert.False(row.QCNote);
+        Assert.Null(sut.AllocatedQCNoteRef);
+        _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
