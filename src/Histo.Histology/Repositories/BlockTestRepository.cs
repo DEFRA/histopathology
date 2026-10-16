@@ -297,8 +297,8 @@ public sealed class BlockTestRepository : IBlockTestRepository
         using var tx = await conn.BeginTransactionAsync(ct);
         try
         {
-            // Reads (and locks) every block's current tests for the batch; the SQL lives in GetBatchBlockTestsForUpdate.
-            using var multi = await conn.QueryMultipleAsync("GetBatchBlockTestsForUpdate", new { BatchID = batchId }, tx,
+            // Reads every block's current tests for the batch.
+            using var multi = await conn.QueryMultipleAsync("GetBatchBlockTests", new { BatchID = batchId }, tx,
                 commandType: System.Data.CommandType.StoredProcedure);
             var blockIds = (await multi.ReadAsync<int>()).ToList();
             var currentHistology  = (await multi.ReadAsync<(int BlockID, string Code)>()).ToLookup(r => r.BlockID, r => r.Code);

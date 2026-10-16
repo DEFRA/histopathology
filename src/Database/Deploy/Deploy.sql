@@ -1,5 +1,5 @@
-﻿-- ============================================================================-- ============================================================================
--- DEPLOYMENT MANIFEST — One-Time Database Migration
+-- ============================================================================-- ============================================================================
+-- DEPLOYMENT MANIFEST � One-Time Database Migration
 -- ============================================================================
 -- This script is idempotent and safe to re-run via CI/CD pipeline.
 -- All scripts herein use DROP+CREATE or IF EXISTS guards.
@@ -44,7 +44,7 @@ GO
 GO
 :r ../StoredProcedures/dbo.GetOrCreateSubmissionQCNote.sql
 GO
-:r ../StoredProcedures/dbo.GetBatchBlockTestsForUpdate.sql
+:r ../StoredProcedures/dbo.GetBatchBlockTests.sql
 GO
 
 -- Step 2: Deployment script to used to alter/create tables, columns etc
