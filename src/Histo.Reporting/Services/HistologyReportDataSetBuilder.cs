@@ -463,7 +463,10 @@ public sealed class HistologyReportDataSetBuilder
                     dr["BlockRef"]      = string.Empty;
                     dr["TissueDetails"] = Str(tissue, "TissueCode");
                     dr["RepeatBlock"]   = string.Empty;
-                    dr["CustomerRef"]   = Str(tissue, "Comment");
+                    // Legacy source: SubmissionForm.aspx.vb::CreateBatchSubmissionDataTable — the
+                    // CustomerRef column is declared but never assigned for Wet Tissue rows; it's a
+                    // Block-only field (see the useBlocks branch below), so it's always blank here.
+                    dr["CustomerRef"]   = string.Empty;
                     dt.Rows.Add(dr);
                 }
             }
@@ -513,7 +516,10 @@ public sealed class HistologyReportDataSetBuilder
                     dr["BlockRef"]      = block is not null ? Str(block, "BlockRef") : string.Empty;
                     dr["TissueDetails"] = Str(tissue, "TissueCode");
                     dr["RepeatBlock"]   = block is not null && Bool(block, "RepeatBlock") ? "Yes" : string.Empty;
-                    dr["CustomerRef"]   = Str(tissue, "Comment");
+                    // Legacy source: SubmissionForm.aspx.vb::CreateBatchBlocksDataTable —
+                    // drBatchBlocks("CustomerRef") = drBlock("CustomerRef"); the block's own Customer
+                    // Reference field, never the tissue's Comment.
+                    dr["CustomerRef"]   = block is not null ? Str(block, "CustomerRef") : string.Empty;
                     dt.Rows.Add(dr);
                 }
             }
