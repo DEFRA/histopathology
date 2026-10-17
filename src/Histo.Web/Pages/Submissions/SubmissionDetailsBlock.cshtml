@@ -204,7 +204,7 @@ else
                                         <ul class="govuk-list">
                                             @foreach (var t in blockTissues)
                                             {
-                                                <li>@t.NoPieces x @Model.TissueName(t.TissueCode) @(string.IsNullOrWhiteSpace(t.Comment) ? "" : $"({t.Comment})")</li>
+                                                <li>@t.NoPieces x @Model.TissueName(t.TissueCode)</li>
                                             }
                                         </ul>
                                     </div>
