@@ -56,6 +56,113 @@ public class ArchiveTissuesModelTests
         _submissions.Verify(s => s.GetBatchSubmissionTissuesAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    // ── Filters — legacy ddlHistologyRefList / ddlTissueList applied via DataView.RowFilter ──
+
+    /// <summary>Three tissues across two animals, giving two histology refs and two tissue types.</summary>
+    private void SetupFilterFixture()
+    {
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 42 });
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)
+            [
+                new BatchSubmission { ID = 10, AnimalID = 7 },
+                new BatchSubmission { ID = 11, AnimalID = 8 },
+            ]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)
+            [
+                new Animal { ID = 7, SenderRef = "S1", HistologyRef = "24/001" },
+                new Animal { ID = 8, SenderRef = "S2", HistologyRef = "24/002" },
+            ]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Tissue>)
+            [
+                new Tissue { ID = 1, OwnerID = 10, TissueCode = "1" },
+                new Tissue { ID = 2, OwnerID = 10, TissueCode = "2" },
+                new Tissue { ID = 3, OwnerID = 11, TissueCode = "2" },
+            ]);
+        _lookups.Setup(l => l.GetLookupDataAsync(9, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)
+            [
+                new LookupItem { Code = "1", Name = "Liver" },
+                new LookupItem { Code = "2", Name = "Kidney" },
+            ]);
+    }
+
+    [Fact]
+    public async Task NoFilter_ReturnsEveryRow()
+    {
+        SetupFilterFixture();
+        var sut = CreateSut();
+        sut.BatchId = 42;
+
+        await sut.OnGetAsync();
+
+        Assert.False(sut.FilterApplied);
+        Assert.Equal(3, sut.TotalCount);
+        Assert.Equal(["24/001", "24/002"], sut.HistologyRefOptions);
+        Assert.Equal(["Kidney", "Liver"], sut.TissueOptions);
+    }
+
+    [Fact]
+    public async Task HistologyRefFilter_KeepsOnlyThatAnimalsTissues()
+    {
+        SetupFilterFixture();
+        var sut = CreateSut();
+        sut.BatchId = 42;
+        sut.FilterHistologyRef = "24/001";
+
+        await sut.OnGetAsync();
+
+        Assert.True(sut.FilterApplied);
+        Assert.Equal(2, sut.TotalCount);
+        Assert.All(sut.FilteredRows, r => Assert.Equal("24/001", r.HistologyRef));
+    }
+
+    [Fact]
+    public async Task TissueFilter_KeepsOnlyThatTissue()
+    {
+        SetupFilterFixture();
+        var sut = CreateSut();
+        sut.BatchId = 42;
+        sut.FilterTissue = "Kidney";
+
+        await sut.OnGetAsync();
+
+        Assert.Equal(2, sut.TotalCount);
+        Assert.All(sut.FilteredRows, r => Assert.Equal("Kidney", r.TissueDescription));
+    }
+
+    [Fact]
+    public async Task BothFiltersCombine_AsAnAndCondition()
+    {
+        SetupFilterFixture();
+        var sut = CreateSut();
+        sut.BatchId = 42;
+        sut.FilterHistologyRef = "24/001";
+        sut.FilterTissue = "Kidney";
+
+        await sut.OnGetAsync();
+
+        var row = Assert.Single(sut.FilteredRows);
+        Assert.Equal("S1", row.SenderRef);
+    }
+
+    [Fact]
+    public async Task FilterOptions_AreBuiltFromAllRowsNotTheFilteredSubset()
+    {
+        SetupFilterFixture();
+        var sut = CreateSut();
+        sut.BatchId = 42;
+        sut.FilterTissue = "Liver";
+
+        await sut.OnGetAsync();
+
+        // Options must stay complete so the user can change or clear the filter.
+        Assert.Equal(["24/001", "24/002"], sut.HistologyRefOptions);
+        Assert.Equal(1, sut.TotalCount);
+    }
+
     [Fact]
     public async Task OnGetAsync_BatchIdInSession_LoadsRows()
     {

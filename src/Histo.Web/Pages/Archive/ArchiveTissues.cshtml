@@ -74,10 +74,51 @@
     </div>
 }
 
+@* Legacy ddlHistologyRefList + ddlTissueList + "Go". GET so the criteria sit in the query
+   string and are preserved by the sort/paging links. *@
+<form method="get" class="govuk-!-margin-bottom-6">
+    <input type="hidden" name="batchId" value="@Model.BatchId" />
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-third">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="FilterHistologyRef">Histology ref</label>
+                <select class="govuk-select" id="FilterHistologyRef" name="FilterHistologyRef">
+                    <option value="">-- All --</option>
+                    @foreach (var h in Model.HistologyRefOptions)
+                    {
+                        <option value="@h" selected="@(Model.FilterHistologyRef == h)">@h</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-third">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="FilterTissue">Tissue</label>
+                <select class="govuk-select" id="FilterTissue" name="FilterTissue">
+                    <option value="">-- All --</option>
+                    @foreach (var t in Model.TissueOptions)
+                    {
+                        <option value="@t" selected="@(Model.FilterTissue == t)">@t</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Go</button>
+        @if (Model.FilterApplied)
+        {
+            <a asp-page="/Archive/ArchiveTissues" asp-route-batchId="@Model.BatchId" class="govuk-link">Clear filter</a>
+        }
+    </div>
+</form>
+
 <form method="post" asp-page-handler="Update">
     <input type="hidden" name="BatchId" value="@Model.BatchId" />
-    @* Keep the current page/sort so "Update selected" redisplays the same view instead of
+    @* Keep the current filter/page/sort so "Update selected" redisplays the same view instead of
        resetting to page 1 — this form's action has no query string of its own to fall back on. *@
+    <input type="hidden" name="FilterHistologyRef" value="@Model.FilterHistologyRef" />
+    <input type="hidden" name="FilterTissue" value="@Model.FilterTissue" />
     <input type="hidden" name="PageNumber" value="@Model.PageNumber" />
     <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
     <input type="hidden" name="SortDesc" value="@Model.SortDesc" />
@@ -174,6 +215,8 @@
    form above via the "form" attribute would submit it as a page-number filter, not a navigation. *@
 <form id="go-to-page-form" method="get" class="govuk-visually-hidden">
     <input type="hidden" name="batchId" value="@Model.BatchId" />
+    <input type="hidden" name="FilterHistologyRef" value="@Model.FilterHistologyRef" />
+    <input type="hidden" name="FilterTissue" value="@Model.FilterTissue" />
     <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
     <input type="hidden" name="SortDesc" value="@Model.SortDesc" />
 </form>
