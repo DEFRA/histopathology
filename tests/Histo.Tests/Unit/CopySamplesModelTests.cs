@@ -88,4 +88,42 @@ public class CopySamplesModelTests
             It.Is<IReadOnlyList<string>>(c => c.Count == 0),
             It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task OnPostFindAsync_SourceBatchIsDifferentTypeFromCurrentBatch_ShowsErrorAndDoesNotPopulateSourceAnimals()
+    {
+        // Current batch (5) defaults to TSE (see constructor setup); source batch (9) is Non-TSE.
+        _batches.Setup(b => b.GetByIdAsync(9, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Batch { ID = 9, BatchType = BatchTypeConstants.NonTse });
+
+        var sut = CreateSut();
+        sut.SourceBatchId = 9;
+
+        await sut.OnPostFindAsync();
+
+        Assert.Equal("The selected submission is not the same type as the current submission. Both must be TSE or Non-TSE.", sut.Error);
+        Assert.Empty(sut.SourceAnimals);
+        Assert.Null(sut.SourceBatch);
+    }
+
+    [Fact]
+    public async Task OnPostFindAsync_SourceBatchIsSameTypeAsCurrentBatch_ProceedsToLoadSourceAnimals()
+    {
+        var sourceBlock = new Block { ID = 1, BatchID = 9, AnimalID = 100, BlockRef = "01" };
+        _batches.Setup(b => b.GetByIdAsync(9, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Batch { ID = 9, BatchType = BatchTypeConstants.Tse });
+        _blocks.Setup(b => b.GetByBatchAsync(9, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[sourceBlock]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(9, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 100, SenderRef = "C54321" }]);
+
+        var sut = CreateSut();
+        sut.SourceBatchId = 9;
+
+        await sut.OnPostFindAsync();
+
+        Assert.Null(sut.Error);
+        Assert.NotNull(sut.SourceBatch);
+        Assert.Single(sut.SourceAnimals);
+    }
 }

@@ -22,8 +22,11 @@ namespace Histo.Web.Pages.Submissions;
 /// NOTE: this page is distinct from legacy <c>ViewSamples.aspx</c> (a standalone,
 /// non-batch-scoped tissue/block search reached from the Home page) — see
 /// <see cref="ViewSamplesModel"/> for that page's migration.
+///
+/// Sortable/paginated via <see cref="GridPageModel"/> — legacy's <c>AllowPaging</c> grid, dropped
+/// during the original flat-list consolidation (D-2), restored on the Sender ref/Histology ref columns.
 /// </summary>
-public class SampleSummaryModel : HistoPageModel
+public class SampleSummaryModel : GridPageModel
 {
     private readonly ISubmissionService _submissions;
     private readonly IBatchService _batches;
@@ -40,6 +43,20 @@ public class SampleSummaryModel : HistoPageModel
     }
 
     public IReadOnlyList<Animal> Animals { get; private set; } = [];
+
+    /// <summary>Current page of <see cref="Animals"/>, sorted by the selected column or — when no
+    /// column is selected — the existing default/bypass-sort order already applied to <see cref="Animals"/>.</summary>
+    public IReadOnlyList<Animal> PagedEntries =>
+        (string.IsNullOrEmpty(SortColumn)
+            ? Animals.AsEnumerable()
+            : SortColumn switch
+            {
+                "HistologyRef" => SortDesc ? Animals.OrderByDescending(a => a.HistologyRef) : Animals.OrderBy(a => a.HistologyRef),
+                _              => SortDesc ? Animals.OrderByDescending(a => a.SenderRef)    : Animals.OrderBy(a => a.SenderRef),
+            })
+        .Skip((PageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
 
     public Batch? Batch { get; private set; }
 
@@ -191,6 +208,7 @@ public class SampleSummaryModel : HistoPageModel
             if (subId > 0) Session.BatchSubmissionID = subId;
         }
 
+        PopulateGridViewData(Animals.Count);
         return Page();
     }
 

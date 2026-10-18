@@ -24,8 +24,8 @@ namespace Histo.Web.Pages.Blocks;
 /// data-binding across postbacks. That plumbing has no equivalent here — this
 /// page queries the source and current submissions directly and copies blocks
 /// in a single step, consistent with <c>Pages/Blocks/CopyBlocks.cshtml</c>.
-/// The legacy submission-type match check (TSE vs Non-TSE) is not reproduced —
-/// the migrated <see cref="Batch"/> model does not carry a batch type. The
+/// The legacy submission-type match check (TSE vs Non-TSE) is reproduced in
+/// <see cref="OnPostFindAsync"/> via <see cref="Batch.BatchType"/>. The
 /// separate read-only "CopySamplesSummary.aspx" batch-wide grid (reached via
 /// <c>btnSummary</c>, independent of the copy operation itself) is not
 /// reproduced — equivalent detail is already available via
@@ -78,6 +78,16 @@ public class CopySamplesModel : HistoPageModel
         if (batch is null)
         {
             Error = "The submission to copy from could not be found.";
+            return Page();
+        }
+
+        // Legacy CopySamples.aspx.vb::CheckSubmissionType — source and current submissions must
+        // be the same TSE/Non-TSE type, or the test-type checkboxes copied onto the target blocks
+        // would be meaningless (the two types use different lookup tables).
+        var currentBatch = await _batches.GetByIdAsync(Session.BatchID ?? 0);
+        if (currentBatch is not null && currentBatch.BatchType != batch.BatchType)
+        {
+            Error = "The selected submission is not the same type as the current submission. Both must be TSE or Non-TSE.";
             return Page();
         }
 

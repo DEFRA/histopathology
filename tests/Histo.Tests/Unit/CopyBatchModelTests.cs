@@ -259,4 +259,28 @@ public class CopyBatchModelTests
         Assert.Equal(10, redirect.RouteValues["sourceBatchId"]);
         Assert.Equal(8, redirect.RouteValues["sourceAnimalId"]);
     }
+
+    [Fact]
+    public void OnPostSummaryAsync_RedirectsToCopyBatchBlocksSummaryAndStashesAnimalsForReturnTrip()
+    {
+        var sut = CreateSut();
+        sut.SourceBatchId = 10;
+        sut.IsCassetted = true;
+        sut.Animals =
+        [
+            new CopyBatchModel.AnimalRow { AnimalId = 7, SenderRef = "S1", NewSenderRef = "N1" },
+        ];
+
+        var result = sut.OnPostSummaryAsync();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Batches/CopyBatchBlocksSummary", redirect.PageName);
+        Assert.Equal(10, redirect.RouteValues!["sourceBatchId"]);
+
+        // Must survive the Summary-page round trip so OnGetAsync's existing restore branch
+        // rehydrates any in-progress "Change" picks instead of reloading blank from the database.
+        var json = Assert.IsType<string>(sut.TempData["CopyBatch_Animals"]);
+        Assert.Contains("N1", json);
+        Assert.Equal("True", sut.TempData["CopyBatch_IsCassetted"]);
+    }
 }
