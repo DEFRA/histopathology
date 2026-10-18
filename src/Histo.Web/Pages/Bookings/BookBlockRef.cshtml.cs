@@ -42,9 +42,11 @@ public class BookBlockRefModel : HistoPageModel
     // instead of landing on it empty (fields are SupportsGet so they rebind from this query string).
     public IActionResult OnPostCheckUsedBlockRefs()
     {
-        var returnPage = $"/Bookings/BookBlockRef?SenderRefFrom={Uri.EscapeDataString(SenderRefFrom)}" +
+        // SupportsGet can bind these non-nullable strings to null when the request omits the key
+        // (ASP.NET Core's implicit-required-for-non-nullable-reference-types behaviour).
+        var returnPage = $"/Bookings/BookBlockRef?SenderRefFrom={Uri.EscapeDataString(SenderRefFrom ?? string.Empty)}" +
             $"&SenderRefTo={Uri.EscapeDataString(SenderRefTo ?? string.Empty)}" +
-            $"&BlockRefFrom={Uri.EscapeDataString(BlockRefFrom)}" +
+            $"&BlockRefFrom={Uri.EscapeDataString(BlockRefFrom ?? string.Empty)}" +
             $"&BlockRefTo={Uri.EscapeDataString(BlockRefTo ?? string.Empty)}";
         return RedirectToPage("/Search/SearchBlockRefs", new { SenderRef = SenderRefFrom, ReturnPage = returnPage });
     }

@@ -32,7 +32,9 @@ public class ViewImportedDataModel : GridPageModel
     // returns there instead of always going to Search menu.
     [BindProperty(SupportsGet = true)] public string? ReturnPage { get; set; }
 
-    public string BackLinkPage => string.IsNullOrWhiteSpace(ReturnPage) ? "/Search/SearchMenu" : ReturnPage;
+    /// <summary>Only ever redirect to a path inside this application — blocks open-redirect abuse.</summary>
+    public string BackLinkPage =>
+        !string.IsNullOrWhiteSpace(ReturnPage) && Url.IsLocalUrl(ReturnPage) ? ReturnPage : "/Search/SearchMenu";
 
     public IReadOnlyList<LookupItem> Tables { get; private set; } = [];
     public IReadOnlyList<ImportedDataRow> Results { get; private set; } = [];

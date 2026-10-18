@@ -201,4 +201,20 @@ public class BookBlockRefModelTests
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
         Assert.Equal("/Bookings/BookBlockRef?SenderRefFrom=PG%2F123&SenderRefTo=&BlockRefFrom=&BlockRefTo=", redirect.RouteValues?["ReturnPage"]);
     }
+
+    // SupportsGet can bind these non-nullable-by-declaration properties to actual null at runtime
+    // (ASP.NET Core's implicit-required-for-non-nullable-reference-types binding behaviour) when the
+    // request omits the key entirely — reproduced here by bypassing the field initializer directly.
+    [Fact]
+    public void OnPostCheckUsedBlockRefs_SenderRefFromAndBlockRefFromAreNull_DoesNotThrow()
+    {
+        var sut = CreateSut();
+        sut.SenderRefFrom = null!;
+        sut.BlockRefFrom = null!;
+
+        var result = sut.OnPostCheckUsedBlockRefs();
+
+        var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+        Assert.Equal("/Bookings/BookBlockRef?SenderRefFrom=&SenderRefTo=&BlockRefFrom=&BlockRefTo=", redirect.RouteValues?["ReturnPage"]);
+    }
 }

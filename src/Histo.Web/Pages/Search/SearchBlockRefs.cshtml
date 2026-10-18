@@ -89,9 +89,12 @@
 }
 
 @* Legacy: lbViewImportedData ("View Old ICC_Sub data") — always visible, independent of search
-   state. Carries the current Sender Ref/Histology Ref across as the free-text filter. *@
+   state. Carries the current Sender Ref/Histology Ref across as the free-text filter.
+   Submitted mirrors Model.Searched (not a hardcoded true) so that, if neither ref was actually
+   entered, Back doesn't misread the empty return trip as a genuine "Search with nothing filled
+   in" and show the mandatory-field error. *@
 <p class="govuk-body">
     <a asp-page="/Search/ViewImportedData" asp-route-Filter="@Model.ViewImportedDataFilter"
-       asp-route-ReturnPage="@Url.Page("/Search/SearchBlockRefs", new { SenderRef = Model.SenderRef, HistologyRef = Model.HistologyRef, Submitted = true, ReturnPage = Model.ReturnPage })"
-       class="govuk-link">View Old ICC_Sub data</a>
+       asp-route-ReturnPage="@Url.Page("/Search/SearchBlockRefs", new { SenderRef = Model.SenderRef, HistologyRef = Model.HistologyRef, Submitted = Model.Searched, ReturnPage = Model.ReturnPage })"
+       class="govuk-button govuk-button--secondary" data-module="govuk-button">View Old ICC_Sub data</a>
 </p>
