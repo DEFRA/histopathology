@@ -172,6 +172,33 @@ public class BookBlockRefModelTests
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
         Assert.Equal("/Search/SearchBlockRefs", redirect.PageName);
         Assert.Equal("S1", redirect.RouteValues?["SenderRef"]);
-        Assert.Equal("/Bookings/BookBlockRef", redirect.RouteValues?["ReturnPage"]);
+        Assert.Equal("/Bookings/BookBlockRef?SenderRefFrom=S1&SenderRefTo=&BlockRefFrom=&BlockRefTo=", redirect.RouteValues?["ReturnPage"]);
+    }
+
+    [Fact]
+    public void OnPostCheckUsedBlockRefs_AllFieldsPopulated_RoundTripsAllOfThemInReturnPage()
+    {
+        var sut = CreateSut();
+        sut.SenderRefFrom = "S1";
+        sut.SenderRefTo = "S2";
+        sut.BlockRefFrom = "01";
+        sut.BlockRefTo = "03";
+
+        var result = sut.OnPostCheckUsedBlockRefs();
+
+        var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+        Assert.Equal("/Bookings/BookBlockRef?SenderRefFrom=S1&SenderRefTo=S2&BlockRefFrom=01&BlockRefTo=03", redirect.RouteValues?["ReturnPage"]);
+    }
+
+    [Fact]
+    public void OnPostCheckUsedBlockRefs_SenderRefContainsSlash_IsEscapedInReturnPage()
+    {
+        var sut = CreateSut();
+        sut.SenderRefFrom = "PG/123";
+
+        var result = sut.OnPostCheckUsedBlockRefs();
+
+        var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+        Assert.Equal("/Bookings/BookBlockRef?SenderRefFrom=PG%2F123&SenderRefTo=&BlockRefFrom=&BlockRefTo=", redirect.RouteValues?["ReturnPage"]);
     }
 }

@@ -43,6 +43,7 @@ public class SampleSummaryModelTests
         _lookups.Setup(l => l.GetLookupDataAsync(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[]);
         _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(0);
+        _blocks.Setup(b => b.GetByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
     }
 
     private SampleSummaryModel CreateSut() =>
@@ -215,6 +216,40 @@ public class SampleSummaryModelTests
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
         Assert.Equal("/Submissions/SubmissionDetailsBlock", redirect.PageName);
+    }
+
+    [Fact]
+    public async Task OnPostSelect_WetTissueWithBlocksAssigned_RoutesToSubmissionDetailsBlock()
+    {
+        _batches.Setup(b => b.GetSubmittedAsCodeAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync("4");
+        _lookups.Setup(l => l.GetLookupDataAsync(11, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 4, Code = "4", Name = "Wet Tissue" }]);
+        _blocks.Setup(b => b.GetByBatchAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { AnimalID = 5 }]);
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        var result = await sut.OnPostSelect(5);
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Submissions/SubmissionDetailsBlock", redirect.PageName);
+    }
+
+    [Fact]
+    public async Task OnPostSelect_WetTissueWithBlocksOnADifferentAnimal_StillRoutesToSubmissionDetails()
+    {
+        _batches.Setup(b => b.GetSubmittedAsCodeAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync("4");
+        _lookups.Setup(l => l.GetLookupDataAsync(11, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 4, Code = "4", Name = "Wet Tissue" }]);
+        _blocks.Setup(b => b.GetByBatchAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { AnimalID = 99 }]);
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        var result = await sut.OnPostSelect(5);
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Submissions/SubmissionDetails", redirect.PageName);
     }
 
     [Theory]

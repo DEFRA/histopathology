@@ -201,6 +201,8 @@ public class SampleSummaryModel : HistoPageModel
         // all block-type submissions route to SubmissionDetailsBlock (block assignment view).
         // Legacy source: BatchSummary.aspx btnEditSubmission → SubmissionDetails.aspx;
         //                BatchBlockSummary.aspx btnEditSubmission → SubmissionDetailsBlock.aspx.
+        // A Wet Tissue sample that already has blocks (via the "Assign tissue to block" journey)
+        // is routed as a block-type submission instead — deliberate consistency rule, not a legacy behaviour.
         var batchId = BatchId ?? Session.BatchID;
         if (batchId is null or <= 0) return RedirectToPage("/Index");
 
@@ -217,7 +219,13 @@ public class SampleSummaryModel : HistoPageModel
         var isWetTissue = ValidationHelpers.IsWetTissueDescription(await ResolveSubmittedAsDescriptionAsync(submittedAsCode));
 
         if (isWetTissue)
-            return RedirectToPage("/Submissions/SubmissionDetails", new { batchId, animalId });
+        {
+            var blocks = await _blocks.GetByBatchAsync(batchId.Value);
+            var hasBlocks = blocks.Any(b => b.AnimalID == animalId);
+            if (!hasBlocks)
+                return RedirectToPage("/Submissions/SubmissionDetails", new { batchId, animalId });
+        }
+
         return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId });
     }
 

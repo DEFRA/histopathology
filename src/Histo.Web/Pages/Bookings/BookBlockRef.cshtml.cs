@@ -21,10 +21,10 @@ public class BookBlockRefModel : HistoPageModel
     public BookBlockRefModel(ISessionService session, IBlockService blocks)
         : base(session) { _blocks = blocks; }
 
-    [BindProperty] public string SenderRefFrom { get; set; } = string.Empty;
-    [BindProperty] public string? SenderRefTo { get; set; }
-    [BindProperty] public string BlockRefFrom { get; set; } = string.Empty;
-    [BindProperty] public string? BlockRefTo { get; set; }
+    [BindProperty(SupportsGet = true)] public string SenderRefFrom { get; set; } = string.Empty;
+    [BindProperty(SupportsGet = true)] public string? SenderRefTo { get; set; }
+    [BindProperty(SupportsGet = true)] public string BlockRefFrom { get; set; } = string.Empty;
+    [BindProperty(SupportsGet = true)] public string? BlockRefTo { get; set; }
 
     public string? Error { get; private set; }
     public string? SuccessMessage { get; private set; }
@@ -38,8 +38,16 @@ public class BookBlockRefModel : HistoPageModel
 
     // Legacy source: BookBlockRef.aspx.vb::lbSearchBlockRefs_Click — a full postback that
     // carries whatever is currently typed in SenderRefFrom, even if "Book" was never clicked.
-    public IActionResult OnPostCheckUsedBlockRefs() =>
-        RedirectToPage("/Search/SearchBlockRefs", new { SenderRef = SenderRefFrom, ReturnPage = "/Bookings/BookBlockRef" });
+    // ReturnPage carries all 4 fields back so Back from SearchBlockRefs restores this form
+    // instead of landing on it empty (fields are SupportsGet so they rebind from this query string).
+    public IActionResult OnPostCheckUsedBlockRefs()
+    {
+        var returnPage = $"/Bookings/BookBlockRef?SenderRefFrom={Uri.EscapeDataString(SenderRefFrom)}" +
+            $"&SenderRefTo={Uri.EscapeDataString(SenderRefTo ?? string.Empty)}" +
+            $"&BlockRefFrom={Uri.EscapeDataString(BlockRefFrom)}" +
+            $"&BlockRefTo={Uri.EscapeDataString(BlockRefTo ?? string.Empty)}";
+        return RedirectToPage("/Search/SearchBlockRefs", new { SenderRef = SenderRefFrom, ReturnPage = returnPage });
+    }
 
     public async Task<IActionResult> OnPostAsync()
     {
