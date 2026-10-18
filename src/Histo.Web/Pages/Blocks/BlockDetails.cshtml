@@ -166,7 +166,6 @@ else
                 <tr class="govuk-table__row">
                     <th scope="col" class="govuk-table__header">Tissue</th>
                     <th scope="col" class="govuk-table__header">No. pieces</th>
-                    <th scope="col" class="govuk-table__header">Comment</th>
                     <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Action</span></th>
                 </tr>
             </thead>
@@ -176,7 +175,7 @@ else
                     @if (Model.EditTissueId == t.ID)
                     {
                         <tr class="govuk-table__row">
-                            <td class="govuk-table__cell" colspan="4">
+                            <td class="govuk-table__cell" colspan="3">
                                 <form method="post" asp-page-handler="UpdateTissue">
                                     <input type="hidden" asp-for="BatchId" />
                                     <input type="hidden" asp-for="AnimalId" />
@@ -198,10 +197,6 @@ else
                                         <label class="govuk-label" for="EditNoPieces">Number of pieces</label>
                                         <input class="govuk-input govuk-input--width-3" asp-for="EditNoPieces" />
                                     </div>
-                                    <div class="govuk-form-group">
-                                        <label class="govuk-label" for="EditComment">Comment</label>
-                                        <input class="govuk-input" asp-for="EditComment" />
-                                    </div>
                                     <div class="govuk-button-group">
                                         <button type="submit" class="govuk-button" data-module="govuk-button">Save tissue</button>
                                         <a asp-page="/Blocks/BlockDetails" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-BlockId="@Model.BlockId" asp-route-IsAddFlow="@Model.IsAddFlow" asp-route-IsFromNextBlock="@Model.IsFromNextBlock" asp-route-UseWholeTissueList="@Model.UseWholeTissueList" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
@@ -215,7 +210,6 @@ else
                         <tr class="govuk-table__row">
                             <td class="govuk-table__cell">@(Model.EditTissueOptions.FirstOrDefault(o => o.Code == t.TissueCode)?.Name ?? t.TissueCode)</td>
                             <td class="govuk-table__cell">@t.NoPieces</td>
-                            <td class="govuk-table__cell app-table-comment-cell">@t.Comment</td>
                             <td class="govuk-table__cell">
                                 <div class="govuk-button-group govuk-!-margin-bottom-0">
                                     <a asp-page="/Blocks/BlockDetails" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-BlockId="@Model.BlockId"
@@ -239,7 +233,7 @@ else
                 }
                 @if (!Model.Tissues.Any())
                 {
-                    <tr class="govuk-table__row"><td colspan="4" class="govuk-table__cell">No tissues assigned to this block.</td></tr>
+                    <tr class="govuk-table__row"><td colspan="3" class="govuk-table__cell">No tissues assigned to this block.</td></tr>
                 }
             </tbody>
         </table>
@@ -282,10 +276,6 @@ else
             <div class="govuk-form-group">
                 <label class="govuk-label" for="NewTissueNoPieces">Number of pieces</label>
                 <input class="govuk-input govuk-input--width-3" asp-for="NewTissueNoPieces" />
-            </div>
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="NewTissueComment">Comment</label>
-                <input class="govuk-input" asp-for="NewTissueComment" />
             </div>
             <button type="submit" class="govuk-button" data-module="govuk-button">Add tissue</button>
         </form>

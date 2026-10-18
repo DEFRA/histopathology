@@ -87,7 +87,6 @@ public class BlockDetailsModel : HistoPageModel
 
     [BindProperty] public string NewTissueCode { get; set; } = string.Empty;
     [BindProperty] public short NewTissueNoPieces { get; set; } = 1;
-    [BindProperty] public string? NewTissueComment { get; set; }
 
     /// <summary>Tissue currently shown in its inline edit row.</summary>
     [BindProperty(SupportsGet = true)] public int? EditTissueId { get; set; }
@@ -96,7 +95,6 @@ public class BlockDetailsModel : HistoPageModel
     /// <summary>Inline edit-row fields — separate from the Add-tissue fields above so editing a row doesn't pre-fill the Add form.</summary>
     [BindProperty] public string EditTissueCode { get; set; } = string.Empty;
     [BindProperty] public short EditNoPieces { get; set; } = 1;
-    [BindProperty] public string? EditComment { get; set; }
 
     /// <summary>Legacy: chkUseWholeTissueList. Defaults to the full lookup list; the user opts in
     /// to filtering the dropdown down to codes already used on this submission.</summary>
@@ -273,6 +271,8 @@ public class BlockDetailsModel : HistoPageModel
             // becomes available again instead of being permanently skipped over.
             var usedRefs = animalBlocks.Where(b => batchTissues.Any(t => t.OwnerID == b.ID)).Select(b => b.BlockRef)
                 .Concat(await GetOtherBatchRefsAsync(Animal.ID));
+            if (!IsPreCassetted)
+                usedRefs = usedRefs.Concat((await _blocks.GetPreBookedByAnimalAsync(Animal.ID) ?? []).Select(b => b.BlockRef));
             NewBlockRef = IsPreCassetted
                 ? PreBookedBlockRefs.FirstOrDefault()?.BlockRef
                 : BlockHelpers.ComputeNextBlockRef(usedRefs, Animal.NextBlockRef);
@@ -625,7 +625,6 @@ public class BlockDetailsModel : HistoPageModel
                 Owner = TissueOwner.Block,
                 TissueCode = NewTissueCode,
                 NoPieces = NewTissueNoPieces,
-                Comment = NewTissueComment,
             };
             await _submissions.AddTissueAsync(tissue, Session.UserID);
             await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
@@ -707,7 +706,9 @@ public class BlockDetailsModel : HistoPageModel
             Owner = TissueOwner.Block,
             TissueCode = EditTissueCode,
             NoPieces = EditNoPieces,
-            Comment = EditComment,
+            // No tissue-level Comment field on this screen (legacy BlockDetails.aspx has none) —
+            // preserve whatever value already exists rather than erasing it.
+            Comment = existing.Comment,
             RowStamp = existing.RowStamp,
         };
         await _submissions.UpdateTissueAsync(updated, Session.UserID);
@@ -818,7 +819,8 @@ public class BlockDetailsModel : HistoPageModel
             // button) permanently reserves its ref, so every later "Next block" click skips further
             // and further past it (e.g. abandoned 02/03 -> jumps straight to 04 instead of 02).
             var usedRefs = animalBlocks.Where(b => batchTissues.Any(t => t.OwnerID == b.ID)).Select(b => b.BlockRef)
-                .Concat(await GetOtherBatchRefsAsync(Animal.ID));
+                .Concat(await GetOtherBatchRefsAsync(Animal.ID))
+                .Concat((await _blocks.GetPreBookedByAnimalAsync(Animal.ID) ?? []).Select(b => b.BlockRef));
             var nextRef = BlockHelpers.ComputeNextBlockRef(usedRefs, Animal.NextBlockRef,
                 allBlocks.FirstOrDefault(b => b.ID == BlockId)?.BlockRef);
 
@@ -960,7 +962,6 @@ public class BlockDetailsModel : HistoPageModel
                 TissueId = editing.ID;
                 EditTissueCode = editing.TissueCode;
                 EditNoPieces = editing.NoPieces;
-                EditComment = editing.Comment;
             }
         }
 

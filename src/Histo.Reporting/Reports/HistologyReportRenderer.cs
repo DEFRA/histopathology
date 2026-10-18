@@ -546,7 +546,8 @@ public sealed class HistologyReportRenderer
                                 Td(string.Empty); // Block Filed
                                 Td(string.Empty); // Stain
                                 Td(string.Empty); // QC Code
-                                Td(Field(row, "CustomerRef")); // Comments column
+                                // Block-level field (same for every tissue in the block) — suppress on continuation rows, same as Sender/Histology Ref.
+                                Td(continuesBlock ? string.Empty : Field(row, "CustomerRef")); // Comments column
                                 Td(string.Empty); // Dispatch
                             }
                         });

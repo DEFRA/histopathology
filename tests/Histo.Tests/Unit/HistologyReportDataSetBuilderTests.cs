@@ -444,6 +444,8 @@ public class HistologyReportDataSetBuilderTests
     [Fact]
     public void BuildSubmissionTable_AllColumnsPopulated()
     {
+        // Legacy source: SubmissionForm.aspx.vb::CreateBatchSubmissionDataTable never assigns
+        // CustomerRef for Wet Tissue rows (it's a Block-only field) — tissue Comment must not leak in.
         var tissue = Row(("AnimalID", (object)42), ("ID", (object)1), ("BatchSubmissionID", (object)1), ("TissueCode", "Kidney"), ("Comment", "c-ref"));
         var animal = Row(("ID", (object)42), ("SenderRef", "S-001"), ("HistologyRef", "11/999"));
 
@@ -462,7 +464,7 @@ public class HistologyReportDataSetBuilderTests
         Assert.Equal("",       row["BlockRef"]);
         Assert.Equal("Kidney", row["TissueDetails"]);
         Assert.Equal("",       row["RepeatBlock"]);
-        Assert.Equal("c-ref",  row["CustomerRef"]);
+        Assert.Equal("",       row["CustomerRef"]);
     }
 
     [Fact]
@@ -492,7 +494,9 @@ public class HistologyReportDataSetBuilderTests
     {
         // Cassetted/Wax Block etc. have no BatchTissues rows at all — GetBatchBlockDetails/
         // GetBatchBlockTissues is the only source of detail rows for this submission type.
-        var block  = Row(("ID", (object)900), ("AnimalID", (object)42), ("BlockRef", "01"), ("RepeatBlock", (object)false));
+        // Legacy source: SubmissionForm.aspx.vb::CreateBatchBlocksDataTable —
+        // drBatchBlocks("CustomerRef") = drBlock("CustomerRef"); tissue Comment must not leak in.
+        var block  = Row(("ID", (object)900), ("AnimalID", (object)42), ("BlockRef", "01"), ("RepeatBlock", (object)false), ("CustomerRef", "CUST-1"));
         var tissue = Row(("BlockID", (object)900), ("ID", (object)1), ("TissueCode", "Viscera"), ("Comment", "visc 1"));
         var animal = Row(("ID", (object)42), ("SenderRef", "S-001"), ("HistologyRef", "11/999"));
 
@@ -509,7 +513,7 @@ public class HistologyReportDataSetBuilderTests
         Assert.Equal("11/999",  row["HistologyRef"]);
         Assert.Equal("01",      row["BlockRef"]);
         Assert.Equal("Viscera", row["TissueDetails"]);
-        Assert.Equal("visc 1",  row["CustomerRef"]);
+        Assert.Equal("CUST-1",  row["CustomerRef"]);
     }
 
     [Theory]

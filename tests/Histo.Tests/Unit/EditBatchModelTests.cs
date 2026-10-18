@@ -477,7 +477,8 @@ _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(It.IsAny<int>(), It.IsAny<
     [Fact]
     public async Task OnPostAsync_PreviousSelectionsCouldNotBeRead_DoesNotGuessAndReportsIt()
     {
-        // A failed read must not look like "nothing was selected before" — that would treat every test as new.
+        // A failed read must not look like "nothing was selected before" — that would treat every test as new,
+        // and (since the deselect-check below relies on it too) silently let an in-use test through.
         SetupSuccessfulSave(new BatchTestSelections());
         _batches.Setup(b => b.TryGetBatchTestSelectionsAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync((BatchTestSelections?)null);
         var sut = CreateSut();
@@ -487,9 +488,87 @@ _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(It.IsAny<int>(), It.IsAny<
         var result = await sut.OnPostAsync();
 
         Assert.IsType<PageResult>(result);
-        Assert.Contains("could not be added to the existing blocks", sut.SaveError);
+        Assert.Contains("Could not check existing test selections", sut.SaveError);
+        _batches.Verify(b => b.UpdateAsync(It.IsAny<Batch>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         _blockTests.Verify(t => t.AddTestsToBatchBlocksAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(),
             It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_DeselectingATestStillAssignedToABlock_IsRejected()
+    {
+        // Legacy source: BatchDetails.aspx.vb::HasTestBeenAllocated — a test type already ticked on a
+        // block can't be deselected at the batch level.
+        SetupSuccessfulSave(new BatchTestSelections { Histology = [new BatchTestSelectionRow { Code = HistologyCode.HAndE }] });
+        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Histo.Histology.Models.BlockTest>)[
+                new Histo.Histology.Models.BlockTest { BlockID = 1, TestType = Histo.Histology.Models.BlockTestType.Histology, Code = HistologyCode.HAndE },
+            ]);
+        var sut = CreateSut();
+        sut.SelectedHistologyCodes = [HistologyCode.EO]; // deselects H&E, which is still on a block
+        sut.SafeToHandle = true;
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("The test cannot be de-selected as it has been assigned to a block.", sut.SaveError);
+        _batches.Verify(b => b.UpdateAsync(It.IsAny<Batch>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_DeselectingATestNoLongerOnAnyBlock_Succeeds()
+    {
+        SetupSuccessfulSave(new BatchTestSelections { Histology = [new BatchTestSelectionRow { Code = HistologyCode.HAndE }] });
+        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Histo.Histology.Models.BlockTest>)[]);
+        var sut = CreateSut();
+        sut.SelectedHistologyCodes = [HistologyCode.EO]; // deselects H&E, but no block has it ticked
+        sut.SafeToHandle = true;
+
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<RedirectToPageResult>(result);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_TestAssignedToABlock_IsReportedAsLocked()
+    {
+        _session.Object.BatchID = 10;
+        _batches.Setup(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(SampleBatch());
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BatchTestSelections { Histology = [new BatchTestSelectionRow { Code = HistologyCode.HAndE }] });
+        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Histo.Histology.Models.BlockTest>)[
+                new Histo.Histology.Models.BlockTest { BlockID = 1, TestType = Histo.Histology.Models.BlockTestType.Histology, Code = HistologyCode.HAndE },
+            ]);
+        var sut = CreateSut();
+
+        await sut.OnGetAsync();
+
+        Assert.Contains(HistologyCode.HAndE, sut.LockedHistologyCodes);
+        Assert.True(sut.IsHistologyLocked(HistologyCode.HAndE));
+    }
+
+    [Fact]
+    public async Task OnGetAsync_SubmissionHasNoBlocksYet_NothingIsLockedAndDeselectIsAllowed()
+    {
+        // Answers: "if the submission doesn't have any blocks, what happens?" — nothing is locked,
+        // so every checkbox is enabled and the deselect-check in OnPostAsync never fires.
+        SetupSuccessfulSave(new BatchTestSelections { Histology = [new BatchTestSelectionRow { Code = HistologyCode.HAndE }] });
+        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Histo.Histology.Models.BlockTest>)[]);
+        var sut = CreateSut();
+
+        await sut.OnGetAsync();
+
+        Assert.Empty(sut.LockedHistologyCodes);
+        Assert.False(sut.IsHistologyLocked(HistologyCode.HAndE));
+
+        sut.SelectedHistologyCodes = [HistologyCode.EO]; // deselects H&E
+        sut.SafeToHandle = true;
+        var result = await sut.OnPostAsync();
+
+        Assert.IsType<RedirectToPageResult>(result);
     }
 
     [Fact]
