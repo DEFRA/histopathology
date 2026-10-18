@@ -2,6 +2,7 @@ using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
 using Histo.Core.Domain;
 using Histo.Histology.Interfaces;
+using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -126,6 +127,24 @@ public class EditBatchModel : HistoPageModel
     /// <summary>True when the current histology selection contains Special Stain.</summary>
     public bool ShowStains => SelectedHistologyCodes.Contains(HistologyCode.SpecialStain);
 
+    // ---- Codes already ticked on a block — can't be deselected (see OnPostAsync) ----
+    public IReadOnlyCollection<string> LockedHistologyCodes { get; private set; } = [];
+    public IReadOnlyCollection<string> LockedAntibodyCodes  { get; private set; } = [];
+    public IReadOnlyCollection<string> LockedStainCodes     { get; private set; } = [];
+
+    /// <summary>True when the view should disable this checkbox — selected AND already assigned to a block.</summary>
+    public bool IsHistologyLocked(string code) => SelectedHistologyCodes.Contains(code) && LockedHistologyCodes.Contains(code, StringComparer.OrdinalIgnoreCase);
+    public bool IsAntibodyLocked(string code)  => SelectedAntibodyCodes.Contains(code) && LockedAntibodyCodes.Contains(code, StringComparer.OrdinalIgnoreCase);
+    public bool IsStainLocked(string code)     => SelectedStainCodes.Contains(code) && LockedStainCodes.Contains(code, StringComparer.OrdinalIgnoreCase);
+
+    private async Task LoadLockedTestCodesAsync(int batchId)
+    {
+        var blockTests = await _blockTests.GetAllSelectionsByBatchAsync(batchId);
+        LockedHistologyCodes = blockTests.Where(t => t.TestType == BlockTestType.Histology).Select(t => t.Code).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        LockedAntibodyCodes  = blockTests.Where(t => t.TestType == BlockTestType.Antibodies).Select(t => t.Code).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        LockedStainCodes     = blockTests.Where(t => t.TestType == BlockTestType.Stain).Select(t => t.Code).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
     public async Task<IActionResult> OnGetAsync()
     {
         ViewData["Title"]     = "Edit submission";
@@ -161,6 +180,7 @@ public class EditBatchModel : HistoPageModel
         await LoadLookupsAsync();
         await LoadDisplayFieldsAsync();
         await LoadTestTypeOptionsAsync(Batch.BatchType);
+        await LoadLockedTestCodesAsync(Batch.ID);
 
         // Pre-select the checkboxes from the existing batch-level test selections, unless a
         // draft (from a pick-list detour) already restored them above.
@@ -256,6 +276,7 @@ public class EditBatchModel : HistoPageModel
         await LoadLookupsAsync();
         await LoadDisplayFieldsAsync();
         await LoadTestTypeOptionsAsync(Batch.BatchType);
+        await LoadLockedTestCodesAsync(Batch.ID);
 
         // ---- Test-type validation (mirrors former EditBatchTestsModel) ----
         if (SelectedHistologyCodes.Count == 0)
@@ -280,6 +301,30 @@ public class EditBatchModel : HistoPageModel
             SaveError = "IHC is selected — you must also select at least one antibody.";
             return Page();
         }
+
+        // Legacy source: BatchDetails.aspx.vb chkblHistology/Antibodies/SpecialStain_SelectedIndexChanged +
+        // HasTestBeenAllocated — a test type already ticked on a block can't be deselected at the batch
+        // level. Read before anything is saved; null means the read failed, which must not look like
+        // "nothing was previously selected" (that would silently let an in-use test through).
+        var previousTests = await _batches.TryGetBatchTestSelectionsAsync(Batch.ID);
+        if (previousTests is null)
+        {
+            SaveError = "Could not check existing test selections. Please try again.";
+            return Page();
+        }
+
+        bool DeselectedButAssigned(IEnumerable<string> previous, IReadOnlyList<string> nowSelected, IReadOnlyCollection<string> lockedCodes) =>
+            previous.Except(nowSelected, StringComparer.OrdinalIgnoreCase)
+                .Any(code => lockedCodes.Contains(code, StringComparer.OrdinalIgnoreCase));
+
+        if (DeselectedButAssigned(previousTests.Histology.Select(r => r.Code), SelectedHistologyCodes, LockedHistologyCodes)
+            || DeselectedButAssigned(previousTests.Antibodies.Select(r => r.Code), SelectedAntibodyCodes, LockedAntibodyCodes)
+            || DeselectedButAssigned(previousTests.Stains.Select(r => r.Code), SelectedStainCodes, LockedStainCodes))
+        {
+            SaveError = "The test cannot be de-selected as it has been assigned to a block.";
+            return Page();
+        }
+
         // Legacy: rfvSafeToHandle — mandatory on both New and Edit (BatchDetails.aspx.vb ValidateMandatoryFields).
         if (SafeToHandle is null)
         {
@@ -359,8 +404,6 @@ public class EditBatchModel : HistoPageModel
         // Clear stain/antibody selections if their triggering histology codes aren't selected.
         var cleanedStainCodes    = ShowStains     ? SelectedStainCodes    : (IReadOnlyList<string>)[];
         var cleanedAntibodyCodes = ihcSelected     ? SelectedAntibodyCodes : (IReadOnlyList<string>)[];
-        // Read before the save below overwrites it; null means the read failed, which must not look like "nothing selected".
-        var previousTests = await _batches.TryGetBatchTestSelectionsAsync(Batch.ID);
         if (!await _batches.SaveBatchTestSelectionsAsync(Batch.ID, SelectedHistologyCodes, cleanedAntibodyCodes, cleanedStainCodes, Session.UserID))
         {
             SaveError = "Submission saved, but failed to save test types. Please try again.";
@@ -369,7 +412,6 @@ public class EditBatchModel : HistoPageModel
 
         try
         {
-            if (previousTests is null) throw new InvalidOperationException("Previous test selections could not be read.");
             await AddNewTestsToExistingBlocksAsync(Batch.ID, previousTests, SelectedHistologyCodes, cleanedAntibodyCodes, cleanedStainCodes);
         }
         catch (Exception)

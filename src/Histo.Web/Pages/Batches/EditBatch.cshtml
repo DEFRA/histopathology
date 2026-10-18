@@ -283,11 +283,18 @@
                         {
                             var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
                             var checkboxId = $"edit-histology-{code}";
+                            var isLocked = Model.IsHistologyLocked(code);
                             <div class="govuk-checkboxes__item">
                                 <input class="govuk-checkboxes__input" id="@checkboxId" name="SelectedHistologyCodes"
                                        type="checkbox" value="@code" data-histology-code="@code"
-                                       @(Model.SelectedHistologyCodes.Contains(code) ? "checked" : "") />
+                                       @(Model.SelectedHistologyCodes.Contains(code) ? "checked" : "")
+                                       @(isLocked ? "disabled" : "") />
                                 <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+                                @if (isLocked)
+                                {
+                                    <div class="govuk-hint govuk-checkboxes__hint">Assigned to a block — cannot be removed</div>
+                                    <input type="hidden" name="SelectedHistologyCodes" value="@code" />
+                                }
                             </div>
                         }
                     </div>
@@ -304,11 +311,18 @@
                         {
                             var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
                             var checkboxId = $"edit-antibody-{code}";
+                            var isLocked = Model.IsAntibodyLocked(code);
                             <div class="govuk-checkboxes__item">
                                 <input class="govuk-checkboxes__input" id="@checkboxId" name="SelectedAntibodyCodes"
                                        type="checkbox" value="@code"
-                                       @(Model.SelectedAntibodyCodes.Contains(code) ? "checked" : "") />
+                                       @(Model.SelectedAntibodyCodes.Contains(code) ? "checked" : "")
+                                       @(isLocked ? "disabled" : "") />
                                 <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+                                @if (isLocked)
+                                {
+                                    <div class="govuk-hint govuk-checkboxes__hint">Assigned to a block — cannot be removed</div>
+                                    <input type="hidden" name="SelectedAntibodyCodes" value="@code" />
+                                }
                             </div>
                         }
                     </div>
@@ -325,11 +339,18 @@
                         {
                             var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
                             var checkboxId = $"edit-stain-{code}";
+                            var isLocked = Model.IsStainLocked(code);
                             <div class="govuk-checkboxes__item">
                                 <input class="govuk-checkboxes__input" id="@checkboxId" name="SelectedStainCodes"
                                        type="checkbox" value="@code"
-                                       @(Model.SelectedStainCodes.Contains(code) ? "checked" : "") />
+                                       @(Model.SelectedStainCodes.Contains(code) ? "checked" : "")
+                                       @(isLocked ? "disabled" : "") />
                                 <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+                                @if (isLocked)
+                                {
+                                    <div class="govuk-hint govuk-checkboxes__hint">Assigned to a block — cannot be removed</div>
+                                    <input type="hidden" name="SelectedStainCodes" value="@code" />
+                                }
                             </div>
                         }
                     </div>

@@ -33,6 +33,11 @@ public static class BlockHelpers
     /// <paramref name="storedNextBlockRef"/> is the animal's persisted <c>NextBlockRef</c> — a
     /// high-water mark that only ever moves forward, so a ref freed by deleting a block is not
     /// handed out again. The result is never lower than it (legacy: <c>Animal.NextBlockRef</c>).
+    ///
+    /// Always returns the lowest free number at or after the starting point (either
+    /// <paramref name="afterBlockRef"/> + 1, or <paramref name="storedNextBlockRef"/> when no
+    /// <paramref name="afterBlockRef"/> is given) — gaps below an already-used higher ref (e.g.
+    /// pre-booked refs 03/04 with 01/02 still free) are filled first, never skipped over.
     /// </summary>
     public static string ComputeNextBlockRef(IEnumerable<string> existingBlockRefs, string? storedNextBlockRef = null, string? afterBlockRef = null)
     {
@@ -41,16 +46,11 @@ public static class BlockHelpers
             .ToHashSet();
         var stored = int.TryParse(storedNextBlockRef, out var s) ? s : 0;
 
-        // Continuing from a known block: next number in sequence after it that is still free.
-        if (int.TryParse(afterBlockRef, out var after))
-        {
-            var candidate = Math.Max(after + 1, stored);
-            while (used.Contains(candidate)) candidate++;
-            return FormatBlockRef(candidate);
-        }
-
-        var max = used.DefaultIfEmpty(0).Max();
-        return FormatBlockRef(Math.Max(max + 1, stored));
+        var candidate = int.TryParse(afterBlockRef, out var after)
+            ? Math.Max(after + 1, stored)
+            : Math.Max(1, stored);
+        while (used.Contains(candidate)) candidate++;
+        return FormatBlockRef(candidate);
     }
 
     /// <summary>

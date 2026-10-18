@@ -271,6 +271,8 @@ public class BlockDetailsModel : HistoPageModel
             // becomes available again instead of being permanently skipped over.
             var usedRefs = animalBlocks.Where(b => batchTissues.Any(t => t.OwnerID == b.ID)).Select(b => b.BlockRef)
                 .Concat(await GetOtherBatchRefsAsync(Animal.ID));
+            if (!IsPreCassetted)
+                usedRefs = usedRefs.Concat((await _blocks.GetPreBookedByAnimalAsync(Animal.ID) ?? []).Select(b => b.BlockRef));
             NewBlockRef = IsPreCassetted
                 ? PreBookedBlockRefs.FirstOrDefault()?.BlockRef
                 : BlockHelpers.ComputeNextBlockRef(usedRefs, Animal.NextBlockRef);
@@ -817,7 +819,8 @@ public class BlockDetailsModel : HistoPageModel
             // button) permanently reserves its ref, so every later "Next block" click skips further
             // and further past it (e.g. abandoned 02/03 -> jumps straight to 04 instead of 02).
             var usedRefs = animalBlocks.Where(b => batchTissues.Any(t => t.OwnerID == b.ID)).Select(b => b.BlockRef)
-                .Concat(await GetOtherBatchRefsAsync(Animal.ID));
+                .Concat(await GetOtherBatchRefsAsync(Animal.ID))
+                .Concat((await _blocks.GetPreBookedByAnimalAsync(Animal.ID) ?? []).Select(b => b.BlockRef));
             var nextRef = BlockHelpers.ComputeNextBlockRef(usedRefs, Animal.NextBlockRef,
                 allBlocks.FirstOrDefault(b => b.ID == BlockId)?.BlockRef);
 

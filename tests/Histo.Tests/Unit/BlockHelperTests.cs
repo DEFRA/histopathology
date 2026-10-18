@@ -60,7 +60,8 @@ public class BlockHelperTests
     [Theory]
     [InlineData(new string[0], null, "01")]
     [InlineData(new[] { "01" }, null, "02")]
-    [InlineData(new[] { "01", "09" }, null, "10")]
+    // Gaps are filled first, not skipped over — e.g. pre-booked 03/04 with 01/02 still free.
+    [InlineData(new[] { "01", "09" }, null, "02")]
     [InlineData(new string[0], "01", "01")]
     // The user's case: block 01 was added and then deleted, so the animal's counter was advanced.
     [InlineData(new string[0], "02", "02")]
