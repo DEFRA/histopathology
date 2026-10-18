@@ -188,6 +188,21 @@ public class CopyBatchModel : HistoPageModel
     }
 
     /// <summary>
+    /// "Summary" — legacy source: <c>CopyBatchBlocks.aspx.vb::btnSummary_Click</c> (cassetted
+    /// scenario only). Stashes the same TempData keys <see cref="OnPostPick"/> uses so the
+    /// restore branch in <see cref="OnGetAsync"/> rehydrates any in-progress "Change" picks when
+    /// the user returns from <see cref="CopyBatchBlocksSummaryModel"/> — otherwise returning here
+    /// would reload fresh from the database and silently drop them.
+    /// </summary>
+    public IActionResult OnPostSummaryAsync()
+    {
+        TempData["CopyBatch_Animals"]     = JsonSerializer.Serialize(Animals);
+        TempData["CopyBatch_IsCassetted"] = IsCassetted.ToString();
+
+        return RedirectToPage("/Batches/CopyBatchBlocksSummary", new { sourceBatchId = SourceBatchId });
+    }
+
+    /// <summary>
     /// Saves current Animals to TempData and navigates to SearchSender in picker mode.
     /// Called when the user clicks Change on a row.
     /// </summary>
