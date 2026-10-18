@@ -46,24 +46,6 @@ public sealed class QCNoteService : IQCNoteService
         await _repo.UpdateAsync(qcNoteId, text, rowStamp, userId, ct);
     }
 
-    /// <inheritdoc/>
-    public async Task<SubmissionQCNote?> GetOrCreateForSubmissionAsync(int batchId, int testId, string testType, byte[] expectedRowStamp, int userId, CancellationToken ct = default)
-    {
-        try
-        {
-            return await _repo.GetOrCreateForSubmissionAsync(batchId, testId, testType, expectedRowStamp, userId, ct);
-        }
-        catch (QCNoteLinkConflictException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Failed to get or create the QC note for submission {SubmissionId}.", ex, batchId);
-            return null;
-        }
-    }
-
     /// <summary>Matches the <c>QCNotes.QCText</c> / <c>EditQCNote @QCText</c> size.</summary>
     public const int MaxTextLength = 4000;
 

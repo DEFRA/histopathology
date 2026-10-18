@@ -163,33 +163,6 @@ public sealed class QCNoteRepository : IQCNoteRepository
     }
 
     /// <inheritdoc/>
-    /// <remarks>The lookup, create and RowStamp-guarded link are in <c>GetOrCreateSubmissionQCNote</c> (see its header for the return codes).</remarks>
-    public async Task<SubmissionQCNote> GetOrCreateForSubmissionAsync(int batchId, int testId, string testType, byte[] expectedRowStamp, int userId, CancellationToken ct = default)
-    {
-        using var conn = _db.CreateConnection();
-
-        var parameters = new DynamicParameters();
-        parameters.Add("RETURN_VALUE", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
-        parameters.Add("BatchID", batchId);
-        parameters.Add("TestID", testId);
-        parameters.Add("TestType", testType, System.Data.DbType.AnsiString, size: 20);
-        parameters.Add("RowStamp", expectedRowStamp, System.Data.DbType.Binary, size: 8);
-        parameters.Add("UserID", userId);
-        parameters.Add("DateCreated", DateTime.Now);
-        parameters.Add("QCNoteRef", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
-        parameters.Add("LinkedRowStamp", dbType: System.Data.DbType.Binary, direction: System.Data.ParameterDirection.Output, size: 8);
-
-        await conn.ExecuteAsync("GetOrCreateSubmissionQCNote", parameters, commandType: System.Data.CommandType.StoredProcedure);
-
-        return parameters.Get<int>("RETURN_VALUE") switch
-        {
-            0 => new SubmissionQCNote(parameters.Get<int>("QCNoteRef"), null),
-            1 => new SubmissionQCNote(parameters.Get<int>("QCNoteRef"), parameters.Get<byte[]>("LinkedRowStamp")),
-            2 => throw new QCNoteLinkConflictException(),
-            var other => throw new InvalidOperationException($"GetOrCreateSubmissionQCNote returned {other}."),
-        };
-    }
-    /// <inheritdoc/>
     public async Task<IReadOnlyList<QCNote>> GetAllAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();

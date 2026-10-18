@@ -33,8 +33,8 @@ public class QCNotesModel : GridPageModel
             "Project"      => SortDesc ? Notes.OrderByDescending(n => n.ProjectDescription)   : Notes.OrderBy(n => n.ProjectDescription),
             "Species"      => SortDesc ? Notes.OrderByDescending(n => n.Species)              : Notes.OrderBy(n => n.Species),
             "QCNoteRef"    => SortDesc ? Notes.OrderByDescending(n => n.QCNoteRef)            : Notes.OrderBy(n => n.QCNoteRef),
-            // No column clicked yet — default: ID DESC (most recent first).
-            _              => Notes.OrderByDescending(n => n.ID),
+            // Legacy: QCNotes.aspx.vb default dvBatchesView.Sort = "QCNoteRef DESC".
+            _              => Notes.OrderByDescending(n => n.QCNoteRef),
         })
         .Skip((PageNumber - 1) * PageSize)
         .Take(PageSize)
