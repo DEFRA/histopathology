@@ -206,14 +206,6 @@ public class EditQualityDataTestModel : HistoPageModel
             await _tests.SaveTCCodesAsync(
                 Session.BatchID.Value, TestId, Test.TestType,
                 Test.TCCodes, SelectedCharges, Session.UserID);
-            if (qcNoteRef is > 0 && !string.IsNullOrWhiteSpace(Comment))
-            {
-                var batch = await _batches.GetByIdAsync(Session.BatchID.Value);
-                var names = await QCNoteText.LoadTestNamesAsync(_lookups, batch?.BatchType ?? Histo.Submissions.Models.BatchTypeConstants.Tse);
-                var outcome = await _qc.AppendAsync(qcNoteRef.Value,
-                    [QCNoteText.Line(Test, QCNoteText.TestName(names, Test), Comment)], Session.UserID);
-                noteWarning ??= QCNoteText.AppendWarning(outcome, qcNoteRef.Value);
-            }
             await CompleteBatchIfAllTestsDispatchedAsync(Session.BatchID.Value);
             if (noteWarning is not null) TempData[QCNoteText.WarningTempDataKey] = noteWarning;
             return RedirectToPage("/QC/QualityData");

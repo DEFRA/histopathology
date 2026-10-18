@@ -227,9 +227,10 @@ public class QualityDataModelTests
     }
 
     [Fact]
-    public async Task OnPostUpdateAsync_MultiSelectWithQcNoteTicked_CreatesOnlyOneSharedNote_AndAppendsComments()
+    public async Task OnPostUpdateAsync_MultiSelectWithQcNoteTicked_CreatesOnlyOneSharedNote_DoesNotAppendComment()
     {
         // One new note per save action, shared by every row ticked in THIS save — not one per row.
+        // Edit-quality-data comments must never be auto-appended to the note's text (legacy parity).
         _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1), MakeTest(2)]);
         _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
@@ -245,9 +246,7 @@ public class QualityDataModelTests
         _qc.Verify(q => q.AddAsync(42, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(2, saved.Count);
         Assert.All(saved, bt => Assert.Equal(500, bt.QCNoteRef));
-        _qc.Verify(q => q.AppendAsync(500,
-            It.Is<IReadOnlyList<string>>(l => l.Count == 2 && l.All(s => s.EndsWith(": needs repeat"))),
-            It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+        _qc.Verify(q => q.AppendAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -348,30 +347,7 @@ public class QualityDataModelTests
 
         _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         Assert.Equal(321, Assert.Single(saved).QCNoteRef);
-        _qc.Verify(q => q.AppendAsync(321,
-            It.Is<IReadOnlyList<string>>(l => l.Single() == "Histology - 1 (24/001 / 01): second update"),
-            It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task OnPostUpdateAsync_NoteFull_TestsSaved_WarningShown()
-    {
-        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<BlockTest>)[WithNote(MakeTest(1), 321)]);
-        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
-        var saved = CaptureSaves();
-        _qc.Setup(q => q.AppendAsync(321, It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(QCNoteAppendResult.TooLong);
-        var sut = CreateSut();
-        sut.SelectedIds = [1];
-        sut.QCNote = true; // pre-ticked client-side since the row already has a note
-        sut.NumberOfSlides = 1;
-        sut.Comment = "x";
-
-        await sut.OnPostUpdateAsync();
-
-        Assert.Single(saved);
-        Assert.Contains("QC note 321 is full", sut.NoteWarning);
+        _qc.Verify(q => q.AppendAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -478,35 +454,6 @@ public class QualityDataModelTests
 
         sut.SelectedIds = [1, 3]; // 3 has no ref of its own — no fallback, so it contributes nothing
         Assert.Equal("321", sut.QCNoteRefDisplay());
-    }
-
-    [Fact]
-    public async Task OnPostUpdateAsync_NoteLinesUseResolvedNameAndTestType_SoSameCodeDifferentTypeIsNotDeduped()
-    {
-        var histology = WithNote(MakeTest(1), 321);
-        var antibody = new BlockTest
-        {
-            ID = 2, BlockID = 1, TestType = BlockTestType.Antibodies, Code = "1", HistologyRef = "24/001",
-            BlockRef = "01", QCNote = true, QCNoteRef = 321, RowStamp = [1],
-        };
-        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[histology, antibody]);
-        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
-        _lookups.Setup(l => l.GetHistologyTypesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 1, Code = "1", Name = "EO" }]);
-        CaptureSaves();
-        IReadOnlyList<string>? appended = null;
-        _qc.Setup(q => q.AppendAsync(321, It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Callback<int, IReadOnlyList<string>, int, CancellationToken>((_, l, _, _) => appended = l)
-            .ReturnsAsync(QCNoteAppendResult.Appended);
-        var sut = CreateSut();
-        sut.SelectedIds = [1, 2];
-        sut.Comment = "same comment";
-
-        await sut.OnPostUpdateAsync();
-
-        Assert.Equal(
-            new[] { "Histology - EO (24/001 / 01): same comment", "Antibodies - 1 (24/001 / 01): same comment" },
-            appended);
     }
 
     [Fact]

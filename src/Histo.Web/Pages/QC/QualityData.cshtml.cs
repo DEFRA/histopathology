@@ -272,7 +272,7 @@ public class QualityDataModel : GridPageModel
 
         var selected = all.Where(t => selectedIds.Contains(t.ID)).ToList();
         var concurrencyCount = 0;
-        // Names must be loaded before note lines are built; otherwise GetTestName falls back to raw codes.
+        // Names must be loaded before GetTestName is used for display below.
         await ResolveTestNamesAsync((await _batches.GetByIdAsync(batchId))?.BatchType ?? Histo.Submissions.Models.BatchTypeConstants.Tse);
 
         // Ticked box with no existing ref gets ONE new note shared by every such row in THIS save
@@ -289,8 +289,6 @@ public class QualityDataModel : GridPageModel
             if (newId > 0) targetRef = newId;
             else NoteWarning = QCNoteText.CreateFailedWarning;
         }
-
-        var noteLines = new Dictionary<int, List<string>>();
 
         foreach (var test in selected)
         {
@@ -341,23 +339,11 @@ public class QualityDataModel : GridPageModel
                 // multi-row save; a single-row save always writes it, so unticking all clears them.
                 if (isSingle || SelectedCharges.Count > 0)
                     await _tests.SaveTCCodesAsync(batchId, test.ID, test.TestType, test.TCCodes, SelectedCharges, Session.UserID);
-
-                if (qcNoteRef is > 0 && !string.IsNullOrWhiteSpace(newComment))
-                {
-                    if (!noteLines.TryGetValue(qcNoteRef.Value, out var lines)) noteLines[qcNoteRef.Value] = lines = [];
-                    lines.Add(QCNoteText.Line(test, GetTestName(test), newComment));
-                }
             }
             catch (BlockTestConcurrencyException)
             {
                 concurrencyCount++;
             }
-        }
-
-        foreach (var (noteRef, lines) in noteLines)
-        {
-            var outcome = await _qc.AppendAsync(noteRef, lines, Session.UserID);
-            NoteWarning ??= QCNoteText.AppendWarning(outcome, noteRef);
         }
 
         await CompleteBatchIfAllTestsDispatchedAsync(batchId);
