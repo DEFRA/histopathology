@@ -97,10 +97,12 @@ public class SearchTestModel : HistoPageModel
         if (!Submitted) return;
 
         var raw = await _batches.GetTestPremiumChargeCountsAsync(
-            ProjectDescription, SubmissionType, SelectedHistology, SelectedAntibodies, SelectedSpecialStain, StartDate, EndDate);
+            ProjectDescription, SubmissionType, SelectedCodes(), StartDate, EndDate);
         BuildCrossTab(raw);
         Searched = true;
     }
+
+    private TestCodeSelection SelectedCodes() => new(SelectedHistology, SelectedAntibodies, SelectedSpecialStain);
 
     /// <summary>Legacy <c>bntBatch_Click</c> ("Analyse Submissions").</summary>
     public async Task OnGetAnalyseSubmissionsAsync()
@@ -109,7 +111,7 @@ public class SearchTestModel : HistoPageModel
         await LoadLookupsAsync();
 
         var raw = await _batches.GetTestPremiumChargeBatchesAsync(
-            ProjectDescription, SubmissionType, SelectedHistology, SelectedAntibodies, SelectedSpecialStain, StartDate, EndDate);
+            ProjectDescription, SubmissionType, SelectedCodes(), StartDate, EndDate);
         BuildSubmissionGroups(raw);
         SubmissionsSearched = true;
 
@@ -123,7 +125,7 @@ public class SearchTestModel : HistoPageModel
     {
         await LoadLookupsAsync();
         var raw = await _batches.GetTestPremiumChargeCountsAsync(
-            ProjectDescription, SubmissionType, SelectedHistology, SelectedAntibodies, SelectedSpecialStain, StartDate, EndDate);
+            ProjectDescription, SubmissionType, SelectedCodes(), StartDate, EndDate);
         BuildCrossTab(raw);
 
         var codes = CrossTabColumnTotals.Keys.ToList();
@@ -147,7 +149,7 @@ public class SearchTestModel : HistoPageModel
     {
         await LoadLookupsAsync();
         var raw = await _batches.GetTestPremiumChargeBatchesAsync(
-            ProjectDescription, SubmissionType, SelectedHistology, SelectedAntibodies, SelectedSpecialStain, StartDate, EndDate);
+            ProjectDescription, SubmissionType, SelectedCodes(), StartDate, EndDate);
         BuildSubmissionGroups(raw);
 
         // One row per (premium charge, submission) — a single comma-joined cell can exceed

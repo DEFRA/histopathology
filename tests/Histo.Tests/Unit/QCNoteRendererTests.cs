@@ -57,10 +57,9 @@ public class QCNoteRendererTests
     [Fact]
     public async Task RenderAsync_FullDataSet_ReturnsPdf()
     {
-        var renderer = new QCNoteRenderer();
         var ds       = BuildTestDataSet();
 
-        var pdf = await renderer.RenderAsync(ds);
+        var pdf = await QCNoteRenderer.RenderAsync(ds);
 
         Assert.NotNull(pdf);
         Assert.True(pdf.Length > 0, "PDF byte array should not be empty.");
@@ -74,13 +73,12 @@ public class QCNoteRendererTests
     [Fact]
     public async Task RenderAsync_WritesReadablePdfToDisk()
     {
-        var renderer   = new QCNoteRenderer();
         var ds         = BuildTestDataSet();
         var outputPath = Path.Combine(
             Path.GetDirectoryName(typeof(QCNoteRendererTests).Assembly.Location)!,
             "QCNote-Test.pdf");
 
-        var pdf = await renderer.RenderAsync(ds);
+        var pdf = await QCNoteRenderer.RenderAsync(ds);
         await File.WriteAllBytesAsync(outputPath, pdf);
 
         Assert.True(File.Exists(outputPath), "PDF file should exist on disk.");
@@ -92,12 +90,11 @@ public class QCNoteRendererTests
     [Fact]
     public async Task RenderAsync_EmptyQCText_StillProducesPdf()
     {
-        var renderer = new QCNoteRenderer();
         var ds       = BuildTestDataSet();
 
         ds.Tables["Header"]!.Rows[0]["QCText"] = string.Empty;
 
-        var pdf = await renderer.RenderAsync(ds);
+        var pdf = await QCNoteRenderer.RenderAsync(ds);
 
         Assert.True(pdf.Length > 0, "PDF should render even with empty QCText.");
     }
@@ -105,12 +102,11 @@ public class QCNoteRendererTests
     [Fact]
     public async Task RenderAsync_EmptyStainRef_StillProducesPdf()
     {
-        var renderer = new QCNoteRenderer();
         var ds       = BuildTestDataSet();
 
         ds.Tables["Header"]!.Rows[0]["StainRef"] = string.Empty;
 
-        var pdf = await renderer.RenderAsync(ds);
+        var pdf = await QCNoteRenderer.RenderAsync(ds);
 
         Assert.True(pdf.Length > 0, "PDF should render even with empty StainRef.");
     }
@@ -120,7 +116,6 @@ public class QCNoteRendererTests
     {
         // Reproduces a saved note whose QCText already starts with the same
         // Sender Ref/Histo Ref/Block Ref/Test table TestSummary would otherwise repeat.
-        var renderer = new QCNoteRenderer();
         var ds       = BuildTestDataSet();
 
         ds.Tables["Header"]!.Rows[0]["QCText"] =
@@ -128,7 +123,7 @@ public class QCNoteRendererTests
             "CHECBOXBOOL           26/20020              02             Giesma\r\n" +
             "DEVQA testing\r\nDEVQA testing tworow\r\n";
 
-        var pdf = await renderer.RenderAsync(ds);
+        var pdf = await QCNoteRenderer.RenderAsync(ds);
 
         Assert.True(pdf.Length > 0, "PDF should still render when QCText already embeds the table.");
     }

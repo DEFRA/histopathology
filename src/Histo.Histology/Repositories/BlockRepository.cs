@@ -14,6 +14,8 @@ public sealed class BlockRepository : IBlockRepository
 {
     private readonly IDbConnectionFactory _db;
 
+    private const string NewIdParam = "NewID";
+
     public BlockRepository(IDbConnectionFactory db) => _db = db;
 
     /// <inheritdoc/>
@@ -128,15 +130,15 @@ public sealed class BlockRepository : IBlockRepository
         parameters.Add("Status",      block.Status);
         parameters.Add("Order",       block.Order);
         parameters.Add("OldID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
-        parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+        parameters.Add(NewIdParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync("AddBlock", parameters, tx, commandType: System.Data.CommandType.StoredProcedure);
-        return parameters.Get<int>("NewID");
+        return parameters.Get<int>(NewIdParam);
     }
 
     // Real EditBlock signature (confirmed against the database directly) has no @RowStamp
     // (full-row replace, no optimistic concurrency) and requires the 3 archive columns on every call.
-    private static Task UpdateBlockRowAsync(IDbConnection conn, IDbTransaction? tx, Block block, int userId) =>
+    private static Task<int> UpdateBlockRowAsync(IDbConnection conn, IDbTransaction? tx, Block block, int userId) =>
         conn.ExecuteAsync(
             "EditBlock",
             new
@@ -183,7 +185,7 @@ public sealed class BlockRepository : IBlockRepository
         parameters.Add("Status", BlockStatus.PreBooked);
         parameters.Add("Order", dbType: System.Data.DbType.Int32, value: DBNull.Value);
         parameters.Add("OldID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
-        parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+        parameters.Add(NewIdParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync("AddBlock", parameters, commandType: System.Data.CommandType.StoredProcedure);
     }
@@ -285,10 +287,10 @@ public sealed class BlockRepository : IBlockRepository
         parameters.Add("NextBlockRef", "01");
         parameters.Add("PMDate", DBNull.Value, dbType: System.Data.DbType.String);
         parameters.Add("OnHold", false);
-        parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+        parameters.Add(NewIdParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync("AddAnimal", parameters, tx, commandType: System.Data.CommandType.StoredProcedure);
-        return parameters.Get<int?>("NewID") ?? 0;
+        return parameters.Get<int?>(NewIdParam) ?? 0;
     }
 
     /// <summary>Inserts one pre-booked placeholder inside the booking transaction.</summary>
@@ -305,7 +307,7 @@ public sealed class BlockRepository : IBlockRepository
         parameters.Add("Status", BlockStatus.PreBooked);
         parameters.Add("Order", dbType: System.Data.DbType.Int32, value: DBNull.Value);
         parameters.Add("OldID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
-        parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+        parameters.Add(NewIdParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync("AddBlock", parameters, tx, commandType: System.Data.CommandType.StoredProcedure);
     }
@@ -397,9 +399,5 @@ public sealed class BlockRepository : IBlockRepository
     }
 
     /// <summary>Row shape of <c>GetAnimalBatches</c> â€” the batch/submission-type list a slide archive search fans out over.</summary>
-    private sealed class AnimalBatch
-    {
-        public int BatchID { get; init; }
-        public int SubmissionType { get; init; }
-    }
+    private sealed record AnimalBatch(int BatchID, int SubmissionType);
 }

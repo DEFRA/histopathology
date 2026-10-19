@@ -626,7 +626,8 @@ public class AddSubmissionModel : HistoPageModel
         // SenderRef collisions from a different batch (e.g. leftover test/fixture data) still
         // cause the tissue-copy step inside CreateMouseRangeAsync to fail deep in a DB transaction.
         var candidates = Enumerable.Range(fromId, rangeSize).Select(SenderRefHelpers.FormatMouseNumber).ToList();
-        var duplicate = (await _submissions.GetExistingSenderRefsAsync(candidates)).FirstOrDefault();
+        var existingRefs = await _submissions.GetExistingSenderRefsAsync(candidates);
+        var duplicate = existingRefs.Count > 0 ? existingRefs[0] : null;
 
         return duplicate is not null
             ? ([], $"Mouse number {duplicate} already exists. Alter the range and try again.")

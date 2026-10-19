@@ -54,7 +54,7 @@ public class SearchTestModelTests
     public async Task OnGetAsync_PivotsCountsPerProjectAndPremiumCode_FillingZeroForMissingCombinations()
     {
         _batches.Setup(b => b.GetTestPremiumChargeCountsAsync(
-                It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<TestCodeSelection>(),
                 It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<TestPremiumChargeCount>)
             [
@@ -90,7 +90,7 @@ public class SearchTestModelTests
     public async Task OnGetAnalyseSubmissionsAsync_GroupsByPremiumCode_WithDistinctSortedBatchIds()
     {
         _batches.Setup(b => b.GetTestPremiumChargeBatchesAsync(
-                It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<TestCodeSelection>(),
                 It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<TestPremiumChargeBatchRef>)
             [
@@ -118,7 +118,7 @@ public class SearchTestModelTests
     public async Task OnGetAsync_NoTestCodesSelected_QueriesWithEmptyListsAndShowsNoResults()
     {
         _batches.Setup(b => b.GetTestPremiumChargeCountsAsync(
-                It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<TestCodeSelection>(),
                 It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<TestPremiumChargeCount>)[]);
         var sut = CreateSut();

@@ -47,4 +47,23 @@ public class BatchServiceTests
 
         Assert.Empty(result);
     }
+
+    [Fact]
+    public async Task TryGetBatchTestSelectionsAsync_DelegatesToRepository()
+    {
+        var selections = new BatchTestSelections();
+        _repoMock.Setup(r => r.GetBatchTestSelectionsAsync(12, default)).ReturnsAsync(selections);
+
+        var result = await BuildSut().TryGetBatchTestSelectionsAsync(12);
+
+        Assert.Same(selections, result);
+    }
+
+    [Fact]
+    public async Task TryGetBatchTestSelectionsAsync_RepositoryThrows_ReturnsNull()
+    {
+        _repoMock.Setup(r => r.GetBatchTestSelectionsAsync(12, default)).ThrowsAsync(new InvalidOperationException("boom"));
+
+        Assert.Null(await BuildSut().TryGetBatchTestSelectionsAsync(12));
+    }
 }

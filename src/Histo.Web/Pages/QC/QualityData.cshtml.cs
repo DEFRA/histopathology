@@ -32,8 +32,7 @@ public class QualityDataModel : GridPageModel
     private readonly IUserService _users;
     private readonly IQCNoteService _qc;
 
-    private const int LookupHistologyTse     = 7;
-    private const int LookupHistologyNonTse  = 8;
+    private const string PageTitleText = "Quality data";
     private const int LookupQcCode           = 14;
     private const int LookupRemedialAction   = 15;
     private const int LookupArchiveLocation  = 16;
@@ -166,8 +165,8 @@ public class QualityDataModel : GridPageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
-        ViewData["Title"] = "Quality data";
-        ViewData["PageTitle"] = "Quality data";
+        ViewData["Title"] = PageTitleText;
+        ViewData["PageTitle"] = PageTitleText;
 
         if (BatchId is > 0)
         {
@@ -221,19 +220,14 @@ public class QualityDataModel : GridPageModel
     /// </summary>
     public async Task<IActionResult> OnPostUpdateAsync()
     {
-        ViewData["Title"] = "Quality data";
-        ViewData["PageTitle"] = "Quality data";
+        ViewData["Title"] = PageTitleText;
+        ViewData["PageTitle"] = PageTitleText;
         if (!Session.BatchID.HasValue) return RedirectToPage("/Index");
         if (IsViewMode) return RedirectToPage();
         var batchId = Session.BatchID.Value;
 
         var all = await _tests.GetByBatchAsync(batchId);
-
-        // Legacy never lets an on-hold or unreferenced test be ticked, so "All" must skip them too.
-        var selectable = all.Where(t => !t.OnHold && !string.IsNullOrWhiteSpace(t.HistologyRef)).ToList();
-        var selectedIds = SelectAllAcrossPages
-            ? ApplyCurrentFilter(selectable).Select(t => t.ID).ToList()
-            : selectable.Where(t => SelectedIds.Contains(t.ID)).Select(t => t.ID).ToList();
+        var selectedIds = ResolveSelectedIds(all);
 
         if (selectedIds.Count == 0)
         {
@@ -247,20 +241,11 @@ public class QualityDataModel : GridPageModel
         // With two or more rows, blank means "leave each row's own value alone".
         var isSingle = selectedIds.Count == 1;
 
-        if (!isSingle)
+        if (!isSingle && !AnyFieldEntered())
         {
-            var anyFieldEntered = !string.IsNullOrWhiteSpace(Result) || !string.IsNullOrWhiteSpace(QCCode)
-                || QCNote || !string.IsNullOrWhiteSpace(StainRef) || Dispatched
-                || DispatchedDate is not null || !string.IsNullOrWhiteSpace(DispatchedBy) || !string.IsNullOrWhiteSpace(DispatchedTo)
-                || !string.IsNullOrWhiteSpace(RemedialAction) || !string.IsNullOrWhiteSpace(ArchiveLocationCode) || ArchivedDate is not null
-                || !string.IsNullOrWhiteSpace(ArchiveComment) || NumberOfSlides is not null || !string.IsNullOrWhiteSpace(Comment)
-                || SelectedCharges.Count > 0;
-            if (!anyFieldEntered)
-            {
-                Error = "Enter at least one field to apply to the selected tests.";
-                await ReloadGridAsync(batchId);
-                return Page();
-            }
+            Error = "Enter at least one field to apply to the selected tests.";
+            await ReloadGridAsync(batchId);
+            return Page();
         }
 
         ValidateEntry(isSingle);
@@ -271,10 +256,41 @@ public class QualityDataModel : GridPageModel
         }
 
         var selected = all.Where(t => selectedIds.Contains(t.ID)).ToList();
-        var concurrencyCount = 0;
         // Names must be loaded before GetTestName is used for display below.
         await ResolveTestNamesAsync((await _batches.GetByIdAsync(batchId))?.BatchType ?? Histo.Submissions.Models.BatchTypeConstants.Tse);
 
+        var concurrencyCount = await SaveSelectedTestsAsync(batchId, selected, isSingle);
+
+        await CompleteBatchIfAllTestsDispatchedAsync(batchId);
+
+        Error = concurrencyCount > 0
+            ? $"{concurrencyCount} test(s) were modified by another user and were not updated. Please reload and try again."
+            : null;
+        SuccessMessage = concurrencyCount == 0 ? $"Updated {selected.Count} test(s)." : null;
+
+        await ReloadGridAsync(batchId);
+        return Page();
+    }
+
+    private List<int> ResolveSelectedIds(IReadOnlyList<BlockTest> all)
+    {
+        // Legacy never lets an on-hold or unreferenced test be ticked, so "All" must skip them too.
+        var selectable = all.Where(t => !t.OnHold && !string.IsNullOrWhiteSpace(t.HistologyRef)).ToList();
+        return SelectAllAcrossPages
+            ? ApplyCurrentFilter(selectable).Select(t => t.ID).ToList()
+            : selectable.Where(t => SelectedIds.Contains(t.ID)).Select(t => t.ID).ToList();
+    }
+
+    private bool AnyFieldEntered() =>
+        !string.IsNullOrWhiteSpace(Result) || !string.IsNullOrWhiteSpace(QCCode)
+        || QCNote || !string.IsNullOrWhiteSpace(StainRef) || Dispatched
+        || DispatchedDate is not null || !string.IsNullOrWhiteSpace(DispatchedBy) || !string.IsNullOrWhiteSpace(DispatchedTo)
+        || !string.IsNullOrWhiteSpace(RemedialAction) || !string.IsNullOrWhiteSpace(ArchiveLocationCode) || ArchivedDate is not null
+        || !string.IsNullOrWhiteSpace(ArchiveComment) || NumberOfSlides is not null || !string.IsNullOrWhiteSpace(Comment)
+        || SelectedCharges.Count > 0;
+
+    private async Task<int> SaveSelectedTestsAsync(int batchId, List<BlockTest> selected, bool isSingle)
+    {
         // Ticked box with no existing ref gets ONE new note shared by every such row in THIS save
         // only — never reused on a later, separate save (legacy's iQCNoteID: one new note per Edit
         // click, not one per submission). A test that already has its own ref keeps it unchanged;
@@ -282,54 +298,13 @@ public class QualityDataModel : GridPageModel
         bool AppliesQcNote(BlockTest t) => isSingle ? QCNote : QCNote || t.QCNote;
         var anyNeedsNewRef = selected.Any(t => AppliesQcNote(t) && t.QCNoteRef is null or 0);
 
-        int? targetRef = null;
-        if (anyNeedsNewRef)
-        {
-            var newId = await _qc.AddAsync(batchId, Session.UserID);
-            if (newId > 0) targetRef = newId;
-            else NoteWarning = QCNoteText.CreateFailedWarning;
-        }
+        int? targetRef = anyNeedsNewRef ? await CreateSharedQcNoteAsync(batchId) : null;
+        var concurrencyCount = 0;
 
         foreach (var test in selected)
         {
             var applyQcNote = AppliesQcNote(test);
-            int? qcNoteRef = !applyQcNote ? null : test.QCNoteRef is > 0 ? test.QCNoteRef : targetRef;
-
-            var newArchiveLocation = Pick(isSingle, ArchiveLocationCode, test.ArchiveLocation);
-            var newArchivedDate = isSingle ? ArchivedDate : ArchivedDate ?? test.ArchivedDate;
-            var newComment = Pick(isSingle, Comment, test.Comment);
-
-            var updated = new BlockTest
-            {
-                ID = test.ID,
-                BlockID = test.BlockID,
-                BlockRef = test.BlockRef,
-                HistologyRef = test.HistologyRef,
-                TestType = test.TestType,
-                Code = test.Code,
-                TestDetails = test.TestDetails,
-                Result = isSingle
-                    ? (string.IsNullOrWhiteSpace(Result) || Result == "0" ? null : Result)
-                    : Result switch { null or "" => test.Result, "0" => null, _ => Result },
-                QCCode = Pick(isSingle, QCCode, test.QCCode),
-                QCNote = applyQcNote,
-                QCNoteRef = qcNoteRef,
-                StainRef = Pick(isSingle, StainRef, test.StainRef),
-                Dispatched = isSingle ? Dispatched : Dispatched || test.Dispatched,
-                DispatchedDate = isSingle ? DispatchedDate : DispatchedDate ?? test.DispatchedDate,
-                DispatchedBy = Pick(isSingle, DispatchedBy, test.DispatchedBy),
-                PremiumCharge = test.PremiumCharge, // pass-through, not edited here
-                DispatchedTo = Pick(isSingle, DispatchedTo, test.DispatchedTo),
-                Comment = newComment,
-                RemedialAction = Pick(isSingle, RemedialAction, test.RemedialAction),
-                ArchiveLocation = newArchiveLocation,
-                ArchivedDate = newArchivedDate,
-                ArchiveComment = Pick(isSingle, ArchiveComment, test.ArchiveComment),
-                NumberOfSlides = isSingle ? NumberOfSlides : NumberOfSlides ?? test.NumberOfSlides,
-                OnHold = test.OnHold,
-                Archived = !string.IsNullOrWhiteSpace(newArchiveLocation) && newArchivedDate is not null,
-                RowStamp = test.RowStamp,
-            };
+            var updated = BuildUpdatedTest(test, isSingle, applyQcNote, ResolveQcNoteRef(applyQcNote, test, targetRef));
 
             try
             {
@@ -346,22 +321,73 @@ public class QualityDataModel : GridPageModel
             }
         }
 
-        await CompleteBatchIfAllTestsDispatchedAsync(batchId);
+        return concurrencyCount;
+    }
 
-        Error = concurrencyCount > 0
-            ? $"{concurrencyCount} test(s) were modified by another user and were not updated. Please reload and try again."
-            : null;
-        SuccessMessage = concurrencyCount == 0 ? $"Updated {selected.Count} test(s)." : null;
+    private async Task<int?> CreateSharedQcNoteAsync(int batchId)
+    {
+        var newId = await _qc.AddAsync(batchId, Session.UserID);
+        if (newId > 0) return newId;
 
-        await ReloadGridAsync(batchId);
-        return Page();
+        NoteWarning = QCNoteText.CreateFailedWarning;
+        return null;
+    }
+
+    private static int? ResolveQcNoteRef(bool applyQcNote, BlockTest test, int? targetRef)
+    {
+        if (!applyQcNote) return null;
+        return test.QCNoteRef is > 0 ? test.QCNoteRef : targetRef;
+    }
+
+    private string? ResolveResult(bool isSingle, string? existing)
+    {
+        if (isSingle) return string.IsNullOrWhiteSpace(Result) || Result == "0" ? null : Result;
+        return Result switch { null or "" => existing, "0" => null, _ => Result };
+    }
+
+    private BlockTest BuildUpdatedTest(BlockTest test, bool isSingle, bool applyQcNote, int? qcNoteRef)
+    {
+        var newArchiveLocation = Pick(isSingle, ArchiveLocationCode, test.ArchiveLocation);
+        var newArchivedDate = isSingle ? ArchivedDate : ArchivedDate ?? test.ArchivedDate;
+        var newComment = Pick(isSingle, Comment, test.Comment);
+
+        return new BlockTest
+        {
+            ID = test.ID,
+            BlockID = test.BlockID,
+            BlockRef = test.BlockRef,
+            HistologyRef = test.HistologyRef,
+            TestType = test.TestType,
+            Code = test.Code,
+            TestDetails = test.TestDetails,
+            Result = ResolveResult(isSingle, test.Result),
+            QCCode = Pick(isSingle, QCCode, test.QCCode),
+            QCNote = applyQcNote,
+            QCNoteRef = qcNoteRef,
+            StainRef = Pick(isSingle, StainRef, test.StainRef),
+            Dispatched = isSingle ? Dispatched : Dispatched || test.Dispatched,
+            DispatchedDate = isSingle ? DispatchedDate : DispatchedDate ?? test.DispatchedDate,
+            DispatchedBy = Pick(isSingle, DispatchedBy, test.DispatchedBy),
+            PremiumCharge = test.PremiumCharge, // pass-through, not edited here
+            DispatchedTo = Pick(isSingle, DispatchedTo, test.DispatchedTo),
+            Comment = newComment,
+            RemedialAction = Pick(isSingle, RemedialAction, test.RemedialAction),
+            ArchiveLocation = newArchiveLocation,
+            ArchivedDate = newArchivedDate,
+            ArchiveComment = Pick(isSingle, ArchiveComment, test.ArchiveComment),
+            NumberOfSlides = isSingle ? NumberOfSlides : NumberOfSlides ?? test.NumberOfSlides,
+            OnHold = test.OnHold,
+            Archived = !string.IsNullOrWhiteSpace(newArchiveLocation) && newArchivedDate is not null,
+            RowStamp = test.RowStamp,
+        };
     }
 
     /// <summary>Single-row saves write blanks through as clears; multi-row saves treat blank as "unchanged".</summary>
-    private static string? Pick(bool isSingle, string? entered, string? existing) =>
-        isSingle
-            ? (string.IsNullOrWhiteSpace(entered) ? null : entered)
-            : (!string.IsNullOrWhiteSpace(entered) ? entered : existing);
+    private static string? Pick(bool isSingle, string? entered, string? existing)
+    {
+        if (isSingle) return string.IsNullOrWhiteSpace(entered) ? null : entered;
+        return string.IsNullOrWhiteSpace(entered) ? existing : entered;
+    }
 
     /// <summary>
     /// Cross-field checks mirroring legacy's conditionally-enabled validators. In multi-row mode
@@ -371,26 +397,37 @@ public class QualityDataModel : GridPageModel
     /// </summary>
     private void ValidateEntry(bool isSingle)
     {
-        if (Dispatched)
-        {
-            if (DispatchedDate is null) Errors["DispatchedDate"] = "Enter a dispatched date.";
-            if (string.IsNullOrWhiteSpace(DispatchedBy)) Errors["DispatchedBy"] = "Select who dispatched the test.";
-            if (string.IsNullOrWhiteSpace(DispatchedTo)) Errors["DispatchedTo"] = "Enter who the test was dispatched to.";
-        }
+        ValidateDispatch();
+        ValidateFailedResult();
+        ValidateArchive();
 
-        if (Result == BlockTestResult.Failed)
-        {
-            if (string.IsNullOrWhiteSpace(QCCode)) Errors["QCCode"] = "Enter a QC code when setting the result to Failed.";
-            if (string.IsNullOrWhiteSpace(RemedialAction)) Errors["RemedialAction"] = "Select a remedial action when setting the result to Failed.";
-        }
+        if (NumberOfSlides is <= 0) Errors["NumberOfSlides"] = "Number of blocks/slides must be greater than zero.";
+        if (isSingle && NumberOfSlides is null) Errors["NumberOfSlides"] = "Enter the number of blocks/slides.";
+    }
 
+    private void ValidateDispatch()
+    {
+        if (!Dispatched) return;
+
+        if (DispatchedDate is null) Errors["DispatchedDate"] = "Enter a dispatched date.";
+        if (string.IsNullOrWhiteSpace(DispatchedBy)) Errors["DispatchedBy"] = "Select who dispatched the test.";
+        if (string.IsNullOrWhiteSpace(DispatchedTo)) Errors["DispatchedTo"] = "Enter who the test was dispatched to.";
+    }
+
+    private void ValidateFailedResult()
+    {
+        if (Result != BlockTestResult.Failed) return;
+
+        if (string.IsNullOrWhiteSpace(QCCode)) Errors["QCCode"] = "Enter a QC code when setting the result to Failed.";
+        if (string.IsNullOrWhiteSpace(RemedialAction)) Errors["RemedialAction"] = "Select a remedial action when setting the result to Failed.";
+    }
+
+    private void ValidateArchive()
+    {
         if (!string.IsNullOrWhiteSpace(ArchiveLocationCode) && ArchivedDate is null)
             Errors["ArchivedDate"] = "Enter an archive date when an archive location is selected.";
         if (ArchivedDate is not null && string.IsNullOrWhiteSpace(ArchiveLocationCode))
             Errors["ArchiveLocationCode"] = "Select an archive location when an archive date is entered.";
-
-        if (NumberOfSlides is <= 0) Errors["NumberOfSlides"] = "Number of blocks/slides must be greater than zero.";
-        if (isSingle && NumberOfSlides is null) Errors["NumberOfSlides"] = "Enter the number of blocks/slides.";
     }
 
     private IEnumerable<BlockTest> ApplyCurrentFilter(IEnumerable<BlockTest> tests)
@@ -428,7 +465,7 @@ public class QualityDataModel : GridPageModel
         HistologyRefs = allTests.Select(t => t.HistologyRef).Where(r => !string.IsNullOrEmpty(r))
             .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(r => r).ToList()!;
         TestNames = allTests.Select(GetTestName).Where(n => !string.IsNullOrEmpty(n))
-            .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n).ToList()!;
+            .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n).ToList();
 
         Tests = ApplyCurrentFilter(allTests).ToList();
 

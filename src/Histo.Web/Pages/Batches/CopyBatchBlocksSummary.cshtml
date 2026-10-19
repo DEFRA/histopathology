@@ -61,14 +61,14 @@
                             </details>
                         }
                     </td>
-                    <td class="govuk-table__cell"><input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.Archive)" /></td>
-                    <td class="govuk-table__cell"><input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.EO)" /></td>
-                    <td class="govuk-table__cell"><input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.HAndE)" /></td>
-                    <td class="govuk-table__cell"><input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.HeBse)" /></td>
-                    <td class="govuk-table__cell"><input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.SpecialStain)" /></td>
-                    <td class="govuk-table__cell"><input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcPrp)" /></td>
-                    <td class="govuk-table__cell"><input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcOther)" /></td>
-                    <td class="govuk-table__cell"><input type="checkbox" class="govuk-checkboxes__input" disabled checked="@b.RepeatBlock" /></td>
+                    <td class="govuk-table__cell"><input type="checkbox" class="govuk-checkboxes__input" aria-label="Archive" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.Archive)" /></td>
+                    <td class="govuk-table__cell"><input type="checkbox" class="govuk-checkboxes__input" aria-label="EO" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.EO)" /></td>
+                    <td class="govuk-table__cell"><input type="checkbox" class="govuk-checkboxes__input" aria-label="H&amp;E" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.HAndE)" /></td>
+                    <td class="govuk-table__cell"><input type="checkbox" class="govuk-checkboxes__input" aria-label="H&amp;E (BSE)" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.HeBse)" /></td>
+                    <td class="govuk-table__cell"><input type="checkbox" class="govuk-checkboxes__input" aria-label="Special stain" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.SpecialStain)" /></td>
+                    <td class="govuk-table__cell"><input type="checkbox" class="govuk-checkboxes__input" aria-label="IHC Prp" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcPrp)" /></td>
+                    <td class="govuk-table__cell"><input type="checkbox" class="govuk-checkboxes__input" aria-label="IHC Other" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcOther)" /></td>
+                    <td class="govuk-table__cell"><input type="checkbox" class="govuk-checkboxes__input" aria-label="Additional request" disabled checked="@b.RepeatBlock" /></td>
                 </tr>
             }
             @if (!Model.Blocks.Any())

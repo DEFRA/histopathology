@@ -12,5 +12,6 @@ public class SessionErrorModel : PageModel
 {
     public void OnGet()
     {
+        // Nothing to load: the page is static and must stay anonymous.
     }
 }

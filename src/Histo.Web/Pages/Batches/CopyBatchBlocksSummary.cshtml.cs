@@ -80,8 +80,8 @@ public class CopyBatchBlocksSummaryModel : HistoPageModel
 
         var allTissues = await _submissions.GetTissuesByBatchAsync(sourceBatchId);
         var tissuesByBlockId = new Dictionary<int, IReadOnlyList<Tissue>>();
-        foreach (var block in Blocks)
-            tissuesByBlockId[block.ID] = allTissues.Where(t => t.OwnerID == block.ID).ToList();
+        foreach (var blockId in Blocks.Select(b => b.ID))
+            tissuesByBlockId[blockId] = allTissues.Where(t => t.OwnerID == blockId).ToList();
         TissuesByBlockId = tissuesByBlockId;
 
         // Wrapped so a 10-result-set SP shape mismatch doesn't take the whole page down —
@@ -90,8 +90,8 @@ public class CopyBatchBlocksSummaryModel : HistoPageModel
         {
             var allTests = await _blockTests.GetAllSelectionsByBatchAsync(sourceBatchId);
             var histologyByBlock = new Dictionary<int, IReadOnlyList<string>>();
-            foreach (var block in Blocks)
-                histologyByBlock[block.ID] = allTests.Where(t => t.BlockID == block.ID && t.TestType == BlockTestType.Histology).Select(t => t.Code).ToList();
+            foreach (var blockId in Blocks.Select(b => b.ID))
+                histologyByBlock[blockId] = allTests.Where(t => t.BlockID == blockId && t.TestType == BlockTestType.Histology).Select(t => t.Code).ToList();
             HistologyCodesByBlockId = histologyByBlock;
         }
         catch (Exception ex)

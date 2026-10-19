@@ -134,7 +134,7 @@ public sealed class SessionService : ISessionService
     public bool? UseSenderRefValidation
     {
         get => GetNullableInt(KeyUseSenderRefValidation) switch { null => null, var v => v == 1 };
-        set => SetNullableInt(KeyUseSenderRefValidation, value is null ? null : value.Value ? 1 : 0);
+        set => SetNullableInt(KeyUseSenderRefValidation, value is { } flag ? Convert.ToInt32(flag) : null);
     }
 
     // ── Role helpers ─────────────────────────────────────────────────────────

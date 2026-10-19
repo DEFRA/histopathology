@@ -73,6 +73,8 @@ public sealed class QCNoteRepository : IQCNoteRepository
         };
     }
 
+    private static readonly string[] DateFormats = ["dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss"];
+
     /// <summary>
     /// Parses a "DateCreated" value that may arrive as a native SQL <c>DateTime</c> or, when the
     /// SP wraps it in <c>CONVERT(VARCHAR, col, 103)</c>, a <c>dd/MM/yyyy</c> string — mirrors
@@ -88,7 +90,7 @@ public sealed class QCNoteRepository : IQCNoteRepository
         if (string.IsNullOrWhiteSpace(s)) return null;
 
         return DateTime.TryParseExact(
-            s, new[] { "dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss" },
+            s, DateFormats,
             System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.DateTimeStyles.None,
             out var parsed)

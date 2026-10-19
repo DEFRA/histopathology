@@ -40,9 +40,9 @@
             <select class="govuk-select @(Model.ModelError is not null && !Model.MouseRangeHasError ? "govuk-select--error" : "")" asp-for="SenderRef" required
                     aria-describedby="@(Model.ModelError is not null && !Model.MouseRangeHasError ? "SenderRef-error" : null)">
                 <option value="">-- Select a sample --</option>
-                @foreach (var animal in Model.AvailableAnimals)
+                @foreach (var availableSenderRef in Model.AvailableAnimals.Select(a => a.SenderRef))
                 {
-                    <option value="@animal.SenderRef" selected="@(Model.SenderRef == animal.SenderRef)">@animal.SenderRef</option>
+                    <option value="@availableSenderRef" selected="@(Model.SenderRef == availableSenderRef)">@availableSenderRef</option>
                 }
             </select>
         }

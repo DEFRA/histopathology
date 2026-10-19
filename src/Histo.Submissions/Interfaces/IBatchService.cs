@@ -42,15 +42,13 @@ public interface IBatchService
 
     /// <summary>See <see cref="Histo.Submissions.Interfaces.IBatchRepository.GetTestPremiumChargeCountsAsync"/>.</summary>
     Task<IReadOnlyList<TestPremiumChargeCount>> GetTestPremiumChargeCountsAsync(
-        string? projectDesc, int batchType,
-        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        string? projectDesc, int batchType, TestCodeSelection codes,
         DateTime? startDate = null, DateTime? endDate = null,
         CancellationToken ct = default);
 
     /// <summary>See <see cref="Histo.Submissions.Interfaces.IBatchRepository.GetTestPremiumChargeBatchesAsync"/>.</summary>
     Task<IReadOnlyList<TestPremiumChargeBatchRef>> GetTestPremiumChargeBatchesAsync(
-        string? projectDesc, int batchType,
-        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        string? projectDesc, int batchType, TestCodeSelection codes,
         DateTime? startDate = null, DateTime? endDate = null,
         CancellationToken ct = default);
 

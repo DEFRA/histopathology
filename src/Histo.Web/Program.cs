@@ -92,7 +92,7 @@ try
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
-        options.KnownNetworks.Clear();
+        options.KnownIPNetworks.Clear();
         options.KnownProxies.Clear();
     });
 
@@ -258,9 +258,7 @@ try
 
     // -- Reporting module ------------------------------------------------------
     builder.Services.AddTransient<HistologyReportDataSetBuilder>();
-    builder.Services.AddTransient<HistologyReportRenderer>();
     builder.Services.AddTransient<QCNoteDataSetBuilder>();
-    builder.Services.AddTransient<QCNoteRenderer>();
     builder.Services.AddTransient<SubmissionNotesDataSetBuilder>();
     builder.Services.AddTransient<SubmissionNotesRenderer>();
 
