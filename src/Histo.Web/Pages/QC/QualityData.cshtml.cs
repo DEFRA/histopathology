@@ -3,6 +3,7 @@ using Histo.Administration.Models;
 using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
 using Histo.QualityControl.Interfaces;
+using Histo.QualityControl.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -31,9 +32,6 @@ public class QualityDataModel : GridPageModel
     private readonly IUserService _users;
     private readonly IQCNoteService _qc;
 
-    private const int LookupAntibodiesTse    = 4;
-    private const int LookupAntibodiesNonTse = 5;
-    private const int LookupSpecialStain     = 6;
     private const int LookupHistologyTse     = 7;
     private const int LookupHistologyNonTse  = 8;
     private const int LookupQcCode           = 14;
@@ -126,6 +124,17 @@ public class QualityDataModel : GridPageModel
     public string? Error { get; private set; }
     public string? SuccessMessage { get; private set; }
 
+    /// <summary>Tests were saved but their comments could not be added to the QC note.</summary>
+    public string? NoteWarning { get; private set; }
+
+    /// <summary>Refs on the currently selected rows, each test's own ref only — no submission-wide fallback.</summary>
+    public string QCNoteRefDisplay()
+    {
+        var refs = Tests.Where(t => SelectedIds.Contains(t.ID) && t.QCNoteRef is > 0)
+            .Select(t => t.QCNoteRef!.Value).Distinct().OrderBy(r => r);
+        return string.Join(", ", refs);
+    }
+
     /// <summary>Field id → message, rendered via the shared clickable _ErrorSummary partial.</summary>
     public Dictionary<string, string> Errors { get; } = new();
 
@@ -138,8 +147,7 @@ public class QualityDataModel : GridPageModel
     // Resolved code→name map keyed as "TestType|Code"
     private IReadOnlyDictionary<string, string> _testNameMap = new Dictionary<string, string>();
 
-    public string GetTestName(BlockTest t) =>
-        _testNameMap.TryGetValue($"{t.TestType}|{t.Code}", out var n) ? n : t.Code;
+    public string GetTestName(BlockTest t) => QCNoteText.TestName(_testNameMap, t);
 
     public IReadOnlyList<BlockTest> PagedEntries =>
         (SortColumn switch
@@ -199,6 +207,7 @@ public class QualityDataModel : GridPageModel
             .ToList()!;
 
         Tests = ApplyCurrentFilter(allTests).ToList();
+        NoteWarning = TempData[QCNoteText.WarningTempDataKey] as string;
 
         await LoadEditLookupsAsync();
         PopulateGridViewData(Tests.Count);
@@ -263,23 +272,32 @@ public class QualityDataModel : GridPageModel
 
         var selected = all.Where(t => selectedIds.Contains(t.ID)).ToList();
         var concurrencyCount = 0;
+        // Names must be loaded before GetTestName is used for display below.
+        await ResolveTestNamesAsync((await _batches.GetByIdAsync(batchId))?.BatchType ?? Histo.Submissions.Models.BatchTypeConstants.Tse);
+
+        // Ticked box with no existing ref gets ONE new note shared by every such row in THIS save
+        // only — never reused on a later, separate save (legacy's iQCNoteID: one new note per Edit
+        // click, not one per submission). A test that already has its own ref keeps it unchanged;
+        // an unticked box with an existing ref unlinks it (legacy: RemoveQCNoteRef).
+        bool AppliesQcNote(BlockTest t) => isSingle ? QCNote : QCNote || t.QCNote;
+        var anyNeedsNewRef = selected.Any(t => AppliesQcNote(t) && t.QCNoteRef is null or 0);
+
+        int? targetRef = null;
+        if (anyNeedsNewRef)
+        {
+            var newId = await _qc.AddAsync(batchId, Session.UserID);
+            if (newId > 0) targetRef = newId;
+            else NoteWarning = QCNoteText.CreateFailedWarning;
+        }
 
         foreach (var test in selected)
         {
-            var applyQcNote = isSingle ? QCNote : QCNote || test.QCNote;
-            var qcNoteRef = test.QCNoteRef;
-            if (applyQcNote && qcNoteRef is null or 0)
-            {
-                var newId = await _qc.AddAsync(batchId, Session.UserID);
-                if (newId > 0) qcNoteRef = newId;
-            }
-            else if (!applyQcNote)
-            {
-                qcNoteRef = null;
-            }
+            var applyQcNote = AppliesQcNote(test);
+            int? qcNoteRef = !applyQcNote ? null : test.QCNoteRef is > 0 ? test.QCNoteRef : targetRef;
 
             var newArchiveLocation = Pick(isSingle, ArchiveLocationCode, test.ArchiveLocation);
             var newArchivedDate = isSingle ? ArchivedDate : ArchivedDate ?? test.ArchivedDate;
+            var newComment = Pick(isSingle, Comment, test.Comment);
 
             var updated = new BlockTest
             {
@@ -302,7 +320,7 @@ public class QualityDataModel : GridPageModel
                 DispatchedBy = Pick(isSingle, DispatchedBy, test.DispatchedBy),
                 PremiumCharge = test.PremiumCharge, // pass-through, not edited here
                 DispatchedTo = Pick(isSingle, DispatchedTo, test.DispatchedTo),
-                Comment = Pick(isSingle, Comment, test.Comment),
+                Comment = newComment,
                 RemedialAction = Pick(isSingle, RemedialAction, test.RemedialAction),
                 ArchiveLocation = newArchiveLocation,
                 ArchivedDate = newArchivedDate,
@@ -427,21 +445,8 @@ public class QualityDataModel : GridPageModel
         Users            = await _users.GetAllUsersAsync();
     }
 
-    private async Task ResolveTestNamesAsync(int batchType)
-    {
-        var antibodyId = batchType == Histo.Submissions.Models.BatchTypeConstants.Tse ? LookupAntibodiesTse : LookupAntibodiesNonTse;
-
-        var histTask     = _lookups.GetHistologyTypesAsync();
-        var antibodyTask = _lookups.GetLookupDataAsync(antibodyId);
-        var stainTask    = _lookups.GetLookupDataAsync(LookupSpecialStain);
-        await Task.WhenAll(histTask, antibodyTask, stainTask);
-
-        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var i in histTask.Result)     map[$"Histology|{i.Code ?? i.ID.ToString()}"]  = i.Name;
-        foreach (var i in antibodyTask.Result) map[$"Antibodies|{i.Code ?? i.ID.ToString()}"] = i.Name;
-        foreach (var i in stainTask.Result)    map[$"Stain|{i.Code ?? i.ID.ToString()}"]      = i.Name;
-        _testNameMap = map;
-    }
+    private async Task ResolveTestNamesAsync(int batchType) =>
+        _testNameMap = await QCNoteText.LoadTestNamesAsync(_lookups, batchType);
 
     private async Task ResolveBatchSummaryAsync(Batch batch)
     {

@@ -49,6 +49,7 @@ public class EditQualityDataTestModelTests
                 ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()),
                 HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext(),
             },
+            TempData = new TempDataDictionary(new Microsoft.AspNetCore.Http.DefaultHttpContext(), Mock.Of<ITempDataProvider>()),
         };
 
     private static BlockTest MakeTest() => new()
@@ -204,5 +205,112 @@ public class EditQualityDataTestModelTests
 
         Assert.False(string.IsNullOrEmpty(sut.ConcurrencyError));
         Assert.Empty(sut.Errors);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_UntickingBox_UnlinksExistingRef()
+    {
+        var test = new BlockTest
+        {
+            ID = 1, BlockID = 1, TestType = BlockTestType.Histology, Code = "1", HistologyRef = "26/001",
+            BlockRef = "01", QCNote = true, QCNoteRef = 321, RowStamp = [1, 2, 3],
+        };
+        _tests.Setup(t => t.GetByIdAsync(42, 1, It.IsAny<CancellationToken>())).ReturnsAsync(test);
+        BlockTest? saved = null;
+        _tests.Setup(t => t.UpdateAsync(It.IsAny<BlockTest>(), 7, It.IsAny<CancellationToken>()))
+            .Callback<BlockTest, int, CancellationToken>((bt, _, _) => saved = bt)
+            .Returns(Task.CompletedTask);
+        var sut = CreateSut();
+        sut.TestId = 1;
+        sut.RemedialAction = "1";
+        sut.QCNote = false;
+        sut.Comment = "re-cut";
+
+        await sut.OnPostAsync();
+
+        Assert.Null(saved!.QCNoteRef);
+        Assert.False(saved.QCNote);
+        _qc.Verify(q => q.AppendAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_TickedWithExistingRef_KeepsRef_DoesNotAppendComment()
+    {
+        var test = new BlockTest
+        {
+            ID = 1, BlockID = 1, TestType = BlockTestType.Histology, Code = "1", HistologyRef = "26/001",
+            BlockRef = "01", QCNote = true, QCNoteRef = 321, RowStamp = [1, 2, 3],
+        };
+        _tests.Setup(t => t.GetByIdAsync(42, 1, It.IsAny<CancellationToken>())).ReturnsAsync(test);
+        BlockTest? saved = null;
+        _tests.Setup(t => t.UpdateAsync(It.IsAny<BlockTest>(), 7, It.IsAny<CancellationToken>()))
+            .Callback<BlockTest, int, CancellationToken>((bt, _, _) => saved = bt)
+            .Returns(Task.CompletedTask);
+        var sut = CreateSut();
+        sut.TestId = 1;
+        sut.RemedialAction = "1";
+        sut.QCNote = true; // pre-ticked client-side since the test already has a note
+        sut.Comment = "re-cut";
+
+        await sut.OnPostAsync();
+
+        Assert.Equal(321, saved!.QCNoteRef);
+        Assert.True(saved.QCNote);
+        _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _qc.Verify(q => q.AppendAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_NoteCreationFails_WarningCarriedThroughRedirect()
+    {
+        _tests.Setup(t => t.GetByIdAsync(42, 1, It.IsAny<CancellationToken>())).ReturnsAsync(MakeTest());
+        _qc.Setup(q => q.AddAsync(42, 7, It.IsAny<CancellationToken>())).ReturnsAsync(0);
+        var sut = CreateSut();
+        sut.TestId = 1;
+        sut.RemedialAction = "1";
+        sut.QCNote = true;
+
+        await sut.OnPostAsync();
+
+        Assert.Equal(QCNoteText.CreateFailedWarning, sut.TempData[QCNoteText.WarningTempDataKey]);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_OtherTestsNoteDoesNotAutoLink()
+    {
+        _tests.Setup(t => t.GetByIdAsync(42, 1, It.IsAny<CancellationToken>())).ReturnsAsync(MakeTest());
+        BlockTest? saved = null;
+        _tests.Setup(t => t.UpdateAsync(It.IsAny<BlockTest>(), 7, It.IsAny<CancellationToken>()))
+            .Callback<BlockTest, int, CancellationToken>((bt, _, _) => saved = bt)
+            .Returns(Task.CompletedTask);
+        var sut = CreateSut();
+        sut.TestId = 1;
+        sut.RemedialAction = "1";
+
+        await sut.OnPostAsync();
+
+        Assert.Null(saved!.QCNoteRef);
+        _qc.Verify(q => q.AddAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_FirstNoteOnTest_CreatesViaAddAsync()
+    {
+        _tests.Setup(t => t.GetByIdAsync(42, 1, It.IsAny<CancellationToken>())).ReturnsAsync(MakeTest());
+        _qc.Setup(q => q.AddAsync(42, 7, It.IsAny<CancellationToken>())).ReturnsAsync(800);
+        BlockTest? saved = null;
+        _tests.Setup(t => t.UpdateAsync(It.IsAny<BlockTest>(), 7, It.IsAny<CancellationToken>()))
+            .Callback<BlockTest, int, CancellationToken>((bt, _, _) => saved = bt)
+            .Returns(Task.CompletedTask);
+        var sut = CreateSut();
+        sut.TestId = 1;
+        sut.RemedialAction = "1";
+        sut.QCNote = true;
+
+        await sut.OnPostAsync();
+
+        Assert.Equal(800, saved!.QCNoteRef);
+        Assert.Equal(new byte[] { 1, 2, 3 }, saved.RowStamp); // unchanged — no atomic link bumping it
+        _qc.Verify(q => q.AddAsync(42, 7, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

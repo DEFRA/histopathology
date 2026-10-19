@@ -1,0 +1,19 @@
+@page
+@model Histo.Web.Pages.SessionErrorModel
+@{
+    ViewData["Title"] = "Your session has timed out";
+}
+
+<div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+
+        <h1 class="govuk-heading-xl">Your session has timed out</h1>
+
+        <p class="govuk-body">
+            Your session timed out after a period of inactivity. Please sign in again to continue.
+        </p>
+
+        <a href="/signin" role="button" draggable="false" class="govuk-button" data-module="govuk-button">Sign in again</a>
+
+    </div>
+</div>

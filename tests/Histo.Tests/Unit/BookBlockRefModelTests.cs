@@ -160,4 +160,61 @@ public class BookBlockRefModelTests
         _blocks.Verify(b => b.BookPreBookedBlocksAsync("MC000001", It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Once);
         _blocks.Verify(b => b.BookPreBookedBlocksAsync("MC000002", It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public void OnPostCheckUsedBlockRefs_RedirectsToSearchBlockRefs_WithLiveSenderRefAndReturnPage()
+    {
+        var sut = CreateSut();
+        sut.SenderRefFrom = "S1";
+
+        var result = sut.OnPostCheckUsedBlockRefs();
+
+        var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+        Assert.Equal("/Search/SearchBlockRefs", redirect.PageName);
+        Assert.Equal("S1", redirect.RouteValues?["SenderRef"]);
+        Assert.Equal("/Bookings/BookBlockRef?SenderRefFrom=S1&SenderRefTo=&BlockRefFrom=&BlockRefTo=", redirect.RouteValues?["ReturnPage"]);
+    }
+
+    [Fact]
+    public void OnPostCheckUsedBlockRefs_AllFieldsPopulated_RoundTripsAllOfThemInReturnPage()
+    {
+        var sut = CreateSut();
+        sut.SenderRefFrom = "S1";
+        sut.SenderRefTo = "S2";
+        sut.BlockRefFrom = "01";
+        sut.BlockRefTo = "03";
+
+        var result = sut.OnPostCheckUsedBlockRefs();
+
+        var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+        Assert.Equal("/Bookings/BookBlockRef?SenderRefFrom=S1&SenderRefTo=S2&BlockRefFrom=01&BlockRefTo=03", redirect.RouteValues?["ReturnPage"]);
+    }
+
+    [Fact]
+    public void OnPostCheckUsedBlockRefs_SenderRefContainsSlash_IsEscapedInReturnPage()
+    {
+        var sut = CreateSut();
+        sut.SenderRefFrom = "PG/123";
+
+        var result = sut.OnPostCheckUsedBlockRefs();
+
+        var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+        Assert.Equal("/Bookings/BookBlockRef?SenderRefFrom=PG%2F123&SenderRefTo=&BlockRefFrom=&BlockRefTo=", redirect.RouteValues?["ReturnPage"]);
+    }
+
+    // SupportsGet can bind these non-nullable-by-declaration properties to actual null at runtime
+    // (ASP.NET Core's implicit-required-for-non-nullable-reference-types binding behaviour) when the
+    // request omits the key entirely — reproduced here by bypassing the field initializer directly.
+    [Fact]
+    public void OnPostCheckUsedBlockRefs_SenderRefFromAndBlockRefFromAreNull_DoesNotThrow()
+    {
+        var sut = CreateSut();
+        sut.SenderRefFrom = null!;
+        sut.BlockRefFrom = null!;
+
+        var result = sut.OnPostCheckUsedBlockRefs();
+
+        var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+        Assert.Equal("/Bookings/BookBlockRef?SenderRefFrom=&SenderRefTo=&BlockRefFrom=&BlockRefTo=", redirect.RouteValues?["ReturnPage"]);
+    }
 }

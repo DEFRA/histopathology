@@ -317,6 +317,17 @@ public sealed class BatchService : IBatchService
     }
 
     /// <inheritdoc/>
+    public async Task<BatchTestSelections?> TryGetBatchTestSelectionsAsync(int batchId, CancellationToken ct = default)
+    {
+        try { return await _batches.GetBatchTestSelectionsAsync(batchId, ct); }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to get batch test selections for batch {BatchId}.", ex, batchId);
+            return null;
+        }
+    }
+
+    /// <inheritdoc/>
     public async Task<bool> SaveBatchTestSelectionsAsync(
         int batchId,
         IReadOnlyList<string> histologyCodes,

@@ -149,7 +149,7 @@ public class EditSubmissionStatusModel : HistoPageModel
             return Page();
         }
 
-        return RedirectToPage(ReturnPage, ParseReturnQuery());
+        return this.RedirectToReturnPage(ReturnPage, Session.ReturnPageQuery);
     }
 
     /// <summary>
@@ -162,19 +162,6 @@ public class EditSubmissionStatusModel : HistoPageModel
     {
         Session.EditBatchReturnPage = "/Batches/EditSubmissionStatus";
         return RedirectToPage("/Batches/EditBatch");
-    }
-
-    /// <summary>Parses <see cref="ISessionService.ReturnPageQuery"/> into route values so a
-    /// post-save redirect restores the list's sort/page state, not just its bare page name.</summary>
-    private Microsoft.AspNetCore.Routing.RouteValueDictionary ParseReturnQuery()
-    {
-        var result = new Microsoft.AspNetCore.Routing.RouteValueDictionary();
-        var query = Session.ReturnPageQuery;
-        if (string.IsNullOrEmpty(query)) return result;
-
-        foreach (var pair in Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(query))
-            result[pair.Key] = pair.Value.ToString();
-        return result;
     }
 
     private async Task LoadDisplayFieldsAsync()

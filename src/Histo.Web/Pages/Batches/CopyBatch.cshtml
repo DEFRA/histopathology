@@ -6,7 +6,8 @@
 }
 
 @section BeforeHeading {
-    <a asp-page="/Batches/BatchDetails" asp-route-BatchId="@Model.SourceBatchId" class="govuk-back-link">Back</a>
+    @* Only entry point is ViewSubmissions' "Copy submission" button — matches the Cancel button below. *@
+    <a asp-page="/Submissions/ViewSubmissions" class="govuk-back-link">Back</a>
 }
 
 @if (!string.IsNullOrEmpty(Model.Error))
@@ -43,14 +44,21 @@
 
         <p class="govuk-body">The following table shows the samples in this submission.
         To change a sender reference, edit the value in the <strong>New sender ref</strong> column before clicking Finish.
-        Expand a row to view its tissue details where available.</p>
+        @if (!Model.IsCassetted)
+        {
+            @:Expand a row to view its tissue details where available.
+        }
+        </p>
 
         <h2 class="govuk-heading-m">Samples to copy</h2>
         <table class="govuk-table">
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
                     <th scope="col" class="govuk-table__header">Sender ref</th>
-                    <th scope="col" class="govuk-table__header">Tissue details</th>
+                    @if (!Model.IsCassetted)
+                    {
+                        <th scope="col" class="govuk-table__header">Tissue details</th>
+                    }
                     <th scope="col" class="govuk-table__header">New sender ref</th>
                     <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Change</span></th>
                 </tr>
@@ -61,24 +69,27 @@
                     var primaryRowIndex = visibleRow.RowIndexes.FirstOrDefault();
                     <tr class="govuk-table__row">
                         <td class="govuk-table__cell">@visibleRow.SenderRef</td>
-                        <td class="govuk-table__cell">
-                            @if (visibleRow.TissueDetails.Any())
-                            {
-                                <details class="govuk-details">
-                                    <summary class="govuk-details__summary">
-                                        <span class="govuk-details__summary-text">@visibleRow.TissueDetails.Count tissue(s)</span>
-                                    </summary>
-                                    <div class="govuk-details__text">
-                                        <ul class="govuk-list">
-                                            @foreach (var td in visibleRow.TissueDetails)
-                                            {
-                                                <li>@td</li>
-                                            }
-                                        </ul>
-                                    </div>
-                                </details>
-                            }
-                        </td>
+                        @if (!Model.IsCassetted)
+                        {
+                            <td class="govuk-table__cell">
+                                @if (visibleRow.TissueDetails.Any())
+                                {
+                                    <details class="govuk-details">
+                                        <summary class="govuk-details__summary">
+                                            <span class="govuk-details__summary-text">@visibleRow.TissueDetails.Count tissue(s)</span>
+                                        </summary>
+                                        <div class="govuk-details__text">
+                                            <ul class="govuk-list">
+                                                @foreach (var td in visibleRow.TissueDetails)
+                                                {
+                                                    <li>@td</li>
+                                                }
+                                            </ul>
+                                        </div>
+                                    </details>
+                                }
+                            </td>
+                        }
                         <td class="govuk-table__cell">
                             @if (!string.IsNullOrWhiteSpace(visibleRow.DisplayNewSenderRef))
                             {
@@ -108,13 +119,17 @@
                 }
                 @if (!Model.Animals.Any())
                 {
-                    <tr class="govuk-table__row"><td colspan="4" class="govuk-table__cell">No samples found for this submission.</td></tr>
+                    <tr class="govuk-table__row"><td colspan="@(Model.IsCassetted ? 3 : 4)" class="govuk-table__cell">No samples found for this submission.</td></tr>
                 }
             </tbody>
         </table>
 
         <div class="govuk-button-group">
             <button type="submit" class="govuk-button" data-module="govuk-button">Finish</button>
+            @if (Model.IsCassetted)
+            {
+                <button type="submit" formaction="?handler=Summary" class="govuk-button govuk-button--secondary" data-module="govuk-button">Summary</button>
+            }
             <a asp-page="/Submissions/ViewSubmissions" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
         </div>
     </form>

@@ -1,5 +1,5 @@
-﻿-- ============================================================================-- ============================================================================
--- DEPLOYMENT MANIFEST — One-Time Database Migration
+-- ============================================================================-- ============================================================================
+-- DEPLOYMENT MANIFEST � One-Time Database Migration
 -- ============================================================================
 -- This script is idempotent and safe to re-run via CI/CD pipeline.
 -- All scripts herein use DROP+CREATE or IF EXISTS guards.
@@ -42,6 +42,8 @@ GO
 GO
 :r ../StoredProcedures/dbo.DrawNextHistologyRefRun.sql
 GO
+:r ../StoredProcedures/dbo.GetBatchBlockTests.sql
+GO
 
 -- Step 2: Deployment script to used to alter/create tables, columns etc
 PRINT '--- Create or Alter Table, Column  ---';
@@ -61,6 +63,11 @@ GO
 -- Step 5: Make tlkpSpecies editable via the picklist admin screen
 PRINT '--- Applying picklist Species changes ---';
 :r ../Migrations/picklist-species-changes.sql
+GO
+
+-- Step 6: Drop the now-unused "one QC note per submission" stored procedure
+PRINT '--- Dropping GetOrCreateSubmissionQCNote ---';
+:r ../Migrations/V20261018_01_Drop_GetOrCreateSubmissionQCNote_Proc.sql
 GO
 
 PRINT '=== Database deployment completed ===';

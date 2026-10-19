@@ -75,18 +75,49 @@
 <table class="govuk-table">
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
-            <th scope="col" class="govuk-table__header">Sender ref</th>
-            <th scope="col" class="govuk-table__header">Histology ref</th>
+            @{ ViewData["Label"] = "Sender ref"; ViewData["Column"] = "SenderRef"; }
+            <partial name="_SortableHeader" />
+            @{ ViewData["Label"] = "Histology ref"; ViewData["Column"] = "HistologyRef"; }
+            <partial name="_SortableHeader" />
+            @if (Model.IsWetTissue)
+            {
+                <th scope="col" class="govuk-table__header">Tissue details</th>
+            }
             <th scope="col" class="govuk-table__header">Actions</th>
         </tr>
     </thead>
     <tbody class="govuk-table__body">
-        @for (var i = 0; i < Model.Animals.Count; i++)
+        @foreach (var a in Model.PagedEntries)
         {
-            var a = Model.Animals[i];
+            var sampleTissues = Model.TissuesByAnimalId.TryGetValue(a.ID, out var st) ? st : (IReadOnlyList<string>)[];
             <tr class="govuk-table__row">
                 <td class="govuk-table__cell">@a.SenderRef</td>
                 <td class="govuk-table__cell">@a.HistologyRef</td>
+                @if (Model.IsWetTissue)
+                {
+                    <td class="govuk-table__cell">
+                        @if (sampleTissues.Any())
+                        {
+                            <details class="govuk-details govuk-!-margin-bottom-0">
+                                <summary class="govuk-details__summary">
+                                    <span class="govuk-details__summary-text">@sampleTissues.Count tissue(s)</span>
+                                </summary>
+                                <div class="govuk-details__text">
+                                    <ul class="govuk-list">
+                                        @foreach (var td in sampleTissues)
+                                        {
+                                            <li>@td</li>
+                                        }
+                                    </ul>
+                                </div>
+                            </details>
+                        }
+                        else
+                        {
+                            <span>None</span>
+                        }
+                    </td>
+                }
                 <td class="govuk-table__cell">
                     <div class="govuk-button-group govuk-!-margin-bottom-0">
                     @* Routes to SubmissionDetails (Wet Tissue) or SubmissionDetailsBlock (block types),
@@ -118,7 +149,8 @@
         }
         @if (!Model.Animals.Any())
         {
-            <tr class="govuk-table__row"><td colspan="3" class="govuk-table__cell">No samples in this submission.</td></tr>
+            <tr class="govuk-table__row"><td colspan="@(Model.IsWetTissue ? 4 : 3)" class="govuk-table__cell">No samples in this submission.</td></tr>
         }
     </tbody>
 </table>
+<partial name="_Pagination" />

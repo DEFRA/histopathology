@@ -278,8 +278,18 @@ public class SearchSubmissionsModel : HistoPageModel
         if (SelectedBatchId > 0)
         {
             Session.BatchID    = SelectedBatchId;
-            Session.ReturnPage = "/Search/SearchSubmissions";  // GAP-3: context-aware back link on BatchDetails
+            // Forward our OWN entry-point ReturnPage as a query param so that once the user backs
+            // out of BatchDetails/EditBatch/etc. and lands back here, this page's Back link still
+            // knows it originally came from (e.g.) Home rather than falling back to SearchMenu.
+            Session.ReturnPage = string.IsNullOrWhiteSpace(ReturnPage)
+                ? "/Search/SearchSubmissions"
+                : $"/Search/SearchSubmissions?ReturnPage={Uri.EscapeDataString(ReturnPage)}";  // GAP-3: context-aware back link on BatchDetails
             Session.EditBatchReturnPage = null; // this entry point owns EditBatch's return target, not any stale Edit Submission Status detour
+            // ReturnPageQuery is only ever meant to pair with whichever page last set ReturnPage
+            // (e.g. BatchesForEditing's sort/page state) — clear it so a stale value from an
+            // earlier, unrelated journey can't get wrongly concatenated onto OUR ReturnPage by
+            // EditBatch/EditSubmissionStatus's ReturnUrl.
+            Session.ReturnPageQuery = null;
             Session.IsViewSubmissionMode = true;
 
             HasNotes = await SubmissionNotesHelper.HasAnyNotesAsync(SelectedBatchId, _batches, _blocks, _submissions, _tests);

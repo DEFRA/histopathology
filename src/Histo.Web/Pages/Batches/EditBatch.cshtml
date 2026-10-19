@@ -283,11 +283,16 @@
                         {
                             var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
                             var checkboxId = $"edit-histology-{code}";
+                            var isLocked = Model.IsHistologyLocked(code);
                             <div class="govuk-checkboxes__item">
                                 <input class="govuk-checkboxes__input" id="@checkboxId" name="SelectedHistologyCodes"
                                        type="checkbox" value="@code" data-histology-code="@code"
                                        @(Model.SelectedHistologyCodes.Contains(code) ? "checked" : "") />
                                 <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+                                @if (isLocked)
+                                {
+                                    <div class="govuk-hint govuk-checkboxes__hint">Assigned to a block — cannot be removed</div>
+                                }
                             </div>
                         }
                     </div>
@@ -304,11 +309,16 @@
                         {
                             var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
                             var checkboxId = $"edit-antibody-{code}";
+                            var isLocked = Model.IsAntibodyLocked(code);
                             <div class="govuk-checkboxes__item">
                                 <input class="govuk-checkboxes__input" id="@checkboxId" name="SelectedAntibodyCodes"
                                        type="checkbox" value="@code"
                                        @(Model.SelectedAntibodyCodes.Contains(code) ? "checked" : "") />
                                 <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+                                @if (isLocked)
+                                {
+                                    <div class="govuk-hint govuk-checkboxes__hint">Assigned to a block — cannot be removed</div>
+                                }
                             </div>
                         }
                     </div>
@@ -325,11 +335,16 @@
                         {
                             var code = !string.IsNullOrWhiteSpace(item.Code) ? item.Code : item.ID.ToString();
                             var checkboxId = $"edit-stain-{code}";
+                            var isLocked = Model.IsStainLocked(code);
                             <div class="govuk-checkboxes__item">
                                 <input class="govuk-checkboxes__input" id="@checkboxId" name="SelectedStainCodes"
                                        type="checkbox" value="@code"
                                        @(Model.SelectedStainCodes.Contains(code) ? "checked" : "") />
                                 <label class="govuk-label govuk-checkboxes__label" for="@checkboxId">@item.Name</label>
+                                @if (isLocked)
+                                {
+                                    <div class="govuk-hint govuk-checkboxes__hint">Assigned to a block — cannot be removed</div>
+                                }
                             </div>
                         }
                     </div>

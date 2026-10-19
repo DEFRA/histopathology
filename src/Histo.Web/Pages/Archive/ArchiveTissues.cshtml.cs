@@ -72,6 +72,27 @@ public class ArchiveTissuesModel : GridPageModel
     public IReadOnlyList<LookupItem> ArchiveLocations { get; private set; } = [];
     public bool IsViewMode => Session.IsViewSubmissionMode;
 
+    /// <summary>
+    /// Legacy <c>ddlHistologyRefList</c> / <c>ddlTissueList</c> — populated from the batch's own
+    /// rows and applied in memory, matching legacy's <c>DataView.RowFilter</c> rather than
+    /// re-querying. Mirrors <see cref="ArchiveBlocksModel"/>'s HistologyRef/BlockRef filter.
+    /// </summary>
+    [BindProperty(SupportsGet = true)] public string? FilterHistologyRef { get; set; }
+    [BindProperty(SupportsGet = true)] public string? FilterTissue { get; set; }
+
+    public IReadOnlyList<string> HistologyRefOptions =>
+        [.. Rows.Select(r => r.HistologyRef).Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v!).Distinct().Order()];
+
+    public IReadOnlyList<string> TissueOptions =>
+        [.. Rows.Select(r => r.TissueDescription).Where(v => !string.IsNullOrWhiteSpace(v)).Distinct().Order()];
+
+    public bool FilterApplied => !string.IsNullOrWhiteSpace(FilterHistologyRef) || !string.IsNullOrWhiteSpace(FilterTissue);
+
+    public IReadOnlyList<ArchiveTissueRow> FilteredRows =>
+        [.. Rows.Where(r =>
+            (string.IsNullOrWhiteSpace(FilterHistologyRef) || string.Equals(r.HistologyRef, FilterHistologyRef, StringComparison.OrdinalIgnoreCase))
+         && (string.IsNullOrWhiteSpace(FilterTissue) || string.Equals(r.TissueDescription, FilterTissue, StringComparison.OrdinalIgnoreCase)))];
+
     // Resolved display names for the batch summary header (shared with QualityData).
     public string? ProjectName { get; private set; }
     public string? PathologistName { get; private set; }
@@ -81,16 +102,16 @@ public class ArchiveTissuesModel : GridPageModel
     public string? SubmittedByName { get; private set; }
     public string? SubmittedAreaName { get; private set; }
 
-    public int TotalCount => Rows.Count;
+    public int TotalCount => FilteredRows.Count;
 
     public IReadOnlyList<ArchiveTissueRow> PagedEntries =>
         (SortColumn switch
         {
-            "HistologyRef"    => SortDesc ? Rows.OrderByDescending(r => r.HistologyRef)    : Rows.OrderBy(r => r.HistologyRef),
-            "Tissue"          => SortDesc ? Rows.OrderByDescending(r => r.TissueDescription) : Rows.OrderBy(r => r.TissueDescription),
-            "ArchivedDate"    => SortDesc ? Rows.OrderByDescending(r => r.ArchivedDate)    : Rows.OrderBy(r => r.ArchivedDate),
-            "ArchiveLocation" => SortDesc ? Rows.OrderByDescending(r => r.ArchiveLocationName) : Rows.OrderBy(r => r.ArchiveLocationName),
-            _                 => SortDesc ? Rows.OrderByDescending(r => r.SenderRef)       : Rows.OrderBy(r => r.SenderRef),
+            "HistologyRef"    => SortDesc ? FilteredRows.OrderByDescending(r => r.HistologyRef)    : FilteredRows.OrderBy(r => r.HistologyRef),
+            "Tissue"          => SortDesc ? FilteredRows.OrderByDescending(r => r.TissueDescription) : FilteredRows.OrderBy(r => r.TissueDescription),
+            "ArchivedDate"    => SortDesc ? FilteredRows.OrderByDescending(r => r.ArchivedDate)    : FilteredRows.OrderBy(r => r.ArchivedDate),
+            "ArchiveLocation" => SortDesc ? FilteredRows.OrderByDescending(r => r.ArchiveLocationName) : FilteredRows.OrderBy(r => r.ArchiveLocationName),
+            _                 => SortDesc ? FilteredRows.OrderByDescending(r => r.SenderRef)       : FilteredRows.OrderBy(r => r.SenderRef),
         })
         .Skip((PageNumber - 1) * PageSize)
         .Take(PageSize)
@@ -130,7 +151,7 @@ public class ArchiveTissuesModel : GridPageModel
 
         // "All" only ever reaches the server as a flag — off-page rows' checkboxes never render,
         // so SelectedIds alone can't carry them across a page boundary.
-        var selectedIds = SelectAllAcrossPages ? Rows.Select(r => r.ID).ToList() : SelectedIds;
+        var selectedIds = SelectAllAcrossPages ? FilteredRows.Select(r => r.ID).ToList() : SelectedIds;
         if (selectedIds.Count == 0) { Error = "Select at least one tissue to update."; return Page(); }
         if (string.IsNullOrWhiteSpace(ArchiveLocationCode) && ArchivedDate is null && string.IsNullOrWhiteSpace(Comment))
         {

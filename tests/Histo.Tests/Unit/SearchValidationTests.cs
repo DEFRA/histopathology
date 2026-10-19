@@ -304,6 +304,22 @@ public class SearchValidationTests
         Assert.False(sut.Searched);
     }
 
+    // Regression guard: this link (legacy lbViewImportedData, "View Old ICC_Sub data") was added
+    // in an earlier run, then silently dropped during a later full-markup rewrite of this page.
+    [Theory]
+    [InlineData("S1", null, "S1")]
+    [InlineData(null, "H1", "H1")]
+    [InlineData("S1", "H1", "S1 H1")]
+    [InlineData(null, null, "")]
+    public void SearchBlockRefs_ViewImportedDataFilter_MatchesLegacyConcatenation(string? senderRef, string? histologyRef, string expected)
+    {
+        var sut = CreateSearchBlockRefs();
+        sut.SenderRef = senderRef;
+        sut.HistologyRef = histologyRef;
+
+        Assert.Equal(expected, sut.ViewImportedDataFilter);
+    }
+
     // ── ViewSamples ──────────────────────────────────────────────────────────────
 
     private ViewSamplesModel CreateViewSamples() =>

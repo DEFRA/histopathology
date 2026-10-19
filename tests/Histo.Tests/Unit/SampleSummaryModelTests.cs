@@ -43,12 +43,17 @@ public class SampleSummaryModelTests
         _lookups.Setup(l => l.GetLookupDataAsync(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[]);
         _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(0);
+        _blocks.Setup(b => b.GetByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
     }
 
     private SampleSummaryModel CreateSut() =>
         new(_session.Object, _submissions.Object, _batches.Object, _blocks.Object, _lookups.Object)
         {
-            PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
+            PageContext = new PageContext
+            {
+                HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext(),
+                ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()),
+            },
             TempData = Mock.Of<ITempDataDictionary>(),
         };
 
@@ -75,6 +80,48 @@ public class SampleSummaryModelTests
 
         Assert.IsType<PageResult>(result);
         Assert.Equal(1, _session.Object.BatchID);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_MoreThanOnePageOfSamples_PagedEntriesReturnsOnlyFirstPage()
+    {
+        // Legacy BatchSummary.aspx/BatchBlockSummary.aspx had AllowPaging="True" — D-2.
+        _batches.Setup(b => b.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 1 });
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(
+            (IReadOnlyList<Animal>)Enumerable.Range(1, 12).Select(i => new Animal { ID = i, SenderRef = $"S{i:D2}" }).ToList());
+
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        await sut.OnGetAsync();
+
+        Assert.Equal(12, sut.Animals.Count);
+        Assert.Equal(10, sut.PagedEntries.Count);
+        Assert.Equal(2, sut.TotalPages);
+
+        sut.PageNumber = 2;
+        Assert.Equal(2, sut.PagedEntries.Count);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_SortByHistologyRefDescending_SortsPagedEntries()
+    {
+        _batches.Setup(b => b.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 1 });
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)
+        [
+            new Animal { ID = 1, SenderRef = "S1", HistologyRef = "24/001" },
+            new Animal { ID = 2, SenderRef = "S2", HistologyRef = "24/002" },
+        ]);
+
+        var sut = CreateSut();
+        sut.BatchId = 1;
+        sut.SortColumn = "HistologyRef";
+        sut.SortDesc = true;
+
+        await sut.OnGetAsync();
+
+        Assert.Equal("24/002", sut.PagedEntries[0].HistologyRef);
+        Assert.Equal("24/001", sut.PagedEntries[1].HistologyRef);
     }
 
     [Fact]
@@ -215,6 +262,40 @@ public class SampleSummaryModelTests
 
         var redirect = Assert.IsType<RedirectToPageResult>(result);
         Assert.Equal("/Submissions/SubmissionDetailsBlock", redirect.PageName);
+    }
+
+    [Fact]
+    public async Task OnPostSelect_WetTissueWithBlocksAssigned_RoutesToSubmissionDetailsBlock()
+    {
+        _batches.Setup(b => b.GetSubmittedAsCodeAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync("4");
+        _lookups.Setup(l => l.GetLookupDataAsync(11, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 4, Code = "4", Name = "Wet Tissue" }]);
+        _blocks.Setup(b => b.GetByBatchAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { AnimalID = 5 }]);
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        var result = await sut.OnPostSelect(5);
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Submissions/SubmissionDetailsBlock", redirect.PageName);
+    }
+
+    [Fact]
+    public async Task OnPostSelect_WetTissueWithBlocksOnADifferentAnimal_StillRoutesToSubmissionDetails()
+    {
+        _batches.Setup(b => b.GetSubmittedAsCodeAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync("4");
+        _lookups.Setup(l => l.GetLookupDataAsync(11, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 4, Code = "4", Name = "Wet Tissue" }]);
+        _blocks.Setup(b => b.GetByBatchAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { AnimalID = 99 }]);
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        var result = await sut.OnPostSelect(5);
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Submissions/SubmissionDetails", redirect.PageName);
     }
 
     [Theory]

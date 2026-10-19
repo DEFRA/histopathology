@@ -25,6 +25,13 @@
         <p class="govuk-panel__body">@Model.SuccessMessage</p>
     </div>
 }
+@if (Model.NoteWarning is not null)
+{
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <strong class="govuk-warning-text__text"><span class="govuk-visually-hidden">Warning</span> @Model.NoteWarning</strong>
+    </div>
+}
 
 @* Batch summary — mirrors legacy Batch.ascx header *@
 <dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-4">
@@ -347,8 +354,8 @@
                     <label class="govuk-label" for="QCNoteRef">QC Note Ref</label>
                     @* Read-only in legacy too — the reference is allocated by the system when a QC
                        note is first raised for the test, never typed in. *@
-                    <input class="govuk-input govuk-input--width-10" id="QCNoteRef" type="text" readonly disabled aria-describedby="QCNoteRef-hint" />
-                    <div id="QCNoteRef-hint" class="govuk-hint govuk-!-font-size-16">Allocated automatically when a QC note is raised.</div>
+                    <input class="govuk-input govuk-input--width-20" id="QCNoteRef" type="text" value="@Model.QCNoteRefDisplay()" readonly disabled aria-describedby="QCNoteRef-hint" />
+                    <div id="QCNoteRef-hint" class="govuk-hint govuk-!-font-size-16">Allocated per test the first time a QC note is raised for it.</div>
                 </div>
             </div>
             <div class="govuk-grid-column-one-half">
@@ -455,8 +462,7 @@ else
                 Result: 'result', QCCode: 'qccode', StainRef: 'stainref', DispatchedDate: 'dispatcheddate',
                 DispatchedBy: 'dispatchedby', DispatchedTo: 'dispatchedto', RemedialAction: 'remedialaction',
                 ArchiveLocationCode: 'archivelocation', ArchivedDate: 'archiveddate',
-                ArchiveComment: 'archivecomment', NumberOfSlides: 'numberofslides', Comment: 'comment',
-                QCNoteRef: 'qcnoteref'
+                ArchiveComment: 'archivecomment', NumberOfSlides: 'numberofslides', Comment: 'comment'
             };
             var dispatched = document.getElementById('Dispatched');
             var qcNote = document.getElementById('QCNote');
@@ -481,6 +487,20 @@ else
             function applySelection() {
                 var checked = rows.filter(function (cb) { return cb.checked; });
                 setFields(checked.length === 1 && (!selectAll || !selectAll.checked) ? checked[0] : null);
+                showNoteRefs(checked);
+            }
+
+            // Mirrors QualityDataModel.QCNoteRefDisplay: each checked row's own ref only, no fallback.
+            var refBox = document.getElementById('QCNoteRef');
+            function showNoteRefs(checked) {
+                if (!refBox) return;
+                var refs = [];
+                checked.forEach(function (cb) {
+                    var r = cb.dataset.qcnoteref;
+                    if (r && refs.indexOf(r) === -1) refs.push(r);
+                });
+                refs.sort(function (a, b) { return a - b; });
+                refBox.value = refs.join(', ');
             }
 
             rows.forEach(function (cb) {
@@ -505,18 +525,24 @@ else
 
             // Ticking "Dispatched?" defaults Dispatched By/Date to the logged-in user/today (who is
             // actually recording the dispatch), and Dispatched To to who submitted the batch.
+            // Unticking resets all three back to blank.
             if (dispatched) {
                 var currentUserId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Session.UserID.ToString()));
                 var submittedByName = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SubmittedByName ?? string.Empty));
                 var today = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(DateTime.Today.ToString("yyyy-MM-dd")));
                 dispatched.addEventListener('change', function () {
-                    if (!dispatched.checked) return;
                     var to = document.getElementById('DispatchedTo');
                     var date = document.getElementById('DispatchedDate');
                     var by = document.getElementById('DispatchedBy');
-                    if (to) to.value = submittedByName;
-                    if (date) date.value = today;
-                    if (by) by.value = currentUserId;
+                    if (dispatched.checked) {
+                        if (to) to.value = submittedByName;
+                        if (date) date.value = today;
+                        if (by) by.value = currentUserId;
+                    } else {
+                        if (to) to.value = '';
+                        if (date) date.value = '';
+                        if (by) by.value = '';
+                    }
                 });
             }
         })();

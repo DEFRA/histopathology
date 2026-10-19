@@ -170,6 +170,19 @@ public sealed class QCNoteRepository : IQCNoteRepository
             "GetBatchQCNotes",
             new { QCNoteRef = (int?)null },
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+
+        // The SP returns one row per distinct stain ref on the note's tests; the list shows one row per note.
+        return rows
+            .GroupBy(r => r.QCNoteRef)
+            .Select(g => new QCNote
+            {
+                ID = g.First().ID,
+                QCNoteRef = g.Key,
+                ProjectDescription = g.First().ProjectDescription,
+                Species = g.First().Species,
+                StainRef = string.Join(", ", g.Select(r => r.StainRef?.Trim())
+                    .Where(s => !string.IsNullOrEmpty(s)).Distinct(StringComparer.OrdinalIgnoreCase)),
+            })
+            .ToList();
     }
 }

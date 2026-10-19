@@ -66,9 +66,10 @@
 
     <div class="govuk-form-group">
         <p class="govuk-body govuk-!-margin-bottom-1"><strong>QC note ref:</strong>
-            @if (Model.Test?.QCNoteRef is > 0)
+            @{ var noteRef = Model.Test?.QCNoteRef; }
+            @if (noteRef is > 0)
             {
-                <a asp-page="/Reports/QCNote" asp-route-qcNoteRef="@Model.Test.QCNoteRef" class="govuk-link">@Model.Test.QCNoteRef</a>
+                <a asp-page="/Reports/QCNote" asp-route-qcNoteRef="@noteRef" class="govuk-link">@noteRef</a>
             }
             else
             {

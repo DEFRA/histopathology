@@ -44,6 +44,23 @@ public class QCNotesModelTests
     }
 
     [Fact]
+    public async Task PagedEntries_NoColumnSorted_DefaultsToQCNoteRefDescending()
+    {
+        // Legacy: QCNotes.aspx.vb default dvBatchesView.Sort = "QCNoteRef DESC".
+        _qc.Setup(q => q.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<QCNote>)
+        [
+            new QCNote { QCNoteRef = 1 },
+            new QCNote { QCNoteRef = 3 },
+            new QCNote { QCNoteRef = 2 },
+        ]);
+        var sut = CreateSut();
+
+        await sut.OnGetAsync();
+
+        Assert.Equal([3, 2, 1], sut.PagedEntries.Select(n => n.QCNoteRef).ToArray());
+    }
+
+    [Fact]
     public void IsGlobalView_NoBatchIdInSession_IsTrue()
     {
         _session.Object.BatchID = null;

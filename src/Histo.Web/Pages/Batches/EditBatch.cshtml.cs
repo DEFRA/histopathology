@@ -1,6 +1,8 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
 using Histo.Core.Domain;
+using Histo.Histology.Interfaces;
+using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -28,13 +30,16 @@ public class EditBatchModel : HistoPageModel
     private readonly IBatchService   _batches;
     private readonly ILookupService  _lookups;
     private readonly IUserService    _users;
+    private readonly IBlockTestService _blockTests;
 
-    public EditBatchModel(ISessionService session, IBatchService batches, ILookupService lookups, IUserService users)
+    public EditBatchModel(ISessionService session, IBatchService batches, ILookupService lookups, IUserService users,
+        IBlockTestService blockTests)
         : base(session)
     {
         _batches = batches;
         _lookups = lookups;
         _users   = users;
+        _blockTests = blockTests;
     }
 
     // ---- Required editable fields ----
@@ -90,8 +95,8 @@ public class EditBatchModel : HistoPageModel
 
     /// <summary>
     /// <see cref="ReturnPage"/> plus the sort/page query string captured when the user left the
-    /// list, so Back/Cancel restore the exact filter/sort/page state. Hrefs only — never pass to
-    /// <c>RedirectToPage</c>, which requires a bare page name.
+    /// list, so Back/Cancel restore the exact filter/sort/page state. Hrefs only — a redirect goes through
+    /// <see cref="ReturnPageRedirect.RedirectToReturnPage"/>, because <c>RedirectToPage</c> requires a bare page name.
     /// </summary>
     public string ReturnUrl => ReturnPage + (Session.ReturnPageQuery ?? string.Empty);
 
@@ -121,6 +126,24 @@ public class EditBatchModel : HistoPageModel
 
     /// <summary>True when the current histology selection contains Special Stain.</summary>
     public bool ShowStains => SelectedHistologyCodes.Contains(HistologyCode.SpecialStain);
+
+    // ---- Codes already ticked on a block — can't be deselected (see OnPostAsync) ----
+    public IReadOnlyCollection<string> LockedHistologyCodes { get; private set; } = [];
+    public IReadOnlyCollection<string> LockedAntibodyCodes  { get; private set; } = [];
+    public IReadOnlyCollection<string> LockedStainCodes     { get; private set; } = [];
+
+    /// <summary>True when the view should disable this checkbox — selected AND already assigned to a block.</summary>
+    public bool IsHistologyLocked(string code) => SelectedHistologyCodes.Contains(code) && LockedHistologyCodes.Contains(code, StringComparer.OrdinalIgnoreCase);
+    public bool IsAntibodyLocked(string code)  => SelectedAntibodyCodes.Contains(code) && LockedAntibodyCodes.Contains(code, StringComparer.OrdinalIgnoreCase);
+    public bool IsStainLocked(string code)     => SelectedStainCodes.Contains(code) && LockedStainCodes.Contains(code, StringComparer.OrdinalIgnoreCase);
+
+    private async Task LoadLockedTestCodesAsync(int batchId)
+    {
+        var blockTests = await _blockTests.GetAllSelectionsByBatchAsync(batchId);
+        LockedHistologyCodes = blockTests.Where(t => t.TestType == BlockTestType.Histology).Select(t => t.Code).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        LockedAntibodyCodes  = blockTests.Where(t => t.TestType == BlockTestType.Antibodies).Select(t => t.Code).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        LockedStainCodes     = blockTests.Where(t => t.TestType == BlockTestType.Stain).Select(t => t.Code).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -157,6 +180,7 @@ public class EditBatchModel : HistoPageModel
         await LoadLookupsAsync();
         await LoadDisplayFieldsAsync();
         await LoadTestTypeOptionsAsync(Batch.BatchType);
+        await LoadLockedTestCodesAsync(Batch.ID);
 
         // Pre-select the checkboxes from the existing batch-level test selections, unless a
         // draft (from a pick-list detour) already restored them above.
@@ -252,6 +276,7 @@ public class EditBatchModel : HistoPageModel
         await LoadLookupsAsync();
         await LoadDisplayFieldsAsync();
         await LoadTestTypeOptionsAsync(Batch.BatchType);
+        await LoadLockedTestCodesAsync(Batch.ID);
 
         // ---- Test-type validation (mirrors former EditBatchTestsModel) ----
         if (SelectedHistologyCodes.Count == 0)
@@ -276,6 +301,30 @@ public class EditBatchModel : HistoPageModel
             SaveError = "IHC is selected — you must also select at least one antibody.";
             return Page();
         }
+
+        // Legacy source: BatchDetails.aspx.vb chkblHistology/Antibodies/SpecialStain_SelectedIndexChanged +
+        // HasTestBeenAllocated — a test type already ticked on a block can't be deselected at the batch
+        // level. Read before anything is saved; null means the read failed, which must not look like
+        // "nothing was previously selected" (that would silently let an in-use test through).
+        var previousTests = await _batches.TryGetBatchTestSelectionsAsync(Batch.ID);
+        if (previousTests is null)
+        {
+            SaveError = "Could not check existing test selections. Please try again.";
+            return Page();
+        }
+
+        bool DeselectedButAssigned(IEnumerable<string> previous, IReadOnlyList<string> nowSelected, IReadOnlyCollection<string> lockedCodes) =>
+            previous.Except(nowSelected, StringComparer.OrdinalIgnoreCase)
+                .Any(code => lockedCodes.Contains(code, StringComparer.OrdinalIgnoreCase));
+
+        if (DeselectedButAssigned(previousTests.Histology.Select(r => r.Code), SelectedHistologyCodes, LockedHistologyCodes)
+            || DeselectedButAssigned(previousTests.Antibodies.Select(r => r.Code), SelectedAntibodyCodes, LockedAntibodyCodes)
+            || DeselectedButAssigned(previousTests.Stains.Select(r => r.Code), SelectedStainCodes, LockedStainCodes))
+        {
+            SaveError = "The test cannot be de-selected as it has been assigned to a block.";
+            return Page();
+        }
+
         // Legacy: rfvSafeToHandle — mandatory on both New and Edit (BatchDetails.aspx.vb ValidateMandatoryFields).
         if (SafeToHandle is null)
         {
@@ -361,20 +410,36 @@ public class EditBatchModel : HistoPageModel
             return Page();
         }
 
-        return RedirectToPage(ReturnPage, ParseReturnQuery());
+        try
+        {
+            await AddNewTestsToExistingBlocksAsync(Batch.ID, previousTests, SelectedHistologyCodes, cleanedAntibodyCodes, cleanedStainCodes);
+        }
+        catch (Exception)
+        {
+            SaveError = "Submission saved, but the new tests could not be added to the existing blocks. Add them on each block instead.";
+            return Page();
+        }
+
+        return this.RedirectToReturnPage(ReturnPage, Session.ReturnPageQuery);
     }
 
-    /// <summary>Parses <see cref="ISessionService.ReturnPageQuery"/> into route values so a
-    /// post-save redirect restores the list's sort/page state, not just its bare page name.</summary>
-    private Microsoft.AspNetCore.Routing.RouteValueDictionary ParseReturnQuery()
+    /// <summary>
+    /// Adds tests newly selected for the submission to every block it already has, so the sample and
+    /// block pages show them. Deliberate enhancement: legacy only offered them unticked on each block.
+    /// Add-only and atomic (see <see cref="IBlockTestRepository.AddTestsToBatchBlocksAsync"/>): it can't remove or overwrite block tests.
+    /// </summary>
+    private async Task AddNewTestsToExistingBlocksAsync(int batchId, BatchTestSelections previous,
+        IReadOnlyList<string> histology, IReadOnlyList<string> antibodies, IReadOnlyList<string> stains)
     {
-        var result = new Microsoft.AspNetCore.Routing.RouteValueDictionary();
-        var query = Session.ReturnPageQuery;
-        if (string.IsNullOrEmpty(query)) return result;
+        static List<string> Added(IReadOnlyList<string> now, IReadOnlyList<BatchTestSelectionRow> before) =>
+            now.Except(before.Select(r => r.Code), StringComparer.OrdinalIgnoreCase).ToList();
 
-        foreach (var pair in Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(query))
-            result[pair.Key] = pair.Value.ToString();
-        return result;
+        var addedHistology  = Added(histology, previous.Histology);
+        var addedAntibodies = Added(antibodies, previous.Antibodies);
+        var addedStains     = Added(stains, previous.Stains);
+        if (addedHistology.Count == 0 && addedAntibodies.Count == 0 && addedStains.Count == 0) return;
+
+        await _blockTests.AddTestsToBatchBlocksAsync(batchId, addedHistology, addedAntibodies, addedStains, Session.UserID);
     }
 
     private async Task LoadLookupsAsync()

@@ -91,6 +91,108 @@ public class BlockDetailsModelTests
         Assert.DoesNotContain(sut.TissueOptions, o => o.Code == "OTHER");
     }
 
+    private void SetupExistingBlock()
+    {
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+        ]);
+    }
+
+    [Fact]
+    public async Task AddTissue_KeepsTheTypedBlockFieldsAcrossTheRedirect()
+    {
+        SetupExistingBlock();
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.IsAddFlow = true;
+        sut.BlockFieldsPosted = true;
+        sut.NewTissueCode = "AGAR";
+        sut.NewBlockRef = "07";
+        sut.NewNumberOfBlocks = 3;
+        sut.NewCustomerRef = "CUST";
+        sut.NewComment = "typed";
+        sut.NewRepeatBlock = true;
+        sut.SelectedHistologyCodes = [HistologyCode.HAndE];
+
+        var result = await sut.OnPostAddTissueAsync();
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+
+        // The follow-up GET shows the typed values, not the saved block's ("01").
+        var next = CreateSut(animalId: 2, blockId: 319181);
+        next.TempData = sut.TempData;
+        next.IsAddFlow = true;
+        await next.OnGetAsync();
+
+        Assert.Equal("07", next.NewBlockRef);
+        Assert.Equal(3, next.NewNumberOfBlocks);
+        Assert.Equal("CUST", next.NewCustomerRef);
+        Assert.Equal("typed", next.NewComment);
+        Assert.True(next.NewRepeatBlock);
+        Assert.Equal(new[] { HistologyCode.HAndE }, next.ExistingHistologyCodes);
+    }
+
+    [Fact]
+    public async Task AddTissue_BlockRefClearedByUser_StillKeepsTheOtherTypedFields()
+    {
+        // An emptied Block ref posts "" and binds to null; that must not look like "no fields posted".
+        SetupExistingBlock();
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.BlockFieldsPosted = true;
+        sut.NewTissueCode = "AGAR";
+        sut.NewBlockRef = null;
+        sut.NewCustomerRef = "CUST";
+        sut.NewComment = "typed";
+        sut.SelectedHistologyCodes = [HistologyCode.HAndE];
+
+        await sut.OnPostAddTissueAsync();
+
+        var next = CreateSut(animalId: 2, blockId: 319181);
+        next.TempData = sut.TempData;
+        await next.OnGetAsync();
+
+        Assert.Null(next.NewBlockRef);
+        Assert.Equal("CUST", next.NewCustomerRef);
+        Assert.Equal("typed", next.NewComment);
+        Assert.Equal(new[] { HistologyCode.HAndE }, next.ExistingHistologyCodes);
+    }
+
+    [Fact]
+    public async Task AddTissue_WithoutPostedBlockFields_ShowsTheSavedBlock()
+    {
+        SetupExistingBlock();
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewTissueCode = "AGAR";
+
+        await sut.OnPostAddTissueAsync();
+
+        var next = CreateSut(animalId: 2, blockId: 319181);
+        next.TempData = sut.TempData;
+        await next.OnGetAsync();
+
+        Assert.Equal("01", next.NewBlockRef);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_DraftForAnotherBlock_IsIgnored()
+    {
+        SetupExistingBlock();
+        var other = CreateSut(animalId: 2, blockId: 999);
+        other.BlockFieldsPosted = true;
+        other.NewBlockRef = "99";
+        await other.OnPostDeleteTissueAsync(1);
+
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.TempData = other.TempData;
+        await sut.OnGetAsync();
+
+        Assert.Equal("01", sut.NewBlockRef);
+    }
+
     [Fact]
     public async Task LoadSupportingData_DefaultsToTheWholeTissueList()
     {
@@ -313,9 +415,13 @@ public class BlockDetailsModelTests
             new Block { ID = 1, BatchID = 5, AnimalID = 2, BlockRef = "01" },
             new Block { ID = 2, BatchID = 5, AnimalID = 2, BlockRef = "02" },
         ]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 2, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 2, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
         _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(9);
         var sut = CreateSut(animalId: 2, blockId: 2);
+        sut.NewBlockRef = "02";
         sut.SelectedHistologyCodes = [HistologyCode.EO];
 
         await sut.OnPostNextBlockAsync();
@@ -604,6 +710,64 @@ public class BlockDetailsModelTests
     }
 
     [Fact]
+    public async Task OnGetAsync_AddMode_NotPreCassetted_DefaultsTo01WhenFree_EvenWithHigherRefsPreBooked()
+    {
+        // User-reported scenario: refs 03/04 are pre-booked (not yet real blocks) for this sample.
+        // The Add-block default must still be "01" — pre-booked refs higher up must not make the
+        // default jump past genuinely free lower numbers.
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2", NextBlockRef = "01" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
+        _blocks.Setup(b => b.GetBlockRefsOnOtherBatchesAsync(2, 5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<string>)[]);
+        _blocks.Setup(b => b.GetPreBookedByAnimalAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 900, AnimalID = 2, BlockRef = "03", Status = BlockStatus.PreBooked },
+            new Block { ID = 901, AnimalID = 2, BlockRef = "04", Status = BlockStatus.PreBooked },
+        ]);
+        var sut = CreateSut(animalId: 2, blockId: 0);
+
+        await sut.OnGetAsync();
+
+        Assert.Equal("01", sut.NewBlockRef);
+    }
+
+    [Fact]
+    public async Task OnPostNextBlockAsync_NotPreCassetted_SkipsPreBookedRefs_LandsOnFirstGenuinelyFreeRef()
+    {
+        // User-reported scenario continued: the sample's current block is "02"; refs 03/04 are
+        // pre-booked for this sample, so "Next block" must skip both and land on "05".
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "02" },
+        ]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
+        _blocks.Setup(b => b.GetBlockRefsOnOtherBatchesAsync(2, 5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<string>)[]);
+        _blocks.Setup(b => b.GetPreBookedByAnimalAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 900, AnimalID = 2, BlockRef = "03", Status = BlockStatus.PreBooked },
+            new Block { ID = 901, AnimalID = 2, BlockRef = "04", Status = BlockStatus.PreBooked },
+        ]);
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, "05", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(319182);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.IsAddFlow = false;
+        sut.NewBlockRef = "02";
+        sut.SelectedHistologyCodes = [HistologyCode.EO];
+
+        await sut.OnPostNextBlockAsync();
+
+        _blocks.Verify(b => b.AddBlockAsync(5, 2, "05", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task OnPostDoneAsync_AddFlow_HistopathAreaUser_NoHistologyRef_SetsErrorAndDoesNotSave()
     {
         _session.Setup(s => s.UserArea).Returns("Histopath");
@@ -661,6 +825,81 @@ public class BlockDetailsModelTests
         _blocks.Verify(b => b.UpdateBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    private void SetupReuseScenario(IReadOnlyList<Block> batchBlocks)
+    {
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2", NextBlockRef = "06" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(batchBlocks);
+        // The sample already has blocks 01-05 on an earlier submission.
+        _blocks.Setup(b => b.GetBlockRefsOnOtherBatchesAsync(2, 5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<string>)["01", "02", "03", "04", "05"]);
+        _blocks.Setup(b => b.GetPreBookedByAnimalAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
+        _blocks.Setup(b => b.UpdateBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+    }
+
+    [Fact]
+    public async Task OnPostDoneAsync_RefHeldOnAnotherSubmission_IsReused()
+    {
+        // Legacy ValidateRequiredData only checks the current submission's blocks.
+        SetupReuseScenario([new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "06" }]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.IsAddFlow = false;
+        sut.NewBlockRef = "01";
+        sut.SelectedHistologyCodes = [HistologyCode.EO];
+
+        var result = await sut.OnPostDoneAsync();
+
+        Assert.IsNotType<PageResult>(result);
+        _blocks.Verify(b => b.UpdateBlockAsync(It.Is<Block>(blk => blk.BlockRef == "01"), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostDoneAsync_ReuseWithNumberOfBlocks_SiblingsTakeTheFollowingExistingRefs()
+    {
+        SetupReuseScenario([new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "06", Order = 1 }]);
+        _blocks.Setup(b => b.AddBlockKeepingRefAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(400);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.IsAddFlow = false;
+        sut.NewBlockRef = "01";
+        sut.NewNumberOfBlocks = 5;
+        sut.SelectedHistologyCodes = [HistologyCode.EO];
+
+        await sut.OnPostDoneAsync();
+
+        // Not floored on the sample's NextBlockRef (06) and not pushed past the earlier submission's refs.
+        foreach (var r in new[] { "02", "03", "04", "05" })
+            _blocks.Verify(b => b.AddBlockKeepingRefAsync(5, 2, r, It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
+            It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostDoneAsync_RefAlreadyOnThisSubmissionForTheSample_IsRejected()
+    {
+        SetupReuseScenario([
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "06" },
+            new Block { ID = 319182, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+        ]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.IsAddFlow = false;
+        sut.NewBlockRef = "01";
+        sut.SelectedHistologyCodes = [HistologyCode.EO];
+
+        var result = await sut.OnPostDoneAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("This block reference has already been used for this sample on this submission.", sut.ErrorMessage);
+        _blocks.Verify(b => b.UpdateBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Fact]
     public async Task OnPostNextBlockAsync_Success_NewBlockIsCancellableViaBack()
     {
@@ -675,10 +914,14 @@ public class BlockDetailsModelTests
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
             new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
         ]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
         _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(319182);
         var sut = CreateSut(animalId: 2, blockId: 319181);
         sut.IsAddFlow = false; // editing an established block when "Next block" is clicked
+        sut.NewBlockRef = "01";
         sut.SelectedHistologyCodes = [HistologyCode.EO];
 
         var result = await sut.OnPostNextBlockAsync();
@@ -696,7 +939,9 @@ public class BlockDetailsModelTests
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
         _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
-        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
         _batches.Setup(b => b.GetByIdAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 5, IsPreCassetted = true });
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
             new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
@@ -704,6 +949,7 @@ public class BlockDetailsModelTests
         _blocks.Setup(b => b.GetPreBookedByAnimalAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
         var sut = CreateSut(animalId: 2, blockId: 319181);
         sut.IsAddFlow = true; // original block was itself still in add-flow
+        sut.NewBlockRef = "01";
         sut.SelectedHistologyCodes = [HistologyCode.EO];
 
         var result = await sut.OnPostNextBlockAsync();
@@ -726,12 +972,16 @@ public class BlockDetailsModelTests
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
             new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
         ]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
         var preBooked02 = new Block { ID = 901, AnimalID = 2, BlockRef = "02", Status = BlockStatus.PreBooked };
         _blocks.Setup(b => b.GetPreBookedByAnimalAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[preBooked02]);
         _blocks.Setup(b => b.ClaimPreBookedBlockAsync(preBooked02, 5, It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         var sut = CreateSut(animalId: 2, blockId: 319181);
         sut.IsAddFlow = false;
+        sut.NewBlockRef = "01";
         sut.SelectedHistologyCodes = [HistologyCode.EO];
 
         var result = await sut.OnPostNextBlockAsync();
@@ -741,6 +991,546 @@ public class BlockDetailsModelTests
             It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
         Assert.Equal(901, redirect.RouteValues?["blockId"]);
+    }
+
+    [Fact]
+    public async Task OnPostNextBlockAsync_PersistsCurrentBlockRefCustomerRefRepeatAndComment()
+    {
+        // Phase F: legacy btnAddBlock_Click calls UpdateBlockDetails() same as btnDone_Click —
+        // Next block must persist these fields for the current block too, not just Done.
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+        ]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
+        _blocks.Setup(b => b.UpdateBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(319182);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewBlockRef = "01";
+        sut.NewCustomerRef = "CUST-1";
+        sut.NewRepeatBlock = true;
+        sut.NewComment = "a comment";
+        sut.SelectedHistologyCodes = [HistologyCode.EO];
+
+        await sut.OnPostNextBlockAsync();
+
+        _blocks.Verify(b => b.UpdateBlockAsync(
+            It.Is<Block>(blk => blk.ID == 319181 && blk.CustomerRef == "CUST-1" && blk.Comment == "a comment" && blk.RepeatBlock == true),
+            It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostNextBlockAsync_NoTissuesAndNotRepeatBlock_SetsErrorAndDoesNotCreateNextBlock()
+    {
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+        ]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewBlockRef = "01";
+        sut.NewRepeatBlock = false;
+        sut.SelectedHistologyCodes = [HistologyCode.EO];
+
+        var result = await sut.OnPostNextBlockAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("Add at least one tissue to this block before completing it.", sut.ErrorMessage);
+        _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
+            It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostNextBlockAsync_RepeatBlockTicked_ZeroTissuesStillProceeds()
+    {
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+        ]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(319182);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewBlockRef = "01";
+        sut.NewRepeatBlock = true;
+        sut.SelectedHistologyCodes = [HistologyCode.EO];
+
+        var result = await sut.OnPostNextBlockAsync();
+
+        var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+        Assert.Equal(319182, redirect.RouteValues?["blockId"]);
+    }
+
+    [Fact]
+    public async Task OnPostNextBlockAsync_NumberOfBlocksGreaterThanOne_DuplicatesSiblingsBeforeCreatingNextBlock()
+    {
+        // Legacy CreateMultiBlocks runs on Next Block too, not just Done.
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2", NextBlockRef = "01" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        // SaveCurrentBlockDetailsAsync duplicates block 319181's tissues onto sibling 400 — this
+        // must reflect that so block 400 is not mistaken for an abandoned/orphaned block by the
+        // "next ref" computation's zero-tissue exclusion.
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+            new Tissue { ID = 2, OwnerID = 400, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
+        // First call (before the sibling is created) sees only the original block; the second
+        // (after SaveCurrentBlockDetailsAsync's duplication) sees the newly-created sibling too —
+        // mocks can't mutate themselves the way a real DB insert would, so simulate that with a
+        // sequence rather than one static return value.
+        _blocks.SetupSequence(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[
+                new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01", Order = 1 },
+            ])
+            .ReturnsAsync((IReadOnlyList<Block>)[
+                new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01", Order = 1 },
+                new Block { ID = 400, BatchID = 5, AnimalID = 2, BlockRef = "02", Order = 2 },
+            ]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
+        // "02" is the sibling duplicated by SaveCurrentBlockDetailsAsync; "03" is the actual next block.
+        _blocks.Setup(b => b.AddBlockKeepingRefAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, "CUST", null, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(400);
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, "03", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(500);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewBlockRef = "01";
+        sut.NewCustomerRef = "CUST";
+        sut.NewNumberOfBlocks = 2;
+        sut.SelectedHistologyCodes = [HistologyCode.EO];
+
+        var result = await sut.OnPostNextBlockAsync();
+
+        _blocks.Verify(b => b.AddBlockKeepingRefAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, "CUST", null, false, It.IsAny<CancellationToken>()), Times.Once);
+        var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+        Assert.Equal(500, redirect.RouteValues?["blockId"]);
+    }
+
+    [Fact]
+    public async Task OnPostNextBlockAsync_CarryTestsToNextBlock_SavesSameCodesOntoNewBlock()
+    {
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+        ]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(319182);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewBlockRef = "01";
+        sut.SelectedHistologyCodes = [HistologyCode.EO];
+        sut.SelectedAntibodyCodes = ["AB01"];
+        sut.SelectedStainCodes = ["ST01"];
+        sut.CarryTestsToNextBlock = true;
+
+        await sut.OnPostNextBlockAsync();
+
+        _blockTests.Verify(t => t.SaveTestSelectionsAsync(
+            5, 319182,
+            It.Is<IReadOnlyList<string>>(c => c.SequenceEqual(new[] { HistologyCode.EO })),
+            It.Is<IReadOnlyList<string>>(c => c.SequenceEqual(new[] { "AB01" })),
+            It.Is<IReadOnlyList<string>>(c => c.SequenceEqual(new[] { "ST01" })),
+            7, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostDoneAsync_Success_RedirectsToSubmissionDetailsBlock()
+    {
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+        ]);
+        _blocks.Setup(b => b.UpdateBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewBlockRef = "01";
+        sut.SelectedHistologyCodes = [HistologyCode.EO];
+
+        var result = await sut.OnPostDoneAsync();
+
+        var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+        Assert.Equal("/Submissions/SubmissionDetailsBlock", redirect.PageName);
+    }
+
+    [Fact]
+    public async Task LoadTestOptions_NarrowsToBatchLevelSelection()
+    {
+        // Legacy: HideTests() — the full lookup table has more codes than the submission chose
+        // at Create/Edit Submission time; only the chosen ones must ever be offered.
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+        ]);
+        _lookups.Setup(l => l.GetHistologyTypesAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[
+            new LookupItem { Code = HistologyCode.EO, Name = "EO" },
+            new LookupItem { Code = HistologyCode.HAndE, Name = "H&E" },
+            new LookupItem { Code = HistologyCode.SpecialStain, Name = "Special Stain" },
+        ]);
+        _lookups.Setup(l => l.GetLookupDataAsync(4, It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[
+            new LookupItem { Code = "AB01", Name = "Antibody 1" },
+            new LookupItem { Code = "AB02", Name = "Antibody 2" },
+        ]);
+        _lookups.Setup(l => l.GetLookupDataAsync(6, It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[
+            new LookupItem { Code = "ST01", Name = "Stain 1" },
+            new LookupItem { Code = "ST02", Name = "Stain 2" },
+        ]);
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Histo.Submissions.Models.BatchTestSelections
+        {
+            Histology = [new BatchTestSelectionRow { ID = 1, BatchID = 5, Code = HistologyCode.EO }],
+            Antibodies = [new BatchTestSelectionRow { ID = 2, BatchID = 5, Code = "AB01" }],
+            Stains = [new BatchTestSelectionRow { ID = 3, BatchID = 5, Code = "ST01" }],
+        });
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+
+        await sut.OnGetAsync();
+
+        Assert.Equal([HistologyCode.EO], sut.HistologyOptions.Select(o => o.Code));
+        Assert.Equal(["AB01"], sut.AntibodyOptions.Select(o => o.Code));
+        Assert.Equal(["ST01"], sut.StainOptions.Select(o => o.Code));
+    }
+
+    [Fact]
+    public async Task LoadEditModeData_FirstBlockNoSavedTests_DefaultsToBatchSelections()
+    {
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+        ]);
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Histo.Submissions.Models.BatchTestSelections
+        {
+            Histology = [new BatchTestSelectionRow { ID = 1, BatchID = 5, Code = HistologyCode.EO }],
+        });
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.IsFromNextBlock = false;
+
+        await sut.OnGetAsync();
+
+        Assert.Equal([HistologyCode.EO], sut.ExistingHistologyCodes);
+    }
+
+    [Fact]
+    public async Task LoadEditModeData_NextBlockCreatedBlockNoSavedTests_StaysUnselected()
+    {
+        // Phase B fix: distinguishes a block created via "Next block" (should stay blank unless
+        // carried forward) from the very first block (should default to the batch selections).
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319182, BatchID = 5, AnimalID = 2, BlockRef = "02" },
+        ]);
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Histo.Submissions.Models.BatchTestSelections
+        {
+            Histology = [new BatchTestSelectionRow { ID = 1, BatchID = 5, Code = HistologyCode.EO }],
+        });
+        var sut = CreateSut(animalId: 2, blockId: 319182);
+        sut.IsFromNextBlock = true;
+
+        await sut.OnGetAsync();
+
+        Assert.Empty(sut.ExistingHistologyCodes);
+    }
+
+    [Fact]
+    public async Task LoadEditModeData_BlockSelectionsAreIndependentOfOtherBlocks()
+    {
+        // Block 1 has its own saved EO selection; block 2 has none of its own — block 2 must not
+        // inherit block 1's selection, nor (with IsFromNextBlock set) fall back to batch defaults.
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 1, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+            new Block { ID = 2, BatchID = 5, AnimalID = 2, BlockRef = "02" },
+        ]);
+        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[
+            new BlockTest { ID = 1, BlockID = 1, TestType = BlockTestType.Histology, Code = HistologyCode.EO },
+        ]);
+        var sut = CreateSut(animalId: 2, blockId: 2);
+        sut.IsFromNextBlock = true;
+
+        await sut.OnGetAsync();
+
+        Assert.Empty(sut.ExistingHistologyCodes);
+    }
+
+    [Fact]
+    public async Task OnPostNextBlockAsync_ValidationFailsForAnUnrelatedReason_StillShowsThePostedTestSelectionNotTheBatchDefaults()
+    {
+        // Regression: a validation error re-render used to call LoadEditModeDataAsync() (which
+        // re-applies the batch-level defaults, here EO) AFTER echoing back the posted selection,
+        // silently clobbering it — so a user who unchecked EO and checked H&E would see EO still
+        // ticked on any error, however unrelated (e.g. "add a tissue"), and the error would keep
+        // recurring no matter how many times they retried.
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+        ]);
+        // No tissues on the current block -> SaveCurrentBlockDetailsAsync fails with the
+        // "add at least one tissue" error, unrelated to the test selection itself.
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        // Batch-level default is EO — if the bug were present, this is what would reappear.
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Histo.Submissions.Models.BatchTestSelections
+        {
+            Histology = [new BatchTestSelectionRow { ID = 1, BatchID = 5, Code = HistologyCode.EO }],
+        });
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewBlockRef = "01";
+        sut.NewCustomerRef = "edited customer ref";
+        // User unchecked EO and ticked H&E instead.
+        sut.SelectedHistologyCodes = [HistologyCode.HAndE];
+
+        var result = await sut.OnPostNextBlockAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("Add at least one tissue to this block before completing it.", sut.ErrorMessage);
+        Assert.Equal([HistologyCode.HAndE], sut.ExistingHistologyCodes);
+        Assert.DoesNotContain(HistologyCode.EO, sut.ExistingHistologyCodes);
+        // Block Ref/Customer Ref edits must also survive the error re-render, not revert to the saved row.
+        Assert.Equal("01", sut.NewBlockRef);
+        Assert.Equal("edited customer ref", sut.NewCustomerRef);
+    }
+
+    [Fact]
+    public async Task ShowAntibodiesAndShowStains_NextBlockCreatedBlockWithNothingTicked_StillTrueWhenBatchHasOptions()
+    {
+        // Regression: a Next-Block-created block starts with no Histology codes ticked at all
+        // (by design — see LoadEditModeData_NextBlockCreatedBlockNoSavedTests_StaysUnselected), so
+        // gating the Antibodies/Special stain SECTIONS on "is IHC-PrP/Special Stain currently
+        // ticked on this block" hid them entirely until the user re-ticked the parent Histology
+        // box first — contradicting "all Antibody and Special Stain items should be displayed as
+        // checkboxes in an unselected state". The sections must stay visible whenever the
+        // submission has such options at all, regardless of this block's own tick state.
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319182, BatchID = 5, AnimalID = 2, BlockRef = "02" },
+        ]);
+        _lookups.Setup(l => l.GetLookupDataAsync(4, It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[
+            new LookupItem { Code = "AB01", Name = "Antibody 1" },
+        ]);
+        _lookups.Setup(l => l.GetLookupDataAsync(6, It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[
+            new LookupItem { Code = "ST01", Name = "Stain 1" },
+        ]);
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Histo.Submissions.Models.BatchTestSelections
+        {
+            Histology = [new BatchTestSelectionRow { ID = 1, BatchID = 5, Code = HistologyCode.IhcPrp }],
+            Antibodies = [new BatchTestSelectionRow { ID = 2, BatchID = 5, Code = "AB01" }],
+            Stains = [new BatchTestSelectionRow { ID = 3, BatchID = 5, Code = "ST01" }],
+        });
+        var sut = CreateSut(animalId: 2, blockId: 319182);
+        sut.IsFromNextBlock = true;
+
+        await sut.OnGetAsync();
+
+        Assert.Empty(sut.ExistingHistologyCodes);
+        Assert.True(sut.ShowAntibodies);
+        Assert.True(sut.ShowStains);
+    }
+
+    [Fact]
+    public async Task AntibodiesEnabledAndStainsEnabled_AntibodyCodeSavedWithoutItsHistologyTrigger_StillTrue()
+    {
+        // Legacy parity: DisplayBatchLevelTests/DisplayBlockLevelTests enable chkblAntibodies
+        // purely from an Antibody row's presence, independent of whether IHC-PrP/IHC-Other is also
+        // saved for this block. Gating solely on the Histology trigger would render this orphaned
+        // Antibody code disabled, and the next Done/Next-block save would silently delete it
+        // (disabled checkboxes never post their value) — a real data-loss regression vs legacy.
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+        ]);
+        _lookups.Setup(l => l.GetLookupDataAsync(4, It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[
+            new LookupItem { Code = "AB01", Name = "Antibody 1" },
+        ]);
+        _lookups.Setup(l => l.GetLookupDataAsync(6, It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[
+            new LookupItem { Code = "ST01", Name = "Stain 1" },
+        ]);
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Histo.Submissions.Models.BatchTestSelections());
+        // This block has AB01/ST01 saved but no IHC-PrP/IHC-Other/Special Stain Histology code —
+        // an inconsistent state that must not have arisen under the new rules, but may already
+        // exist from data saved before this feature.
+        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[
+            new BlockTest { ID = 1, BlockID = 319181, TestType = BlockTestType.Histology, Code = HistologyCode.HAndE },
+            new BlockTest { ID = 2, BlockID = 319181, TestType = BlockTestType.Antibodies, Code = "AB01" },
+            new BlockTest { ID = 3, BlockID = 319181, TestType = BlockTestType.Stain, Code = "ST01" },
+        ]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+
+        await sut.OnGetAsync();
+
+        Assert.DoesNotContain(HistologyCode.IhcPrp, sut.ExistingHistologyCodes);
+        Assert.DoesNotContain(HistologyCode.SpecialStain, sut.ExistingHistologyCodes);
+        Assert.True(sut.AntibodiesEnabled);
+        Assert.True(sut.StainsEnabled);
+    }
+
+    [Fact]
+    public async Task AntibodiesEnabledAndStainsEnabled_NextBlockCreatedBlockWithNothingTicked_BothFalse()
+    {
+        // A Next-Block-created block starts with no Histology codes ticked — the Antibodies/
+        // Special stain sections stay visible (ShowAntibodies/ShowStains) but their checkboxes
+        // must render disabled until the user ticks IHC-PrP/IHC-Other/Special Stain on this block.
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319182, BatchID = 5, AnimalID = 2, BlockRef = "02" },
+        ]);
+        _lookups.Setup(l => l.GetLookupDataAsync(4, It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[
+            new LookupItem { Code = "AB01", Name = "Antibody 1" },
+        ]);
+        _lookups.Setup(l => l.GetLookupDataAsync(6, It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[
+            new LookupItem { Code = "ST01", Name = "Stain 1" },
+        ]);
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Histo.Submissions.Models.BatchTestSelections
+        {
+            Histology = [new BatchTestSelectionRow { ID = 1, BatchID = 5, Code = HistologyCode.IhcPrp }],
+            Antibodies = [new BatchTestSelectionRow { ID = 2, BatchID = 5, Code = "AB01" }],
+            Stains = [new BatchTestSelectionRow { ID = 3, BatchID = 5, Code = "ST01" }],
+        });
+        var sut = CreateSut(animalId: 2, blockId: 319182);
+        sut.IsFromNextBlock = true;
+
+        await sut.OnGetAsync();
+
+        Assert.False(sut.AntibodiesEnabled);
+        Assert.False(sut.StainsEnabled);
+    }
+
+    [Fact]
+    public async Task AntibodiesEnabledAndStainsEnabled_CarriedForwardTestsIncludeIhcAndSpecialStain_BothTrue()
+    {
+        // Carry-forward (CarryTestsToNextBlock) saves the prior block's codes onto the new block
+        // before redirecting — IHC-PrP/Special Stain being among them must enable, not just show,
+        // the dependent checkboxes on first load of that new block.
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319182, BatchID = 5, AnimalID = 2, BlockRef = "02" },
+        ]);
+        _lookups.Setup(l => l.GetLookupDataAsync(4, It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[
+            new LookupItem { Code = "AB01", Name = "Antibody 1" },
+        ]);
+        _lookups.Setup(l => l.GetLookupDataAsync(6, It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[
+            new LookupItem { Code = "ST01", Name = "Stain 1" },
+        ]);
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Histo.Submissions.Models.BatchTestSelections
+        {
+            Histology = [new BatchTestSelectionRow { ID = 1, BatchID = 5, Code = HistologyCode.IhcPrp }],
+            Antibodies = [new BatchTestSelectionRow { ID = 2, BatchID = 5, Code = "AB01" }],
+            Stains = [new BatchTestSelectionRow { ID = 3, BatchID = 5, Code = "ST01" }],
+        });
+        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BlockTest>)[
+            new BlockTest { ID = 1, BlockID = 319182, TestType = BlockTestType.Histology, Code = HistologyCode.IhcPrp },
+            new BlockTest { ID = 2, BlockID = 319182, TestType = BlockTestType.Histology, Code = HistologyCode.SpecialStain },
+            new BlockTest { ID = 3, BlockID = 319182, TestType = BlockTestType.Antibodies, Code = "AB01" },
+            new BlockTest { ID = 4, BlockID = 319182, TestType = BlockTestType.Stain, Code = "ST01" },
+        ]);
+        var sut = CreateSut(animalId: 2, blockId: 319182);
+        sut.IsFromNextBlock = true;
+
+        await sut.OnGetAsync();
+
+        Assert.True(sut.AntibodiesEnabled);
+        Assert.True(sut.StainsEnabled);
+    }
+
+    [Fact]
+    public async Task OnPostNextBlockAsync_AbandonedZeroTissueBlocksExist_SkipsThemAndResumesTheExactNextRef()
+    {
+        // Regression: editing block 01 and clicking "Next block" must always land on the true
+        // next sequential ref (02), even when blocks 02/03 already exist as abandoned, never-
+        // finished rows left behind by earlier "Next block" clicks the user didn't complete or
+        // explicitly cancel. Before this fix, those zero-tissue rows permanently reserved their
+        // ref numbers (only OnGetAsync's Add-block flow excluded/resumed them), so every repeat
+        // of this sequence pushed the numbering one block further — 02, then 03, then 04 — instead
+        // of resuming 02 as intended.
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+            new Block { ID = 319182, BatchID = 5, AnimalID = 2, BlockRef = "02" }, // abandoned, 0 tissues
+            new Block { ID = 319183, BatchID = 5, AnimalID = 2, BlockRef = "03" }, // abandoned, 0 tissues
+        ]);
+        // Only block 01 (the one being edited) has tissues — 02/03 are the abandoned rows.
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewBlockRef = "01";
+        sut.SelectedHistologyCodes = [HistologyCode.EO];
+
+        var result = await sut.OnPostNextBlockAsync();
+
+        // Resumes the existing abandoned block 319182 (ref "02") instead of creating a new row.
+        _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
+            It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+        var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+        Assert.Equal(319182, redirect.RouteValues?["blockId"]);
     }
 }
 

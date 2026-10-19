@@ -7,6 +7,11 @@
     <RootNamespace>Histo.Web</RootNamespace>
     <UserSecretsId>histo-web-dev-secrets</UserSecretsId>
     <Description>ASP.NET Core Razor Pages web host. Replaces HistopathologySystem (64 ASPX + 8 ASCX).</Description>
+    <!-- obj_copilot\ is an ad hoc -p:BaseOutputPath used to build/test around a locked bin/obj
+         (see repo build notes); the default content glob only excludes bin/obj, not this folder,
+         so without the exclusion its generated staticwebassets JSON gets copied in as bogus Content.
+         Matched at any depth (not just project-root) since a stale copy can end up nested under bin. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/obj_copilot/**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
