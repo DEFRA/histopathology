@@ -67,7 +67,7 @@ public class SearchTestModelTests
 
         Assert.IsType<Microsoft.AspNetCore.Mvc.FileContentResult>(result);
         _batches.Verify(b => b.GetTestPremiumChargeCountsAsync(
-            It.IsAny<string?>(), It.IsAny<int>(), It.Is<TestCodeSelection>(c => c.HistologyCodes.SequenceEqual(new[] { "1" })),
+            It.IsAny<string?>(), It.IsAny<int>(), It.Is<TestCodeSelection>(c => c.HistologyCodes.Count == 1 && c.HistologyCodes[0] == "1"),
             It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
