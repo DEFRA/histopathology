@@ -66,4 +66,40 @@ public class BatchServiceTests
 
         Assert.Null(await BuildSut().TryGetBatchTestSelectionsAsync(12));
     }
+
+    [Fact]
+    public async Task GetTestPremiumChargeCountsAsync_PassesTheCodeListsToTheRepository()
+    {
+        var codes = new TestCodeSelection(["1"], ["A1"], ["S1"]);
+        IReadOnlyList<TestPremiumChargeCount> counts = [new() { ProjectDescription = "P", PremiumCode = "TC 1", Count = 2 }];
+        _repoMock.Setup(r => r.GetTestPremiumChargeCountsAsync("P", 0, codes.HistologyCodes, codes.AntibodyCodes, codes.StainCodes, null, null, default))
+            .ReturnsAsync(counts);
+
+        var result = await BuildSut().GetTestPremiumChargeCountsAsync("P", 0, codes);
+
+        Assert.Same(counts, result);
+    }
+
+    [Fact]
+    public async Task GetTestPremiumChargeBatchesAsync_PassesTheCodeListsToTheRepository()
+    {
+        var codes = new TestCodeSelection(["1"], [], []);
+        IReadOnlyList<TestPremiumChargeBatchRef> batches = [new() { PremiumCode = "TC 1", BatchID = 7 }];
+        _repoMock.Setup(r => r.GetTestPremiumChargeBatchesAsync(null, 1, codes.HistologyCodes, codes.AntibodyCodes, codes.StainCodes, null, null, default))
+            .ReturnsAsync(batches);
+
+        var result = await BuildSut().GetTestPremiumChargeBatchesAsync(null, 1, codes);
+
+        Assert.Same(batches, result);
+    }
+
+    [Fact]
+    public async Task GetTestPremiumChargeCountsAsync_RepositoryThrows_ReturnsEmpty()
+    {
+        _repoMock.Setup(r => r.GetTestPremiumChargeCountsAsync(It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("boom"));
+
+        Assert.Empty(await BuildSut().GetTestPremiumChargeCountsAsync(null, 0, new TestCodeSelection([], [], [])));
+    }
 }

@@ -48,7 +48,7 @@ namespace Histo.Reporting.Reports;
 /// the Edit screen's auto-filled default verbatim) — otherwise it would print twice.
 /// </para>
 /// </summary>
-public sealed class QCNoteRenderer
+public static class QCNoteRenderer
 {
     static QCNoteRenderer()
     {

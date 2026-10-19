@@ -82,6 +82,27 @@ public class SampleSummaryModelTests
         Assert.Equal(1, _session.Object.BatchID);
     }
 
+    [Theory]
+    [InlineData("SenderRef", false, new[] { 1, 2 })]
+    [InlineData("SenderRef", true, new[] { 2, 1 })]
+    [InlineData("HistologyRef", true, new[] { 2, 1 })]
+    public async Task PagedEntries_SortsByTheSelectedColumn(string column, bool desc, int[] expectedIds)
+    {
+        _batches.Setup(b => b.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 1 });
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)
+        [
+            new Animal { ID = 1, SenderRef = "A", HistologyRef = "24/001" },
+            new Animal { ID = 2, SenderRef = "B", HistologyRef = "24/002" },
+        ]);
+        var sut = CreateSut();
+        sut.BatchId = 1;
+        await sut.OnGetAsync();
+        sut.SortColumn = column;
+        sut.SortDesc = desc;
+
+        Assert.Equal(expectedIds, sut.PagedEntries.Select(a => a.ID));
+    }
+
     [Fact]
     public async Task OnGetAsync_MoreThanOnePageOfSamples_PagedEntriesReturnsOnlyFirstPage()
     {

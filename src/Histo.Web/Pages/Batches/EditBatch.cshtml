@@ -82,7 +82,7 @@
         </div>
         <div class="govuk-grid-column-one-third">
             <div class="govuk-form-group">
-                <label class="govuk-label" for="OtherSubmittedArea">Submitted area</label>
+                <label class="govuk-label" for="@(Model.CanEditSubmittedArea ? "OtherSubmittedArea" : "OtherSubmittedAreaDisplay")">Submitted area</label>
                 @if (Model.CanEditSubmittedArea)
                 {
                     <select class="govuk-select" asp-for="OtherSubmittedArea" id="OtherSubmittedArea">
@@ -95,7 +95,7 @@
                 }
                 else
                 {
-                    <select class="govuk-select" id="OtherSubmittedAreaDisplay" aria-label="Submitted area" disabled>
+                    <select class="govuk-select" id="OtherSubmittedAreaDisplay" disabled>
                         <option value="">-- None --</option>
                         @foreach (var a in Model.UserAreas)
                         {

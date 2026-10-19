@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Data;
 using System.Data.Common;
+using System.Diagnostics.CodeAnalysis;
 using Histo.Infrastructure;
 
 namespace Histo.Tests.Support;
@@ -34,7 +35,7 @@ public sealed class FakeDb : IDbConnectionFactory
         private ConnectionState _state = ConnectionState.Closed;
 
         public FakeDb Db { get; } = db;
-        public override string ConnectionString { get; set; } = string.Empty;
+        [AllowNull] public override string ConnectionString { get; set; } = string.Empty;
         public override string Database => "fake";
         public override string DataSource => "fake";
         public override string ServerVersion => "0";
@@ -63,7 +64,7 @@ public sealed class FakeDb : IDbConnectionFactory
 
         internal FakeCommand(FakeConnection connection) => _connection = connection;
 
-        public override string CommandText { get; set; } = string.Empty;
+        [AllowNull] public override string CommandText { get; set; } = string.Empty;
         public override int CommandTimeout { get; set; }
         public override CommandType CommandType { get; set; }
         public override bool DesignTimeVisible { get; set; }
@@ -109,9 +110,9 @@ public sealed class FakeDb : IDbConnectionFactory
         public override DbType DbType { get; set; }
         public override ParameterDirection Direction { get; set; } = ParameterDirection.Input;
         public override bool IsNullable { get; set; }
-        public override string ParameterName { get; set; } = string.Empty;
+        [AllowNull] public override string ParameterName { get; set; } = string.Empty;
         public override int Size { get; set; }
-        public override string SourceColumn { get; set; } = string.Empty;
+        [AllowNull] public override string SourceColumn { get; set; } = string.Empty;
         public override bool SourceColumnNullMapping { get; set; }
         public override object? Value { get; set; }
         public override void ResetDbType() { }

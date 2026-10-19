@@ -41,7 +41,7 @@ namespace Histo.Reporting.Reports;
 /// </list>
 /// </para>
 /// </summary>
-public sealed class HistologyReportRenderer
+public static class HistologyReportRenderer
 {
     static HistologyReportRenderer()
     {
@@ -65,42 +65,36 @@ public sealed class HistologyReportRenderer
     /// <returns>PDF content as a byte array.</returns>
     public static Task<byte[]> RenderAsync(DataSet ds, int rowsPerPage = 13)
     {
-        DataRow? batch   = ds.Tables["Batch"]?.Rows.Count > 0
-            ? ds.Tables["Batch"]!.Rows[0] : null;
-        DataRow? postFix = ds.Tables["BatchPostFixation"]?.Rows.Count > 0
-            ? ds.Tables["BatchPostFixation"]!.Rows[0] : null;
+        DataRow? batch   = FirstRow(ds, "Batch");
+        DataRow? postFix = FirstRow(ds, "BatchPostFixation");
 
-        var histologyRows  = ds.Tables["BatchHistology"]?.Rows.Cast<DataRow>().ToList()  ?? [];
-        var submissionRows = ds.Tables["BatchSubmission"]?.Rows.Cast<DataRow>().ToList() ?? [];
+        var histologyRows  = RowsOf(ds, "BatchHistology");
+        var submissionRows = RowsOf(ds, "BatchSubmission");
 
-        var versionStr = ds.Tables["Version"]?.Rows.Count > 0
-            ? Field(ds.Tables["Version"]!.Rows[0], "Version")
-            : string.Empty;
+        var versionStr = FieldOrEmpty(FirstRow(ds, "Version"), "Version");
 
         // Pre-resolve values used in multiple sections.
-        var projectCode    = batch is not null ? Field(batch, "ProjectContractCode") : string.Empty;
-        var pathologist    = batch is not null ? Field(batch, "ContactName")         : string.Empty;
-        var submittedBy    = batch is not null ? Field(batch, "OtherSubmittedBy")    : string.Empty;
-        var submittedAs    = batch is not null ? Field(batch, "SubmittedAs")         : string.Empty;
-        var batchDate      = batch is not null ? FormatDate(Field(batch, "BatchDate"))     : string.Empty;
-        var dateReceived   = batch is not null ? FormatDate(Field(batch, "DateReceived"))  : string.Empty;
-        var timeReceived   = batch is not null ? Field(batch, "TimeReceived")        : string.Empty;
-        var species        = batch is not null ? Field(batch, "Species")             : string.Empty;
-        var batchType      = batch is not null ? Field(batch, "BatchType")           : string.Empty;
-        var adequatelyFixed = batch is not null
-            ? (Field(batch, "SafeToHandle") is "True" or "true" or "1" or "yes" or "Yes" ? "Yes" : "No")
-            : string.Empty;
-        var totalSamples   = batch is not null ? Field(batch, "NumberSamples")       : string.Empty;
-        var fixation       = batch is not null ? Field(batch, "Fixation")            : string.Empty;
-        var postFixOther   = batch is not null ? Field(batch, "PostFixationOther")   : string.Empty;
-        var comments       = batch is not null ? Field(batch, "Comments")            : string.Empty;
-        var commentLengthOk = batch is not null ? IsChecked(Field(batch, "CommentLengthOK")) : false;
-        var batchId        = batch is not null ? Field(batch, "ID")                  : string.Empty;
+        var projectCode    = FieldOrEmpty(batch, "ProjectContractCode");
+        var pathologist    = FieldOrEmpty(batch, "ContactName");
+        var submittedBy    = FieldOrEmpty(batch, "OtherSubmittedBy");
+        var submittedAs    = FieldOrEmpty(batch, "SubmittedAs");
+        var batchDate      = FormatDate(FieldOrEmpty(batch, "BatchDate"));
+        var dateReceived   = FormatDate(FieldOrEmpty(batch, "DateReceived"));
+        var timeReceived   = FieldOrEmpty(batch, "TimeReceived");
+        var species        = FieldOrEmpty(batch, "Species");
+        var batchType      = FieldOrEmpty(batch, "BatchType");
+        var adequatelyFixed = AdequatelyFixed(batch);
+        var totalSamples   = FieldOrEmpty(batch, "NumberSamples");
+        var fixation       = FieldOrEmpty(batch, "Fixation");
+        var postFixOther   = FieldOrEmpty(batch, "PostFixationOther");
+        var comments       = FieldOrEmpty(batch, "Comments");
+        var commentLengthOk = IsFlagSet(batch, "CommentLengthOK");
+        var batchId        = FieldOrEmpty(batch, "ID");
 
-        var decal  = postFix is not null ? IsChecked(Field(postFix, "Decal"))  : false;
-        var phenol = postFix is not null ? IsChecked(Field(postFix, "Phenol")) : false;
-        var formic = postFix is not null ? IsChecked(Field(postFix, "Formic")) : false;
-        var other  = postFix is not null ? IsChecked(Field(postFix, "Other"))  : false;
+        var decal  = IsFlagSet(postFix, "Decal");
+        var phenol = IsFlagSet(postFix, "Phenol");
+        var formic = IsFlagSet(postFix, "Formic");
+        var other  = IsFlagSet(postFix, "Other");
 
         byte[] pdf = Document.Create(container =>
         {
@@ -139,8 +133,7 @@ public sealed class HistologyReportRenderer
                                     left.Item().Text("Histology Required").Bold().FontSize(8);
 
                                     // HistologySubReport inlined (ADR-004): BatchHistology codes list.
-                                    foreach (var hrow in histologyRows)
-                                        left.Item().PaddingLeft(4).Text(Field(hrow, "Code")).FontSize(8);
+                                    AddHistologyCodes(left, histologyRows);
                                 });
 
                                 top.ConstantItem(6);
@@ -449,7 +442,16 @@ public sealed class HistologyReportRenderer
                        .Italic().FontSize(7.5f);
                 });
 
-                page.Content().Column(col =>
+                ComposeContent(page.Content(), submissionRows, rowsPerPage);
+            });
+        }).GeneratePdf();
+
+        return Task.FromResult(pdf);
+    }
+
+    private static void ComposeContent(IContainer container, List<DataRow> submissionRows, int rowsPerPage)
+    {
+                container.Column(col =>
                 {
                     // ════════════════════════════════════════════════════════════
                     // SECTIONS 1 + 2 — PageHeader + Detail
@@ -558,13 +560,33 @@ public sealed class HistologyReportRenderer
                     }
 
                 });
-            });
-        }).GeneratePdf();
-
-        return Task.FromResult(pdf);
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────────
+
+    private static DataRow? FirstRow(DataSet ds, string table) =>
+        ds.Tables[table]?.Rows.Count > 0 ? ds.Tables[table]!.Rows[0] : null;
+
+    private static List<DataRow> RowsOf(DataSet ds, string table) =>
+        ds.Tables[table]?.Rows.Cast<DataRow>().ToList() ?? [];
+
+    private static string FieldOrEmpty(DataRow? row, string column) =>
+        row is null ? string.Empty : Field(row, column);
+
+    private static bool IsFlagSet(DataRow? row, string column) =>
+        row is not null && IsChecked(Field(row, column));
+
+    private static string AdequatelyFixed(DataRow? batch)
+    {
+        if (batch is null) return string.Empty;
+        return Field(batch, "SafeToHandle") is "True" or "true" or "1" or "yes" or "Yes" ? "Yes" : "No";
+    }
+
+    private static void AddHistologyCodes(ColumnDescriptor column, List<DataRow> histologyRows)
+    {
+        foreach (var hrow in histologyRows)
+            column.Item().PaddingLeft(4).Text(Field(hrow, "Code")).FontSize(8);
+    }
 
     /// <summary>    /// Renders a legacy-style square checkbox (a bordered box, not a tiny Unicode glyph) followed
     /// by its label. When <paramref name="trailingLine"/> is set, a fill-in underline follows the
