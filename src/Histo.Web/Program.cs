@@ -126,7 +126,11 @@ try
     //   .AddSqlServer(connectionString, name: "histology-db", tags: ["db"]);
 
     // -- Razor Pages + MVC controllers (controllers needed for SAML2 endpoints) --
-    builder.Services.AddRazorPages()
+    builder.Services.AddRazorPages(options =>
+                    {
+                        options.Conventions.AddFolderApplicationModelConvention(
+                            "/Admin", model => model.Filters.Add(new Histo.Web.Auth.MaintenanceOnlyPageFilter()));
+                    })
                     .AddSessionStateTempDataProvider();
     builder.Services.AddControllers(); // AuthController (SAML2 protocol endpoints)
     builder.Services.AddHttpClient();  // required for async IdP metadata loading post-build
