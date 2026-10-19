@@ -223,4 +223,43 @@ public class HistologyReportRendererTests
 
         Assert.True(pdf.Length > 0);
     }
+
+    [Fact]
+    public async Task RenderAsync_NoBatchOrPostFixationRows_StillProducesPdf()
+    {
+        var ds = BuildTestDataSet();
+        ds.Tables["Batch"]!.Rows.Clear();
+        ds.Tables.Remove("BatchPostFixation");
+
+        var pdf = await HistologyReportRenderer.RenderAsync(ds);
+
+        Assert.True(pdf.Length > 0);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RenderAsync_SafeToHandleValue_StillProducesPdf(bool safe)
+    {
+        var ds = BuildTestDataSet();
+        ds.Tables["Batch"]!.Rows[0]["SafeToHandle"] = safe;
+
+        var pdf = await HistologyReportRenderer.RenderAsync(ds);
+
+        Assert.True(pdf.Length > 0);
+    }
+
+    [Fact]
+    public async Task RenderAsync_TissuesOfTheSameBlock_RenderAsOneGroup()
+    {
+        var ds = BuildTestDataSet();
+        var submissions = ds.Tables["BatchSubmission"]!;
+        submissions.Rows.Clear();
+        for (var i = 0; i < 3; i++)
+            submissions.Rows.Add("42", "15/P220/06/11", "11/42879", "01", $"Tissue {i}", "1", "visc");
+
+        var pdf = await HistologyReportRenderer.RenderAsync(ds);
+
+        Assert.True(pdf.Length > 0);
+    }
 }

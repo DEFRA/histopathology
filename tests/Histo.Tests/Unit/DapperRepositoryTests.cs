@@ -157,6 +157,44 @@ public class DapperRepositoryTests
         Assert.Equal(BlockStatus.PreBooked, insert.Parameters["Status"]);
     }
 
+    [Fact]
+    public async Task BlockBookPreBookedBlocksAsync_BooksFreeRefsAgainstANewAnimalAndSkipsTakenOnes()
+    {
+        var db = new FakeDb
+        {
+            OnQuery = c => c.Text == "GetBlocksForSenderRef"
+                ? new DataSet().Also(ds => ds.Tables.Add(Table("taken", ("BlockRef", typeof(int))).Also(t => t.Rows.Add(1))))
+                : null,
+            OnExecute = c =>
+            {
+                if (c.Text == "sp_getapplock") c.Command.Parameters["RETURN_VALUE"].Value = 0;
+                if (c.Text == "AddAnimal") c.Command.Parameters["NewID"].Value = 9;
+            },
+        };
+
+        var results = await new BlockRepository(db).BookPreBookedBlocksAsync("S1", [1, 2, 3]);
+
+        Assert.Equal(
+            [PreBookedBlockOutcome.AlreadyExists, PreBookedBlockOutcome.Booked, PreBookedBlockOutcome.Booked],
+            results.Select(r => r.Outcome));
+        Assert.All(db.Commands.Where(c => c.Text == "AddBlock"), c => Assert.Equal(9, c.Parameters["AnimalID"]));
+        Assert.Single(db.Commands, c => c.Text == "AddAnimal");
+        Assert.True(db.Committed);
+    }
+
+    [Fact]
+    public async Task BlockBookPreBookedBlocksAsync_AnimalCannotBeCreated_ReportsNoSample()
+    {
+        var db = new FakeDb
+        {
+            OnExecute = c => { if (c.Text == "sp_getapplock") c.Command.Parameters["RETURN_VALUE"].Value = 0; },
+        };
+
+        var results = await new BlockRepository(db).BookPreBookedBlocksAsync("S1", [4]);
+
+        Assert.Equal(PreBookedBlockOutcome.NoSample, Assert.Single(results).Outcome);
+    }
+
     private static DataTable RefTable(params string[] refs)
     {
         var table = Table("refs", ("BlockRef", typeof(string)));
@@ -167,6 +205,12 @@ public class DapperRepositoryTests
 
 internal static class DataSetExtensions
 {
+    public static DataTable Also(this DataTable table, Action<DataTable> configure)
+    {
+        configure(table);
+        return table;
+    }
+
     public static DataSet Also(this DataSet ds, Action<DataSet> configure)
     {
         configure(ds);
