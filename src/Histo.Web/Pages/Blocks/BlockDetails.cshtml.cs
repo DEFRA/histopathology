@@ -131,7 +131,13 @@ public class BlockDetailsModel : HistoPageModel
     public Animal? Animal { get; private set; }
     public Batch? Batch { get; private set; }
     public Block? Block { get; private set; }
-    public bool IsPreCassetted => Batch?.IsPreCassetted == true;
+
+    /// <summary>
+    /// True only for SubmittedAs code "5" (genuinely Pre-Cassetted Tissue) — NOT the same as
+    /// Batch.IsPreCassetted (DB Cassetted column, true for any non-Wet-Tissue type). Legacy:
+    /// Common.vb::IsBatchPreCassetted. Set in LoadSupportingDataAsync.
+    /// </summary>
+    public bool IsPreCassetted { get; private set; }
 
     /// <summary>Mirrors SubmissionDetailsBlockModel.ShowHistologyRefTypePicker's area check.</summary>
     public bool IsHistopathAreaUser =>
@@ -875,6 +881,7 @@ public class BlockDetailsModel : HistoPageModel
         Batch = await _batches.GetByIdAsync(BatchId ?? 0);
 
         var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(BatchId ?? 0);
+        IsPreCassetted = Histo.Core.Domain.ValidationHelpers.IsBatchPreCassetted(submittedAsCode);
         // Legacy: EnableDisableAdditionalRequest — disabled for Wet Tissue(1)/Stained Section(3)/Pre Cassetted(5).
         CanUseAdditionalRequest = submittedAsCode is not ("1" or "3" or "5");
 

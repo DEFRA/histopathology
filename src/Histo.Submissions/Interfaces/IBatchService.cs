@@ -91,6 +91,12 @@ public interface IBatchService
     /// </summary>
     Task<bool> SetCompletedAsync(int batchId, DateTime completedDate, int userId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Marks a batch In progress, leaving all other fields intact. Returns <see langword="false"/>
+    /// on failure. Legacy source: <c>QualityData.aspx.vb</c> — <c>UpdateSubmissionStatus</c>.
+    /// </summary>
+    Task<bool> SetInProgressAsync(int batchId, int userId, CancellationToken ct = default);
+
     // -----------------------------------------------------------------------
     // Batch-level test type selections (Histology / Antibodies / Special Stains)
     // -----------------------------------------------------------------------

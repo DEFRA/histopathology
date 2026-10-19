@@ -225,12 +225,14 @@ public class AddSubmissionModel : HistoPageModel
         }
 
         Session.BatchSubmissionID = submissionId;
-        var batch = await _batches.GetByIdAsync(batchId);
+        // Narrow check (SubmittedAs code "5" only) — NOT Batch.IsPreCassetted, which is true for
+        // every non-Wet-Tissue type and would wrongly demand a pre-booked block for Wax Block etc.
+        var isGenuinelyPreCassetted = Histo.Core.Domain.ValidationHelpers.IsBatchPreCassetted(await _batches.GetSubmittedAsCodeAsync(batchId));
 
         if (ShouldUseMouseRange())
             return await OnPostMouseRangeAsync(batchId);
 
-        var (newAnimalId, createError) = await CreateAnimalForSenderAsync(submissionId.Value, batch, SenderRef);
+        var (newAnimalId, createError) = await CreateAnimalForSenderAsync(submissionId.Value, isGenuinelyPreCassetted, SenderRef);
         if (createError is not null)
         {
             ModelError = createError;
@@ -558,7 +560,7 @@ public class AddSubmissionModel : HistoPageModel
     /// Animal for <paramref name="senderRef"/>. Shared by the single Sender Ref path and the
     /// mouse-range loop in <see cref="OnPostMouseRangeAsync"/>.
     /// </summary>
-    private async Task<(int AnimalId, string? Error)> CreateAnimalForSenderAsync(int submissionId, Batch? batch, string senderRef)
+    private async Task<(int AnimalId, string? Error)> CreateAnimalForSenderAsync(int submissionId, bool isGenuinelyPreCassetted, string senderRef)
     {
         // Pre-cassetted samples may only use a block ref already pre-booked for this sender
         // (Book Blocks) — legacy: clsBlock.NewBlock -> GetPreBookedBlock. Checking here, before
@@ -568,7 +570,7 @@ public class AddSubmissionModel : HistoPageModel
         // Regression note: this check existed previously and was silently dropped as collateral
         // damage by an unrelated refactor (commit e40a473) that removed the IBlockService
         // dependency this page no longer used for anything else at the time — restored here.
-        if (batch?.IsPreCassetted == true)
+        if (isGenuinelyPreCassetted)
         {
             // A sender ref can match more than one animal row (e.g. an unrelated past submission
             // with no pre-booked blocks, alongside the actual pre-booked placeholder) — check each

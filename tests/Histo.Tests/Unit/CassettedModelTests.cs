@@ -108,6 +108,31 @@ public class CassettedModelTests
         Assert.True(sut.Errors.ContainsKey("SubmittedAs"));
     }
 
+    /// <summary>
+    /// Regression: legacy (Cassetted.aspx.vb::btnYes_Click) sets Cassetted from the selected
+    /// item's TEXT ("Wet Tissue" vs anything else), not from a hardcoded "code 5 = pre-cassetted"
+    /// check — Wax Block/Stained/Unstained Section (codes 2/3/4) must also set Cassetted=true,
+    /// or they wrongly end up on BatchesReceived (Wet-Tissue-only) instead of BatchesForDispatch.
+    /// </summary>
+    [Theory]
+    [InlineData("2", "Wax Block", "True")]
+    [InlineData("3", "Stained Section", "True")]
+    [InlineData("4", "Unstained Section", "True")]
+    [InlineData("5", "Pre Cassetted Tissue", "True")]
+    [InlineData("1", "Wet Tissue", "False")]
+    public async Task OnPostAsync_SetsCassettedFlag_FromWetTissueDescriptionNotCodeFive(
+        string code, string name, string expectedCassetted)
+    {
+        _lookups.Setup(l => l.GetLookupDataAsync(11, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 0, Code = code, Name = name }]);
+        var sut = CreateSut();
+        sut.SubmittedAs = code;
+
+        await sut.OnPostAsync();
+
+        Assert.Equal(expectedCassetted, sut.TempData["CreateIsPreCassetted"]);
+    }
+
     [Fact]
     public async Task OnGetAsync_Restore_RestoresTheSubmissionTypeCodeFromTempData()
     {

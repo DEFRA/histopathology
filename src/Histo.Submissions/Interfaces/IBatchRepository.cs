@@ -70,18 +70,20 @@ public interface IBatchRepository
     Task SetCustomerReceivedDateAsync(int batchId, DateTime? date, byte[] rowStamp, int userId, CancellationToken ct = default);
 
     /// <summary>
-    /// Updates batch status. Maps to <c>EditBatchStatus</c>.
-    /// Throws <see cref="BatchConcurrencyException"/> on rowstamp mismatch.
-    /// </summary>
-    Task<bool> UpdateStatusAsync(int batchId, string newStatus, int userId, CancellationToken ct = default);
-
-    /// <summary>
     /// Marks a batch Completed and stamps its completed date, preserving every other field.
     /// Legacy source: <c>QualityData.aspx.vb</c> — <c>UpdateSessionWithQualityData</c> sets
     /// <c>BatchStatus = STATUS_COMPLETED</c> and <c>DateCompleted</c> once every test on the
     /// batch has been dispatched.
     /// </summary>
     Task SetCompletedAsync(int batchId, DateTime completedDate, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Marks a batch In progress, preserving every other field. Legacy source:
+    /// <c>QualityData.aspx.vb</c> — <c>UpdateSubmissionStatus</c> sets the in-memory row's status,
+    /// then persists via the same full-row <c>EditBatch</c> save as every other field — legacy has
+    /// no dedicated status-only SP call. Mirrors <see cref="SetCompletedAsync"/>'s pattern exactly.
+    /// </summary>
+    Task SetInProgressAsync(int batchId, int userId, CancellationToken ct = default);
 
     /// <summary>
     /// Persists the ByPassSort flag. Reloads current batch to supply the full EditBatch parameter set.
