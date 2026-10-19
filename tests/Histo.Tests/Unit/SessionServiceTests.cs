@@ -41,7 +41,7 @@ public class SessionServiceTests
     [Fact]
     public void SessionErrorModel_OnGet_DoesNothing()
     {
-        new SessionErrorModel().OnGet();
+        Assert.Null(Record.Exception(() => new SessionErrorModel().OnGet()));
     }
 
     private sealed class FakeSession : ISession
@@ -56,6 +56,6 @@ public class SessionServiceTests
         public Task LoadAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public void Remove(string key) => _store.Remove(key);
         public void Set(string key, byte[] value) => _store[key] = value;
-        public bool TryGetValue(string key, out byte[]? value) => _store.TryGetValue(key, out value);
+        public bool TryGetValue(string key, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out byte[]? value) => _store.TryGetValue(key, out value);
     }
 }

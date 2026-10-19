@@ -23,6 +23,7 @@ namespace Histo.Tests.Unit;
 public class CopySamplesModelTests
 {
     private static readonly string[] AntibodyF99 = ["F99"];
+    private static readonly string[] HistologyCodes = ["H&E(BSE)", "IHC-PrP"];
 
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<IBatchService> _batches = new();
@@ -85,7 +86,7 @@ public class CopySamplesModelTests
 
         _blockTests.Verify(t => t.SaveTestSelectionsAsync(
             5, 55,
-            It.Is<IReadOnlyList<string>>(c => c.SequenceEqual(new[] { "H&E(BSE)", "IHC-PrP" })),
+            It.Is<IReadOnlyList<string>>(c => c.SequenceEqual(HistologyCodes)),
             It.Is<IReadOnlyList<string>>(c => c.SequenceEqual(AntibodyF99)),
             It.Is<IReadOnlyList<string>>(c => c.Count == 0),
             It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);

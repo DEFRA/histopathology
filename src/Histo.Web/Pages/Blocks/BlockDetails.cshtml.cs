@@ -272,7 +272,7 @@ public class BlockDetailsModel : HistoPageModel
             if (!IsPreCassetted)
                 usedRefs = usedRefs.Concat((await _blocks.GetPreBookedByAnimalAsync(Animal.ID) ?? []).Select(b => b.BlockRef));
             NewBlockRef = IsPreCassetted
-                ? (PreBookedBlockRefs.Count > 0 ? PreBookedBlockRefs[0].BlockRef : null)
+                ? FirstPreBookedRef()
                 : BlockHelpers.ComputeNextBlockRef(usedRefs, Animal.NextBlockRef);
 
             if (string.IsNullOrWhiteSpace(NewBlockRef))
@@ -863,6 +863,9 @@ public class BlockDetailsModel : HistoPageModel
             return "IHC selected — at least one antibody test must be selected.";
         return null;
     }
+
+    private string? FirstPreBookedRef() =>
+        PreBookedBlockRefs.Count > 0 ? PreBookedBlockRefs[0].BlockRef : null;
 
     private async Task<IReadOnlyList<string>> GetOtherBatchRefsAsync(int animalId) =>
         await _blocks.GetBlockRefsOnOtherBatchesAsync(animalId, BatchId ?? 0) ?? [];

@@ -126,6 +126,37 @@ public class DapperRepositoryTests
         Assert.True(db.Committed);
     }
 
+    [Fact]
+    public async Task BlockTestRepository_BatchWithNoBlocks_ReturnsNoTests_ForBothReaders()
+    {
+        var db = new FakeDb
+        {
+            OnQuery = c =>
+            {
+                var ds = new DataSet();
+                for (var i = 0; i < 10; i++) ds.Tables.Add(Table($"set{i}", ("ID", typeof(int))));
+                return c.Text == "GetBatchBlocksByID" ? ds : null;
+            },
+        };
+        var repo = new BlockTestRepository(db);
+
+        Assert.Empty(await repo.GetByBatchAsync(5));
+        Assert.Empty(await repo.GetAllSelectionsByBatchAsync(5));
+    }
+
+    [Fact]
+    public async Task BlockCreatePreBookedBlockAsync_InsertsAPreBookedPlaceholderForTheAnimal()
+    {
+        var db = new FakeDb();
+
+        await new BlockRepository(db).CreatePreBookedBlockAsync(2, "05");
+
+        var insert = Assert.Single(db.Commands, c => c.Text == "AddBlock");
+        Assert.Equal(2, insert.Parameters["AnimalID"]);
+        Assert.Equal("05", insert.Parameters["BlockRef"]);
+        Assert.Equal(BlockStatus.PreBooked, insert.Parameters["Status"]);
+    }
+
     private static DataTable RefTable(params string[] refs)
     {
         var table = Table("refs", ("BlockRef", typeof(string)));

@@ -174,6 +174,11 @@ public sealed class BlockRepository : IBlockRepository
     public async Task CreatePreBookedBlockAsync(int animalId, string blockRef, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
+        await conn.ExecuteAsync("AddBlock", PreBookedBlockParameters(animalId, blockRef), commandType: System.Data.CommandType.StoredProcedure);
+    }
+
+    private static DynamicParameters PreBookedBlockParameters(int animalId, string blockRef)
+    {
         var parameters = new DynamicParameters();
         parameters.Add("ID", 0);
         parameters.Add("BatchID", dbType: System.Data.DbType.Int32, value: DBNull.Value);
@@ -186,8 +191,7 @@ public sealed class BlockRepository : IBlockRepository
         parameters.Add("Order", dbType: System.Data.DbType.Int32, value: DBNull.Value);
         parameters.Add("OldID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
         parameters.Add(NewIdParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
-
-        await conn.ExecuteAsync("AddBlock", parameters, commandType: System.Data.CommandType.StoredProcedure);
+        return parameters;
     }
 
     /// <inheritdoc/>
@@ -296,20 +300,7 @@ public sealed class BlockRepository : IBlockRepository
     /// <summary>Inserts one pre-booked placeholder inside the booking transaction.</summary>
     private static async Task InsertPreBookedBlockAsync(IDbConnection conn, IDbTransaction tx, int animalId, string blockRef)
     {
-        var parameters = new DynamicParameters();
-        parameters.Add("ID", 0);
-        parameters.Add("BatchID", dbType: System.Data.DbType.Int32, value: DBNull.Value);
-        parameters.Add("AnimalID", animalId);
-        parameters.Add("BlockRef", blockRef);
-        parameters.Add("CustomerRef", " ");
-        parameters.Add("RepeatBlock", false);
-        parameters.Add("Comment", " ");
-        parameters.Add("Status", BlockStatus.PreBooked);
-        parameters.Add("Order", dbType: System.Data.DbType.Int32, value: DBNull.Value);
-        parameters.Add("OldID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
-        parameters.Add(NewIdParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
-
-        await conn.ExecuteAsync("AddBlock", parameters, tx, commandType: System.Data.CommandType.StoredProcedure);
+        await conn.ExecuteAsync("AddBlock", PreBookedBlockParameters(animalId, blockRef), tx, commandType: System.Data.CommandType.StoredProcedure);
     }
 
     // -----------------------------------------------------------------------

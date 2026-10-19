@@ -51,6 +51,44 @@ public class SearchTestModelTests
         };
 
     [Fact]
+    public async Task OnGetExportOutputsExcelAsync_QueriesWithTheSelectedCodes_AndReturnsAWorkbook()
+    {
+        _batches.Setup(b => b.GetTestPremiumChargeCountsAsync(
+                It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<TestCodeSelection>(),
+                It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<TestPremiumChargeCount>)
+            [
+                new() { ProjectDescription = "Project A", PremiumCode = "TC 0008", Count = 3 },
+            ]);
+        var sut = CreateSut();
+        sut.SelectedHistology = ["1"];
+
+        var result = await sut.OnGetExportOutputsExcelAsync();
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.FileContentResult>(result);
+        _batches.Verify(b => b.GetTestPremiumChargeCountsAsync(
+            It.IsAny<string?>(), It.IsAny<int>(), It.Is<TestCodeSelection>(c => c.HistologyCodes.SequenceEqual(new[] { "1" })),
+            It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnGetExportSubmissionsExcelAsync_ReturnsAWorkbookOfSubmissionsPerPremiumCode()
+    {
+        _batches.Setup(b => b.GetTestPremiumChargeBatchesAsync(
+                It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<TestCodeSelection>(),
+                It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<TestPremiumChargeBatchRef>)
+            [
+                new() { PremiumCode = "TC 0008", BatchID = 101 },
+            ]);
+        var sut = CreateSut();
+
+        var result = await sut.OnGetExportSubmissionsExcelAsync();
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.FileContentResult>(result);
+    }
+
+    [Fact]
     public async Task OnGetAsync_PivotsCountsPerProjectAndPremiumCode_FillingZeroForMissingCombinations()
     {
         _batches.Setup(b => b.GetTestPremiumChargeCountsAsync(
