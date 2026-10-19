@@ -449,118 +449,98 @@ public static class HistologyReportRenderer
         return Task.FromResult(pdf);
     }
 
+    // 13-column submission table, paginated at rowsPerPage rows per page (legacy default 13).
+    // Column headers repeat per chunk; the report header and 4-panel footer repeat via the page-level
+    // Header()/Footer(). Columns 1–4 carry data; columns 5–13 are pre-printed blanks.
     private static void ComposeContent(IContainer container, List<DataRow> submissionRows, int rowsPerPage)
     {
-                container.Column(col =>
-                {
-                    // ════════════════════════════════════════════════════════════
-                    // SECTIONS 1 + 2 — PageHeader + Detail
-                    // 13-column submission table, paginated at exactly 13 rows per page
-                    // (matches legacy Crystal Reports). Column headers repeat per chunk;
-                    // the report header (SECTION 0) and 4-panel footer repeat via the
-                    // page-level Header()/Footer(), so every page carries both.
-                    // Columns 1–4 carry data; columns 5–13 are pre-printed blanks.
-                    // RepeatBlock rule: "*" suffix on BlockRef when truthy.
-                    // ════════════════════════════════════════════════════════════
-                    // Configurable page size (legacy default 13); guarded against non-positive values.
-                    int RowsPerPage = rowsPerPage > 0 ? rowsPerPage : 13;
-                    var pageChunks = submissionRows
-                        .Select((row, i) => (row, i))
-                        .GroupBy(x => x.i / RowsPerPage)
-                        .Select(g => g.Select(x => x.row).ToList())
-                        .ToList();
-                    if (pageChunks.Count == 0) pageChunks.Add([]);
+        var size = rowsPerPage > 0 ? rowsPerPage : 13;
+        var pageChunks = submissionRows
+            .Select((row, i) => (row, i))
+            .GroupBy(x => x.i / size)
+            .Select(g => g.Select(x => x.row).ToList())
+            .ToList();
+        if (pageChunks.Count == 0) pageChunks.Add([]);
 
-                    for (int chunkIndex = 0; chunkIndex < pageChunks.Count; chunkIndex++)
-                    {
-                        var chunk = pageChunks[chunkIndex];
-                        col.Item().Table(t =>
-                        {
-                            t.ColumnsDefinition(c =>
-                            {
-                                c.RelativeColumn(10); // 1  Sender Ref
-                                c.RelativeColumn(9);  // 2  Histology Ref
-                                c.RelativeColumn(6);  // 3  Block Ref
-                                c.RelativeColumn(9);  // 4  Tissue Code
-                                c.RelativeColumn(6);  // 5  Block      (blank)
-                                c.RelativeColumn(5);  // 6  Cass       (blank)
-                                c.RelativeColumn(6);  // 7  Embed      (blank)
-                                c.RelativeColumn(6);  // 8  Section    (blank)
-                                c.RelativeColumn(7);  // 9  Block Filed (blank)
-                                c.RelativeColumn(6);  // 10 Stain      (blank)
-                                c.RelativeColumn(6);  // 11 QC Code    (blank)
-                                c.RelativeColumn(14); // 12 Comments   (CustomerRef)
-                                c.RelativeColumn(10); // 13 Dispatch   (blank)
-                            });
+        container.Column(col =>
+        {
+            for (int chunkIndex = 0; chunkIndex < pageChunks.Count; chunkIndex++)
+            {
+                var chunk = pageChunks[chunkIndex];
+                col.Item().Table(t => ComposeSubmissionTable(t, chunk));
 
-                            t.Header(h =>
-                            {
-                                void Th(string lbl) =>
-                                    h.Cell()
-                                     .Background(Colors.Grey.Lighten3)
-                                     .Border(0.5f)
-                                     .PaddingVertical(2).PaddingHorizontal(2)
-                                     .Text(lbl).Bold().FontSize(7.5f);
-
-                                Th("Sender Ref");
-                                Th("Histology\nRef");
-                                Th("Block\nRef");
-                                Th("Tissue\nCode");
-                                Th("Block");
-                                Th("Cass");
-                                Th("Embed");
-                                Th("Section");
-                                Th("Block\nFiled");
-                                Th("Stain");
-                                Th("QC\nCode");
-                                Th("Comments");
-                                Th("Dispatch");
-                            });
-
-                            DataRow? prevRow = null;
-                            foreach (var row in chunk)
-                            {
-                                // Legacy: further tissues of the same block leave Sender/Histology/Block Ref
-                                // blank so the block reads as one group; refs repeat at the top of each page.
-                                // Tissues not yet in a block have no Block Ref, so they group per sample.
-                                var continuesBlock = prevRow is not null
-                                    && Field(row, "BlockRef") == Field(prevRow, "BlockRef")
-                                    && Field(row, "SenderRef") == Field(prevRow, "SenderRef")
-                                    && Field(row, "HistologyRef") == Field(prevRow, "HistologyRef");
-                                prevRow = row;
-
-                                var repeatMark = IsRepeatBlock(Field(row, "RepeatBlock")) ? "*" : string.Empty;
-                                var blockRef = continuesBlock ? string.Empty : Field(row, "BlockRef") + repeatMark;
-
-                                void Td(string v) =>
-                                    t.Cell().Border(0.5f)
-                                     .PaddingVertical(2).PaddingHorizontal(2)
-                                     .Text(v).FontSize(8);
-
-                                Td(continuesBlock ? string.Empty : Field(row, "SenderRef"));
-                                Td(continuesBlock ? string.Empty : Field(row, "HistologyRef"));
-                                Td(blockRef);
-                                Td(Field(row, "TissueDetails"));
-                                Td(string.Empty); // Block
-                                Td(string.Empty); // Cass
-                                Td(string.Empty); // Embed
-                                Td(string.Empty); // Section
-                                Td(string.Empty); // Block Filed
-                                Td(string.Empty); // Stain
-                                Td(string.Empty); // QC Code
-                                // Block-level field (same for every tissue in the block) — suppress on continuation rows, same as Sender/Histology Ref.
-                                Td(continuesBlock ? string.Empty : Field(row, "CustomerRef")); // Comments column
-                                Td(string.Empty); // Dispatch
-                            }
-                        });
-
-                        // Force a new page after each full chunk except the last.
-                        if (chunkIndex < pageChunks.Count - 1)
-                            col.Item().PageBreak();
-                    }
-
-                });
+                // Force a new page after each full chunk except the last.
+                if (chunkIndex < pageChunks.Count - 1)
+                    col.Item().PageBreak();
+            }
+        });
     }
+
+    private static void ComposeSubmissionTable(TableDescriptor t, List<DataRow> chunk)
+    {
+        t.ColumnsDefinition(c =>
+        {
+            c.RelativeColumn(10); // 1  Sender Ref
+            c.RelativeColumn(9);  // 2  Histology Ref
+            c.RelativeColumn(6);  // 3  Block Ref
+            c.RelativeColumn(9);  // 4  Tissue Code
+            c.RelativeColumn(6);  // 5  Block      (blank)
+            c.RelativeColumn(5);  // 6  Cass       (blank)
+            c.RelativeColumn(6);  // 7  Embed      (blank)
+            c.RelativeColumn(6);  // 8  Section    (blank)
+            c.RelativeColumn(7);  // 9  Block Filed (blank)
+            c.RelativeColumn(6);  // 10 Stain      (blank)
+            c.RelativeColumn(6);  // 11 QC Code    (blank)
+            c.RelativeColumn(14); // 12 Comments   (CustomerRef)
+            c.RelativeColumn(10); // 13 Dispatch   (blank)
+        });
+
+        t.Header(h =>
+        {
+            foreach (var label in SubmissionHeaders)
+                h.Cell()
+                 .Background(Colors.Grey.Lighten3)
+                 .Border(0.5f)
+                 .PaddingVertical(2).PaddingHorizontal(2)
+                 .Text(label).Bold().FontSize(7.5f);
+        });
+
+        DataRow? prevRow = null;
+        foreach (var row in chunk)
+        {
+            // Legacy: further tissues of the same block leave Sender/Histology/Block Ref
+            // blank so the block reads as one group; refs repeat at the top of each page.
+            // Tissues not yet in a block have no Block Ref, so they group per sample.
+            var continuesBlock = prevRow is not null
+                && Field(row, "BlockRef") == Field(prevRow, "BlockRef")
+                && Field(row, "SenderRef") == Field(prevRow, "SenderRef")
+                && Field(row, "HistologyRef") == Field(prevRow, "HistologyRef");
+            prevRow = row;
+
+            var repeatMark = IsRepeatBlock(Field(row, "RepeatBlock")) ? "*" : string.Empty;
+            string Lead(string column) => continuesBlock ? string.Empty : Field(row, column);
+
+            AddCell(t, Lead("SenderRef"));
+            AddCell(t, Lead("HistologyRef"));
+            AddCell(t, continuesBlock ? string.Empty : Field(row, "BlockRef") + repeatMark);
+            AddCell(t, Field(row, "TissueDetails"));
+            for (var blank = 0; blank < 7; blank++) AddCell(t, string.Empty); // Block..QC Code
+            // Block-level field — suppressed on continuation rows, same as Sender/Histology Ref.
+            AddCell(t, Lead("CustomerRef")); // Comments
+            AddCell(t, string.Empty); // Dispatch
+        }
+    }
+
+    private static readonly string[] SubmissionHeaders =
+    [
+        "Sender Ref", "Histology\nRef", "Block\nRef", "Tissue\nCode", "Block", "Cass", "Embed",
+        "Section", "Block\nFiled", "Stain", "QC\nCode", "Comments", "Dispatch",
+    ];
+
+    private static void AddCell(TableDescriptor t, string value) =>
+        t.Cell().Border(0.5f)
+         .PaddingVertical(2).PaddingHorizontal(2)
+         .Text(value).FontSize(8);
 
     // ── Private helpers ──────────────────────────────────────────────────────────
 

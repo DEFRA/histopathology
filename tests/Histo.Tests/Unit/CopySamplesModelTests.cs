@@ -92,6 +92,37 @@ public class CopySamplesModelTests
             It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Theory]
+    [InlineData(21, "boom")]
+    [InlineData(22, "boom 1 block(s) were copied successfully before this failure.")]
+    public async Task OnPostCopyAsync_CopyFails_ReportsTheFailureAndHowManyBlocksWereCopied(int failingAnimalId, string expected)
+    {
+        var sourceBlock = new Block { ID = 1, BatchID = 9, AnimalID = 100, BlockRef = "01" };
+        _batches.Setup(b => b.GetByIdAsync(9, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 9 });
+        _blocks.Setup(b => b.GetByBatchAsync(9, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[sourceBlock]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(9, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 100, SenderRef = "C1" }]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 21, SenderRef = "T1" }, new Animal { ID = 22, SenderRef = "T2" }]);
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(9, 1, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[]);
+        _blocks.Setup(b => b.CopyBlockAsync(sourceBlock, 5, It.IsAny<int>(), It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>()))
+            .ReturnsAsync(55);
+        _blocks.Setup(b => b.CopyBlockAsync(sourceBlock, 5, failingAnimalId, It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>()))
+            .ThrowsAsync(new InvalidOperationException("boom"));
+
+        var sut = CreateSut();
+        sut.SourceBatchId = 9;
+        sut.SourceAnimalId = 100;
+        sut.TargetAnimalIds = [21, 22];
+
+        await sut.OnPostCopyAsync();
+
+        Assert.Equal(expected, sut.Error);
+    }
+
     [Fact]
     public async Task OnPostFindAsync_SourceBatchIsDifferentTypeFromCurrentBatch_ShowsErrorAndDoesNotPopulateSourceAnimals()
     {
