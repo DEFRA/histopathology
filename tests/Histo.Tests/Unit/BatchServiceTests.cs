@@ -68,6 +68,49 @@ public class BatchServiceTests
     }
 
     [Fact]
+    public async Task SetInProgressAsync_DelegatesToRepository_ReturnsTrue()
+    {
+        var result = await BuildSut().SetInProgressAsync(42, 7);
+
+        Assert.True(result);
+        _repoMock.Verify(r => r.SetInProgressAsync(42, 7, default), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetInProgressAsync_RepositoryThrows_LogsAndReturnsFalse()
+    {
+        _repoMock.Setup(r => r.SetInProgressAsync(42, 7, default)).ThrowsAsync(new InvalidOperationException("boom"));
+
+        var result = await BuildSut().SetInProgressAsync(42, 7);
+
+        Assert.False(result);
+        _loggerMock.Verify(l => l.LogError("Failed to mark batch {BatchId} in progress.", It.IsAny<Exception>(), It.IsAny<object[]>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetCompletedAsync_DelegatesToRepository_ReturnsTrue()
+    {
+        var completedDate = new DateTime(2026, 10, 19);
+
+        var result = await BuildSut().SetCompletedAsync(42, completedDate, 7);
+
+        Assert.True(result);
+        _repoMock.Verify(r => r.SetCompletedAsync(42, completedDate, 7, default), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetCompletedAsync_RepositoryThrows_LogsAndReturnsFalse()
+    {
+        var completedDate = new DateTime(2026, 10, 19);
+        _repoMock.Setup(r => r.SetCompletedAsync(42, completedDate, 7, default)).ThrowsAsync(new InvalidOperationException("boom"));
+
+        var result = await BuildSut().SetCompletedAsync(42, completedDate, 7);
+
+        Assert.False(result);
+        _loggerMock.Verify(l => l.LogError("Failed to mark batch {BatchId} completed.", It.IsAny<Exception>(), It.IsAny<object[]>()), Times.Once);
+    }
+
+    [Fact]
     public async Task GetTestPremiumChargeCountsAsync_PassesTheCodeListsToTheRepository()
     {
         var codes = new TestCodeSelection(["1"], ["A1"], ["S1"]);
