@@ -9,6 +9,7 @@ using Histo.Reporting.Reports;
 using Histo.Reporting.Services;
 using Histo.Submissions;
 using Histo.Web.Auth;
+using Histo.Web.Security;
 using Histo.Web.Services;
 using ITfoxtec.Identity.Saml2;
 using ITfoxtec.Identity.Saml2.MvcCore;
@@ -193,8 +194,16 @@ try
     {
         options.Cookie.Name = AuthCookieName;
         options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
         options.ExpireTimeSpan = idleTimeout;
         options.SlidingExpiration = true;
+
+        var originalValidatePrincipal = options.Events.OnValidatePrincipal;
+        options.Events.OnValidatePrincipal = async context =>
+        {
+            await originalValidatePrincipal(context);
+            await SingleSessionPolicy.ValidateAsync(context);
+        };
 
         var originalRedirectToLogin = options.Events.OnRedirectToLogin;
         options.Events.OnRedirectToLogin = context =>
@@ -240,8 +249,10 @@ try
         o.IdleTimeout = idleTimeout;
         o.Cookie.Name = SessionCookieName;
         o.Cookie.HttpOnly = true;
+        o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
         o.Cookie.IsEssential = true;
     });
+    builder.Services.AddAntiforgery(o => o.Cookie.SecurePolicy = CookieSecurePolicy.Always);
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddScoped<ISessionService, SessionService>();
 
@@ -272,8 +283,12 @@ try
     var aiConnString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
     if (!string.IsNullOrWhiteSpace(aiConnString) && !aiConnString.StartsWith("__", StringComparison.Ordinal))
     {
+        // InjectResponseHeaders=false stops the SDK advertising the app id in the Request-Context header.
         builder.Services.AddApplicationInsightsTelemetry(o =>
-            o.ConnectionString = aiConnString);
+        {
+            o.ConnectionString = aiConnString;
+            o.RequestCollectionOptions.InjectResponseHeaders = false;
+        });
     }
     else
     {
@@ -329,6 +344,8 @@ try
     }
 
     // -- Middleware pipeline --------------------------------------------------
+    app.UseSecurityHeaders(sendHsts: !app.Environment.IsDevelopment());
+
     if (app.Environment.IsDevelopment())
     {
         app.UseDeveloperExceptionPage();
