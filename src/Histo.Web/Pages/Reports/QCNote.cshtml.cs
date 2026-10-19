@@ -17,16 +17,13 @@ namespace Histo.Web.Pages.Reports;
 public class QCNoteModel : HistoPageModel
 {
     private readonly QCNoteDataSetBuilder _dataSetBuilder;
-    private readonly QCNoteRenderer _renderer;
 
     public QCNoteModel(
         ISessionService session,
-        QCNoteDataSetBuilder dataSetBuilder,
-        QCNoteRenderer renderer)
+        QCNoteDataSetBuilder dataSetBuilder)
         : base(session)
     {
         _dataSetBuilder = dataSetBuilder;
-        _renderer       = renderer;
     }
 
     public async Task<IActionResult> OnGetAsync(int qcNoteRef, CancellationToken ct = default)
@@ -35,7 +32,7 @@ public class QCNoteModel : HistoPageModel
             return RedirectToPage("/Index");
 
         var ds  = await _dataSetBuilder.BuildAsync(qcNoteRef, ct);
-        var pdf = await _renderer.RenderAsync(ds);
+        var pdf = await QCNoteRenderer.RenderAsync(ds);
 
         return File(pdf, "application/pdf", $"QCNote-{qcNoteRef}.pdf");
     }

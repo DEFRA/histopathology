@@ -62,6 +62,19 @@ public class EditQualityDataTestModelTests
     };
 
     [Fact]
+    public async Task OnGetAsync_TestLinkedToAQCNoteRef_TicksTheQCNoteBox()
+    {
+        _tests.Setup(t => t.GetByIdAsync(42, 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BlockTest { ID = 1, BlockID = 1, TestType = BlockTestType.Histology, Code = "1", QCNote = false, QCNoteRef = 9 });
+        var sut = CreateSut();
+        sut.TestId = 1;
+
+        await sut.OnGetAsync();
+
+        Assert.True(sut.QCNote);
+    }
+
+    [Fact]
     public async Task OnPostAsync_FailedResultWithoutQCCode_SetsFieldKeyedError()
     {
         _tests.Setup(t => t.GetByIdAsync(42, 1, It.IsAny<CancellationToken>())).ReturnsAsync(MakeTest());

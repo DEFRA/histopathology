@@ -87,7 +87,8 @@ public sealed class AuthController : ControllerBase
 
         var nameId = saml2AuthnResponse.ClaimsIdentity
             .FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "(none)";
-        _logger.LogInformation("SAML assertion validated. NameIdentifier: {NameId}", nameId);
+        if (_logger.IsEnabled(LogLevel.Information))
+            _logger.LogInformation("SAML assertion validated. NameIdentifier: {NameId}", nameId);
 
         // Resolve application user and bake app claims into the cookie session.
         // CreateSessionAsync then calls HttpContext.SignInAsync internally.

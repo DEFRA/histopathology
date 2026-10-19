@@ -1,3 +1,4 @@
+using System.Data.Common;
 using Microsoft.Data.SqlClient;
 
 namespace Histo.Infrastructure;
@@ -13,6 +14,6 @@ namespace Histo.Infrastructure;
 /// </summary>
 public interface IDbConnectionFactory
 {
-    /// <summary>Returns a new, unopened <see cref="SqlConnection"/>.</summary>
-    SqlConnection CreateConnection();
+    /// <summary>Returns a new, unopened connection (a <see cref="SqlConnection"/> in production).</summary>
+    DbConnection CreateConnection();
 }

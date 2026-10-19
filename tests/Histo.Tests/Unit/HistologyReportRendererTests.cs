@@ -140,10 +140,9 @@ public class HistologyReportRendererTests
     [Fact]
     public async Task RenderAsync_FullDataSet_ReturnsPdf()
     {
-        var renderer = new HistologyReportRenderer();
         var ds       = BuildTestDataSet();
 
-        var pdf = await renderer.RenderAsync(ds);
+        var pdf = await HistologyReportRenderer.RenderAsync(ds);
 
         Assert.NotNull(pdf);
         Assert.True(pdf.Length > 0, "PDF byte array should not be empty.");
@@ -157,13 +156,12 @@ public class HistologyReportRendererTests
     [Fact]
     public async Task RenderAsync_WritesReadablePdfToDisk()
     {
-        var renderer  = new HistologyReportRenderer();
         var ds        = BuildTestDataSet();
         var outputPath = Path.Combine(
             Path.GetDirectoryName(typeof(HistologyReportRendererTests).Assembly.Location)!,
             "HistologyReport-Test.pdf");
 
-        var pdf = await renderer.RenderAsync(ds);
+        var pdf = await HistologyReportRenderer.RenderAsync(ds);
         await File.WriteAllBytesAsync(outputPath, pdf);
 
         Assert.True(File.Exists(outputPath), "PDF file should exist on disk.");
@@ -176,13 +174,12 @@ public class HistologyReportRendererTests
     [Fact]
     public async Task RenderAsync_EmptySubmissionRows_StillProducesPdf()
     {
-        var renderer = new HistologyReportRenderer();
         var ds       = BuildTestDataSet();
 
         // Clear submission rows — report should still render without throwing
         ds.Tables["BatchSubmission"]!.Rows.Clear();
 
-        var pdf = await renderer.RenderAsync(ds);
+        var pdf = await HistologyReportRenderer.RenderAsync(ds);
 
         Assert.True(pdf.Length > 0);
     }
@@ -192,7 +189,6 @@ public class HistologyReportRendererTests
     {
         // 28 rows (matching batch 10243) must span multiple pages at 13/page without
         // a QuestPDF layout overflow — guards the chunked-pagination logic.
-        var renderer = new HistologyReportRenderer();
         var ds       = BuildTestDataSet();
 
         var submissions = ds.Tables["BatchSubmission"]!;
@@ -210,7 +206,7 @@ public class HistologyReportRendererTests
             submissions.Rows.Add(r);
         }
 
-        var pdf = await renderer.RenderAsync(ds);
+        var pdf = await HistologyReportRenderer.RenderAsync(ds);
 
         Assert.True(pdf.Length > 0, "28-row report should render to a non-empty multi-page PDF.");
     }
@@ -218,13 +214,12 @@ public class HistologyReportRendererTests
     [Fact]
     public async Task RenderAsync_EmptyHistologyRows_StillProducesPdf()
     {
-        var renderer = new HistologyReportRenderer();
         var ds       = BuildTestDataSet();
 
         // Clear histology rows — sub-report section should render empty without throwing
         ds.Tables["BatchHistology"]!.Rows.Clear();
 
-        var pdf = await renderer.RenderAsync(ds);
+        var pdf = await HistologyReportRenderer.RenderAsync(ds);
 
         Assert.True(pdf.Length > 0);
     }

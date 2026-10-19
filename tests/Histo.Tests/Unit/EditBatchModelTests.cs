@@ -20,6 +20,8 @@ namespace Histo.Tests.Unit;
 /// </summary>
 public class EditBatchModelTests
 {
+    private static readonly string[] StainNine = ["9"];
+
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<IBatchService> _batches = new();
     private readonly Mock<ILookupService> _lookups = new();
@@ -51,6 +53,17 @@ _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(It.IsAny<int>(), It.IsAny<
             .ReturnsAsync(new BatchTestSelections());
         _batches.Setup(b => b.TryGetBatchTestSelectionsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new BatchTestSelections());
+    }
+
+    [Fact]
+    public void LockHelpers_NothingLocked_ReportsEveryCodeAsUnlocked()
+    {
+        var sut = CreateSut();
+        sut.SelectedAntibodyCodes = ["A1"];
+        sut.SelectedStainCodes = ["S1"];
+
+        Assert.False(sut.IsAntibodyLocked("A1"));
+        Assert.False(sut.IsStainLocked("S1"));
     }
 
     private EditBatchModel CreateSut()
@@ -454,7 +467,7 @@ _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(It.IsAny<int>(), It.IsAny<
         _blockTests.Verify(t => t.AddTestsToBatchBlocksAsync(10,
             It.Is<IReadOnlyList<string>>(h => h.SequenceEqual(new[] { HistologyCode.SpecialStain })),
             It.Is<IReadOnlyList<string>>(a => a.Count == 0),
-            It.Is<IReadOnlyList<string>>(s => s.SequenceEqual(new[] { "9" })),
+            It.Is<IReadOnlyList<string>>(s => s.SequenceEqual(StainNine)),
             7, It.IsAny<CancellationToken>()), Times.Once);
         _blockTests.Verify(t => t.SaveTestSelectionsAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<IReadOnlyList<string>>(),
             It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);

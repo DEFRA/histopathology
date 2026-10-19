@@ -8,8 +8,19 @@ namespace Histo.Core.Domain;
 /// BookBlockRef.aspx.vb (<c>PadPGNumberZeroes</c>/<c>PadMouseNumberZeroes</c>), and Common.vb
 /// (<c>ConvertBlockRefToString</c>).
 /// </summary>
-public static class SenderRefHelpers
+public static partial class SenderRefHelpers
 {
+    private const int RegexTimeoutMs = 1000;
+
+    [System.Text.RegularExpressions.GeneratedRegex("^[0-9][0-9]$", System.Text.RegularExpressions.RegexOptions.None, RegexTimeoutMs)]
+    private static partial System.Text.RegularExpressions.Regex TwoDigitBlockRefRegex();
+
+    [System.Text.RegularExpressions.GeneratedRegex("^[1-9][0-9][0-9]$", System.Text.RegularExpressions.RegexOptions.None, RegexTimeoutMs)]
+    private static partial System.Text.RegularExpressions.Regex ThreeDigitBlockRefRegex();
+
+    [System.Text.RegularExpressions.GeneratedRegex("^[0-9]{2}/[0-9]{5}/[0-9]{2}$", System.Text.RegularExpressions.RegexOptions.None, RegexTimeoutMs)]
+    private static partial System.Text.RegularExpressions.Regex TbDiagnosticsRegex();
+
     /// <summary>True when the sender ref starts with "PG" (case-insensitive), e.g. "PG0123/24".</summary>
     public static bool IsPgNumber(string senderRef) =>
         senderRef.Length > 2 && senderRef[..2].Equals("PG", StringComparison.OrdinalIgnoreCase);
@@ -63,8 +74,8 @@ public static class SenderRefHelpers
     {
         if (blockRef is "00" or "000") return false;
         return blockRef.Length <= 2
-            ? System.Text.RegularExpressions.Regex.IsMatch(blockRef, "^[0-9][0-9]$")
-            : System.Text.RegularExpressions.Regex.IsMatch(blockRef, "^[1-9][0-9][0-9]$");
+            ? TwoDigitBlockRefRegex().IsMatch(blockRef)
+            : ThreeDigitBlockRefRegex().IsMatch(blockRef);
     }
 
     /// <summary>
@@ -74,5 +85,5 @@ public static class SenderRefHelpers
     /// ("Validate Sender Ref?").
     /// </summary>
     public static bool IsValidTBDiagnosticsFormat(string senderRef) =>
-        System.Text.RegularExpressions.Regex.IsMatch(senderRef, "^[0-9]{2}/[0-9]{5}/[0-9]{2}$");
+        TbDiagnosticsRegex().IsMatch(senderRef);
 }

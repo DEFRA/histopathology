@@ -47,6 +47,22 @@ public class CopyBatchBlocksSummaryModelTests
         };
 
     [Fact]
+    public async Task OnGetAsync_TestSelectionsFailToLoad_StillShowsThePage()
+    {
+        _blocks.Setup(b => b.GetByBatchAsync(SourceBatchId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 100, AnimalID = 7, BlockRef = "01" }]);
+        _blockTests.Setup(b => b.GetAllSelectionsByBatchAsync(SourceBatchId, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("SP shape mismatch"));
+        var sut = CreateSut();
+
+        var result = await sut.OnGetAsync(SourceBatchId);
+
+        Assert.IsType<PageResult>(result);
+        Assert.Single(sut.Blocks);
+        Assert.Empty(sut.HistologyCodesByBlockId);
+    }
+
+    [Fact]
     public async Task OnGetAsync_NoBlocks_ShowsEmptyGridWithoutError()
     {
         var sut = CreateSut();

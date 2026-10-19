@@ -1,3 +1,4 @@
+using System.Data.Common;
 using Microsoft.Data.SqlClient;
 
 namespace Histo.Infrastructure;
@@ -14,5 +15,5 @@ public sealed class SqlConnectionFactory : IDbConnectionFactory
     }
 
     /// <inheritdoc/>
-    public SqlConnection CreateConnection() => new(_connectionString);
+    public DbConnection CreateConnection() => new SqlConnection(_connectionString);
 }

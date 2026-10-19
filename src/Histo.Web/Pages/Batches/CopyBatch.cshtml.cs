@@ -104,10 +104,12 @@ public class CopyBatchModel : HistoPageModel
             .GroupBy(s => s.AnimalID)
             .ToDictionary(g => g.Key, g => g.First().ID);
 
-        int OwnSubmissionId(Animal a) =>
-            submissionByAnimalId.TryGetValue(a.ID, out var own) ? own
-            : a.BatchSubmissionID > 0 && submissionIds.Contains(a.BatchSubmissionID) ? a.BatchSubmissionID
-            : firstSubmId;
+        int OwnSubmissionId(Animal a)
+        {
+            if (submissionByAnimalId.TryGetValue(a.ID, out var own)) return own;
+            if (a.BatchSubmissionID > 0 && submissionIds.Contains(a.BatchSubmissionID)) return a.BatchSubmissionID;
+            return firstSubmId;
+        }
 
         List<string> ResolveTissues(Animal a) =>
             submissionByAnimalId.TryGetValue(a.ID, out var own) && tissuesBySubmId.TryGetValue(own, out var td) ? td : [];
@@ -234,7 +236,7 @@ public class CopyBatchModel : HistoPageModel
         && a.SubmissionId == b.SubmissionId
         && string.Equals(a.SenderRef, b.SenderRef, StringComparison.OrdinalIgnoreCase);
 
-    private static IReadOnlyList<CopyBatchDisplayRow> BuildDisplayRows(IReadOnlyList<AnimalRow> animals)
+    private static List<CopyBatchDisplayRow> BuildDisplayRows(List<AnimalRow> animals)
     {
         var result = new List<CopyBatchDisplayRow>();
         var consumed = new HashSet<int>();
@@ -246,28 +248,12 @@ public class CopyBatchModel : HistoPageModel
 
             var anchor = animals[i];
             var rowIndexes = new List<int> { i };
-            var newSenderRefs = new List<string>();
+            rowIndexes.AddRange(ClaimGroupMembers(animals, i, consumed));
 
-            if (!string.IsNullOrWhiteSpace(anchor.NewSenderRef))
-                newSenderRefs.Add(anchor.NewSenderRef);
-
-            for (var j = i + 1; j < animals.Count; j++)
-            {
-                if (!consumed.Add(j))
-                    continue;
-
-                var candidate = animals[j];
-                if (IsSameDisplayGroup(candidate, anchor))
-                {
-                    rowIndexes.Add(j);
-                    if (!string.IsNullOrWhiteSpace(candidate.NewSenderRef))
-                        newSenderRefs.Add(candidate.NewSenderRef);
-                }
-                else
-                {
-                    consumed.Remove(j);
-                }
-            }
+            var newSenderRefs = rowIndexes
+                .Select(index => animals[index].NewSenderRef)
+                .Where(senderRef => !string.IsNullOrWhiteSpace(senderRef))
+                .ToList();
 
             result.Add(new CopyBatchDisplayRow
             {
@@ -281,6 +267,24 @@ public class CopyBatchModel : HistoPageModel
         }
 
         return result;
+    }
+
+    /// <summary>Marks and returns the rows after <paramref name="anchorIndex"/> that belong to the same display group.</summary>
+    private static List<int> ClaimGroupMembers(List<AnimalRow> animals, int anchorIndex, HashSet<int> consumed)
+    {
+        var members = new List<int>();
+        for (var j = anchorIndex + 1; j < animals.Count; j++)
+        {
+            if (!consumed.Add(j))
+                continue;
+
+            if (IsSameDisplayGroup(animals[j], animals[anchorIndex]))
+                members.Add(j);
+            else
+                consumed.Remove(j);
+        }
+
+        return members;
     }
 
     /// <summary>One editable row of the source submission's samples.</summary>

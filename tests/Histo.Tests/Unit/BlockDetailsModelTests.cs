@@ -27,13 +27,15 @@ namespace Histo.Tests.Unit;
 /// </summary>
 public class BlockDetailsModelTests
 {
+    private static readonly string[] Ab01 = ["AB01"];
+    private static readonly string[] St01 = ["ST01"];
+
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<ISubmissionService> _submissions = new();
     private readonly Mock<IBlockService> _blocks = new();
     private readonly Mock<IBatchService> _batches = new();
     private readonly Mock<ILookupService> _lookups = new();
     private readonly Mock<IBlockTestService> _blockTests = new();
-    private readonly Mock<IHistologyRefService> _histologyRefs = new();
 
     public BlockDetailsModelTests()
     {
@@ -49,7 +51,7 @@ public class BlockDetailsModelTests
     }
 
     private BlockDetailsModel CreateSut(int animalId, int blockId) =>
-        new(_session.Object, _submissions.Object, _blocks.Object, _batches.Object, _lookups.Object, _blockTests.Object, _histologyRefs.Object,
+        new(_session.Object, _submissions.Object, _blocks.Object, _batches.Object, _lookups.Object, _blockTests.Object,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<BlockDetailsModel>.Instance)
         {
             PageContext = new PageContext { ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) },
@@ -366,8 +368,8 @@ public class BlockDetailsModelTests
         _blockTests.Verify(t => t.SaveTestSelectionsAsync(
             5, 400,
             It.Is<IReadOnlyList<string>>(codes => codes.SequenceEqual(new[] { HistologyCode.EO, HistologyCode.HAndE })),
-            It.Is<IReadOnlyList<string>>(codes => codes.SequenceEqual(new[] { "AB01" })),
-            It.Is<IReadOnlyList<string>>(codes => codes.SequenceEqual(new[] { "ST01" })),
+            It.Is<IReadOnlyList<string>>(codes => codes.SequenceEqual(Ab01)),
+            It.Is<IReadOnlyList<string>>(codes => codes.SequenceEqual(St01)),
             7,
             It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -399,6 +401,143 @@ public class BlockDetailsModelTests
         Assert.IsType<Microsoft.AspNetCore.Mvc.RazorPages.PageResult>(result);
         Assert.NotNull(sut.ErrorMessage);
         _blocks.Verify(b => b.DeleteBlockAsync(400, 7, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostDoneAsync_NoHistologySelected_ShowsErrorAndKeepsThePostedBlockFields()
+    {
+        SetupExistingBlock();
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewBlockRef = "ZZ";
+        sut.NewCustomerRef = "CUST";
+        sut.NewComment = "typed";
+        sut.NewRepeatBlock = true;
+        sut.SelectedHistologyCodes = [];
+
+        var result = await sut.OnPostDoneAsync();
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RazorPages.PageResult>(result);
+        Assert.Equal("Select at least one histology test for this block.", sut.ErrorMessage);
+        Assert.Equal("ZZ", sut.NewBlockRef);
+        Assert.Equal("CUST", sut.NewCustomerRef);
+        Assert.Equal("typed", sut.NewComment);
+        Assert.True(sut.NewRepeatBlock);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_UnreadableDraft_IsIgnored()
+    {
+        SetupExistingBlock();
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.TempData["BlockDetails_Draft"] = "not json";
+
+        await sut.OnGetAsync();
+
+        Assert.Equal("01", sut.NewBlockRef);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateTissueAsync_SavesTheEditedTissueKeepingItsComment()
+    {
+        SetupExistingBlock();
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 11, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1, Comment = "keep me" },
+        ]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.TissueId = 11;
+        sut.EditTissueCode = "BRN";
+        sut.EditNoPieces = 3;
+
+        var result = await sut.OnPostUpdateTissueAsync();
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+        _submissions.Verify(s => s.UpdateTissueAsync(
+            It.Is<Tissue>(t => t.ID == 11 && t.TissueCode == "BRN" && t.NoPieces == 3 && t.Comment == "keep me"),
+            7, It.IsAny<CancellationToken>()), Times.Once);
+        _batches.Verify(b => b.RefreshAllTissuesAssignedAsync(5, 7, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostNextBlockAsync_CurrentBlockHasNoTissues_ShowsTheSaveErrorAndKeepsThePostedFields()
+    {
+        SetupExistingBlock();
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewBlockRef = "01";
+        sut.NewComment = "typed";
+        sut.SelectedHistologyCodes = [HistologyCode.EO];
+
+        var result = await sut.OnPostNextBlockAsync();
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RazorPages.PageResult>(result);
+        Assert.NotNull(sut.ErrorMessage);
+        Assert.Equal("typed", sut.NewComment);
+    }
+
+    [Fact]
+    public async Task OnPostNextBlockAsync_PreCassettedWithNoPreBookedRefsLeft_ShowsAnError()
+    {
+        SetupExistingBlock();
+        _batches.Setup(b => b.GetByIdAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 5, IsPreCassetted = true });
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
+        _blocks.Setup(b => b.GetPreBookedByAnimalAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewBlockRef = "01";
+        sut.SelectedHistologyCodes = [HistologyCode.EO];
+
+        var result = await sut.OnPostNextBlockAsync();
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RazorPages.PageResult>(result);
+        Assert.Equal("There are no more pre-booked block references available for this sample.", sut.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task OnPostNextBlockAsync_NoHistologySelected_ShowsErrorAndKeepsThePostedBlockFields()
+    {
+        SetupExistingBlock();
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewBlockRef = "ZZ";
+        sut.NewCustomerRef = "CUST";
+        sut.NewComment = "typed";
+        sut.NewRepeatBlock = true;
+        sut.SelectedHistologyCodes = [];
+
+        var result = await sut.OnPostNextBlockAsync();
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RazorPages.PageResult>(result);
+        Assert.Equal("Select at least one histology test for this block.", sut.ErrorMessage);
+        Assert.Equal("ZZ", sut.NewBlockRef);
+        Assert.Equal("CUST", sut.NewCustomerRef);
+        Assert.Equal("typed", sut.NewComment);
+        Assert.True(sut.NewRepeatBlock);
+        _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
+            It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("99", 1, "Select one of the pre-booked block references for this pre-cassetted submission.")]
+    [InlineData("02", 3, "Only 1 pre-booked block reference(s) are available from this starting point.")]
+    public async Task OnPostNextBlockAsync_PreCassettedMultiBlock_RejectsAnInvalidPreBookedStart(string startRef, int count, string expected)
+    {
+        SetupExistingBlock();
+        _batches.Setup(b => b.GetByIdAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 5, IsPreCassetted = true });
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
+        _blocks.Setup(b => b.GetPreBookedByAnimalAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 900, AnimalID = 2, BlockRef = "01", Status = BlockStatus.PreBooked },
+            new Block { ID = 901, AnimalID = 2, BlockRef = "02", Status = BlockStatus.PreBooked },
+        ]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.IsAddFlow = true;
+        sut.NewBlockRef = startRef;
+        sut.NewNumberOfBlocks = count;
+        sut.SelectedHistologyCodes = [HistologyCode.HAndE];
+
+        await sut.OnPostNextBlockAsync();
+
+        Assert.Equal(expected, sut.ErrorMessage);
     }
 
     [Fact]
@@ -695,14 +834,14 @@ public class BlockDetailsModelTests
             preBooked01,
             new Block { ID = 901, AnimalID = 2, BlockRef = "02", Status = BlockStatus.PreBooked },
         ]);
-        _blocks.Setup(b => b.ClaimPreBookedBlockAsync(preBooked01, 5, It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.ClaimPreBookedBlockAsync(preBooked01, 5, It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         var sut = CreateSut(animalId: 2, blockId: 0);
 
         var result = await sut.OnGetAsync();
 
         Assert.Equal("01", sut.NewBlockRef);
-        _blocks.Verify(b => b.ClaimPreBookedBlockAsync(preBooked01, 5, It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _blocks.Verify(b => b.ClaimPreBookedBlockAsync(preBooked01, 5, It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()), Times.Once);
         _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
             It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
@@ -864,7 +1003,7 @@ public class BlockDetailsModelTests
     public async Task OnPostDoneAsync_ReuseWithNumberOfBlocks_SiblingsTakeTheFollowingExistingRefs()
     {
         SetupReuseScenario([new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "06", Order = 1 }]);
-        _blocks.Setup(b => b.AddBlockKeepingRefAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.AddBlockKeepingRefAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, new BlockOptions(null, null, false), It.IsAny<CancellationToken>()))
             .ReturnsAsync(400);
         var sut = CreateSut(animalId: 2, blockId: 319181);
         sut.IsAddFlow = false;
@@ -876,7 +1015,7 @@ public class BlockDetailsModelTests
 
         // Not floored on the sample's NextBlockRef (06) and not pushed past the earlier submission's refs.
         foreach (var r in new[] { "02", "03", "04", "05" })
-            _blocks.Verify(b => b.AddBlockKeepingRefAsync(5, 2, r, It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+            _blocks.Verify(b => b.AddBlockKeepingRefAsync(5, 2, r, It.IsAny<IEnumerable<int>>(), 7, new BlockOptions(null, null, false), It.IsAny<CancellationToken>()), Times.Once);
         _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
             It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -927,7 +1066,7 @@ public class BlockDetailsModelTests
         var result = await sut.OnPostNextBlockAsync();
 
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
-        Assert.Equal(true, redirect.RouteValues?["isAddFlow"]);
+        Assert.True(redirect.RouteValues?["isAddFlow"] as bool?);
         Assert.Equal(319182, redirect.RouteValues?["blockId"]);
     }
 
@@ -977,7 +1116,7 @@ public class BlockDetailsModelTests
         ]);
         var preBooked02 = new Block { ID = 901, AnimalID = 2, BlockRef = "02", Status = BlockStatus.PreBooked };
         _blocks.Setup(b => b.GetPreBookedByAnimalAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[preBooked02]);
-        _blocks.Setup(b => b.ClaimPreBookedBlockAsync(preBooked02, 5, It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.ClaimPreBookedBlockAsync(preBooked02, 5, It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         var sut = CreateSut(animalId: 2, blockId: 319181);
         sut.IsAddFlow = false;
@@ -986,7 +1125,7 @@ public class BlockDetailsModelTests
 
         var result = await sut.OnPostNextBlockAsync();
 
-        _blocks.Verify(b => b.ClaimPreBookedBlockAsync(preBooked02, 5, It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _blocks.Verify(b => b.ClaimPreBookedBlockAsync(preBooked02, 5, It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()), Times.Once);
         _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
             It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
@@ -1107,7 +1246,7 @@ public class BlockDetailsModelTests
             new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
         ]);
         // "02" is the sibling duplicated by SaveCurrentBlockDetailsAsync; "03" is the actual next block.
-        _blocks.Setup(b => b.AddBlockKeepingRefAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, "CUST", null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.AddBlockKeepingRefAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, new BlockOptions("CUST", null, false), It.IsAny<CancellationToken>()))
             .ReturnsAsync(400);
         _blocks.Setup(b => b.AddBlockAsync(5, 2, "03", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(500);
@@ -1119,7 +1258,7 @@ public class BlockDetailsModelTests
 
         var result = await sut.OnPostNextBlockAsync();
 
-        _blocks.Verify(b => b.AddBlockKeepingRefAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, "CUST", null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _blocks.Verify(b => b.AddBlockKeepingRefAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, new BlockOptions("CUST", null, false), It.IsAny<CancellationToken>()), Times.Once);
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
         Assert.Equal(500, redirect.RouteValues?["blockId"]);
     }
@@ -1152,8 +1291,8 @@ public class BlockDetailsModelTests
         _blockTests.Verify(t => t.SaveTestSelectionsAsync(
             5, 319182,
             It.Is<IReadOnlyList<string>>(c => c.SequenceEqual(new[] { HistologyCode.EO })),
-            It.Is<IReadOnlyList<string>>(c => c.SequenceEqual(new[] { "AB01" })),
-            It.Is<IReadOnlyList<string>>(c => c.SequenceEqual(new[] { "ST01" })),
+            It.Is<IReadOnlyList<string>>(c => c.SequenceEqual(Ab01)),
+            It.Is<IReadOnlyList<string>>(c => c.SequenceEqual(St01)),
             7, It.IsAny<CancellationToken>()), Times.Once);
     }
 

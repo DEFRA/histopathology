@@ -63,7 +63,7 @@ public sealed class HistologyReportRenderer
     /// <param name="ds">Populated DataSet matching HistologyReportDataset.xsd.</param>
     /// <param name="rowsPerPage">Submission rows printed per page (legacy default 13). Values &lt;= 0 fall back to 13.</param>
     /// <returns>PDF content as a byte array.</returns>
-    public Task<byte[]> RenderAsync(DataSet ds, int rowsPerPage = 13)
+    public static Task<byte[]> RenderAsync(DataSet ds, int rowsPerPage = 13)
     {
         DataRow? batch   = ds.Tables["Batch"]?.Rows.Count > 0
             ? ds.Tables["Batch"]!.Rows[0] : null;
@@ -527,8 +527,8 @@ public sealed class HistologyReportRenderer
                                     && Field(row, "HistologyRef") == Field(prevRow, "HistologyRef");
                                 prevRow = row;
 
-                                var blockRef = continuesBlock ? string.Empty : Field(row, "BlockRef")
-                                    + (IsRepeatBlock(Field(row, "RepeatBlock")) ? "*" : string.Empty);
+                                var repeatMark = IsRepeatBlock(Field(row, "RepeatBlock")) ? "*" : string.Empty;
+                                var blockRef = continuesBlock ? string.Empty : Field(row, "BlockRef") + repeatMark;
 
                                 void Td(string v) =>
                                     t.Cell().Border(0.5f)
