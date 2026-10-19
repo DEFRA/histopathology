@@ -93,8 +93,13 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
     public IReadOnlyList<BlockRefRangeHelpers.BlockRefRangeRow> UsedBlockRefResults { get; private set; } = [];
     public BatchTestSelections? BatchTestSelections { get; private set; }
 
-    /// <summary>True for pre-cassetted submissions, where the block ref must come from the pre-booked list and histology ref is mandatory.</summary>
-    public bool IsPreCassetted => Batch?.IsPreCassetted == true;
+    /// <summary>
+    /// True only for SubmittedAs code "5" (genuinely Pre-Cassetted Tissue) — NOT the same as
+    /// Batch.IsPreCassetted (DB Cassetted column, true for any non-Wet-Tissue type). Legacy:
+    /// Common.vb::IsBatchPreCassetted. Set in LoadSupportingDataAsync; the block ref must come
+    /// from the pre-booked list and histology ref is mandatory only for this narrower set.
+    /// </summary>
+    public bool IsPreCassetted { get; private set; }
 
     /// <summary>True for TSE submissions — shows H&amp;E (BSE)/IHC Prp grid columns instead of IHC Other, matching legacy HideColumns.</summary>
     public bool IsTse => Batch?.BatchType != BatchTypeConstants.NonTse;
@@ -647,6 +652,7 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
     private async Task LoadSupportingDataAsync()
     {
         Batch = await _batches.GetByIdAsync(BatchId ?? 0);
+        IsPreCassetted = Histo.Core.Domain.ValidationHelpers.IsBatchPreCassetted(await _batches.GetSubmittedAsCodeAsync(BatchId ?? 0));
         BatchTestSelections = await _batches.GetBatchTestSelectionsAsync(BatchId ?? 0);
         TissueOptions = await _lookups.GetLookupDataAsync(LookupTissueCode);
         HistologyRefTypeOptions = await _lookups.GetHistologyRefTypesAsync();

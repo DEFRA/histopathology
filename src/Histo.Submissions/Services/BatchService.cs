@@ -140,6 +140,12 @@ public sealed class BatchService : IBatchService
         catch (Exception ex) { _logger.LogError("Failed to mark batch {BatchId} completed.", ex, batchId); return false; }
     }
 
+    public async Task<bool> SetInProgressAsync(int batchId, int userId, CancellationToken ct = default)
+    {
+        try { await _batches.SetInProgressAsync(batchId, userId, ct); return true; }
+        catch (Exception ex) { _logger.LogError("Failed to mark batch {BatchId} in progress.", ex, batchId); return false; }
+    }
+
     public async Task<bool> SetByPassSortAsync(int batchId, bool byPassSort, int userId, CancellationToken ct = default)
     {
         try { await _batches.SetByPassSortAsync(batchId, byPassSort, userId, ct); return true; }

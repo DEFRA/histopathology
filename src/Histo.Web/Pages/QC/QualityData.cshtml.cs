@@ -261,6 +261,9 @@ public class QualityDataModel : GridPageModel
 
         var concurrencyCount = await SaveSelectedTestsAsync(batchId, selected, isSingle);
 
+        // Legacy: QualityData.aspx.vb::btnSave_Click always sets the batch InProgress first (then
+        // CompleteBatchIfAllTestsDispatchedAsync may immediately escalate it further to Completed).
+        await _batches.SetInProgressAsync(batchId, Session.UserID);
         await CompleteBatchIfAllTestsDispatchedAsync(batchId);
 
         Error = concurrencyCount > 0

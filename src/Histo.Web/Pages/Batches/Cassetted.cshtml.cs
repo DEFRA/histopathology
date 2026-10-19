@@ -91,10 +91,13 @@ public class CassettedModel : HistoPageModel
         // stuck true for this brand-new batch, hiding Add sample and other edit actions.
         Session.IsViewSubmissionMode = false;
         Session.ReturnPage = string.Empty; // also reset stale back-link context for the new journey
-        // Pass SubmittedAs code and pre-cassetted flag via TempData so BatchDetails can read them once.
+        // Pass SubmittedAs code and the Cassetted flag via TempData so BatchDetails can read them once.
+        // Legacy (Cassetted.aspx.vb::btnYes_Click) sets Cassetted from the selected item's TEXT
+        // ("Wet Tissue" vs anything else) — NOT from IsBatchPreCassetted (code "5" only), which
+        // would wrongly leave Wax Block/Stained/Unstained Section batches as Cassetted=false.
         var code = selected!.Code!.Trim();
         TempData["CreateSubmittedAsCode"] = code;
-        TempData["CreateIsPreCassetted"]  = Histo.Core.Domain.ValidationHelpers.IsBatchPreCassetted(code).ToString();
+        TempData["CreateIsPreCassetted"]  = (!Histo.Core.Domain.ValidationHelpers.IsWetTissueDescription(selected.Name)).ToString();
 
         return RedirectToPage("/Batches/BatchDetails", new { mode = "create" });
     }
