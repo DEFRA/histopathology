@@ -743,7 +743,6 @@ public class BatchDetailsModel : HistoPageModel
 
         // Read type-selection values from TempData (set by Cassetted step)
         var submittedAsCode = TempData[CreateSubmittedAsCodeKey]?.ToString() ?? "";
-        var isPreCassetted  = bool.TryParse(TempData[CreateIsPreCassettedKey]?.ToString(), out var ipc) && ipc;
 
         TempData.Keep(CreateSubmittedAsCodeKey);
         TempData.Keep(CreateIsPreCassettedKey);
@@ -809,7 +808,10 @@ public class BatchDetailsModel : HistoPageModel
         {
             SubmittedByUserID   = Session.UserID,
             UserAreaCode        = Session.UserAreaID,
-            IsPreCassetted      = isPreCassetted,
+            // Legacy Cassetted.aspx/BatchDetails.aspx: every type except Wet Tissue is saved Cassetted + IsBlocked,
+            // which keeps it off Assign blocks and sends it straight to Quality data once received.
+            IsCassetted         = !ValidationHelpers.IsWetTissueDescription(Create_SubmittedAsName),
+            IsBlocked           = !ValidationHelpers.IsWetTissueDescription(Create_SubmittedAsName),
             BatchType           = Session.BatchType,
             ProjectContractCode = Create_ProjectContractCode,
             ContactName         = Create_ContactName,

@@ -367,7 +367,7 @@ public class EditBatchModel : HistoPageModel
             UserAreaCode        = Batch.UserAreaCode,
             // Not editable here (its checkbox was removed) — always persist the existing value so
             // saving never silently resets a pre-cassetted submission back to false.
-            IsPreCassetted      = Batch.IsPreCassetted,
+            IsCassetted      = Batch.IsCassetted,
             ByPassSort          = Batch.ByPassSort,
             RowStamp            = Batch.RowStamp,
             // Submission category is fixed at creation (legacy's Cassetted.aspx type-selection

@@ -28,19 +28,25 @@ public sealed class BatchRepository : IBatchRepository
             new { ID = batchId },
             commandType: System.Data.CommandType.StoredProcedure);
 
-        // Result set 0 = BATCH_TABLE (GetBatchDetails). Consume remaining sets to avoid connection errors.
+        // Result set 0 = BATCH_TABLE (GetBatchDetails); set 5 = BATCH_SUBMITTEDAS. Consume the rest to avoid connection errors.
         var batchRows = await multi.ReadAsync<dynamic>();
-        while (!multi.IsConsumed) await multi.ReadAsync<dynamic>();
+        string? submittedAsCode = null;
+        for (var set = 1; !multi.IsConsumed; set++)
+        {
+            var rows = await multi.ReadAsync<dynamic>();
+            if (set == 5 && rows.FirstOrDefault() is IDictionary<string, object> sa && sa.TryGetValue("Code", out var c))
+                submittedAsCode = Convert.ToString(c)?.Trim();
+        }
 
         var row = batchRows.FirstOrDefault();
-        return row is null ? null : MapBatch(row);
+        return row is null ? null : MapBatch(row, submittedAsCode);
     }
 
     /// <summary>Maps a dynamic row from <c>GetBatchDetails</c> to a <see cref="Batch"/> object.
     /// Handles column name mismatches (e.g. BatchStatus int→Status string, DateReceived→ReceivedDate)
     /// and varchar dates returned as "dd/MM/yyyy" strings.
     /// </summary>
-    private static Batch MapBatch(dynamic row)
+    private static Batch MapBatch(dynamic row, string? submittedAsCode)
     {
         var d    = (IDictionary<string, object>)row;
         // GetBatchDetails has a duplicate PostFixationOther column; TryAdd takes first occurrence.
@@ -88,7 +94,8 @@ public sealed class BatchRepository : IBatchRepository
             CompletedDate     = ParseDate(dict, "DateCompleted"),  // SP column: DateCompleted
             SubmittedByUserID = Int(dict, "SubmittedBy"),          // populate old field for backward compat
             UserAreaCode      = int.TryParse(submittedAreaStr, out var ua) ? ua : 0,
-            IsPreCassetted    = Bool(dict, "Cassetted"),           // SP column: Cassetted
+            IsCassetted       = Bool(dict, "Cassetted"),           // SP column: Cassetted
+            IsPreCassetted    = Histo.Core.Domain.ValidationHelpers.IsBatchPreCassetted(submittedAsCode),
             ByPassSort        = Bool(dict, "ByPassSort"),
             RowStamp          = d.TryGetValue("RowStamp", out var rs) ? rs as byte[] : null,
             BatchType         = Int(dict, "BatchType"),
@@ -241,7 +248,7 @@ public sealed class BatchRepository : IBatchRepository
         p.Add("OtherSubmittedArea",  batch.OtherSubmittedArea ?? "");
         p.Add("Fixation",            batch.Fixation);
         p.Add("Comments",            batch.Comments);
-        p.Add("Cassetted",           batch.IsPreCassetted);
+        p.Add("Cassetted",           batch.IsCassetted);
         p.Add("IsBlocked",           batch.IsBlocked);
         p.Add("CustomerReceivedDate",batch.CustomerReceivedDate);
         p.Add("SubmittedArea",       batch.UserAreaCode > 0 ? batch.UserAreaCode.ToString() : null);
@@ -275,7 +282,7 @@ public sealed class BatchRepository : IBatchRepository
         p.Add(ReceivedByColumn,      batch.ReceivedBy);
         p.Add("OtherSubmittedBy",    batch.OtherSubmittedBy ?? 0);
         p.Add("OtherSubmittedArea",  batch.OtherSubmittedArea ?? "");
-        p.Add("Cassetted",           batch.IsPreCassetted);
+        p.Add("Cassetted",           batch.IsCassetted);
         p.Add("Fixation",            batch.Fixation);
         p.Add("Comments",            batch.Comments);
         p.Add("StatusComments",      batch.StatusComments);
@@ -305,7 +312,7 @@ public sealed class BatchRepository : IBatchRepository
             StatusComments = existing.StatusComments, BatchDate = existing.BatchDate,
             ReceivedDate = existing.ReceivedDate, CompletedDate = existing.CompletedDate,
             SubmittedByUserID = existing.SubmittedByUserID, UserAreaCode = existing.UserAreaCode,
-            IsPreCassetted = existing.IsPreCassetted, ByPassSort = existing.ByPassSort,
+            IsCassetted = existing.IsCassetted, ByPassSort = existing.ByPassSort,
             RowStamp = rowStamp, BatchType = existing.BatchType,
             ProjectContractCode = existing.ProjectContractCode, ContactName = existing.ContactName,
             Species = existing.Species, Fixation = existing.Fixation,
@@ -331,7 +338,7 @@ public sealed class BatchRepository : IBatchRepository
             StatusComments = existing.StatusComments, BatchDate = existing.BatchDate,
             ReceivedDate = existing.ReceivedDate, CompletedDate = existing.CompletedDate,
             SubmittedByUserID = existing.SubmittedByUserID, UserAreaCode = existing.UserAreaCode,
-            IsPreCassetted = existing.IsPreCassetted, ByPassSort = byPassSort,
+            IsCassetted = existing.IsCassetted, ByPassSort = byPassSort,
             RowStamp = existing.RowStamp, BatchType = existing.BatchType,
             ProjectContractCode = existing.ProjectContractCode, ContactName = existing.ContactName,
             Species = existing.Species, Fixation = existing.Fixation,
@@ -437,7 +444,7 @@ public sealed class BatchRepository : IBatchRepository
             CompletedDate = existing.CompletedDate,
             SubmittedByUserID = existing.SubmittedByUserID,
             UserAreaCode = existing.UserAreaCode,
-            IsPreCassetted = existing.IsPreCassetted,
+            IsCassetted = existing.IsCassetted,
             ByPassSort = existing.ByPassSort,
             RowStamp = existing.RowStamp,
             BatchType = existing.BatchType,
@@ -475,7 +482,7 @@ public sealed class BatchRepository : IBatchRepository
             StatusComments = existing.StatusComments, BatchDate = existing.BatchDate,
             ReceivedDate = existing.ReceivedDate, CompletedDate = completedDate,
             SubmittedByUserID = existing.SubmittedByUserID, UserAreaCode = existing.UserAreaCode,
-            IsPreCassetted = existing.IsPreCassetted, ByPassSort = existing.ByPassSort,
+            IsCassetted = existing.IsCassetted, ByPassSort = existing.ByPassSort,
             RowStamp = existing.RowStamp, BatchType = existing.BatchType,
             ProjectContractCode = existing.ProjectContractCode, ContactName = existing.ContactName,
             Species = existing.Species, Fixation = existing.Fixation,
@@ -873,7 +880,7 @@ public sealed class BatchRepository : IBatchRepository
             CompletedDate = existing.CompletedDate,
             SubmittedByUserID = existing.SubmittedByUserID,
             UserAreaCode = existing.UserAreaCode,
-            IsPreCassetted = existing.IsPreCassetted,
+            IsCassetted = existing.IsCassetted,
             ByPassSort = existing.ByPassSort,
             RowStamp = existing.RowStamp,
             BatchType = existing.BatchType,
