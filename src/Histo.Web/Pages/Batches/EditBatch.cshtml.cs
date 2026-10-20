@@ -53,6 +53,7 @@ public class EditBatchModel : HistoPageModel
     [BindProperty] public string? Fixation            { get; set; }
     [BindProperty] public bool?   SafeToHandle        { get; set; }
     [BindProperty] public string? Comments            { get; set; }
+    [BindProperty] public bool    ProceedToSamples    { get; set; }
     [BindProperty] public int?    OtherSubmittedBy    { get; set; }
     [BindProperty] public string? OtherSubmittedArea  { get; set; }
 
@@ -410,36 +411,9 @@ public class EditBatchModel : HistoPageModel
             return Page();
         }
 
-        try
-        {
-            await AddNewTestsToExistingBlocksAsync(Batch.ID, previousTests, SelectedHistologyCodes, cleanedAntibodyCodes, cleanedStainCodes);
-        }
-        catch (Exception)
-        {
-            SaveError = "Submission saved, but the new tests could not be added to the existing blocks. Add them on each block instead.";
-            return Page();
-        }
-
-        return this.RedirectToReturnPage(ReturnPage, Session.ReturnPageQuery);
-    }
-
-    /// <summary>
-    /// Adds tests newly selected for the submission to every block it already has, so the sample and
-    /// block pages show them. Deliberate enhancement: legacy only offered them unticked on each block.
-    /// Add-only and atomic (see <see cref="IBlockTestRepository.AddTestsToBatchBlocksAsync"/>): it can't remove or overwrite block tests.
-    /// </summary>
-    private async Task AddNewTestsToExistingBlocksAsync(int batchId, BatchTestSelections previous,
-        IReadOnlyList<string> histology, IReadOnlyList<string> antibodies, IReadOnlyList<string> stains)
-    {
-        static List<string> Added(IReadOnlyList<string> now, IReadOnlyList<BatchTestSelectionRow> before) =>
-            now.Except(before.Select(r => r.Code), StringComparer.OrdinalIgnoreCase).ToList();
-
-        var addedHistology  = Added(histology, previous.Histology);
-        var addedAntibodies = Added(antibodies, previous.Antibodies);
-        var addedStains     = Added(stains, previous.Stains);
-        if (addedHistology.Count == 0 && addedAntibodies.Count == 0 && addedStains.Count == 0) return;
-
-        await _blockTests.AddTestsToBatchBlocksAsync(batchId, addedHistology, addedAntibodies, addedStains, Session.UserID);
+        return ProceedToSamples
+            ? RedirectToPage("/Submissions/SampleSummary", new { BatchId = Batch.ID })
+            : this.RedirectToReturnPage(ReturnPage, Session.ReturnPageQuery);
     }
 
     private async Task LoadLookupsAsync()
