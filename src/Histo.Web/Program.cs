@@ -1,4 +1,4 @@
-﻿using Dapper;
+using Dapper;
 // Modular monolith — each module registers its own internals via extension method
 using Histo.Administration;
 using Histo.AuditLog;
@@ -16,8 +16,7 @@ using ITfoxtec.Identity.Saml2.MvcCore;
 using ITfoxtec.Identity.Saml2.MvcCore.Configuration;
 using ITfoxtec.Identity.Saml2.Schemas.Metadata;
 using Histo.Web.Telemetry;
-using Microsoft.ApplicationInsights;
-using Microsoft.ApplicationInsights.Extensibility;
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
@@ -25,7 +24,6 @@ using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Localization;
 using Serilog;
-using Serilog.Sinks.ApplicationInsights.TelemetryConverters;
 using System.Security.Cryptography.X509Certificates;
 
 // Bootstrap Serilog before the host is built so startup errors are captured.
@@ -54,14 +52,7 @@ try
            .ReadFrom.Services(services)
            .Enrich.FromLogContext()
            .WriteTo.Console();
-
-        // Routes every IAppLogger/ILogger call (not just ASP.NET Core's own auto-collected
-        // requests/dependencies) into Application Insights, so the existing LogError/LogWarning
-        // calls throughout the repositories/services are actually visible there.
-        var aiConnectionString = ctx.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
-        if (!string.IsNullOrWhiteSpace(aiConnectionString) && !aiConnectionString.StartsWith("__", StringComparison.Ordinal))
-            cfg.WriteTo.ApplicationInsights(aiConnectionString, TelemetryConverter.Traces);
-    });
+    }, writeToProviders: IsAzureMonitorConfigured(builder.Configuration));
 
     // -- Strongly-typed options -----------------------------------------------
     builder.Services.Configure<AppOptions>(
@@ -116,8 +107,7 @@ try
     builder.Services.AddTransient<IAppLogger>(sp =>
     {
         var factory = sp.GetRequiredService<ILoggerFactory>();
-        var telemetryClient = sp.GetRequiredService<TelemetryClient>();
-        return new AppLogger<IAppLogger>(factory.CreateLogger<IAppLogger>(), telemetryClient);
+        return new AppLogger<IAppLogger>(factory.CreateLogger<IAppLogger>());
     });
     builder.Services.AddScoped<TelemetryHelper>();
 
@@ -277,26 +267,17 @@ try
     builder.Services.AddTransient<SubmissionNotesDataSetBuilder>();
     builder.Services.AddTransient<SubmissionNotesRenderer>();
 
-    // -- Application Insights telemetry --------------------------------------
+    // -- Azure Monitor (OpenTelemetry) telemetry ------------------------------
     // Matches the standard App Service setting name (APPLICATIONINSIGHTS_CONNECTION_STRING,
-    // top-level — the same key Azure's own AI extension and the SDK's auto-detection use).
-    var aiConnString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
-    if (!string.IsNullOrWhiteSpace(aiConnString) && !aiConnString.StartsWith("__", StringComparison.Ordinal))
+    // top-level, the same key Azure's own extension uses). Skipped when unset (e.g. local dev).
+    // OpenTelemetry does not emit the Request-Context app-id response header.
+    if (IsAzureMonitorConfigured(builder.Configuration))
     {
-        // InjectResponseHeaders=false stops the SDK advertising the app id in the Request-Context header.
-        builder.Services.AddApplicationInsightsTelemetry(o =>
-        {
-            o.ConnectionString = aiConnString;
-            o.RequestCollectionOptions.InjectResponseHeaders = false;
-        });
-    }
-    else
-    {
-        // AddApplicationInsightsTelemetry is what registers TelemetryClient — skipped above when
-        // no connection string is configured (e.g. local dev). TelemetryHelper still requires one,
-        // so register a client backed by an unconfigured TelemetryConfiguration: it accepts every
-        // Track*/Flush call but has nowhere to send data, so it's a safe local no-op.
-        builder.Services.AddSingleton(new TelemetryClient(new TelemetryConfiguration()));
+        // Serilog forwards to the OpenTelemetry provider (writeToProviders), so the default
+        // providers are cleared here to avoid duplicate console output.
+        builder.Logging.ClearProviders();
+        builder.Services.AddOpenTelemetry().UseAzureMonitor(o =>
+            o.ConnectionString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]);
     }
 
     var app = builder.Build();
@@ -446,10 +427,6 @@ try
     app.MapGet("/Submissions/BatchBlockSummary", (HttpRequest request) =>
         Results.Redirect($"/Submissions/SampleSummary{request.QueryString}", permanent: true));
 
-    // Global.asax Application_End has no .NET 10 equivalent — flush telemetry explicitly on shutdown.
-    app.Lifetime.ApplicationStopped.Register(() =>
-        app.Services.GetRequiredService<TelemetryClient>().Flush());
-
     app.Run();
 }
 catch (Exception ex) when (ex is not HostAbortedException)
@@ -460,4 +437,10 @@ catch (Exception ex) when (ex is not HostAbortedException)
 finally
 {
     Log.CloseAndFlush();
+}
+
+static bool IsAzureMonitorConfigured(IConfiguration configuration)
+{
+    var connectionString = configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
+    return !string.IsNullOrWhiteSpace(connectionString) && !connectionString.StartsWith("__", StringComparison.Ordinal);
 }
