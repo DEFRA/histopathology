@@ -6,6 +6,7 @@ using ITfoxtec.Identity.Saml2.MvcCore;
 using ITfoxtec.Identity.Saml2.Schemas;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace Histo.Web.Controllers;
 
@@ -15,8 +16,8 @@ namespace Histo.Web.Controllers;
 /// These are protocol endpoints (not UI pages) — the browser never renders them.
 /// Sign-in: GET /Saml2/login → redirect to Entra ID.
 /// ACS:     POST /Saml2/acs ← Entra ID posts SAML assertion here.
-/// Logout:  GET /Saml2/logout → redirect to Entra ID SLO.
-/// SLO:     POST /Saml2/slo ← Entra ID posts logout request/response here.
+/// Logout:  POST /Saml2/SignOut (antiforgery) → redirect to Entra ID SLO.
+/// SLO:     POST /Saml2/Logout ← Entra ID posts a signed logout request/response here.
 ///
 /// SECURITY:
 ///   - Assertion payloads must NOT be logged — no raw XML, no claim dumps.
@@ -28,17 +29,20 @@ public sealed class AuthController : ControllerBase
 {
     private readonly Saml2Configuration _saml2Config;
     private readonly IUserService _users;
+    private readonly IDistributedCache _cache;
     private readonly ILogger<AuthController> _logger;
     private readonly bool _forceAuthn;
 
     public AuthController(
         Saml2Configuration saml2Config,
         IUserService users,
+        IDistributedCache cache,
         ILogger<AuthController> logger,
         IConfiguration configuration)
     {
         _saml2Config = saml2Config;
         _users       = users;
+        _cache       = cache;
         _logger      = logger;
         _forceAuthn  = configuration.GetValue<bool>("Saml2:ForceAuthn");
     }
@@ -115,6 +119,8 @@ public sealed class AuthController : ControllerBase
                     identity.AddClaim(new Claim(AppClaimTypes.GroupId,    user.GroupCode.ToString()));
                     identity.AddClaim(new Claim(AppClaimTypes.UserArea,   user.AreaName));
                     identity.AddClaim(new Claim(AppClaimTypes.UserAreaId, user.AreaCode.ToString()));
+                    identity.AddClaim(SingleSessionPolicy.StampClaim(
+                        await SingleSessionPolicy.IssueStampAsync(_cache, user.UserID.ToString())));
                 }
                 else
                 {
@@ -136,7 +142,8 @@ public sealed class AuthController : ControllerBase
     /// Sends a SAML LogoutRequest to Entra ID SLO endpoint and clears the local cookie.
     /// </summary>
     [Authorize]
-    [HttpGet("Logout")]
+    [HttpPost("SignOut")]
+    [ValidateAntiForgeryToken]
     public IActionResult Logout()
     {
         var binding           = new Saml2RedirectBinding();
@@ -151,16 +158,43 @@ public sealed class AuthController : ControllerBase
     // ── SLO callback (IdP-initiated or response to SP-initiated SLO) ────────
 
     /// <summary>
-    /// Receives a SAML LogoutRequest or LogoutResponse from Entra ID at the SloPath.
-    /// Clears the local session and redirects to the home page.
+    /// Receives a SAML LogoutRequest or LogoutResponse from Entra ID at the SloPath. The message
+    /// signature is validated before the local session is cleared, so an unsigned or forged POST
+    /// cannot sign a user out.
     /// </summary>
     [AllowAnonymous]
     [HttpPost("Logout")]
     public IActionResult SingleLogoutService()
     {
+        if (!TryReadSignedLogoutMessage())
+            return BadRequest();
+
         var saml2LogoutRequest = new Saml2LogoutRequest(_saml2Config, User);
         saml2LogoutRequest.DeleteSession(HttpContext);
         return LocalRedirect("/Index");
+    }
+
+    private bool TryReadSignedLogoutMessage()
+    {
+        if (!Request.HasFormContentType) return false;
+
+        try
+        {
+            var binding = new Saml2PostBinding();
+            var request = Request.ToGenericHttpRequest();
+            if (Request.Form.ContainsKey("SAMLResponse"))
+                binding.ReadSamlResponse(request, new Saml2LogoutResponse(_saml2Config));
+            else if (Request.Form.ContainsKey("SAMLRequest"))
+                binding.ReadSamlRequest(request, new Saml2LogoutRequest(_saml2Config));
+            else
+                return false;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "SLO message rejected: signature or format invalid.");
+            return false;
+        }
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────

@@ -49,6 +49,8 @@ public class ArchiveTissuesModel : GridPageModel
     [BindProperty(SupportsGet = true)]
     public int? BatchId { get; set; }
 
+    protected override int? RequestedBatchId => BatchId is > 0 ? BatchId : Session.BatchID;
+
     /// <summary>
     /// Origin page to return to once archiving is done. Set explicitly by <c>ArchiveMenu</c>, which
     /// itself forwards whatever navigated to it (BatchesForArchiving or SearchSubmissions) — without

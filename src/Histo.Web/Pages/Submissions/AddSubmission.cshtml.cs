@@ -39,6 +39,8 @@ public class AddSubmissionModel : HistoPageModel
     /// <summary>Batch ID from the URL (route/query). Falls back to <see cref="ISessionService.BatchID"/>.</summary>
     [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
 
+    protected override int? RequestedBatchId => BatchId is > 0 ? BatchId : Session.BatchID;
+
     /// <summary>Submission ID carried through the form so POST never depends on session alone.</summary>
     [BindProperty(SupportsGet = true)] public int? BatchSubmissionId { get; set; }
 
