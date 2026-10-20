@@ -101,6 +101,9 @@ public sealed class SubmissionRepository : ISubmissionRepository
             {
                 var mouseNumber = SenderRefHelpers.FormatMouseNumber(currentNumber);
                 var animalId = await CreateMouseAnimalAsync(conn, tx, mouseNumber);
+                if (siblings.Any(s => s.AnimalID == animalId))
+                    throw new InvalidOperationException($"Mouse number {mouseNumber} already exists on the new submission. Alter the range and try again.");
+
                 var submissionId = await AddSubmissionAsync(conn, tx,
                     new BatchSubmission { BatchID = batchId, AnimalID = animalId, SubmissionName = "Default", Order = nextOrder++ });
 
@@ -297,7 +300,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
 
     private static async Task<int> CreateMouseAnimalAsync(IDbConnection conn, IDbTransaction tx, string mouseNumber)
     {
-        var (animalId, addResult) = await AddAnimalAsync(conn, tx, new Animal
+        var (animalId, _) = await AddAnimalAsync(conn, tx, new Animal
         {
             BatchSubmissionID = 0,
             SenderRef = mouseNumber,
@@ -311,11 +314,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
             BookedHistologyRef = false,
         });
 
-        // A range creates brand-new samples, so unlike the copy journey an existing Sender Ref
-        // (return 1) is a clash to report, not an animal to reuse.
-        if (addResult == 1)
-            throw new InvalidOperationException($"Mouse number {mouseNumber} already exists. Alter the range and try again.");
-
+        // Legacy parity: an existing Sender Ref (return 1) is reused, keeping its histology ref.
         if (animalId <= 0)
             throw new InvalidOperationException($"Failed to create animal {mouseNumber}.");
 
@@ -468,24 +467,12 @@ public sealed class SubmissionRepository : ISubmissionRepository
         };
         if (upper == 0) return null;
 
-        // UnUsedHistologyRefs has no type column — a ref's type is the range of its last 5 digits.
-        // TRY_CAST keeps the pool's non-numeric rows from failing the whole statement.
-        // UPDLOCK holds the chosen row for the rest of THIS transaction (a plain read-committed
-        // SELECT releases its shared lock immediately, letting a concurrent copy pick the same ref
-        // and then fail on AddAnimal); READPAST sends concurrent copies to the next free row
-        // instead of blocking on this one.
+        // The SP's UPDLOCK holds the chosen row for THIS transaction, so it must run inside tx.
         var pooled = await conn.QueryFirstOrDefaultAsync<string?>(
-            """
-            SELECT TOP (1) HistologyRef
-            FROM   UnUsedHistologyRefs WITH (UPDLOCK, ROWLOCK, READPAST)
-            WHERE  Used = 0
-              AND  LEFT(RTRIM(HistologyRef), 3) = @YearPrefix
-              AND  TRY_CAST(RIGHT(RTRIM(HistologyRef), 5) AS INT) >= @Lower
-              AND  TRY_CAST(RIGHT(RTRIM(HistologyRef), 5) AS INT) <  @Upper
-            ORDER BY TRY_CAST(RIGHT(RTRIM(HistologyRef), 5) AS INT)
-            """,
+            "GetPooledHistologyRef",
             new { YearPrefix = Histo.Core.Domain.HistologyRefHelpers.CurrentYearPrefix, Lower = lower, Upper = upper },
-            transaction: tx);
+            transaction: tx,
+            commandType: System.Data.CommandType.StoredProcedure);
         if (!string.IsNullOrWhiteSpace(pooled)) return pooled.Trim();
 
         var p = new DynamicParameters();
@@ -751,33 +738,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         try
         {
             await conn.ExecuteAsync(new CommandDefinition(
-                """
-                -- TC (premium charge) codes hang off the block test rows by TestID and are not
-                -- cascaded, so they must go before their parents or they are orphaned.
-                DELETE tc FROM HistologyTCCodes    tc INNER JOIN BlockHistology  bh ON bh.ID = tc.TestID INNER JOIN BatchBlock b ON b.ID = bh.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
-                DELETE tc FROM AntibodiesTCCodes   tc INNER JOIN BlockAntibodies ba ON ba.ID = tc.TestID INNER JOIN BatchBlock b ON b.ID = ba.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
-                DELETE tc FROM SpecialStainTCCodes tc INNER JOIN BlockStain      bs ON bs.ID = tc.TestID INNER JOIN BatchBlock b ON b.ID = bs.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
-
-                DELETE bt FROM BlockTissues    bt INNER JOIN BatchBlock b ON b.ID = bt.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
-                DELETE bh FROM BlockHistology  bh INNER JOIN BatchBlock b ON b.ID = bh.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
-                DELETE ba FROM BlockAntibodies ba INNER JOIN BatchBlock b ON b.ID = ba.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
-                DELETE bs FROM BlockStain      bs INNER JOIN BatchBlock b ON b.ID = bs.BlockID WHERE b.BatchID = @BatchID AND b.AnimalID = @AnimalID;
-
-                -- Pre-booked block refs are a finite booked resource: releasing them back to the
-                -- pool (status PreBookedUsed -> PreBooked, no batch) keeps them available for
-                -- re-assignment instead of destroying the booking.
-                UPDATE BatchBlock
-                   SET Status = @PreBookedStatus, BatchID = NULL
-                 WHERE BatchID = @BatchID AND AnimalID = @AnimalID AND Status = @PreBookedUsedStatus;
-
-                DELETE FROM BatchBlock WHERE BatchID = @BatchID AND AnimalID = @AnimalID;
-
-                IF @IncludeSubmission = 1
-                BEGIN
-                    DELETE t FROM BatchTissues t INNER JOIN BatchSubmission s ON s.ID = t.BatchSubmissionID WHERE s.BatchID = @BatchID AND s.AnimalID = @AnimalID;
-                    DELETE FROM BatchSubmission WHERE BatchID = @BatchID AND AnimalID = @AnimalID;
-                END
-                """,
+                "DeleteSampleFromBatch",
                 new
                 {
                     BatchID = batchId,
@@ -787,6 +748,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
                     PreBookedUsedStatus = BlockStatusPreBookedUsed,
                 },
                 transaction: tx,
+                commandType: System.Data.CommandType.StoredProcedure,
                 cancellationToken: ct));
 
             await tx.CommitAsync(ct);
@@ -1054,12 +1016,11 @@ public sealed class SubmissionRepository : ISubmissionRepository
         var refs = senderRefs.ToList();
         if (refs.Count == 0) return [];
 
-        // No legacy SP covers a bulk existence check — direct query, same pattern as
-        // GetAllUnusedRefsAsync (HistologyRepository) where the SP shape doesn't fit.
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<string>(
-            "SELECT SenderRef FROM Animal WHERE SenderRef IN @SenderRefs",
-            new { SenderRefs = refs });
+            "GetExistingSenderRefs",
+            new { SenderRefs = string.Join(',', refs) },
+            commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
     }
 

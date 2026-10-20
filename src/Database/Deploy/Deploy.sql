@@ -44,6 +44,18 @@ GO
 GO
 :r ../StoredProcedures/dbo.GetBatchBlockTests.sql
 GO
+:r ../StoredProcedures/dbo.GetAnimalSenderRef.sql
+GO
+:r ../StoredProcedures/dbo.GetAnimalBlockRefs.sql
+GO
+:r ../StoredProcedures/dbo.GetAllUnusedHistologyRefs.sql
+GO
+:r ../StoredProcedures/dbo.GetPooledHistologyRef.sql
+GO
+:r ../StoredProcedures/dbo.GetExistingSenderRefs.sql
+GO
+:r ../StoredProcedures/dbo.DeleteSampleFromBatch.sql
+GO
 
 -- Step 2: Deployment script to used to alter/create tables, columns etc
 PRINT '--- Create or Alter Table, Column  ---';

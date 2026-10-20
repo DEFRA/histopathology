@@ -601,7 +601,7 @@ public class AddSubmissionModel : HistoPageModel
     /// Returns the error message instead of the refs when the range is invalid or collides with
     /// an existing sample.
     /// </summary>
-    private async Task<(List<string> Refs, string? Error)> ResolveMouseRangeRefsAsync()
+    private async Task<(List<string> Refs, string? Error)> ResolveMouseRangeRefsAsync(int? batchId = null)
     {
         const int maxMouseRangeEntries = 1000;
 
@@ -622,14 +622,19 @@ public class AddSubmissionModel : HistoPageModel
         if (rangeSize > maxMouseRangeEntries)
             return ([], $"The mouse number range cannot exceed {maxMouseRangeEntries} entries. Use a smaller range or create a bulk job.");
 
-        // Validate the whole range against EVERY animal in the database (not just this batch) —
-        // SenderRef collisions from a different batch (e.g. leftover test/fixture data) still
-        // cause the tissue-copy step inside CreateMouseRangeAsync to fail deep in a DB transaction.
         var candidates = Enumerable.Range(fromId, rangeSize).Select(SenderRefHelpers.FormatMouseNumber).ToList();
-        var duplicate = (await _submissions.GetExistingSenderRefsAsync(candidates)).FirstOrDefault();
+        if (batchId is null)
+            return (candidates, null);
+
+        // Legacy parity: a mouse number that exists elsewhere is reused (with its histology ref);
+        // only one already on THIS submission is a clash.
+        var onBatch = (await _submissions.GetAnimalsByBatchAsync(batchId.Value))
+            .Select(a => a.SenderRef.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var duplicate = candidates.FirstOrDefault(onBatch.Contains);
 
         return duplicate is not null
-            ? ([], $"Mouse number {duplicate} already exists. Alter the range and try again.")
+            ? ([], $"Mouse number {duplicate} already exists on the new submission. Alter the range and try again.")
             : (candidates, null);
     }
 
@@ -640,7 +645,7 @@ public class AddSubmissionModel : HistoPageModel
     /// </summary>
     private async Task<IActionResult> OnPostMouseRangeAsync(int batchId)
     {
-        var (rangeRefs, rangeError) = await ResolveMouseRangeRefsAsync();
+        var (rangeRefs, rangeError) = await ResolveMouseRangeRefsAsync(batchId);
         if (rangeError is not null)
         {
             ModelError = rangeError;

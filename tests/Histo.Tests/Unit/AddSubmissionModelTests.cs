@@ -544,7 +544,9 @@ public class AddSubmissionModelTests
         _submissions.Setup(s => s.GetExistingSenderRefsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<string>)[]);
         _submissions.Setup(s => s.CreateMouseRangeAsync(5, 42, "MC000001", "MC000002", 7, It.IsAny<CancellationToken>())).ReturnsAsync(true);
-        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+        _submissions.SetupSequence(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[
+                new Animal { ID = 42, SenderRef = "SRC", HistologyRef = "26/60001", HistoRefSet = true }])
             .ReturnsAsync((IReadOnlyList<Animal>)[
                 new Animal { ID = 42, SenderRef = "SRC", HistologyRef = "26/60001", HistoRefSet = true },
                 new Animal { ID = 51, SenderRef = "MC000001" },
@@ -778,8 +780,8 @@ public class AddSubmissionModelTests
         _session.Setup(s => s.UserArea).Returns("Histopath");
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
-        _submissions.Setup(s => s.GetExistingSenderRefsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<string>)["MC000002"]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 7, SenderRef = "MC000002" }]);
         var sut = CreateSut(returnPage: null);
         sut.BatchSubmissionId = 99;
         sut.SourceAnimalId = 1;
@@ -789,7 +791,7 @@ public class AddSubmissionModelTests
         var result = await sut.OnPostAsync();
 
         Assert.IsType<PageResult>(result);
-        Assert.Equal("Mouse number MC000002 already exists. Alter the range and try again.", sut.ModelError);
+        Assert.Equal("Mouse number MC000002 already exists on the new submission. Alter the range and try again.", sut.ModelError);
         _submissions.Verify(s => s.AddAnimalAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 

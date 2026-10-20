@@ -88,7 +88,7 @@ public sealed class BlockRepository : IBlockRepository
     private static async Task LockForAnimalAsync(IDbConnection conn, IDbTransaction tx, int animalId)
     {
         var senderRef = await conn.ExecuteScalarAsync<string?>(
-            "SELECT RTRIM(SenderRef) FROM Animal WHERE ID = @AnimalID", new { AnimalID = animalId }, tx);
+            "GetAnimalSenderRef", new { AnimalID = animalId }, tx, commandType: System.Data.CommandType.StoredProcedure);
         if (!string.IsNullOrWhiteSpace(senderRef))
             await AcquireSenderRefLockAsync(conn, tx, senderRef);
     }
@@ -108,8 +108,9 @@ public sealed class BlockRepository : IBlockRepository
             return block.BlockRef;
 
         var all = (await conn.QueryAsync<string>(
-            "SELECT RTRIM(BlockRef) FROM BatchBlock WHERE AnimalID = @AnimalID AND BlockRef IS NOT NULL",
-            new { AnimalID = block.AnimalID }, tx)).ToList();
+            "GetAnimalBlockRefs",
+            new { AnimalID = block.AnimalID }, tx,
+            commandType: System.Data.CommandType.StoredProcedure)).ToList();
         return BlockHelpers.ComputeNextBlockRef(all, null, block.BlockRef);
     }
 
