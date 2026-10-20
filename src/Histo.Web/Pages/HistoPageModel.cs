@@ -60,8 +60,27 @@ public abstract class HistoPageModel : PageModel
         // change is reflected on the next page load instead of persisting for the whole session.
         Session.PopulateFromClaims(User);
 
+        // Runs after model binding, so every GET and POST handler is covered, not just the first.
+        var requestedBatchId = RequestedBatchId;
+        if (requestedBatchId is > 0)
+        {
+            var batches = HttpContext.RequestServices.GetRequiredService<IBatchService>();
+            var forbidden = await CheckBatchAccessAsync(batches, requestedBatchId.Value);
+            if (forbidden is not null)
+            {
+                context.Result = forbidden;
+                return;
+            }
+        }
+
         await next();
     }
+
+    /// <summary>
+    /// Override on pages that act on a batch taken from the URL or session. When it returns a
+    /// batch ID, the caller's area is checked against that batch before any handler runs.
+    /// </summary>
+    protected virtual int? RequestedBatchId => null;
 
     /// <summary>
     /// Object-level access check for batch-scoped pages that accept a batch ID from the
