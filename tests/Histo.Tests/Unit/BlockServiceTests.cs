@@ -56,6 +56,20 @@ public class BlockServiceTests
     }
 
     [Fact]
+    public async Task CopyBlockAsync_SavesWithKeepRef_SoRefUsedOnOtherSubmissionIsNotBumped()
+    {
+        Block? saved = null;
+        _repo.Setup(r => r.SaveAsync(It.IsAny<Block>(), 7, true, It.IsAny<CancellationToken>()))
+            .Callback<Block, int, bool, CancellationToken>((b, _, _, _) => saved = b)
+            .ReturnsAsync(55);
+
+        var id = await CreateSut().CopyBlockAsync(new Block { BlockRef = "01" }, 5, 2, [], ExistingOrders, 7);
+
+        Assert.Equal(55, id);
+        Assert.Equal("01", saved?.BlockRef);
+    }
+
+    [Fact]
     public async Task AddBlockKeepingRefAsync_NoOptions_LeavesOptionalFieldsEmpty()
     {
         Block? saved = null;

@@ -212,9 +212,10 @@ public sealed class BlockService : IBlockService
         CancellationToken ct = default)
     {
         var newBlockRef = BlockHelpers.ComputeNextBlockRef(existingBlockRefs);
-        return await AddBlockAsync(
+        // Legacy only checks the current submission, so a ref used on another submission (e.g. 01) is still allowed.
+        return await AddBlockKeepingRefAsync(
             newBatchId, newAnimalId, newBlockRef, existingOrders, userId,
-            source.CustomerRef, source.Comment, source.RepeatBlock, ct);
+            new BlockOptions(source.CustomerRef, source.Comment, source.RepeatBlock), ct);
     }
 
     /// <summary>Deletes a block.</summary>
