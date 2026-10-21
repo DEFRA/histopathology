@@ -467,13 +467,19 @@ public sealed class SubmissionRepository : ISubmissionRepository
         };
         if (upper == 0) return null;
 
-        // The SP's UPDLOCK holds the chosen row for THIS transaction, so it must run inside tx.
-        var pooled = await conn.QueryFirstOrDefaultAsync<string?>(
-            "GetPooledHistologyRef",
-            new { YearPrefix = Histo.Core.Domain.HistologyRefHelpers.CurrentYearPrefix, Lower = lower, Upper = upper },
+        // Legacy GetUnusedHistologyRefs returns the whole pool, so the year/range filter is applied here. The row is
+        // not locked; a concurrent copy taking the same ref is rejected by AddAnimal (return 2) and rolls back.
+        var pool = await conn.QueryAsync<string>(
+            "GetUnusedHistologyRefs",
             transaction: tx,
             commandType: System.Data.CommandType.StoredProcedure);
-        if (!string.IsNullOrWhiteSpace(pooled)) return pooled.Trim();
+        var pooled = pool
+            .Where(Histo.Core.Domain.HistologyRefHelpers.IsCurrentYear)
+            .Select(r => r.Trim())
+            .Where(r => Histo.Core.Domain.HistologyRefHelpers.RefNumber(r) >= lower && Histo.Core.Domain.HistologyRefHelpers.RefNumber(r) < upper)
+            .OrderBy(Histo.Core.Domain.HistologyRefHelpers.RefNumber)
+            .FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(pooled)) return pooled;
 
         var p = new DynamicParameters();
         p.Add("Type", histologyType.Value, dbType: System.Data.DbType.Int32);
@@ -1008,20 +1014,6 @@ public sealed class SubmissionRepository : ISubmissionRepository
                                d.TryGetValue("HistoRef", out var hr2) ? Convert.ToString(hr2) : null,
             };
         }).ToList();
-    }
-
-    /// <inheritdoc/>
-    public async Task<IReadOnlyList<string>> GetExistingSenderRefsAsync(IEnumerable<string> senderRefs, CancellationToken ct = default)
-    {
-        var refs = senderRefs.ToList();
-        if (refs.Count == 0) return [];
-
-        using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<string>(
-            "GetExistingSenderRefs",
-            new { SenderRefs = string.Join(',', refs) },
-            commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
     }
 
     /// <inheritdoc/>

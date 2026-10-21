@@ -403,8 +403,6 @@ public class AddSubmissionModelTests
     {
         _session.Object.BatchSubmissionID = 99;
         _session.Setup(s => s.UserArea).Returns("Histopath");
-        _submissions.Setup(s => s.GetExistingSenderRefsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<string>)[]);
         var sut = CreateSut(returnPage: "/Batches/CopyBatch?sourceBatchId=5");
         sut.BatchSubmissionId = 99;
         sut.SourceAnimalId = 42;
@@ -439,8 +437,6 @@ public class AddSubmissionModelTests
     {
         _session.Object.BatchSubmissionID = 99;
         _session.Setup(s => s.UserArea).Returns("Histopath");
-        _submissions.Setup(s => s.GetExistingSenderRefsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<string>)[]);
         var sut = CreateSut(returnPage: "/Batches/CopyBatch?sourceBatchId=5");
         sut.BatchSubmissionId = 99;
         sut.SourceAnimalId = 42;
@@ -541,8 +537,6 @@ public class AddSubmissionModelTests
         _session.Setup(s => s.UserArea).Returns("Histopath");
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
-        _submissions.Setup(s => s.GetExistingSenderRefsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<string>)[]);
         _submissions.Setup(s => s.CreateMouseRangeAsync(5, 42, "MC000001", "MC000002", 7, It.IsAny<CancellationToken>())).ReturnsAsync(true);
         _submissions.SetupSequence(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[
@@ -584,8 +578,6 @@ public class AddSubmissionModelTests
         _session.Setup(s => s.UserArea).Returns("Histopath");
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
-        _submissions.Setup(s => s.GetExistingSenderRefsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<string>)[]);
         _submissions.Setup(s => s.CreateMouseRangeAsync(5, 42, "MC000001", "MC000002", 7, It.IsAny<CancellationToken>())).ReturnsAsync(true);
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[
@@ -837,8 +829,6 @@ public class AddSubmissionModelTests
         _session.Setup(s => s.UserArea).Returns("Histopath");
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
-        _submissions.Setup(s => s.GetExistingSenderRefsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<string>)[]);
         _submissions.Setup(s => s.CreateMouseRangeAsync(5, 1, "MC000001", "MC000002", 7, It.IsAny<CancellationToken>())).ReturnsAsync(true);
         var sut = CreateSut(returnPage: null);
         sut.BatchSubmissionId = 99;
@@ -881,8 +871,6 @@ public class AddSubmissionModelTests
         _session.Setup(s => s.UserArea).Returns("Histopath");
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 50, BatchID = 5, AnimalID = 1, Order = 1 }]);
-        _submissions.Setup(s => s.GetExistingSenderRefsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<string>)[]);
         _submissions.Setup(s => s.CreateMouseRangeAsync(5, 1, "MC000001", "MC000002", 7, It.IsAny<CancellationToken>())).ReturnsAsync(true);
         var sut = CreateSut(returnPage: null);
         sut.BatchSubmissionId = 99;
@@ -903,8 +891,6 @@ public class AddSubmissionModelTests
         _session.Setup(s => s.UserArea).Returns("Histopath");
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 50, BatchID = 5, AnimalID = 1, Order = 1 }]);
-        _submissions.Setup(s => s.GetExistingSenderRefsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<string>)[]);
         _submissions.Setup(s => s.CreateMouseRangeAsync(5, 1, "MC000001", "MC000002", 7, It.IsAny<CancellationToken>())).ReturnsAsync(false);
         var sut = CreateSut(returnPage: null);
         sut.BatchSubmissionId = 99;

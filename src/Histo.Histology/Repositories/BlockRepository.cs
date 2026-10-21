@@ -66,8 +66,10 @@ public sealed class BlockRepository : IBlockRepository
             using var tx = await conn.BeginTransactionAsync(ct);
             try
             {
-                await LockForAnimalAsync(conn, tx, block.AnimalID);
-                var blockRef = await ResolveFreeRefAsync(conn, tx, block);
+                var senderRef = await FindSenderRefAsync(conn, tx, block.AnimalID, block.BatchID);
+                if (!string.IsNullOrWhiteSpace(senderRef))
+                    await AcquireSenderRefLockAsync(conn, tx, senderRef);
+                var blockRef = await ResolveFreeRefAsync(conn, tx, block, senderRef);
                 var id = await InsertBlockAsync(conn, tx, block, blockRef);
                 await tx.CommitAsync(ct);
                 return id;
@@ -86,13 +88,30 @@ public sealed class BlockRepository : IBlockRepository
         return block.ID;
     }
 
-    /// <summary>Takes the same per-sender-ref lock as <see cref="BookPreBookedBlocksAsync"/>.</summary>
-    private static async Task LockForAnimalAsync(IDbConnection conn, IDbTransaction tx, int animalId)
+    /// <summary>
+    /// Sender ref of an animal on a batch, from the legacy batch SPs: <c>GetBatchAnimal</c> (animals with a submission row),
+    /// then <c>GetBatchBlocksByID</c> result set 5 (BATCH_BLOCK_ANIMAL) for legacy animals that only have blocks.
+    /// </summary>
+    private static async Task<string?> FindSenderRefAsync(IDbConnection conn, IDbTransaction tx, int animalId, int batchId)
     {
-        var senderRef = await conn.ExecuteScalarAsync<string?>(
-            "GetAnimalSenderRef", new { AnimalID = animalId }, tx, commandType: System.Data.CommandType.StoredProcedure);
-        if (!string.IsNullOrWhiteSpace(senderRef))
-            await AcquireSenderRefLockAsync(conn, tx, senderRef);
+        var animals = await conn.QueryAsync<AnimalSenderRow>(
+            "GetBatchAnimal", new { ID = batchId }, tx, commandType: System.Data.CommandType.StoredProcedure);
+        var found = animals.Where(a => a.ID == animalId).Select(a => a.SenderRef).FirstOrDefault();
+        if (found is not null) return found.Trim();
+
+        using var multi = await conn.QueryMultipleAsync(
+            "GetBatchBlocksByID", new { ID = batchId }, tx, commandType: System.Data.CommandType.StoredProcedure);
+        const int blockAnimalResultSetIndex = 5;
+        for (var i = 0; i < blockAnimalResultSetIndex; i++)
+            await multi.ReadAsync<dynamic>();
+        var blockAnimals = await multi.ReadAsync<AnimalSenderRow>();
+        return blockAnimals.Where(a => a.ID == animalId).Select(a => a.SenderRef?.Trim()).FirstOrDefault();
+    }
+
+    private sealed class AnimalSenderRow
+    {
+        public int ID { get; set; }
+        public string? SenderRef { get; set; }
     }
 
     /// <summary>Refs held by the animal on other submissions, including unclaimed pre-booked placeholders.</summary>
@@ -103,16 +122,18 @@ public sealed class BlockRepository : IBlockRepository
             commandType: System.Data.CommandType.StoredProcedure)).ToList();
 
     /// <summary>Returns the requested ref, or the next free one in sequence if another submission took it first.</summary>
-    private static async Task<string> ResolveFreeRefAsync(IDbConnection conn, IDbTransaction tx, Block block)
+    private static async Task<string> ResolveFreeRefAsync(IDbConnection conn, IDbTransaction tx, Block block, string? senderRef)
     {
         var other = await OtherBatchRefsAsync(conn, tx, block.AnimalID, block.BatchID);
         if (!other.Contains(block.BlockRef.Trim(), StringComparer.OrdinalIgnoreCase))
             return block.BlockRef;
 
-        var all = (await conn.QueryAsync<string>(
-            "GetAnimalBlockRefs",
-            new { AnimalID = block.AnimalID }, tx,
-            commandType: System.Data.CommandType.StoredProcedure)).ToList();
+        // Legacy GetBlocksForSenderRef returns refs as integers; refs are stored zero-padded to two digits.
+        var held = string.IsNullOrWhiteSpace(senderRef)
+            ? []
+            : await conn.QueryAsync<int>(
+                "GetBlocksForSenderRef", new { SenderRef = senderRef }, tx, commandType: System.Data.CommandType.StoredProcedure);
+        var all = held.Select(n => n.ToString("00")).ToList();
         return BlockHelpers.ComputeNextBlockRef(all, null, block.BlockRef);
     }
 

@@ -70,12 +70,20 @@ public sealed class HistologyRepository : IHistologyRepository
     /// <inheritdoc/>
     public async Task<IReadOnlyList<HistologyRef>> GetAllUnusedRefsAsync(CancellationToken ct = default)
     {
-        // GetUnusedHistologyRefs returns neither the Ref alias nor SenderRef, so this uses its own SP.
+        // Legacy GetUnusedHistologyRefs returns only an unaliased HistologyRef column (no SenderRef), so Ref is mapped explicitly.
         using var conn = _db.CreateConnection();
-        var rows = await conn.QueryAsync<HistologyRef>(
-            "GetAllUnusedHistologyRefs",
+        var rows = await conn.QueryAsync(
+            "GetUnusedHistologyRefs",
             commandType: System.Data.CommandType.StoredProcedure);
-        return rows.ToList();
+        return rows
+            .Select(r => new HistologyRef
+            {
+                Ref = ((IDictionary<string, object>)r).TryGetValue("HistologyRef", out var v) && v is not DBNull
+                    ? Convert.ToString(v)?.Trim() ?? string.Empty
+                    : string.Empty,
+            })
+            .OrderBy(r => r.Ref, StringComparer.Ordinal)
+            .ToList();
     }
 
     /// <inheritdoc/>
