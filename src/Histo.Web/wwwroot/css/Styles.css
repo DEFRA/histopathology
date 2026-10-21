@@ -24,6 +24,77 @@
     margin-left: auto;
 }
 
+.app-header-user-list {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 15px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* Keep inputs inside the viewport at 400% zoom (WCAG 1.4.10). */
+.govuk-input,
+.govuk-select {
+    max-width: 100%;
+}
+
+/* Stack table rows as labelled cards on narrow viewports so no horizontal scroll is needed. */
+@media (max-width: 640px) {
+    /* Fallback for tables the script doesn't convert: scroll the table, not the page. */
+    main table.govuk-table:not(.app-responsive-table) {
+        display: block;
+        position: relative; /* keeps absolutely positioned visually-hidden text inside the scroller */
+        max-width: 100%;
+        overflow-x: auto;
+    }
+    .app-responsive-table thead,
+    .app-responsive-table thead tr {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px 15px;
+        width: 100%;
+    }
+
+    .app-responsive-table thead th {
+        display: block;
+        border: 0;
+        padding: 5px 0;
+        width: auto;
+    }
+
+    /* Only sortable headers stay visible; plain labels are repeated inside each card. */
+    .app-responsive-table thead th:not(:has(button, a)) {
+        position: absolute;
+        left: -9999px;
+    }
+
+    .app-responsive-table,
+    .app-responsive-table tbody,
+    .app-responsive-table tr,
+    .app-responsive-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .app-responsive-table tr {
+        border-bottom: 2px solid #b1b4b6;
+        padding-bottom: 10px;
+        margin-bottom: 10px;
+    }
+
+    .app-responsive-table td {
+        border: 0;
+        padding: 5px 0;
+        text-align: left;
+    }
+
+    .app-responsive-table td[data-label]::before {
+        content: attr(data-label) ": ";
+        font-weight: 700;
+    }
+}
+
 .app-header-user {
     display: flex;
     flex-wrap: wrap;
@@ -60,6 +131,12 @@
  * display:flex rule. */
 .app-nav-toggle {
     white-space: nowrap;
+    display: none;
+}
+
+/* The toggle only works with JavaScript; without it the menu list stays visible. */
+.js-enabled .app-nav-toggle {
+    display: inline-block;
 }
 
 .govuk-service-navigation__list[hidden] {
@@ -217,6 +294,64 @@
     text-align: center;
 }
 
+/* Non-colour cue so Completed is distinguishable from other statuses (WCAG 1.4.1). */
+.app-status-tag.govuk-tag--green::before {
+    content: "\2713  ";
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: dark;
+    }
+
+    body.govuk-template__body,
+    .govuk-template {
+        background-color: #0b0c0c;
+        color: #ffffff;
+    }
+
+    .govuk-body, .govuk-body-s, .govuk-body-m, .govuk-label, .govuk-hint, .govuk-caption-l,
+    .govuk-heading-xl, .govuk-heading-l, .govuk-heading-m, .govuk-heading-s,
+    .govuk-table__header, .govuk-table__cell, .govuk-table__caption, .govuk-fieldset__legend {
+        color: #ffffff;
+    }
+
+    .govuk-link:link, .govuk-link:visited, .app-link-button {
+        color: #8ec1ee;
+    }
+
+    .govuk-input, .govuk-select, .govuk-textarea {
+        background-color: #1d1f20;
+        color: #ffffff;
+        border-color: #ffffff;
+    }
+
+    .govuk-service-navigation,
+    .govuk-service-navigation__wrapper {
+        background-color: #1d1f20;
+        border-color: #505a5f;
+    }
+
+    .govuk-service-navigation__service-name,
+    .govuk-service-navigation__link,
+    .govuk-service-navigation__link:link,
+    .govuk-service-navigation__link:visited,
+    .govuk-service-navigation__service-name .govuk-service-navigation__link:link,
+    .govuk-service-navigation__service-name .govuk-service-navigation__link:visited,
+    .govuk-service-navigation__toggle,
+    .app-header-user {
+        color: #ffffff;
+    }
+
+    .govuk-back-link:link, .govuk-back-link:visited {
+        color: #ffffff;
+    }
+
+    .govuk-table__cell, .govuk-table__header {
+        border-bottom-color: #505a5f;
+    }
+}
+
 /* Unassigned-tissue marker on the Blocks grid (legacy BatchBlocks.aspx.vb rendered
  * <font color="Green" size="Small">*</font> after the sender ref). The star is aria-hidden and
  * paired with visually-hidden text, so meaning is never carried by colour or symbol alone. */
@@ -246,8 +381,10 @@
  * govuk-link size, is what actually matches row action links like "Change". */
 .app-pagination-window {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 6px;
+    row-gap: 8px;
     font-family: "GDS Transport", arial, sans-serif;
     font-size: 19px;
 }
@@ -312,15 +449,103 @@
 }
 
 .app-pagination-window__item--current span {
-    color: #1a65a6;
-    text-decoration: underline;
+    color: #0b0c0c;
+    text-decoration: none;
+    font-weight: 700;
+    cursor: default;
 }
 
 .app-pagination-window__summary {
     margin: 0 0 0 15px;
-    color: #1a65a6;
+    color: #0b0c0c;
     font-weight: 400;
     white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+    .app-pagination-window {
+        align-items: flex-start;
+    }
+
+    .app-pagination-window__summary {
+        margin-left: 0;
+        white-space: normal;
+    }
+}
+
+/* Declared after the base rules above so dark-mode colours win at equal specificity. */
+@media (prefers-color-scheme: dark) {
+    .app-pagination-window__item--current span,
+    .app-pagination-window__summary,
+    .govuk-footer,
+    .govuk-footer__meta-item,
+    .govuk-footer .govuk-body-s {
+        color: #ffffff;
+    }
+
+    .govuk-footer {
+        background-color: #1d1f20;
+        border-top-color: #505a5f;
+    }
+
+    .app-pagination-window__nav-link,
+    .app-pagination-window__item button,
+    .app-pagination-window__item a,
+    .app-link-button,
+    .govuk-footer__link:link,
+    .govuk-footer__link:visited {
+        color: #8ec1ee;
+    }
+
+    .app-pagination-window__nav-link:disabled {
+        color: #7f8588;
+    }
+
+    .govuk-footer__logo img {
+        background-color: #ffffff;
+        padding: 6px;
+    }
+
+    .govuk-error-summary__title,
+    .govuk-error-summary__body,
+    .govuk-error-summary__body p {
+        color: #ffffff;
+    }
+
+    .govuk-error-summary__list a,
+    .govuk-error-summary__list a:link,
+    .govuk-error-summary__list a:visited,
+    .govuk-error-message,
+    .govuk-form-group--error .govuk-label {
+        color: #ff8f8f;
+    }
+
+    .govuk-error-summary,
+    .govuk-input--error,
+    .govuk-form-group--error {
+        border-color: #ff8f8f;
+    }
+
+    /* GOV.UK focus state is dark text on yellow; restate it so the link colours above don't win. */
+    .govuk-link:focus,
+    .govuk-link:link:focus,
+    .govuk-link:visited:focus,
+    .govuk-back-link:focus,
+    .govuk-back-link:link:focus,
+    .govuk-footer__link:focus,
+    .govuk-footer__link:link:focus,
+    .govuk-footer__link:visited:focus,
+    .govuk-error-summary__list a:focus,
+    .govuk-service-navigation__link:focus,
+    .govuk-service-navigation__link:link:focus,
+    .govuk-service-navigation__service-name .govuk-service-navigation__link:focus,
+    .govuk-service-navigation__toggle:focus,
+    .app-link-button:focus,
+    .app-pagination-window__nav-link:focus,
+    .app-pagination-window__item a:focus,
+    .app-pagination-window__item button:focus {
+        color: #0b0c0c;
+    }
 }
 
 
