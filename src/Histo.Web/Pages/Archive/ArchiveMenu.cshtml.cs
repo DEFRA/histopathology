@@ -10,6 +10,8 @@ public class ArchiveMenuModel : HistoPageModel
     [BindProperty(SupportsGet = true)]
     public int? BatchId { get; set; }
 
+    protected override int? RequestedBatchId => BatchId is > 0 ? BatchId : Session.BatchID;
+
     /// <summary>
     /// Page path for the back link, populated from <see cref="ISessionService.ReturnPage"/>
     /// (set by whichever page navigated here — BatchesForArchiving, SearchSubmissions, etc.).

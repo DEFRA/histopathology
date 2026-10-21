@@ -83,7 +83,8 @@ public class BatchesReceivedModel : GridPageModel
         }
 
         var batch = await _batches.GetByIdAsync(QuickGoId.Value);
-        if (batch is null || batch.Status is not (BatchStatus.Received or BatchStatus.InProgress))
+        // Legacy CheckBatchExists(..., Cassetted = 0): block-type (cassetted) submissions never go through Assign blocks.
+        if (batch is null || batch.IsCassetted || batch.Status is not (BatchStatus.Received or BatchStatus.InProgress))
         {
             GoError = $"Submission {QuickGoId.Value} could not be found or does not have the required status.";
             return Page();

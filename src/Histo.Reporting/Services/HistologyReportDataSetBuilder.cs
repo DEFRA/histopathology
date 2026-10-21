@@ -401,6 +401,14 @@ public sealed class HistologyReportDataSetBuilder
         return dt;
     }
 
+    private const string ColSenderRef = "SenderRef";
+    private const string ColHistologyRef = "HistologyRef";
+    private const string ColBlockRef = "BlockRef";
+    private const string ColRepeatBlock = "RepeatBlock";
+    private const string ColCustomerRef = "CustomerRef";
+    private const string ColAnimalId = "AnimalID";
+    private const string ColBlockId = "BlockID";
+
     internal static DataTable BuildSubmissionTable(
         IList<IDictionary<string, object>> rawBatchSubmissions,
         IList<IDictionary<string, object>> rawTissues,
@@ -412,12 +420,12 @@ public sealed class HistologyReportDataSetBuilder
     {
         var dt = new DataTable("BatchSubmission");
         dt.Columns.Add("BatchID");
-        dt.Columns.Add("SenderRef");
-        dt.Columns.Add("HistologyRef");
-        dt.Columns.Add("BlockRef");
+        dt.Columns.Add(ColSenderRef);
+        dt.Columns.Add(ColHistologyRef);
+        dt.Columns.Add(ColBlockRef);
         dt.Columns.Add("TissueDetails");
-        dt.Columns.Add("RepeatBlock");
-        dt.Columns.Add("CustomerRef");
+        dt.Columns.Add(ColRepeatBlock);
+        dt.Columns.Add(ColCustomerRef);
 
         // Build animal lookup: AnimalID → animal row. GetBatchAnimal (the SP behind this result
         // set) joins through BatchSubmission with no DISTINCT, so an animal referenced by more
@@ -436,99 +444,123 @@ public sealed class HistologyReportDataSetBuilder
         // table is never empty.
         var useBlocks = rawBlockTissues.Count > 0 && (blocksAssigned || rawTissues.Count == 0);
 
-        if (!useBlocks && rawTissues.Count > 0)
-        {
-            // Sort tissues by AnimalID then tissue ID for stable ordering
-            var sortedTissues = rawTissues
-                .OrderBy(t => t.TryGetValue("AnimalID", out var aid) ? Convert.ToInt32(aid) : 0)
-                .ThenBy(t => t.TryGetValue("ID", out var tid) ? Convert.ToInt32(tid) : 0)
-                .ToList();
-
-            foreach (var tissue in sortedTissues)
-            {
-                var animalId = tissue.TryGetValue("AnimalID", out var aidVal)
-                    ? Convert.ToInt32(aidVal) : 0;
-
-                animalById.TryGetValue(animalId, out var animal);
-
-                // Legacy never sets BlockRef here and lists one row per piece (NoPieces).
-                var pieces = tissue.TryGetValue("NoPieces", out var npVal) && npVal is not null and not DBNull
-                    ? Math.Max(1, Convert.ToInt32(npVal)) : 1;
-                for (var p = 0; p < pieces; p++)
-                {
-                    var dr = dt.NewRow();
-                    dr["BatchID"]       = batchId.ToString();
-                    dr["SenderRef"]     = animal is not null ? Str(animal, "SenderRef")    : string.Empty;
-                    dr["HistologyRef"]  = animal is not null ? Str(animal, "HistologyRef") : string.Empty;
-                    dr["BlockRef"]      = string.Empty;
-                    dr["TissueDetails"] = Str(tissue, "TissueCode");
-                    dr["RepeatBlock"]   = string.Empty;
-                    // Legacy source: SubmissionForm.aspx.vb::CreateBatchSubmissionDataTable — the
-                    // CustomerRef column is declared but never assigned for Wet Tissue rows; it's a
-                    // Block-only field (see the useBlocks branch below), so it's always blank here.
-                    dr["CustomerRef"]   = string.Empty;
-                    dt.Rows.Add(dr);
-                }
-            }
-        }
-
         if (useBlocks)
-        {
-            // Block-type submission (Cassetted/Wax Block/Stained/Unstained Section) — BlockRef is
-            // a real, already-allocated value on the block itself (not a running counter), and the
-            // owning animal is resolved via the block's own AnimalID rather than the tissue row.
-            var blockById = rawBlocks
-                .Where(b => b.ContainsKey("ID"))
-                .ToDictionary(b => Convert.ToInt32(b["ID"]), b => b);
-
-            // Group by sample, then block, so a block's tissues are contiguous (legacy sorted animals
-            // by Histology Ref and blocks by Block Ref); block IDs alone interleave samples.
-            var sortedBlockTissues = rawBlockTissues
-                .OrderBy(t => blockById.TryGetValue(t.TryGetValue("BlockID", out var b0) ? Convert.ToInt32(b0) : 0, out var blk)
-                    && blk.TryGetValue("AnimalID", out var a0) && animalById.TryGetValue(Convert.ToInt32(a0), out var an)
-                    ? Str(an, "HistologyRef") : string.Empty, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(t => blockById.TryGetValue(t.TryGetValue("BlockID", out var b1) ? Convert.ToInt32(b1) : 0, out var blk1)
-                    && blk1.TryGetValue("AnimalID", out var a1) ? Convert.ToInt32(a1) : 0)
-                .ThenBy(t => blockById.TryGetValue(t.TryGetValue("BlockID", out var b2) ? Convert.ToInt32(b2) : 0, out var blk2)
-                    ? Str(blk2, "BlockRef") : string.Empty, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(t => t.TryGetValue("BlockID", out var bid) ? Convert.ToInt32(bid) : 0)
-                .ThenBy(t => t.TryGetValue("ID", out var tid) ? Convert.ToInt32(tid) : 0)
-                .ToList();
-
-            foreach (var tissue in sortedBlockTissues)
-            {
-                var blockId = tissue.TryGetValue("BlockID", out var bidVal) ? Convert.ToInt32(bidVal) : 0;
-                blockById.TryGetValue(blockId, out var block);
-
-                var animalId = block is not null && block.TryGetValue("AnimalID", out var aidVal)
-                    ? Convert.ToInt32(aidVal) : 0;
-                animalById.TryGetValue(animalId, out var animal);
-
-                // Legacy lists one row per physical piece (NoPieces) under the same block.
-                var pieces = tissue.TryGetValue("NoPieces", out var npVal) && npVal is not null and not DBNull
-                    ? Math.Max(1, Convert.ToInt32(npVal)) : 1;
-                for (var p = 0; p < pieces; p++)
-                {
-                    var dr = dt.NewRow();
-                    dr["BatchID"]       = batchId.ToString();
-                    dr["SenderRef"]     = animal is not null ? Str(animal, "SenderRef")    : string.Empty;
-                    dr["HistologyRef"]  = animal is not null ? Str(animal, "HistologyRef") : string.Empty;
-                    dr["BlockRef"]      = block is not null ? Str(block, "BlockRef") : string.Empty;
-                    dr["TissueDetails"] = Str(tissue, "TissueCode");
-                    dr["RepeatBlock"]   = block is not null && Bool(block, "RepeatBlock") ? "Yes" : string.Empty;
-                    // Legacy source: SubmissionForm.aspx.vb::CreateBatchBlocksDataTable —
-                    // drBatchBlocks("CustomerRef") = drBlock("CustomerRef"); the block's own Customer
-                    // Reference field, never the tissue's Comment.
-                    dr["CustomerRef"]   = block is not null ? Str(block, "CustomerRef") : string.Empty;
-                    dt.Rows.Add(dr);
-                }
-            }
-        }
+            AddBlockTissueRows(dt, rawBlocks, rawBlockTissues, animalById, batchId);
+        else if (rawTissues.Count > 0)
+            AddSubmissionTissueRows(dt, rawTissues, animalById, batchId);
 
         return dt;
     }
 
-    private DataTable BuildVersionTable(IList<IDictionary<string, object>> rawBatch)
+    private static void AddSubmissionTissueRows(
+        DataTable dt,
+        IList<IDictionary<string, object>> rawTissues,
+        Dictionary<int, IDictionary<string, object>> animalById,
+        int batchId)
+    {
+        // Sort tissues by AnimalID then tissue ID for stable ordering
+        var sortedTissues = rawTissues
+            .OrderBy(t => IntOrZero(t, ColAnimalId))
+            .ThenBy(t => IntOrZero(t, "ID"))
+            .ToList();
+
+        foreach (var tissue in sortedTissues)
+        {
+            animalById.TryGetValue(IntOrZero(tissue, ColAnimalId), out var animal);
+
+            // Legacy never sets BlockRef here and lists one row per piece (NoPieces).
+            // Legacy source: SubmissionForm.aspx.vb::CreateBatchSubmissionDataTable — the
+            // CustomerRef column is declared but never assigned for Wet Tissue rows; it's a
+            // Block-only field, so it's always blank here.
+            for (var p = 0; p < PieceCount(tissue); p++)
+                dt.Rows.Add(NewSubmissionRow(dt, batchId, animal, Str(tissue, "TissueCode"),
+                    blockRef: string.Empty, repeatBlock: string.Empty, customerRef: string.Empty));
+        }
+    }
+
+    private static void AddBlockTissueRows(
+        DataTable dt,
+        IList<IDictionary<string, object>> rawBlocks,
+        IList<IDictionary<string, object>> rawBlockTissues,
+        Dictionary<int, IDictionary<string, object>> animalById,
+        int batchId)
+    {
+        // Block-type submission (Cassetted/Wax Block/Stained/Unstained Section) — BlockRef is
+        // a real, already-allocated value on the block itself (not a running counter), and the
+        // owning animal is resolved via the block's own AnimalID rather than the tissue row.
+        var blockById = rawBlocks
+            .Where(b => b.ContainsKey("ID"))
+            .ToDictionary(b => Convert.ToInt32(b["ID"]), b => b);
+
+        // Group by sample, then block, so a block's tissues are contiguous (legacy sorted animals
+        // by Histology Ref and blocks by Block Ref); block IDs alone interleave samples.
+        var sortedBlockTissues = rawBlockTissues
+            .OrderBy(t => SampleHistologyRef(t, blockById, animalById), StringComparer.OrdinalIgnoreCase)
+            .ThenBy(t => BlockAnimalId(FindBlock(t, blockById)))
+            .ThenBy(t => FindBlock(t, blockById) is { } blk ? Str(blk, ColBlockRef) : string.Empty, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(t => IntOrZero(t, ColBlockId))
+            .ThenBy(t => IntOrZero(t, "ID"))
+            .ToList();
+
+        foreach (var tissue in sortedBlockTissues)
+        {
+            var block = FindBlock(tissue, blockById);
+            animalById.TryGetValue(BlockAnimalId(block), out var animal);
+
+            var blockRef = block is not null ? Str(block, ColBlockRef) : string.Empty;
+            var repeatBlock = block is not null && Bool(block, ColRepeatBlock) ? "Yes" : string.Empty;
+            // Legacy source: SubmissionForm.aspx.vb::CreateBatchBlocksDataTable —
+            // drBatchBlocks("CustomerRef") = drBlock("CustomerRef"); the block's own Customer
+            // Reference field, never the tissue's Comment.
+            var customerRef = block is not null ? Str(block, ColCustomerRef) : string.Empty;
+
+            // Legacy lists one row per physical piece (NoPieces) under the same block.
+            for (var p = 0; p < PieceCount(tissue); p++)
+                dt.Rows.Add(NewSubmissionRow(dt, batchId, animal, Str(tissue, "TissueCode"), blockRef, repeatBlock, customerRef));
+        }
+    }
+
+    private static DataRow NewSubmissionRow(
+        DataTable dt, int batchId, IDictionary<string, object>? animal, string tissueDetails,
+        string blockRef, string repeatBlock, string customerRef)
+    {
+        var dr = dt.NewRow();
+        dr["BatchID"]       = batchId.ToString();
+        dr[ColSenderRef]    = animal is not null ? Str(animal, ColSenderRef) : string.Empty;
+        dr[ColHistologyRef] = animal is not null ? Str(animal, ColHistologyRef) : string.Empty;
+        dr[ColBlockRef]     = blockRef;
+        dr["TissueDetails"] = tissueDetails;
+        dr[ColRepeatBlock]  = repeatBlock;
+        dr[ColCustomerRef]  = customerRef;
+        return dr;
+    }
+
+    private static int IntOrZero(IDictionary<string, object> row, string key) =>
+        row.TryGetValue(key, out var value) ? Convert.ToInt32(value) : 0;
+
+    private static int PieceCount(IDictionary<string, object> tissue) =>
+        tissue.TryGetValue("NoPieces", out var pieces) && pieces is not null and not DBNull
+            ? Math.Max(1, Convert.ToInt32(pieces)) : 1;
+
+    private static IDictionary<string, object>? FindBlock(
+        IDictionary<string, object> tissue, Dictionary<int, IDictionary<string, object>> blockById) =>
+        blockById.GetValueOrDefault(IntOrZero(tissue, ColBlockId));
+
+    private static int BlockAnimalId(IDictionary<string, object>? block) =>
+        block is not null && block.TryGetValue(ColAnimalId, out var animalId) ? Convert.ToInt32(animalId) : 0;
+
+    private static string SampleHistologyRef(
+        IDictionary<string, object> tissue,
+        Dictionary<int, IDictionary<string, object>> blockById,
+        Dictionary<int, IDictionary<string, object>> animalById)
+    {
+        var block = FindBlock(tissue, blockById);
+        if (block is null || !block.TryGetValue(ColAnimalId, out var animalId)) return string.Empty;
+
+        return animalById.TryGetValue(Convert.ToInt32(animalId), out var animal) ? Str(animal, ColHistologyRef) : string.Empty;
+    }
+
+    private DataTable BuildVersionTable(List<IDictionary<string, object>> rawBatch)
     {
         var dt = new DataTable("Version");
         dt.Columns.Add("Version");

@@ -82,9 +82,9 @@
         </div>
         <div class="govuk-grid-column-one-third">
             <div class="govuk-form-group">
-                <label class="govuk-label" for="OtherSubmittedArea">Submitted area</label>
                 @if (Model.CanEditSubmittedArea)
                 {
+                    <label class="govuk-label" for="OtherSubmittedArea">Submitted area</label>
                     <select class="govuk-select" asp-for="OtherSubmittedArea" id="OtherSubmittedArea">
                         <option value="">-- None --</option>
                         @foreach (var a in Model.UserAreas)
@@ -95,6 +95,7 @@
                 }
                 else
                 {
+                    <label class="govuk-label" for="OtherSubmittedAreaDisplay">Submitted area</label>
                     <select class="govuk-select" id="OtherSubmittedAreaDisplay" disabled>
                         <option value="">-- None --</option>
                         @foreach (var a in Model.UserAreas)
@@ -362,10 +363,8 @@
         <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
         <a href="@Model.ReturnUrl" class="govuk-button govuk-button--secondary" data-module="govuk-button"
            onclick="return confirm('Are you sure you want to cancel? Any changes you have made will be lost.');">Cancel</a>
-        @* "Samples" — this page only edits submission header fields; sample/animal/block details
-           (Add sample, Edit sample, Copy sample, Delete sample) are on SampleSummary, matching
-           the same "Samples" entry point already used from BatchDetails.cshtml. *@
-        <a asp-page="/Submissions/SampleSummary" asp-route-BatchId="@Model.Batch?.ID" class="govuk-button govuk-button--secondary" data-module="govuk-button">Samples</a>
+        @* Saves first, then opens SampleSummary (Add/Edit/Copy/Delete sample live there). *@
+        <button type="submit" name="ProceedToSamples" value="true" class="govuk-button govuk-button--secondary" data-module="govuk-button">Save and proceed to samples</button>
     </div>
 </form>
 

@@ -89,7 +89,9 @@ public class ViewSamplesModel : GridPageModel
     public string BackLinkPage =>
         !string.IsNullOrWhiteSpace(ReturnPage) && Url.IsLocalUrl(ReturnPage) ? ReturnPage : "/Search/SearchMenu";
 
-    public IReadOnlyList<AnimalTissueSearchResult> PagedResults =>
+    public IReadOnlyList<AnimalTissueSearchResult> PagedResults => GetPagedResults();
+
+    private List<AnimalTissueSearchResult> GetPagedResults() =>
         SortResults(Results)
         .Skip((PageNumber - 1) * PageSize)
         .Take(PageSize)
@@ -100,16 +102,20 @@ public class ViewSamplesModel : GridPageModel
     private IOrderedEnumerable<AnimalTissueSearchResult> SortResults(IReadOnlyList<AnimalTissueSearchResult> results) =>
         SortColumn switch
         {
-            "DateSubmitted"  => SortDesc ? results.OrderByDescending(r => r.DateSubmitted)  : results.OrderBy(r => r.DateSubmitted),
-            "DateReceived"   => SortDesc ? results.OrderByDescending(r => r.DateReceived)   : results.OrderBy(r => r.DateReceived),
-            "TimeReceived" => SortDesc ? results.OrderByDescending(r => r.TimeReceived) : results.OrderBy(r => r.TimeReceived),
-            "DateCompleted"  => SortDesc ? results.OrderByDescending(r => r.DateCompleted)  : results.OrderBy(r => r.DateCompleted),
-            "SubmittedAs"    => SortDesc ? results.OrderByDescending(r => r.SubmittedAs)    : results.OrderBy(r => r.SubmittedAs),
-            "NoPieces" => SortDesc ? results.OrderByDescending(r => r.NoPieces) : results.OrderBy(r => r.NoPieces),
-            "CustomerReceivedDate" => SortDesc ? results.OrderByDescending(r => r.CustomerReceivedDate) : results.OrderBy(r => r.CustomerReceivedDate),
-            "TissueDescription" => SortDesc ? results.OrderByDescending(r => r.TissueDescription) : results.OrderBy(r => r.TissueDescription),
-            _                => SortDesc ? results.OrderByDescending(r => r.ID) : results.OrderBy(r => r.ID),
+            "DateSubmitted"        => Order(results, r => r.DateSubmitted),
+            "DateReceived"         => Order(results, r => r.DateReceived),
+            "TimeReceived"         => Order(results, r => r.TimeReceived),
+            "DateCompleted"        => Order(results, r => r.DateCompleted),
+            "SubmittedAs"          => Order(results, r => r.SubmittedAs),
+            "NoPieces"             => Order(results, r => r.NoPieces),
+            "CustomerReceivedDate" => Order(results, r => r.CustomerReceivedDate),
+            "TissueDescription"    => Order(results, r => r.TissueDescription),
+            _                      => Order(results, r => r.ID),
         };
+
+    private IOrderedEnumerable<AnimalTissueSearchResult> Order<TKey>(
+        IEnumerable<AnimalTissueSearchResult> results, Func<AnimalTissueSearchResult, TKey> key) =>
+        SortDesc ? results.OrderByDescending(key) : results.OrderBy(key);
 
     public async Task OnGetAsync()
     {

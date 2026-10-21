@@ -18,8 +18,7 @@
     <PackageReference Include="ITfoxtec.Identity.Saml2" Version="4.21.0" />
     <PackageReference Include="ITfoxtec.Identity.Saml2.MvcCore" Version="4.21.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
-    <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.22.0" />
-    <PackageReference Include="Serilog.Sinks.ApplicationInsights" Version="4.0.0" />
+    <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.6.0" />
     <PackageReference Include="ClosedXML" Version="0.104.2" />
   </ItemGroup>
 

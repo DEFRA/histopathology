@@ -20,6 +20,8 @@ namespace Histo.Tests.Unit;
 /// </summary>
 public class ViewSamplesModelTests
 {
+    private static readonly string[] ExpectedNames = ["Alice", "Bravo", "Charlie"];
+
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<ISubmissionService> _submissions = new();
     private readonly Mock<ILookupService> _lookups = new();
@@ -152,8 +154,49 @@ public class ViewSamplesModelTests
         var table = reader.AsDataSet().Tables[0];
 
         Assert.Equal(
-            new[] { "Alice", "Bravo", "Charlie" },
+            ExpectedNames,
             new[] { table.Rows[1], table.Rows[2], table.Rows[3] }.Select(r => r[6]?.ToString()));
+    }
+
+    // Row 1 holds the larger value in every column, row 2 the smaller, so ascending order is [2, 1].
+    [Theory]
+    [InlineData("DateSubmitted", false, new[] { 2, 1 })]
+    [InlineData("DateSubmitted", true, new[] { 1, 2 })]
+    [InlineData("DateReceived", false, new[] { 2, 1 })]
+    [InlineData("TimeReceived", false, new[] { 2, 1 })]
+    [InlineData("DateCompleted", false, new[] { 2, 1 })]
+    [InlineData("SubmittedAs", false, new[] { 2, 1 })]
+    [InlineData("NoPieces", false, new[] { 2, 1 })]
+    [InlineData("CustomerReceivedDate", false, new[] { 2, 1 })]
+    [InlineData("TissueDescription", false, new[] { 2, 1 })]
+    [InlineData(null, false, new[] { 1, 2 })]
+    [InlineData(null, true, new[] { 2, 1 })]
+    public async Task PagedResults_SortsByTheSelectedColumn(string? column, bool desc, int[] expectedIds)
+    {
+        _submissions.Setup(s => s.GetAnimalTissuesAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<AnimalTissueSearchResult>)
+            [
+                new AnimalTissueSearchResult
+                {
+                    ID = 1, SenderRef = "S1", DateSubmitted = new DateTime(2026, 2, 1), DateReceived = new DateTime(2026, 2, 1),
+                    TimeReceived = "10:00", DateCompleted = new DateTime(2026, 2, 1), CustomerReceivedDate = new DateTime(2026, 2, 1),
+                    SubmittedAs = "B", NoPieces = 2, TissueDescription = "B",
+                },
+                new AnimalTissueSearchResult
+                {
+                    ID = 2, SenderRef = "S1", DateSubmitted = new DateTime(2026, 1, 1), DateReceived = new DateTime(2026, 1, 1),
+                    TimeReceived = "09:00", DateCompleted = new DateTime(2026, 1, 1), CustomerReceivedDate = new DateTime(2026, 1, 1),
+                    SubmittedAs = "A", NoPieces = 1, TissueDescription = "A",
+                },
+            ]);
+        var sut = CreateSut();
+        sut.Submitted = true;
+        sut.SenderRef = "S1";
+        await sut.OnGetAsync();
+        sut.SortColumn = column;
+        sut.SortDesc = desc;
+
+        Assert.Equal(expectedIds, sut.PagedResults.Select(r => r.ID));
     }
 }
 

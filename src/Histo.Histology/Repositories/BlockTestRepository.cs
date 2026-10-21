@@ -32,18 +32,18 @@ public sealed class BlockTestRepository : IBlockTestRepository
 
     /// <inheritdoc/>
     public async Task<IReadOnlyList<BlockTest>> GetByBatchAsync(int batchId, CancellationToken ct = default) =>
-        await FetchAsync(batchId, filterToWorklistCodes: true, ct);
+        await FetchAsync(batchId, filterToWorklistCodes: true);
 
     /// <inheritdoc/>
     public async Task<IReadOnlyList<BlockTest>> GetAllSelectionsByBatchAsync(int batchId, CancellationToken ct = default) =>
-        await FetchAsync(batchId, filterToWorklistCodes: false, ct);
+        await FetchAsync(batchId, filterToWorklistCodes: false);
 
     /// <summary>
     /// Shared reader behind <see cref="GetByBatchAsync"/> and <see cref="GetAllSelectionsByBatchAsync"/>.
     /// <paramref name="filterToWorklistCodes"/> selects which of those two contracts to honour —
     /// see the histology-codes comment below for why they must differ.
     /// </summary>
-    private async Task<IReadOnlyList<BlockTest>> FetchAsync(int batchId, bool filterToWorklistCodes, CancellationToken ct)
+    private async Task<IReadOnlyList<BlockTest>> FetchAsync(int batchId, bool filterToWorklistCodes)
     {
         using var conn = _db.CreateConnection();
         using var multi = await conn.QueryMultipleAsync(

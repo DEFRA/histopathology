@@ -39,6 +39,8 @@ public class AddSubmissionModel : HistoPageModel
     /// <summary>Batch ID from the URL (route/query). Falls back to <see cref="ISessionService.BatchID"/>.</summary>
     [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
 
+    protected override int? RequestedBatchId => BatchId is > 0 ? BatchId : Session.BatchID;
+
     /// <summary>Submission ID carried through the form so POST never depends on session alone.</summary>
     [BindProperty(SupportsGet = true)] public int? BatchSubmissionId { get; set; }
 
@@ -225,12 +227,14 @@ public class AddSubmissionModel : HistoPageModel
         }
 
         Session.BatchSubmissionID = submissionId;
-        var batch = await _batches.GetByIdAsync(batchId);
+        // Narrow check (SubmittedAs code "5" only) — NOT Batch.IsPreCassetted, which is true for
+        // every non-Wet-Tissue type and would wrongly demand a pre-booked block for Wax Block etc.
+        var isGenuinelyPreCassetted = Histo.Core.Domain.ValidationHelpers.IsBatchPreCassetted(await _batches.GetSubmittedAsCodeAsync(batchId));
 
         if (ShouldUseMouseRange())
             return await OnPostMouseRangeAsync(batchId);
 
-        var (newAnimalId, createError) = await CreateAnimalForSenderAsync(submissionId.Value, batch, SenderRef);
+        var (newAnimalId, createError) = await CreateAnimalForSenderAsync(submissionId.Value, isGenuinelyPreCassetted, SenderRef);
         if (createError is not null)
         {
             ModelError = createError;
@@ -558,7 +562,7 @@ public class AddSubmissionModel : HistoPageModel
     /// Animal for <paramref name="senderRef"/>. Shared by the single Sender Ref path and the
     /// mouse-range loop in <see cref="OnPostMouseRangeAsync"/>.
     /// </summary>
-    private async Task<(int AnimalId, string? Error)> CreateAnimalForSenderAsync(int submissionId, Batch? batch, string senderRef)
+    private async Task<(int AnimalId, string? Error)> CreateAnimalForSenderAsync(int submissionId, bool isGenuinelyPreCassetted, string senderRef)
     {
         // Pre-cassetted samples may only use a block ref already pre-booked for this sender
         // (Book Blocks) — legacy: clsBlock.NewBlock -> GetPreBookedBlock. Checking here, before
@@ -568,7 +572,7 @@ public class AddSubmissionModel : HistoPageModel
         // Regression note: this check existed previously and was silently dropped as collateral
         // damage by an unrelated refactor (commit e40a473) that removed the IBlockService
         // dependency this page no longer used for anything else at the time — restored here.
-        if (batch?.IsPreCassetted == true)
+        if (isGenuinelyPreCassetted)
         {
             // A sender ref can match more than one animal row (e.g. an unrelated past submission
             // with no pre-booked blocks, alongside the actual pre-booked placeholder) — check each
@@ -601,7 +605,7 @@ public class AddSubmissionModel : HistoPageModel
     /// Returns the error message instead of the refs when the range is invalid or collides with
     /// an existing sample.
     /// </summary>
-    private async Task<(List<string> Refs, string? Error)> ResolveMouseRangeRefsAsync()
+    private async Task<(List<string> Refs, string? Error)> ResolveMouseRangeRefsAsync(int? batchId = null)
     {
         const int maxMouseRangeEntries = 1000;
 
@@ -622,14 +626,19 @@ public class AddSubmissionModel : HistoPageModel
         if (rangeSize > maxMouseRangeEntries)
             return ([], $"The mouse number range cannot exceed {maxMouseRangeEntries} entries. Use a smaller range or create a bulk job.");
 
-        // Validate the whole range against EVERY animal in the database (not just this batch) —
-        // SenderRef collisions from a different batch (e.g. leftover test/fixture data) still
-        // cause the tissue-copy step inside CreateMouseRangeAsync to fail deep in a DB transaction.
         var candidates = Enumerable.Range(fromId, rangeSize).Select(SenderRefHelpers.FormatMouseNumber).ToList();
-        var duplicate = (await _submissions.GetExistingSenderRefsAsync(candidates)).FirstOrDefault();
+        if (batchId is null)
+            return (candidates, null);
+
+        // Legacy parity: a mouse number that exists elsewhere is reused (with its histology ref);
+        // only one already on THIS submission is a clash.
+        var onBatch = (await _submissions.GetAnimalsByBatchAsync(batchId.Value))
+            .Select(a => a.SenderRef.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var duplicate = candidates.FirstOrDefault(onBatch.Contains);
 
         return duplicate is not null
-            ? ([], $"Mouse number {duplicate} already exists. Alter the range and try again.")
+            ? ([], $"Mouse number {duplicate} already exists on the new submission. Alter the range and try again.")
             : (candidates, null);
     }
 
@@ -640,7 +649,7 @@ public class AddSubmissionModel : HistoPageModel
     /// </summary>
     private async Task<IActionResult> OnPostMouseRangeAsync(int batchId)
     {
-        var (rangeRefs, rangeError) = await ResolveMouseRangeRefsAsync();
+        var (rangeRefs, rangeError) = await ResolveMouseRangeRefsAsync(batchId);
         if (rangeError is not null)
         {
             ModelError = rangeError;

@@ -15,7 +15,7 @@
          in each renderer's static constructor.
          Pin to a specific patch version before production release. -->
     <PackageReference Include="QuestPDF" Version="2024.3.5" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.3" />
   </ItemGroup>
 
   <ItemGroup>

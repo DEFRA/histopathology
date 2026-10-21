@@ -85,6 +85,28 @@ public class BatchDetailsModelTests
         Assert.False(sut.Errors?.ContainsKey("Create_Histology"));
     }
 
+    [Theory]
+    [InlineData("2", "Wax Block", true)]
+    [InlineData("1", "Wet Tissue", false)]
+    [InlineData("2", null, false)] // type could not be resolved: must not hide a wet tissue submission from Assign blocks
+    public async Task OnPostCreateAsync_SavesCassettedAndBlockedOnlyForResolvedBlockTypes(string code, string? name, bool expected)
+    {
+        Batch? saved = null;
+        _lookups.Setup(l => l.GetLookupDataAsync(11, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)(name is null ? [] : [new LookupItem { ID = 0, Code = code, Name = name }]));
+        _batches.Setup(b => b.AddAsync(It.IsAny<Batch>(), 7, It.IsAny<CancellationToken>()))
+            .Callback<Batch, int, CancellationToken>((b, _, _) => saved = b).ReturnsAsync(100);
+        var sut = CreateSut();
+        sut.TempData["CreateSubmittedAsCode"] = code;
+        sut.Create_SelectedHistologyCodes = [HistologyCode.EO];
+
+        await sut.OnPostCreateAsync();
+
+        Assert.NotNull(saved);
+        Assert.Equal(expected, saved!.IsCassetted);
+        Assert.Equal(expected, saved.IsBlocked);
+    }
+
     [Fact]
     public async Task OnGetAsync_CreateMode_DoesNotShowExitWarningByDefault()
     {

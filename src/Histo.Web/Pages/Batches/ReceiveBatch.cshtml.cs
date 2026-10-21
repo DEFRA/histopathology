@@ -164,7 +164,7 @@ public class ReceiveBatchModel : HistoPageModel
             CompletedDate       = Batch.CompletedDate,
             SubmittedByUserID   = Batch.SubmittedByUserID,
             UserAreaCode        = Batch.UserAreaCode,
-            IsPreCassetted      = Batch.IsPreCassetted,
+            IsCassetted      = Batch.IsCassetted,
             ByPassSort          = Batch.ByPassSort,
             RowStamp            = Batch.RowStamp,
             BatchType           = Batch.BatchType,

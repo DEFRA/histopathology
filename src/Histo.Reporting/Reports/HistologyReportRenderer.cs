@@ -41,7 +41,7 @@ namespace Histo.Reporting.Reports;
 /// </list>
 /// </para>
 /// </summary>
-public sealed class HistologyReportRenderer
+public static class HistologyReportRenderer
 {
     static HistologyReportRenderer()
     {
@@ -63,44 +63,38 @@ public sealed class HistologyReportRenderer
     /// <param name="ds">Populated DataSet matching HistologyReportDataset.xsd.</param>
     /// <param name="rowsPerPage">Submission rows printed per page (legacy default 13). Values &lt;= 0 fall back to 13.</param>
     /// <returns>PDF content as a byte array.</returns>
-    public Task<byte[]> RenderAsync(DataSet ds, int rowsPerPage = 13)
+    public static Task<byte[]> RenderAsync(DataSet ds, int rowsPerPage = 13)
     {
-        DataRow? batch   = ds.Tables["Batch"]?.Rows.Count > 0
-            ? ds.Tables["Batch"]!.Rows[0] : null;
-        DataRow? postFix = ds.Tables["BatchPostFixation"]?.Rows.Count > 0
-            ? ds.Tables["BatchPostFixation"]!.Rows[0] : null;
+        DataRow? batch   = FirstRow(ds, "Batch");
+        DataRow? postFix = FirstRow(ds, "BatchPostFixation");
 
-        var histologyRows  = ds.Tables["BatchHistology"]?.Rows.Cast<DataRow>().ToList()  ?? [];
-        var submissionRows = ds.Tables["BatchSubmission"]?.Rows.Cast<DataRow>().ToList() ?? [];
+        var histologyRows  = RowsOf(ds, "BatchHistology");
+        var submissionRows = RowsOf(ds, "BatchSubmission");
 
-        var versionStr = ds.Tables["Version"]?.Rows.Count > 0
-            ? Field(ds.Tables["Version"]!.Rows[0], "Version")
-            : string.Empty;
+        var versionStr = FieldOrEmpty(FirstRow(ds, "Version"), "Version");
 
         // Pre-resolve values used in multiple sections.
-        var projectCode    = batch is not null ? Field(batch, "ProjectContractCode") : string.Empty;
-        var pathologist    = batch is not null ? Field(batch, "ContactName")         : string.Empty;
-        var submittedBy    = batch is not null ? Field(batch, "OtherSubmittedBy")    : string.Empty;
-        var submittedAs    = batch is not null ? Field(batch, "SubmittedAs")         : string.Empty;
-        var batchDate      = batch is not null ? FormatDate(Field(batch, "BatchDate"))     : string.Empty;
-        var dateReceived   = batch is not null ? FormatDate(Field(batch, "DateReceived"))  : string.Empty;
-        var timeReceived   = batch is not null ? Field(batch, "TimeReceived")        : string.Empty;
-        var species        = batch is not null ? Field(batch, "Species")             : string.Empty;
-        var batchType      = batch is not null ? Field(batch, "BatchType")           : string.Empty;
-        var adequatelyFixed = batch is not null
-            ? (Field(batch, "SafeToHandle") is "True" or "true" or "1" or "yes" or "Yes" ? "Yes" : "No")
-            : string.Empty;
-        var totalSamples   = batch is not null ? Field(batch, "NumberSamples")       : string.Empty;
-        var fixation       = batch is not null ? Field(batch, "Fixation")            : string.Empty;
-        var postFixOther   = batch is not null ? Field(batch, "PostFixationOther")   : string.Empty;
-        var comments       = batch is not null ? Field(batch, "Comments")            : string.Empty;
-        var commentLengthOk = batch is not null ? IsChecked(Field(batch, "CommentLengthOK")) : false;
-        var batchId        = batch is not null ? Field(batch, "ID")                  : string.Empty;
+        var projectCode    = FieldOrEmpty(batch, "ProjectContractCode");
+        var pathologist    = FieldOrEmpty(batch, "ContactName");
+        var submittedBy    = FieldOrEmpty(batch, "OtherSubmittedBy");
+        var submittedAs    = FieldOrEmpty(batch, "SubmittedAs");
+        var batchDate      = FormatDate(FieldOrEmpty(batch, "BatchDate"));
+        var dateReceived   = FormatDate(FieldOrEmpty(batch, "DateReceived"));
+        var timeReceived   = FieldOrEmpty(batch, "TimeReceived");
+        var species        = FieldOrEmpty(batch, "Species");
+        var batchType      = FieldOrEmpty(batch, "BatchType");
+        var adequatelyFixed = AdequatelyFixed(batch);
+        var totalSamples   = FieldOrEmpty(batch, "NumberSamples");
+        var fixation       = FieldOrEmpty(batch, "Fixation");
+        var postFixOther   = FieldOrEmpty(batch, "PostFixationOther");
+        var comments       = FieldOrEmpty(batch, "Comments");
+        var commentLengthOk = IsFlagSet(batch, "CommentLengthOK");
+        var batchId        = FieldOrEmpty(batch, "ID");
 
-        var decal  = postFix is not null ? IsChecked(Field(postFix, "Decal"))  : false;
-        var phenol = postFix is not null ? IsChecked(Field(postFix, "Phenol")) : false;
-        var formic = postFix is not null ? IsChecked(Field(postFix, "Formic")) : false;
-        var other  = postFix is not null ? IsChecked(Field(postFix, "Other"))  : false;
+        var decal  = IsFlagSet(postFix, "Decal");
+        var phenol = IsFlagSet(postFix, "Phenol");
+        var formic = IsFlagSet(postFix, "Formic");
+        var other  = IsFlagSet(postFix, "Other");
 
         byte[] pdf = Document.Create(container =>
         {
@@ -139,8 +133,7 @@ public sealed class HistologyReportRenderer
                                     left.Item().Text("Histology Required").Bold().FontSize(8);
 
                                     // HistologySubReport inlined (ADR-004): BatchHistology codes list.
-                                    foreach (var hrow in histologyRows)
-                                        left.Item().PaddingLeft(4).Text(Field(hrow, "Code")).FontSize(8);
+                                    AddHistologyCodes(left, histologyRows);
                                 });
 
                                 top.ConstantItem(6);
@@ -449,122 +442,131 @@ public sealed class HistologyReportRenderer
                        .Italic().FontSize(7.5f);
                 });
 
-                page.Content().Column(col =>
-                {
-                    // ════════════════════════════════════════════════════════════
-                    // SECTIONS 1 + 2 — PageHeader + Detail
-                    // 13-column submission table, paginated at exactly 13 rows per page
-                    // (matches legacy Crystal Reports). Column headers repeat per chunk;
-                    // the report header (SECTION 0) and 4-panel footer repeat via the
-                    // page-level Header()/Footer(), so every page carries both.
-                    // Columns 1–4 carry data; columns 5–13 are pre-printed blanks.
-                    // RepeatBlock rule: "*" suffix on BlockRef when truthy.
-                    // ════════════════════════════════════════════════════════════
-                    // Configurable page size (legacy default 13); guarded against non-positive values.
-                    int RowsPerPage = rowsPerPage > 0 ? rowsPerPage : 13;
-                    var pageChunks = submissionRows
-                        .Select((row, i) => (row, i))
-                        .GroupBy(x => x.i / RowsPerPage)
-                        .Select(g => g.Select(x => x.row).ToList())
-                        .ToList();
-                    if (pageChunks.Count == 0) pageChunks.Add([]);
-
-                    for (int chunkIndex = 0; chunkIndex < pageChunks.Count; chunkIndex++)
-                    {
-                        var chunk = pageChunks[chunkIndex];
-                        col.Item().Table(t =>
-                        {
-                            t.ColumnsDefinition(c =>
-                            {
-                                c.RelativeColumn(10); // 1  Sender Ref
-                                c.RelativeColumn(9);  // 2  Histology Ref
-                                c.RelativeColumn(6);  // 3  Block Ref
-                                c.RelativeColumn(9);  // 4  Tissue Code
-                                c.RelativeColumn(6);  // 5  Block      (blank)
-                                c.RelativeColumn(5);  // 6  Cass       (blank)
-                                c.RelativeColumn(6);  // 7  Embed      (blank)
-                                c.RelativeColumn(6);  // 8  Section    (blank)
-                                c.RelativeColumn(7);  // 9  Block Filed (blank)
-                                c.RelativeColumn(6);  // 10 Stain      (blank)
-                                c.RelativeColumn(6);  // 11 QC Code    (blank)
-                                c.RelativeColumn(14); // 12 Comments   (CustomerRef)
-                                c.RelativeColumn(10); // 13 Dispatch   (blank)
-                            });
-
-                            t.Header(h =>
-                            {
-                                void Th(string lbl) =>
-                                    h.Cell()
-                                     .Background(Colors.Grey.Lighten3)
-                                     .Border(0.5f)
-                                     .PaddingVertical(2).PaddingHorizontal(2)
-                                     .Text(lbl).Bold().FontSize(7.5f);
-
-                                Th("Sender Ref");
-                                Th("Histology\nRef");
-                                Th("Block\nRef");
-                                Th("Tissue\nCode");
-                                Th("Block");
-                                Th("Cass");
-                                Th("Embed");
-                                Th("Section");
-                                Th("Block\nFiled");
-                                Th("Stain");
-                                Th("QC\nCode");
-                                Th("Comments");
-                                Th("Dispatch");
-                            });
-
-                            DataRow? prevRow = null;
-                            foreach (var row in chunk)
-                            {
-                                // Legacy: further tissues of the same block leave Sender/Histology/Block Ref
-                                // blank so the block reads as one group; refs repeat at the top of each page.
-                                // Tissues not yet in a block have no Block Ref, so they group per sample.
-                                var continuesBlock = prevRow is not null
-                                    && Field(row, "BlockRef") == Field(prevRow, "BlockRef")
-                                    && Field(row, "SenderRef") == Field(prevRow, "SenderRef")
-                                    && Field(row, "HistologyRef") == Field(prevRow, "HistologyRef");
-                                prevRow = row;
-
-                                var blockRef = continuesBlock ? string.Empty : Field(row, "BlockRef")
-                                    + (IsRepeatBlock(Field(row, "RepeatBlock")) ? "*" : string.Empty);
-
-                                void Td(string v) =>
-                                    t.Cell().Border(0.5f)
-                                     .PaddingVertical(2).PaddingHorizontal(2)
-                                     .Text(v).FontSize(8);
-
-                                Td(continuesBlock ? string.Empty : Field(row, "SenderRef"));
-                                Td(continuesBlock ? string.Empty : Field(row, "HistologyRef"));
-                                Td(blockRef);
-                                Td(Field(row, "TissueDetails"));
-                                Td(string.Empty); // Block
-                                Td(string.Empty); // Cass
-                                Td(string.Empty); // Embed
-                                Td(string.Empty); // Section
-                                Td(string.Empty); // Block Filed
-                                Td(string.Empty); // Stain
-                                Td(string.Empty); // QC Code
-                                // Block-level field (same for every tissue in the block) — suppress on continuation rows, same as Sender/Histology Ref.
-                                Td(continuesBlock ? string.Empty : Field(row, "CustomerRef")); // Comments column
-                                Td(string.Empty); // Dispatch
-                            }
-                        });
-
-                        // Force a new page after each full chunk except the last.
-                        if (chunkIndex < pageChunks.Count - 1)
-                            col.Item().PageBreak();
-                    }
-
-                });
+                ComposeContent(page.Content(), submissionRows, rowsPerPage);
             });
         }).GeneratePdf();
 
         return Task.FromResult(pdf);
     }
 
+    // 13-column submission table, paginated at rowsPerPage rows per page (legacy default 13).
+    // Column headers repeat per chunk; the report header and 4-panel footer repeat via the page-level
+    // Header()/Footer(). Columns 1–4 carry data; columns 5–13 are pre-printed blanks.
+    private static void ComposeContent(IContainer container, List<DataRow> submissionRows, int rowsPerPage)
+    {
+        var size = rowsPerPage > 0 ? rowsPerPage : 13;
+        var pageChunks = submissionRows
+            .Select((row, i) => (row, i))
+            .GroupBy(x => x.i / size)
+            .Select(g => g.Select(x => x.row).ToList())
+            .ToList();
+        if (pageChunks.Count == 0) pageChunks.Add([]);
+
+        container.Column(col =>
+        {
+            for (int chunkIndex = 0; chunkIndex < pageChunks.Count; chunkIndex++)
+            {
+                var chunk = pageChunks[chunkIndex];
+                col.Item().Table(t => ComposeSubmissionTable(t, chunk));
+
+                // Force a new page after each full chunk except the last.
+                if (chunkIndex < pageChunks.Count - 1)
+                    col.Item().PageBreak();
+            }
+        });
+    }
+
+    private static void ComposeSubmissionTable(TableDescriptor t, List<DataRow> chunk)
+    {
+        t.ColumnsDefinition(c =>
+        {
+            c.RelativeColumn(10); // 1  Sender Ref
+            c.RelativeColumn(9);  // 2  Histology Ref
+            c.RelativeColumn(6);  // 3  Block Ref
+            c.RelativeColumn(9);  // 4  Tissue Code
+            c.RelativeColumn(6);  // 5  Block      (blank)
+            c.RelativeColumn(5);  // 6  Cass       (blank)
+            c.RelativeColumn(6);  // 7  Embed      (blank)
+            c.RelativeColumn(6);  // 8  Section    (blank)
+            c.RelativeColumn(7);  // 9  Block Filed (blank)
+            c.RelativeColumn(6);  // 10 Stain      (blank)
+            c.RelativeColumn(6);  // 11 QC Code    (blank)
+            c.RelativeColumn(14); // 12 Comments   (CustomerRef)
+            c.RelativeColumn(10); // 13 Dispatch   (blank)
+        });
+
+        t.Header(h =>
+        {
+            foreach (var label in SubmissionHeaders)
+                h.Cell()
+                 .Background(Colors.Grey.Lighten3)
+                 .Border(0.5f)
+                 .PaddingVertical(2).PaddingHorizontal(2)
+                 .Text(label).Bold().FontSize(7.5f);
+        });
+
+        DataRow? prevRow = null;
+        foreach (var row in chunk)
+        {
+            // Legacy: further tissues of the same block leave Sender/Histology/Block Ref
+            // blank so the block reads as one group; refs repeat at the top of each page.
+            // Tissues not yet in a block have no Block Ref, so they group per sample.
+            var continuesBlock = prevRow is not null
+                && Field(row, "BlockRef") == Field(prevRow, "BlockRef")
+                && Field(row, "SenderRef") == Field(prevRow, "SenderRef")
+                && Field(row, "HistologyRef") == Field(prevRow, "HistologyRef");
+            prevRow = row;
+
+            var repeatMark = IsRepeatBlock(Field(row, "RepeatBlock")) ? "*" : string.Empty;
+            string Lead(string column) => continuesBlock ? string.Empty : Field(row, column);
+
+            AddCell(t, Lead("SenderRef"));
+            AddCell(t, Lead("HistologyRef"));
+            AddCell(t, continuesBlock ? string.Empty : Field(row, "BlockRef") + repeatMark);
+            AddCell(t, Field(row, "TissueDetails"));
+            for (var blank = 0; blank < 7; blank++) AddCell(t, string.Empty); // Block..QC Code
+            // Block-level field — suppressed on continuation rows, same as Sender/Histology Ref.
+            AddCell(t, Lead("CustomerRef")); // Comments
+            AddCell(t, string.Empty); // Dispatch
+        }
+    }
+
+    private static readonly string[] SubmissionHeaders =
+    [
+        "Sender Ref", "Histology\nRef", "Block\nRef", "Tissue\nCode", "Block", "Cass", "Embed",
+        "Section", "Block\nFiled", "Stain", "QC\nCode", "Comments", "Dispatch",
+    ];
+
+    private static void AddCell(TableDescriptor t, string value) =>
+        t.Cell().Border(0.5f)
+         .PaddingVertical(2).PaddingHorizontal(2)
+         .Text(value).FontSize(8);
+
     // ── Private helpers ──────────────────────────────────────────────────────────
+
+    private static DataRow? FirstRow(DataSet ds, string table) =>
+        ds.Tables[table]?.Rows.Count > 0 ? ds.Tables[table]!.Rows[0] : null;
+
+    private static List<DataRow> RowsOf(DataSet ds, string table) =>
+        ds.Tables[table]?.Rows.Cast<DataRow>().ToList() ?? [];
+
+    private static string FieldOrEmpty(DataRow? row, string column) =>
+        row is null ? string.Empty : Field(row, column);
+
+    private static bool IsFlagSet(DataRow? row, string column) =>
+        row is not null && IsChecked(Field(row, column));
+
+    private static string AdequatelyFixed(DataRow? batch)
+    {
+        if (batch is null) return string.Empty;
+        return Field(batch, "SafeToHandle") is "True" or "true" or "1" or "yes" or "Yes" ? "Yes" : "No";
+    }
+
+    private static void AddHistologyCodes(ColumnDescriptor column, List<DataRow> histologyRows)
+    {
+        foreach (var hrow in histologyRows)
+            column.Item().PaddingLeft(4).Text(Field(hrow, "Code")).FontSize(8);
+    }
 
     /// <summary>    /// Renders a legacy-style square checkbox (a bordered box, not a tiny Unicode glyph) followed
     /// by its label. When <paramref name="trailingLine"/> is set, a fill-in underline follows the

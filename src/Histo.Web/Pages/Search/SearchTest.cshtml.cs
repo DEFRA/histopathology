@@ -37,6 +37,7 @@ public class SearchTestModel : HistoPageModel
     private const int LookupTseAntibodies = 4;     // LOOKUP_TSE_ANTIBODIES
     private const int LookupNonTseAntibodies = 5;  // LOOKUP_NONTSE_ANTIBODIES
     private const int LookupSpecialStain = 6;      // LOOKUP_SPECIAL_STAIN
+    private const string OtherLabel = "Other";
 
     private readonly IBatchService _batches;
     private readonly ILookupService _lookups;
@@ -97,10 +98,12 @@ public class SearchTestModel : HistoPageModel
         if (!Submitted) return;
 
         var raw = await _batches.GetTestPremiumChargeCountsAsync(
-            ProjectDescription, SubmissionType, SelectedHistology, SelectedAntibodies, SelectedSpecialStain, StartDate, EndDate);
+            ProjectDescription, SubmissionType, SelectedCodes(), StartDate, EndDate);
         BuildCrossTab(raw);
         Searched = true;
     }
+
+    private TestCodeSelection SelectedCodes() => new(SelectedHistology, SelectedAntibodies, SelectedSpecialStain);
 
     /// <summary>Legacy <c>bntBatch_Click</c> ("Analyse Submissions").</summary>
     public async Task OnGetAnalyseSubmissionsAsync()
@@ -109,7 +112,7 @@ public class SearchTestModel : HistoPageModel
         await LoadLookupsAsync();
 
         var raw = await _batches.GetTestPremiumChargeBatchesAsync(
-            ProjectDescription, SubmissionType, SelectedHistology, SelectedAntibodies, SelectedSpecialStain, StartDate, EndDate);
+            ProjectDescription, SubmissionType, SelectedCodes(), StartDate, EndDate);
         BuildSubmissionGroups(raw);
         SubmissionsSearched = true;
 
@@ -123,7 +126,7 @@ public class SearchTestModel : HistoPageModel
     {
         await LoadLookupsAsync();
         var raw = await _batches.GetTestPremiumChargeCountsAsync(
-            ProjectDescription, SubmissionType, SelectedHistology, SelectedAntibodies, SelectedSpecialStain, StartDate, EndDate);
+            ProjectDescription, SubmissionType, SelectedCodes(), StartDate, EndDate);
         BuildCrossTab(raw);
 
         var codes = CrossTabColumnTotals.Keys.ToList();
@@ -147,7 +150,7 @@ public class SearchTestModel : HistoPageModel
     {
         await LoadLookupsAsync();
         var raw = await _batches.GetTestPremiumChargeBatchesAsync(
-            ProjectDescription, SubmissionType, SelectedHistology, SelectedAntibodies, SelectedSpecialStain, StartDate, EndDate);
+            ProjectDescription, SubmissionType, SelectedCodes(), StartDate, EndDate);
         BuildSubmissionGroups(raw);
 
         // One row per (premium charge, submission) — a single comma-joined cell can exceed
@@ -182,14 +185,16 @@ public class SearchTestModel : HistoPageModel
         // Legacy LoadCheckBoxLists() appends a manual "Other" ListItem (Value="Other") after
         // DataBind — it isn't part of the lookup table itself.
         AntibodyTests = (await _lookups.GetLookupDataAsync(antibodyTableId))
-            .Append(new LookupItem { Name = "Other", Code = "Other" })
+            .Append(OtherOption())
             .ToList();
 
         SpecialStainTests = (await _lookups.GetLookupDataAsync(LookupSpecialStain))
-            .Append(new LookupItem { Name = "Other", Code = "Other" })
+            .Append(OtherOption())
             .ToList();
         PremiumCharges = await _lookups.GetPremiumChargesAsync();
     }
+
+    private static LookupItem OtherOption() => new() { Name = OtherLabel, Code = OtherLabel };
 
     private void BuildCrossTab(IReadOnlyList<TestPremiumChargeCount> raw)
     {
@@ -209,12 +214,11 @@ public class SearchTestModel : HistoPageModel
         foreach (var g in raw.GroupBy(r => r.ProjectDescription ?? "").OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
         {
             var counts = codes.ToDictionary(c => c, _ => 0, StringComparer.OrdinalIgnoreCase);
-            foreach (var r in g)
+            foreach (var r in g.Where(r => r.PremiumCode is not null && counts.ContainsKey(r.PremiumCode)))
             {
                 // A (project, premium code) pair can be contributed by more than one test type
-                // (Histology/Antibodies/Stain) — sum rather than overwrite.
-                if (r.PremiumCode is not null && counts.ContainsKey(r.PremiumCode))
-                    counts[r.PremiumCode] += r.Count;
+                // (Histology/Antibodies/Stain) â€” sum rather than overwrite.
+                counts[r.PremiumCode!] += r.Count;
             }
 
             foreach (var kv in counts) columnTotals[kv.Key] += kv.Value;

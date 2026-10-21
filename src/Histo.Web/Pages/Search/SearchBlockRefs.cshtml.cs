@@ -36,9 +36,16 @@ public class SearchBlockRefsModel : GridPageModel
     // Legacy source: SearchBlockRefs.aspx.vb::lbViewImportedData_Click — Sender Ref, then Histology
     // Ref appended with a space if both are given; Histology Ref alone if only that was entered.
     // Regressed out of the page during the Run #84 two-column layout rewrite; re-added here.
-    public string ViewImportedDataFilter => !string.IsNullOrWhiteSpace(SenderRef)
-        ? (string.IsNullOrWhiteSpace(HistologyRef) ? SenderRef.Trim() : $"{SenderRef.Trim()} {HistologyRef.Trim()}")
-        : HistologyRef?.Trim() ?? string.Empty;
+    public string ViewImportedDataFilter
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(SenderRef))
+                return HistologyRef?.Trim() ?? string.Empty;
+
+            return string.IsNullOrWhiteSpace(HistologyRef) ? SenderRef.Trim() : $"{SenderRef.Trim()} {HistologyRef.Trim()}";
+        }
+    }
 
     public Dictionary<string, string> Errors { get; } = [];
     public IReadOnlyList<BlockRefRangeHelpers.BlockRefRangeRow> Results { get; private set; } = [];

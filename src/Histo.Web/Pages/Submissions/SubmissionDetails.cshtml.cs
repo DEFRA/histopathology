@@ -31,6 +31,8 @@ public class SubmissionDetailsModel : HistoPageModel
     /// <summary>Batch ID from the URL (route/query). Needed for back-link and view-mode awareness.</summary>
     [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
 
+    protected override int? RequestedBatchId => BatchId is > 0 ? BatchId : Session.BatchID;
+
     /// <summary>Animal ID from the URL (route/query). Falls back to session for legacy navigation paths.</summary>
     [BindProperty(SupportsGet = true)] public int? AnimalId { get; set; }
 

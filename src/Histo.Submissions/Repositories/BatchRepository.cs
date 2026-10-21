@@ -28,19 +28,25 @@ public sealed class BatchRepository : IBatchRepository
             new { ID = batchId },
             commandType: System.Data.CommandType.StoredProcedure);
 
-        // Result set 0 = BATCH_TABLE (GetBatchDetails). Consume remaining sets to avoid connection errors.
+        // Result set 0 = BATCH_TABLE (GetBatchDetails); set 5 = BATCH_SUBMITTEDAS. Consume the rest to avoid connection errors.
         var batchRows = await multi.ReadAsync<dynamic>();
-        while (!multi.IsConsumed) await multi.ReadAsync<dynamic>();
+        string? submittedAsCode = null;
+        for (var set = 1; !multi.IsConsumed; set++)
+        {
+            var rows = await multi.ReadAsync<dynamic>();
+            if (set == 5 && rows.FirstOrDefault() is IDictionary<string, object> sa && sa.TryGetValue("Code", out var c))
+                submittedAsCode = Convert.ToString(c)?.Trim();
+        }
 
         var row = batchRows.FirstOrDefault();
-        return row is null ? null : MapBatch(row);
+        return row is null ? null : MapBatch(row, submittedAsCode);
     }
 
     /// <summary>Maps a dynamic row from <c>GetBatchDetails</c> to a <see cref="Batch"/> object.
     /// Handles column name mismatches (e.g. BatchStatus int→Status string, DateReceived→ReceivedDate)
     /// and varchar dates returned as "dd/MM/yyyy" strings.
     /// </summary>
-    private static Batch MapBatch(dynamic row)
+    private static Batch MapBatch(dynamic row, string? submittedAsCode)
     {
         var d    = (IDictionary<string, object>)row;
         // GetBatchDetails has a duplicate PostFixationOther column; TryAdd takes first occurrence.
@@ -88,7 +94,8 @@ public sealed class BatchRepository : IBatchRepository
             CompletedDate     = ParseDate(dict, "DateCompleted"),  // SP column: DateCompleted
             SubmittedByUserID = Int(dict, "SubmittedBy"),          // populate old field for backward compat
             UserAreaCode      = int.TryParse(submittedAreaStr, out var ua) ? ua : 0,
-            IsPreCassetted    = Bool(dict, "Cassetted"),           // SP column: Cassetted
+            IsCassetted       = Bool(dict, "Cassetted"),           // SP column: Cassetted
+            IsPreCassetted    = Histo.Core.Domain.ValidationHelpers.IsBatchPreCassetted(submittedAsCode),
             ByPassSort        = Bool(dict, "ByPassSort"),
             RowStamp          = d.TryGetValue("RowStamp", out var rs) ? rs as byte[] : null,
             BatchType         = Int(dict, "BatchType"),
@@ -241,7 +248,7 @@ public sealed class BatchRepository : IBatchRepository
         p.Add("OtherSubmittedArea",  batch.OtherSubmittedArea ?? "");
         p.Add("Fixation",            batch.Fixation);
         p.Add("Comments",            batch.Comments);
-        p.Add("Cassetted",           batch.IsPreCassetted);
+        p.Add("Cassetted",           batch.IsCassetted);
         p.Add("IsBlocked",           batch.IsBlocked);
         p.Add("CustomerReceivedDate",batch.CustomerReceivedDate);
         p.Add("SubmittedArea",       batch.UserAreaCode > 0 ? batch.UserAreaCode.ToString() : null);
@@ -275,7 +282,7 @@ public sealed class BatchRepository : IBatchRepository
         p.Add(ReceivedByColumn,      batch.ReceivedBy);
         p.Add("OtherSubmittedBy",    batch.OtherSubmittedBy ?? 0);
         p.Add("OtherSubmittedArea",  batch.OtherSubmittedArea ?? "");
-        p.Add("Cassetted",           batch.IsPreCassetted);
+        p.Add("Cassetted",           batch.IsCassetted);
         p.Add("Fixation",            batch.Fixation);
         p.Add("Comments",            batch.Comments);
         p.Add("StatusComments",      batch.StatusComments);
@@ -305,7 +312,7 @@ public sealed class BatchRepository : IBatchRepository
             StatusComments = existing.StatusComments, BatchDate = existing.BatchDate,
             ReceivedDate = existing.ReceivedDate, CompletedDate = existing.CompletedDate,
             SubmittedByUserID = existing.SubmittedByUserID, UserAreaCode = existing.UserAreaCode,
-            IsPreCassetted = existing.IsPreCassetted, ByPassSort = existing.ByPassSort,
+            IsCassetted = existing.IsCassetted, ByPassSort = existing.ByPassSort,
             RowStamp = rowStamp, BatchType = existing.BatchType,
             ProjectContractCode = existing.ProjectContractCode, ContactName = existing.ContactName,
             Species = existing.Species, Fixation = existing.Fixation,
@@ -331,7 +338,7 @@ public sealed class BatchRepository : IBatchRepository
             StatusComments = existing.StatusComments, BatchDate = existing.BatchDate,
             ReceivedDate = existing.ReceivedDate, CompletedDate = existing.CompletedDate,
             SubmittedByUserID = existing.SubmittedByUserID, UserAreaCode = existing.UserAreaCode,
-            IsPreCassetted = existing.IsPreCassetted, ByPassSort = byPassSort,
+            IsCassetted = existing.IsCassetted, ByPassSort = byPassSort,
             RowStamp = existing.RowStamp, BatchType = existing.BatchType,
             ProjectContractCode = existing.ProjectContractCode, ContactName = existing.ContactName,
             Species = existing.Species, Fixation = existing.Fixation,
@@ -437,7 +444,7 @@ public sealed class BatchRepository : IBatchRepository
             CompletedDate = existing.CompletedDate,
             SubmittedByUserID = existing.SubmittedByUserID,
             UserAreaCode = existing.UserAreaCode,
-            IsPreCassetted = existing.IsPreCassetted,
+            IsCassetted = existing.IsCassetted,
             ByPassSort = existing.ByPassSort,
             RowStamp = existing.RowStamp,
             BatchType = existing.BatchType,
@@ -462,6 +469,31 @@ public sealed class BatchRepository : IBatchRepository
         await UpdateAsync(updated, userId, ct);
     }
 
+    /// <summary>
+    /// Builds a full <see cref="Batch"/> row-clone of <paramref name="existing"/> with only
+    /// <see cref="Batch.Status"/>/<see cref="Batch.CompletedDate"/> overridden — shared by
+    /// <see cref="SetCompletedAsync"/>/<see cref="SetInProgressAsync"/> to avoid duplicating the
+    /// full EditBatch parameter carry-forward for what is otherwise an identical operation.
+    /// </summary>
+    private static Batch CloneWithStatus(Batch existing, string status, DateTime? completedDate) => new()
+    {
+        ID = existing.ID, Status = status, Comments = existing.Comments,
+        StatusComments = existing.StatusComments, BatchDate = existing.BatchDate,
+        ReceivedDate = existing.ReceivedDate, CompletedDate = completedDate ?? existing.CompletedDate,
+        SubmittedByUserID = existing.SubmittedByUserID, UserAreaCode = existing.UserAreaCode,
+        IsCassetted = existing.IsCassetted, ByPassSort = existing.ByPassSort,
+        RowStamp = existing.RowStamp, BatchType = existing.BatchType,
+        ProjectContractCode = existing.ProjectContractCode, ContactName = existing.ContactName,
+        Species = existing.Species, Fixation = existing.Fixation,
+        CustomerReceivedDate = existing.CustomerReceivedDate,
+        SubmittedBy = existing.SubmittedBy, SubmittedArea = existing.SubmittedArea,
+        OtherSubmittedBy = existing.OtherSubmittedBy, OtherSubmittedArea = existing.OtherSubmittedArea,
+        SafeToHandle = existing.SafeToHandle, IsBlocked = existing.IsBlocked,
+        SampleSameProjects = existing.SampleSameProjects, AllTissuesAssigned = existing.AllTissuesAssigned,
+        TimeReceived = existing.TimeReceived, ReceivedBy = existing.ReceivedBy,
+        PostFixationOther = existing.PostFixationOther,
+    };
+
     /// <inheritdoc/>
     public async Task SetCompletedAsync(int batchId, DateTime completedDate, int userId, CancellationToken ct = default)
     {
@@ -469,61 +501,17 @@ public sealed class BatchRepository : IBatchRepository
         if (existing is null) return;
         // Goes through EditBatch rather than EditBatchStatus, which would null out the
         // receipt columns (DateReceived/TimeReceived/StatusComments/PostFixationOther).
-        var updated = new Batch
-        {
-            ID = existing.ID, Status = BatchStatus.Completed, Comments = existing.Comments,
-            StatusComments = existing.StatusComments, BatchDate = existing.BatchDate,
-            ReceivedDate = existing.ReceivedDate, CompletedDate = completedDate,
-            SubmittedByUserID = existing.SubmittedByUserID, UserAreaCode = existing.UserAreaCode,
-            IsPreCassetted = existing.IsPreCassetted, ByPassSort = existing.ByPassSort,
-            RowStamp = existing.RowStamp, BatchType = existing.BatchType,
-            ProjectContractCode = existing.ProjectContractCode, ContactName = existing.ContactName,
-            Species = existing.Species, Fixation = existing.Fixation,
-            CustomerReceivedDate = existing.CustomerReceivedDate,
-            SubmittedBy = existing.SubmittedBy, SubmittedArea = existing.SubmittedArea,
-            OtherSubmittedBy = existing.OtherSubmittedBy, OtherSubmittedArea = existing.OtherSubmittedArea,
-            SafeToHandle = existing.SafeToHandle, IsBlocked = existing.IsBlocked,
-            SampleSameProjects = existing.SampleSameProjects, AllTissuesAssigned = existing.AllTissuesAssigned,
-            TimeReceived = existing.TimeReceived, ReceivedBy = existing.ReceivedBy,
-            PostFixationOther = existing.PostFixationOther,
-        };
-        await UpdateAsync(updated, userId, ct);
+        await UpdateAsync(CloneWithStatus(existing, BatchStatus.Completed, completedDate), userId, ct);
     }
 
     /// <inheritdoc/>
-    public async Task<bool> UpdateStatusAsync(int batchId, string newStatus, int userId, CancellationToken ct = default)
+    public async Task SetInProgressAsync(int batchId, int userId, CancellationToken ct = default)
     {
-        if (!int.TryParse(newStatus, out var batchStatusInt)) batchStatusInt = 1;
-
-        // EditBatchStatus overwrites the receipt columns unconditionally, so the current values
-        // must be read and passed straight back — otherwise any status change blanks out
-        // DateReceived/TimeReceived/ReceivedBy/StatusComments/PostFixationOther.
         var existing = await GetByIdAsync(batchId, ct);
-
-        // When marking as Received, auto-populate the receipt stamp (mirrors legacy ReceiveBatch.aspx).
-        var isReceiving = newStatus == BatchStatus.Received;
-        var dateReceived = isReceiving ? existing?.ReceivedDate ?? DateTime.Now : existing?.ReceivedDate;
-        var receivedBy = isReceiving ? userId : existing?.ReceivedBy;
-        int? timeReceived = int.TryParse(existing?.TimeReceived, out var tr) ? tr : null;
-
-        using var conn = _db.CreateConnection();
-        var p = new DynamicParameters();
-        p.Add(ReturnValueParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
-        p.Add("ID",              batchId);
-        p.Add("BatchStatus",     batchStatusInt);
-        p.Add(DateReceivedColumn, dateReceived);
-        p.Add("TimeReceived",    timeReceived);
-        p.Add(ReceivedByColumn,  receivedBy);
-        p.Add("StatusComments",  existing?.StatusComments);
-        p.Add("PostFixationOther", existing?.PostFixationOther);
-
-        await conn.ExecuteAsync("EditBatchStatus", p, commandType: System.Data.CommandType.StoredProcedure);
-
-        var returnValue = p.Get<int>(ReturnValueParam);
-        // SP returns -1 when no rows were updated (concurrency conflict or batch not found).
-        if (returnValue == -1) throw new BatchConcurrencyException();
-        return returnValue == 0;
+        if (existing is null) return;
+        await UpdateAsync(CloneWithStatus(existing, BatchStatus.InProgress, completedDate: null), userId, ct);
     }
+
 
     /// <inheritdoc/>
     public async Task<IReadOnlyList<string>> GetCommentsAsync(int batchId, CancellationToken ct = default)
@@ -873,7 +861,7 @@ public sealed class BatchRepository : IBatchRepository
             CompletedDate = existing.CompletedDate,
             SubmittedByUserID = existing.SubmittedByUserID,
             UserAreaCode = existing.UserAreaCode,
-            IsPreCassetted = existing.IsPreCassetted,
+            IsCassetted = existing.IsCassetted,
             ByPassSort = existing.ByPassSort,
             RowStamp = existing.RowStamp,
             BatchType = existing.BatchType,

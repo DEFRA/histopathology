@@ -46,17 +46,23 @@ public class SampleSummaryModel : GridPageModel
 
     /// <summary>Current page of <see cref="Animals"/>, sorted by the selected column or — when no
     /// column is selected — the existing default/bypass-sort order already applied to <see cref="Animals"/>.</summary>
-    public IReadOnlyList<Animal> PagedEntries =>
-        (string.IsNullOrEmpty(SortColumn)
-            ? Animals.AsEnumerable()
-            : SortColumn switch
-            {
-                "HistologyRef" => SortDesc ? Animals.OrderByDescending(a => a.HistologyRef) : Animals.OrderBy(a => a.HistologyRef),
-                _              => SortDesc ? Animals.OrderByDescending(a => a.SenderRef)    : Animals.OrderBy(a => a.SenderRef),
-            })
-        .Skip((PageNumber - 1) * PageSize)
-        .Take(PageSize)
-        .ToList();
+    public IReadOnlyList<Animal> PagedEntries => GetPagedEntries();
+
+    private const string IndexPage = "/Index";
+
+    private List<Animal> GetPagedEntries()
+    {
+        IEnumerable<Animal> sorted = Animals;
+        if (SortColumn == "HistologyRef")
+            sorted = SortDesc ? Animals.OrderByDescending(a => a.HistologyRef) : Animals.OrderBy(a => a.HistologyRef);
+        else if (!string.IsNullOrEmpty(SortColumn))
+            sorted = SortDesc ? Animals.OrderByDescending(a => a.SenderRef) : Animals.OrderBy(a => a.SenderRef);
+
+        return sorted
+            .Skip((PageNumber - 1) * PageSize)
+            .Take(PageSize)
+            .ToList();
+    }
 
     public Batch? Batch { get; private set; }
 
@@ -127,7 +133,7 @@ public class SampleSummaryModel : GridPageModel
         ViewData["PageTitle"] = "Sample summary";
         if (TempData["SampleSummary_Error"] is string err) SaveError = err;
         var batchId = BatchId ?? Session.BatchID;
-        if (batchId is null or <= 0) return RedirectToPage("/Index");
+        if (batchId is null or <= 0) return RedirectToPage(IndexPage);
 
         var forbidden = await CheckBatchAccessAsync(_batches, batchId.Value);
         if (forbidden is not null) return forbidden;
@@ -222,7 +228,7 @@ public class SampleSummaryModel : GridPageModel
         // A Wet Tissue sample that already has blocks (via the "Assign tissue to block" journey)
         // is routed as a block-type submission instead — deliberate consistency rule, not a legacy behaviour.
         var batchId = BatchId ?? Session.BatchID;
-        if (batchId is null or <= 0) return RedirectToPage("/Index");
+        if (batchId is null or <= 0) return RedirectToPage(IndexPage);
 
         // Back/Save from the detail screen must return here (SampleSummary), the page the user
         // actually clicked the sample from — not further back to wherever SampleSummary itself
@@ -266,7 +272,7 @@ public class SampleSummaryModel : GridPageModel
     {
         // Cascade delete scoped to this submission; DeleteAnimal would remove the shared Animal row and orphan other submissions' blocks.
         var batchId = BatchId ?? Session.BatchID;
-        if (batchId is null or <= 0) return RedirectToPage("/Index");
+        if (batchId is null or <= 0) return RedirectToPage(IndexPage);
 
         var forbidden = await CheckBatchAccessAsync(_batches, batchId.Value);
         if (forbidden is not null) return forbidden;
@@ -312,7 +318,7 @@ public class SampleSummaryModel : GridPageModel
     public async Task<IActionResult> OnPostFinishAsync()
     {
         var batchId = BatchId ?? Session.BatchID;
-        if (batchId is null or <= 0) return RedirectToPage("/Index");
+        if (batchId is null or <= 0) return RedirectToPage(IndexPage);
 
         // Same merge as OnGetAsync — GetAnimalsByBatchAsync alone misses samples that only exist
         // via a block assignment, which was wrongly reporting "no samples" for such batches.
