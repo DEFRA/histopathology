@@ -82,9 +82,4 @@ PRINT '--- Dropping GetOrCreateSubmissionQCNote ---';
 :r ../Migrations/V20261018_01_Drop_GetOrCreateSubmissionQCNote_Proc.sql
 GO
 
--- Step 7: Flag block-type submissions as Cassetted so Assign blocks / Quality data lists match legacy
-PRINT '--- Flagging non-wet-tissue submissions as Cassetted ---';
-:r ../Migrations/V20261020_01_Flag_NonWetTissue_Batches_Cassetted.sql
-GO
-
 PRINT '=== Database deployment completed ===';
