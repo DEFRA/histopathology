@@ -23,6 +23,10 @@ public sealed class Batch
     public DateTime? CompletedDate { get; init; }
     public int SubmittedByUserID { get; init; }
     public int UserAreaCode { get; init; }
+    /// <summary>Persisted <c>Batch.Cassetted</c>: true for every block type (anything but Wet Tissue). Drives the Assign blocks / Quality data lists.</summary>
+    public bool IsCassetted { get; init; }
+
+    /// <summary>Submitted as Pre Cassetted Tissue (code 5), read from <c>BatchSubmittedAs</c> — legacy <c>IsBatchPreCassetted</c>. Not persisted.</summary>
     public bool IsPreCassetted { get; init; }
     /// <summary>
     /// When <see langword="true"/> the sample list is displayed in block-insertion order instead of

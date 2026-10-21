@@ -110,11 +110,15 @@ public class DapperRepositoryTests
             OnQuery = c => c.Text switch
             {
                 "GetAnimalBlockRefsOnOtherBatches" => new DataSet().Also(ds => ds.Tables.Add(RefTable("01"))),
-                _ when c.Text.StartsWith("SELECT RTRIM(BlockRef)") => new DataSet().Also(ds => ds.Tables.Add(RefTable("01"))),
+                "GetBatchAnimal" => new DataSet().Also(ds => ds.Tables.Add(
+                    Table("animals", ("ID", typeof(int)), ("SenderRef", typeof(string))).Also(t => t.Rows.Add(2, "S1 ")))),
+                "GetBlocksForSenderRef" => new DataSet().Also(ds => ds.Tables.Add(
+                    Table("held", ("BlockRef", typeof(int))).Also(t => t.Rows.Add(1)))),
                 _ => null,
             },
             OnExecute = c =>
             {
+                if (c.Text == "sp_getapplock") c.Command.Parameters["RETURN_VALUE"].Value = 0;
                 if (c.Text == "AddBlock") c.Command.Parameters["NewID"].Value = 77;
             },
         };

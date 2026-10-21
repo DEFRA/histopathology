@@ -75,6 +75,20 @@ public class BatchesReceivedModelTests
     }
 
     [Fact]
+    public async Task OnPostGoAsync_CassettedSubmission_IsRejectedBecauseItNeverGoesThroughAssignBlocks()
+    {
+        _batches.Setup(b => b.GetReceivedAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchListResult>)[]);
+        _batches.Setup(b => b.GetByIdAsync(99, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 99, Status = BatchStatus.Received, IsCassetted = true });
+        var sut = CreateSut();
+        sut.QuickGoId = 99;
+
+        var result = await sut.OnPostGoAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.NotNull(sut.GoError);
+    }
+
+    [Fact]
     public async Task OnPostGoAsync_ZeroQuickGoId_ShouldRejectInvalidInput()
     {
         _batches.Setup(b => b.GetReceivedAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchListResult>)[]);
