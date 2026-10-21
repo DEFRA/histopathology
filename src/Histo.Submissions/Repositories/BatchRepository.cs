@@ -386,7 +386,7 @@ public sealed class BatchRepository : IBatchRepository
     }
 
     private static async Task<Dictionary<int, HashSet<string>>> GetAssignedTissueCodesByAnimalAsync(
-        System.Data.IDbConnection conn, int batchId, IReadOnlyDictionary<int, int> blockToAnimal)
+        System.Data.IDbConnection conn, int batchId, Dictionary<int, int> blockToAnimal)
     {
         var assignedByAnimal = new Dictionary<int, HashSet<string>>();
         foreach (var d in await QueryBatchRowsAsync(conn, "GetBatchBlockTissues", batchId))
