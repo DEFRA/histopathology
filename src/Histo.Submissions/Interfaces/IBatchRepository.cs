@@ -253,8 +253,7 @@ public interface IBatchRepository
     /// Legacy source: <c>SearchTest.aspx.vb</c> — premium-charge analytics engine (not fully ported).
     /// </summary>
     Task<IReadOnlyList<TestPremiumChargeCount>> GetTestPremiumChargeCountsAsync(
-        string? projectDesc, int batchType,
-        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        string? projectDesc, int batchType, TestCodeSelection codes,
         DateTime? startDate = null, DateTime? endDate = null,
         CancellationToken ct = default);
 
@@ -263,8 +262,7 @@ public interface IBatchRepository
     /// Legacy source: <c>SearchTest.aspx.vb</c> — premium-charge analytics engine (not fully ported).
     /// </summary>
     Task<IReadOnlyList<TestPremiumChargeBatchRef>> GetTestPremiumChargeBatchesAsync(
-        string? projectDesc, int batchType,
-        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        string? projectDesc, int batchType, TestCodeSelection codes,
         DateTime? startDate = null, DateTime? endDate = null,
         CancellationToken ct = default);
 }

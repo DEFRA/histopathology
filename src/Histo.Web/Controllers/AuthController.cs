@@ -164,9 +164,11 @@ public sealed class AuthController : ControllerBase
     /// </summary>
     [AllowAnonymous]
     [HttpPost("Logout")]
-    public IActionResult SingleLogoutService()
+    public IActionResult SingleLogoutService(
+        [FromForm(Name = "SAMLResponse")] string? samlResponse,
+        [FromForm(Name = "SAMLRequest")] string? samlRequest)
     {
-        if (!TryReadSignedLogoutMessage())
+        if (!TryReadSignedLogoutMessage(samlResponse, samlRequest))
             return BadRequest();
 
         var saml2LogoutRequest = new Saml2LogoutRequest(_saml2Config, User);
@@ -174,7 +176,7 @@ public sealed class AuthController : ControllerBase
         return LocalRedirect("/Index");
     }
 
-    private bool TryReadSignedLogoutMessage()
+    private bool TryReadSignedLogoutMessage(string? samlResponse, string? samlRequest)
     {
         if (!Request.HasFormContentType) return false;
 
@@ -182,9 +184,9 @@ public sealed class AuthController : ControllerBase
         {
             var binding = new Saml2PostBinding();
             var request = Request.ToGenericHttpRequest();
-            if (Request.Form.ContainsKey("SAMLResponse"))
+            if (samlResponse is not null)
                 binding.ReadSamlResponse(request, new Saml2LogoutResponse(_saml2Config));
-            else if (Request.Form.ContainsKey("SAMLRequest"))
+            else if (samlRequest is not null)
                 binding.ReadSamlRequest(request, new Saml2LogoutRequest(_saml2Config));
             else
                 return false;

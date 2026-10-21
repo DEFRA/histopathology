@@ -361,47 +361,21 @@ public sealed class BatchRepository : IBatchRepository
         // GetBatchBlockDetails returns one row per block, so it answers "which animals have a
         // block", never "which tissues are in a block" — the comparison has to be made against
         // BlockTissues, mapped back to the owning animal via the block.
-        var blockToAnimal = (await conn.QueryAsync<dynamic>(
-                "GetBatchBlockDetails",
-                new { ID = batchId },
-                commandType: System.Data.CommandType.StoredProcedure))
-            .Select(r => (IDictionary<string, object>)r)
-            .Select(d => (
-                BlockId: d.TryGetValue("ID", out var bid) && bid is not DBNull ? Convert.ToInt32(bid) : 0,
-                AnimalId: d.TryGetValue("AnimalID", out var aid) && aid is not DBNull ? Convert.ToInt32(aid) : 0))
+        var blockToAnimal = (await QueryBatchRowsAsync(conn, "GetBatchBlockDetails", batchId))
+            .Select(d => (BlockId: ReadInt(d, "ID"), AnimalId: ReadInt(d, "AnimalID")))
             .Where(x => x.BlockId > 0 && x.AnimalId > 0)
             .GroupBy(x => x.BlockId)
             .ToDictionary(g => g.Key, g => g.First().AnimalId);
 
-        var assignedByAnimal = new Dictionary<int, HashSet<string>>();
-        foreach (var d in (await conn.QueryAsync<dynamic>(
-                "GetBatchBlockTissues",
-                new { ID = batchId },
-                commandType: System.Data.CommandType.StoredProcedure))
-            .Select(r => (IDictionary<string, object>)r))
-        {
-            var blockId = d.TryGetValue("BlockID", out var bid) && bid is not DBNull ? Convert.ToInt32(bid) : 0;
-            if (!blockToAnimal.TryGetValue(blockId, out var animalId)) continue;
-
-            var code = d.TryGetValue("TissueCode", out var tc) && tc is not DBNull ? Convert.ToString(tc)?.Trim() : null;
-            if (string.IsNullOrEmpty(code)) continue;
-
-            if (!assignedByAnimal.TryGetValue(animalId, out var codes))
-                assignedByAnimal[animalId] = codes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            codes.Add(code);
-        }
+        var assignedByAnimal = await GetAssignedTissueCodesByAnimalAsync(conn, batchId, blockToAnimal);
 
         var unassigned = new HashSet<int>();
-        foreach (var d in (await conn.QueryAsync<dynamic>(
-                "GetBatchTissues",
-                new { ID = batchId },
-                commandType: System.Data.CommandType.StoredProcedure))
-            .Select(r => (IDictionary<string, object>)r))
+        foreach (var d in await QueryBatchRowsAsync(conn, "GetBatchTissues", batchId))
         {
-            var animalId = d.TryGetValue("AnimalID", out var aid) && aid is not DBNull ? Convert.ToInt32(aid) : 0;
+            var animalId = ReadInt(d, "AnimalID");
             if (animalId <= 0) continue;
 
-            var code = d.TryGetValue("TissueCode", out var tc) && tc is not DBNull ? Convert.ToString(tc)?.Trim() : null;
+            var code = ReadTissueCode(d);
             if (string.IsNullOrEmpty(code)) continue;
 
             if (!assignedByAnimal.TryGetValue(animalId, out var codes) || !codes.Contains(code))
@@ -410,6 +384,39 @@ public sealed class BatchRepository : IBatchRepository
 
         return unassigned;
     }
+
+    private static async Task<Dictionary<int, HashSet<string>>> GetAssignedTissueCodesByAnimalAsync(
+        System.Data.IDbConnection conn, int batchId, Dictionary<int, int> blockToAnimal)
+    {
+        var assignedByAnimal = new Dictionary<int, HashSet<string>>();
+        foreach (var d in await QueryBatchRowsAsync(conn, "GetBatchBlockTissues", batchId))
+        {
+            if (!blockToAnimal.TryGetValue(ReadInt(d, "BlockID"), out var animalId)) continue;
+
+            var code = ReadTissueCode(d);
+            if (string.IsNullOrEmpty(code)) continue;
+
+            if (!assignedByAnimal.TryGetValue(animalId, out var codes))
+                assignedByAnimal[animalId] = codes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            codes.Add(code);
+        }
+
+        return assignedByAnimal;
+    }
+
+    private static async Task<IEnumerable<IDictionary<string, object>>> QueryBatchRowsAsync(
+        System.Data.IDbConnection conn, string procName, int batchId) =>
+        (await conn.QueryAsync<dynamic>(
+            procName,
+            new { ID = batchId },
+            commandType: System.Data.CommandType.StoredProcedure))
+        .Select(r => (IDictionary<string, object>)r);
+
+    private static int ReadInt(IDictionary<string, object> row, string column) =>
+        row.TryGetValue(column, out var value) && value is not DBNull ? Convert.ToInt32(value) : 0;
+
+    private static string? ReadTissueCode(IDictionary<string, object> row) =>
+        row.TryGetValue("TissueCode", out var value) && value is not DBNull ? Convert.ToString(value)?.Trim() : null;
 
     /// <inheritdoc/>
     public async Task RefreshAllTissuesAssignedAsync(int batchId, int userId, CancellationToken ct = default)
@@ -901,8 +908,7 @@ public sealed class BatchRepository : IBatchRepository
     /// Description (confirmed via <c>sp_helptext</c> — the SP itself builds and EXECs that SQL).
     /// </remarks>
     public async Task<IReadOnlyList<Models.TestPremiumChargeCount>> GetTestPremiumChargeCountsAsync(
-        string? projectDesc, int batchType,
-        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        string? projectDesc, int batchType, Models.TestCodeSelection codes,
         DateTime? startDate = null, DateTime? endDate = null,
         CancellationToken ct = default)
     {
@@ -911,9 +917,9 @@ public sealed class BatchRepository : IBatchRepository
 
         var results = new List<Models.TestPremiumChargeCount>();
         var filter = new PremiumChargeFilter(projectDesc, batchType, startDate, endDate);
-        await AddCountsAsync(conn, results, "GetTestHistologyCounts", histologyCodes, premiumCharges, filter);
-        await AddCountsAsync(conn, results, "GetTestAntibodiesCounts", antibodyCodes, premiumCharges, filter);
-        await AddCountsAsync(conn, results, "GetTestStainsCounts", stainCodes, premiumCharges, filter);
+        await AddCountsAsync(conn, results, "GetTestHistologyCounts", codes.HistologyCodes, premiumCharges, filter);
+        await AddCountsAsync(conn, results, "GetTestAntibodiesCounts", codes.AntibodyCodes, premiumCharges, filter);
+        await AddCountsAsync(conn, results, "GetTestStainsCounts", codes.StainCodes, premiumCharges, filter);
         return results;
     }
 
@@ -922,8 +928,7 @@ public sealed class BatchRepository : IBatchRepository
     /// (<c>GetTestHistologyBatch</c>/<c>GetTestAntibodiesBatch</c>/<c>GetTestStainsBatch</c>),
     /// reproducing <c>SearchTest.aspx.vb::bntBatch_Click</c>/<c>AttachEventHanders</c>.</remarks>
     public async Task<IReadOnlyList<Models.TestPremiumChargeBatchRef>> GetTestPremiumChargeBatchesAsync(
-        string? projectDesc, int batchType,
-        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        string? projectDesc, int batchType, Models.TestCodeSelection codes,
         DateTime? startDate = null, DateTime? endDate = null,
         CancellationToken ct = default)
     {
@@ -932,9 +937,9 @@ public sealed class BatchRepository : IBatchRepository
 
         var results = new List<Models.TestPremiumChargeBatchRef>();
         var filter = new PremiumChargeFilter(projectDesc, batchType, startDate, endDate);
-        await AddBatchesAsync(conn, results, "GetTestHistologyBatch", histologyCodes, premiumCharges, filter);
-        await AddBatchesAsync(conn, results, "GetTestAntibodiesBatch", antibodyCodes, premiumCharges, filter);
-        await AddBatchesAsync(conn, results, "GetTestStainsBatch", stainCodes, premiumCharges, filter);
+        await AddBatchesAsync(conn, results, "GetTestHistologyBatch", codes.HistologyCodes, premiumCharges, filter);
+        await AddBatchesAsync(conn, results, "GetTestAntibodiesBatch", codes.AntibodyCodes, premiumCharges, filter);
+        await AddBatchesAsync(conn, results, "GetTestStainsBatch", codes.StainCodes, premiumCharges, filter);
         return results;
     }
 
