@@ -204,7 +204,8 @@
             <input type="hidden" name="ReceivedDateTo"      value="@Model.ReceivedDateTo?.ToString("yyyy-MM-dd")" />
         </form>
 
-        <table class="govuk-table">
+        <h2 id="search-results" tabindex="-1" class="govuk-heading-m">Search results</h2>
+        <table class="govuk-table app-responsive-table">
             <caption class="govuk-table__caption govuk-table__caption--m govuk-visually-hidden">Submissions matching the search criteria</caption>
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
@@ -228,7 +229,7 @@
                 {
                     var isSelected = r.ID == Model.SelectedBatchId;
                     <tr class="govuk-table__row" @(isSelected ? "style=background-color:#bbd4ea" : "")>
-                        <td class="govuk-table__cell govuk-table__cell--numeric">
+                        <td class="govuk-table__cell govuk-table__cell--numeric" data-label="Select">
                             @* HTML5 form association: this button submits submission-action-form
                                with SelectedBatchId overridden to this row's ID. *@
                             <button form="submission-action-form"
@@ -236,17 +237,18 @@
                                     type="submit"
                                     name="SelectedBatchId"
                                     value="@r.ID"
+                                    aria-label="Select submission @r.ID"
                                     class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0"
                                     data-module="govuk-button">
                                 Select
                             </button>
                         </td>
-                        <td class="govuk-table__cell">@r.ID</td>
-                        <td class="govuk-table__cell">@r.ProjectDescription</td>
-                        <td class="govuk-table__cell">@r.ContactDescription</td>
-                        <td class="govuk-table__cell">@r.Species</td>
-                        <td class="govuk-table__cell">@r.BatchDate?.ToShortDateString()</td>
-                        <td class="govuk-table__cell">
+                        <td class="govuk-table__cell" data-label="Submission number">@r.ID</td>
+                        <td class="govuk-table__cell" data-label="Project code">@r.ProjectDescription</td>
+                        <td class="govuk-table__cell" data-label="Pathologist">@r.ContactDescription</td>
+                        <td class="govuk-table__cell" data-label="Species">@r.Species</td>
+                        <td class="govuk-table__cell" data-label="Date">@r.BatchDate?.ToShortDateString()</td>
+                        <td class="govuk-table__cell" data-label="Status">
                             <partial name="_StatusTag" model='(Histo.Core.Domain.BatchStatus.TagClass(r.Status ?? string.Empty), Histo.Core.Domain.BatchStatus.DisplayName(r.Status ?? string.Empty))' />
                         </td>
                     </tr>
@@ -255,6 +257,18 @@
         </table>
 
         <partial name="_PaginationPost" />
+
+        @section Scripts {
+            <script>
+                window.addEventListener('DOMContentLoaded', function () {
+                    const resultsHeading = document.getElementById('search-results');
+                    if (resultsHeading) {
+                        resultsHeading.focus();
+                        resultsHeading.scrollIntoView({ behavior: 'instant', block: 'start' });
+                    }
+                });
+            </script>
+        }
 
         @* Export to CSV — mirrors legacy lbExportExcel behaviour (all result rows, not just selected). *@
         <button form="submission-action-form"
