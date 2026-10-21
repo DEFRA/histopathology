@@ -117,8 +117,8 @@ public class QualityDataModelTests
 
         await sut.OnGetAsync();
 
-        Assert.Single(sut.Tests);
-        Assert.Equal(1, sut.Tests[0].ID);
+        var test = Assert.Single(sut.Tests);
+        Assert.Equal(1, test.ID);
     }
 
     // ── OnPostUpdateAsync — legacy multi-select bulk-save ────────────────────────────────────

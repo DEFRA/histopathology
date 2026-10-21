@@ -11,11 +11,11 @@ namespace Histo.Infrastructure;
 /// <c>ILogger</c> error that carries an exception is exported as an exception record, so callers
 /// that catch and swallow an exception still get visibility through <see cref="LogError"/>.
 /// </summary>
-public sealed class AppLogger<T> : IAppLogger
+public sealed class AppLogger : IAppLogger
 {
-    private readonly ILogger<T> _logger;
+    private readonly ILogger _logger;
 
-    public AppLogger(ILogger<T> logger)
+    public AppLogger(ILogger logger)
     {
         _logger = logger;
     }
