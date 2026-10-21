@@ -181,7 +181,7 @@ public sealed class BatchService : IBatchService
             Comments            = source.Comments,
             SubmittedByUserID   = userId,
             UserAreaCode        = source.UserAreaCode,
-            IsPreCassetted      = source.IsPreCassetted,
+            IsCassetted      = source.IsCassetted,
             BatchType           = source.BatchType,
             ProjectContractCode = source.ProjectContractCode,
             ContactName         = source.ContactName,
