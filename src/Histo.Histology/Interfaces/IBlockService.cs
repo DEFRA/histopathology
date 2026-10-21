@@ -19,7 +19,7 @@ public interface IBlockService
 
     /// <summary>As <see cref="AddBlockAsync"/>, but keeps <paramref name="blockRef"/> even if another submission of the sample already uses it.</summary>
     Task<int> AddBlockKeepingRefAsync(int batchId, int animalId, string blockRef, IEnumerable<int> existingOrders, int userId,
-        string? customerRef = null, string? comment = null, bool repeatBlock = false, CancellationToken ct = default);
+        BlockOptions? options = null, CancellationToken ct = default);
 
     /// <summary>
     /// Creates a new pre-booked block placeholder for an animal, ahead of any batch existing.
@@ -42,7 +42,7 @@ public interface IBlockService
     /// Legacy source: clsBlock.vb::NewBlock/GetPreBookedBlock + EditPreBookedBlockStatus/SetBatchID.
     /// </summary>
     Task<bool> ClaimPreBookedBlockAsync(Block preBooked, int batchId, IEnumerable<int> existingOrders, int userId,
-        string? customerRef = null, string? comment = null, bool repeatBlock = false, CancellationToken ct = default);
+        BlockOptions? options = null, CancellationToken ct = default);
 
     Task<bool> UpdateBlockAsync(Block block, int userId, CancellationToken ct = default);
 

@@ -48,7 +48,7 @@ namespace Histo.Reporting.Reports;
 /// the Edit screen's auto-filled default verbatim) — otherwise it would print twice.
 /// </para>
 /// </summary>
-public sealed class QCNoteRenderer
+public static class QCNoteRenderer
 {
     static QCNoteRenderer()
     {
@@ -61,7 +61,7 @@ public sealed class QCNoteRenderer
     /// </summary>
     /// <param name="ds">Populated DataSet with a single table named <c>"Header"</c>.</param>
     /// <returns>PDF content as a byte array.</returns>
-    public Task<byte[]> RenderAsync(DataSet ds)
+    public static Task<byte[]> RenderAsync(DataSet ds)
     {
         DataRow row = ds.Tables["Header"]!.Rows[0];
 

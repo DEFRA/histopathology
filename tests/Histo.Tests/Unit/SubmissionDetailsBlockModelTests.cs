@@ -222,6 +222,7 @@ public class SubmissionDetailsBlockModelTests
         _session.Setup(s => s.UserArea).Returns("Neuropath");
         _batches.Setup(b => b.GetByIdAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Batch { ID = 5, IsPreCassetted = true });
+        _batches.Setup(b => b.GetSubmittedAsCodeAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync("5");
         var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
 
         await sut.OnGetAsync();

@@ -175,4 +175,57 @@ public class ArchiveTissuesModelTests
 
         Assert.Single(sut.Rows);
     }
+
+    private void SetupArchivedFixture()
+    {
+        SetupFilterFixture();
+        _lookups.Setup(l => l.GetLookupDataAsync(16, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)
+            [
+                new LookupItem { Code = "L1", Name = "Alpha" },
+                new LookupItem { Code = "L2", Name = "Beta" },
+            ]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Tissue>)
+            [
+                new Tissue { ID = 1, OwnerID = 10, TissueCode = "1", ArchiveLocation = "L2", ArchivedDate = new DateTime(2024, 1, 2) },
+                new Tissue { ID = 2, OwnerID = 10, TissueCode = "2", ArchiveLocation = "L1", ArchivedDate = new DateTime(2024, 1, 1) },
+                new Tissue { ID = 3, OwnerID = 11, TissueCode = "2", ArchiveLocation = "L1", ArchivedDate = new DateTime(2024, 1, 3) },
+            ]);
+    }
+
+    [Theory]
+    [InlineData("HistologyRef", true, new[] { 3, 1, 2 })]
+    [InlineData("HistologyRef", false, new[] { 1, 2, 3 })]
+    [InlineData("Tissue", false, new[] { 2, 3, 1 })]
+    [InlineData("ArchivedDate", false, new[] { 2, 1, 3 })]
+    [InlineData("ArchiveLocation", false, new[] { 2, 3, 1 })]
+    [InlineData(null, true, new[] { 3, 1, 2 })]
+    public async Task PagedEntries_SortsByTheSelectedColumn(string? column, bool desc, int[] expectedIds)
+    {
+        SetupArchivedFixture();
+        var sut = CreateSut();
+        sut.BatchId = 42;
+        await sut.OnGetAsync();
+        sut.SortColumn = column;
+        sut.SortDesc = desc;
+
+        Assert.Equal(expectedIds, sut.PagedEntries.Select(r => r.ID));
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_AllAcrossPagesSelected_UpdatesEveryFilteredRow()
+    {
+        SetupArchivedFixture();
+        var sut = CreateSut();
+        sut.BatchId = 42;
+        await sut.OnGetAsync();
+        sut.SelectAllAcrossPages = true;
+        sut.ArchiveLocationCode = "L1";
+
+        await sut.OnPostUpdateAsync();
+
+        _submissions.Verify(s => s.UpdateTissueAsync(It.IsAny<Tissue>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Exactly(3));
+        Assert.Equal("Archive information updated for 3 tissue(s).", sut.SuccessMessage);
+    }
 }

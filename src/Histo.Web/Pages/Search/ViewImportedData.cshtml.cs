@@ -13,7 +13,7 @@ namespace Histo.Web.Pages.Search;
 /// Reports; reads <c>LookupData.GetImportedtables</c> for the table drop-down and
 /// <c>clsAnimal.GetImportedData</c> for the selected table's rows.
 /// </summary>
-public class ViewImportedDataModel : GridPageModel
+public partial class ViewImportedDataModel : GridPageModel
 {
     private readonly ILookupService _lookups;
     private readonly ISubmissionService _submissions;
@@ -104,9 +104,12 @@ public class ViewImportedDataModel : GridPageModel
     private static bool Contains(string? value, string term) =>
         !string.IsNullOrEmpty(value) && value.Contains(term, StringComparison.OrdinalIgnoreCase);
 
-    private static IReadOnlyList<string> SplitTerms(string filter) =>
-        System.Text.RegularExpressions.Regex.Matches(filter, "\"([^\"]*)\"|(\\S+)")
+    private static List<string> SplitTerms(string filter) =>
+        SearchTermRegex().Matches(filter)
             .Select(m => m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value)
             .Where(s => !string.IsNullOrEmpty(s))
             .ToList();
+
+    [System.Text.RegularExpressions.GeneratedRegex("\"([^\"]*)\"|(\\S+)")]
+    private static partial System.Text.RegularExpressions.Regex SearchTermRegex();
 }

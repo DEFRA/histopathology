@@ -1,4 +1,4 @@
-﻿/****** Object:  StoredProcedure [dbo].[GetBatchBlockTests] ******/
+﻿-- Object:  StoredProcedure [dbo].[GetBatchBlockTests]
 -- ============================================================================
 -- dbo.GetBatchBlockTests
 -- ============================================================================

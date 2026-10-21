@@ -804,14 +804,17 @@ public class BatchDetailsModel : HistoPageModel
             return Page();
         }
 
+        // An unresolved type (e.g. lost TempData) must not flag the batch as cassetted: that would hide a wet tissue submission from Assign blocks.
+        var isBlockType = Create_SubmittedAsName is not null && !ValidationHelpers.IsWetTissueDescription(Create_SubmittedAsName);
+
         var batch = new Batch
         {
             SubmittedByUserID   = Session.UserID,
             UserAreaCode        = Session.UserAreaID,
             // Legacy Cassetted.aspx/BatchDetails.aspx: every type except Wet Tissue is saved Cassetted + IsBlocked,
             // which keeps it off Assign blocks and sends it straight to Quality data once received.
-            IsCassetted         = !ValidationHelpers.IsWetTissueDescription(Create_SubmittedAsName),
-            IsBlocked           = !ValidationHelpers.IsWetTissueDescription(Create_SubmittedAsName),
+            IsCassetted         = isBlockType,
+            IsBlocked           = isBlockType,
             BatchType           = Session.BatchType,
             ProjectContractCode = Create_ProjectContractCode,
             ContactName         = Create_ContactName,

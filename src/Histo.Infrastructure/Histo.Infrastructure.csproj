@@ -10,10 +10,12 @@
 
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.35" />
-    <PackageReference Include="Microsoft.ApplicationInsights" Version="2.22.0" />
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
+    <!-- SqlClient 7 moved Entra ID auth (Authentication=Active Directory Managed Identity) into this package -->
+    <PackageReference Include="Microsoft.Data.SqlClient.Extensions.Azure" Version="7.1.1" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.7" />
   </ItemGroup>
 
 </Project>

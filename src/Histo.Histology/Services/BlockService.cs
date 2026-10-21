@@ -71,7 +71,7 @@ public sealed class BlockService : IBlockService
         string? comment = null,
         bool repeatBlock = false,
         CancellationToken ct = default) =>
-        AddAsync(batchId, animalId, blockRef, existingOrders, userId, customerRef, comment, repeatBlock, keepRef: false, ct);
+        AddAsync(NewBlock(batchId, animalId, blockRef, existingOrders, customerRef, comment, repeatBlock), userId, keepRef: false, ct);
 
     /// <inheritdoc/>
     public Task<int> AddBlockKeepingRefAsync(
@@ -80,17 +80,13 @@ public sealed class BlockService : IBlockService
         string blockRef,
         IEnumerable<int> existingOrders,
         int userId,
-        string? customerRef = null,
-        string? comment = null,
-        bool repeatBlock = false,
+        BlockOptions? options = null,
         CancellationToken ct = default) =>
-        AddAsync(batchId, animalId, blockRef, existingOrders, userId, customerRef, comment, repeatBlock, keepRef: true, ct);
+        AddAsync(NewBlock(batchId, animalId, blockRef, existingOrders, options?.CustomerRef, options?.Comment, options?.RepeatBlock ?? false), userId, keepRef: true, ct);
 
-    private async Task<int> AddAsync(int batchId, int animalId, string blockRef, IEnumerable<int> existingOrders, int userId,
-        string? customerRef, string? comment, bool repeatBlock, bool keepRef, CancellationToken ct)
-    {
-        var order = BlockHelpers.ComputeNextOrder(existingOrders);
-        var block = new Block
+    private static Block NewBlock(int batchId, int animalId, string blockRef, IEnumerable<int> existingOrders,
+        string? customerRef, string? comment, bool repeatBlock) =>
+        new()
         {
             BatchID     = batchId,
             AnimalID    = animalId,
@@ -99,16 +95,18 @@ public sealed class BlockService : IBlockService
             Comment     = comment,
             RepeatBlock = repeatBlock,
             Status      = BlockStatus.Used,
-            Order       = order,
+            Order       = BlockHelpers.ComputeNextOrder(existingOrders),
         };
 
+    private async Task<int> AddAsync(Block block, int userId, bool keepRef, CancellationToken ct)
+    {
         try
         {
             return await _repo.SaveAsync(block, userId, keepRef, ct);
         }
         catch (Exception ex)
         {
-            _logger.LogError("Failed to add block for batch {BatchId}.", ex, batchId);
+            _logger.LogError("Failed to add block for batch {BatchId}.", ex, block.BatchID);
             return 0;
         }
     }
@@ -167,7 +165,7 @@ public sealed class BlockService : IBlockService
     /// so the ref is retired and <see cref="GetPreBookedByAnimalAsync"/> never returns it again.
     /// </summary>
     public async Task<bool> ClaimPreBookedBlockAsync(Block preBooked, int batchId, IEnumerable<int> existingOrders, int userId,
-        string? customerRef = null, string? comment = null, bool repeatBlock = false, CancellationToken ct = default)
+        BlockOptions? options = null, CancellationToken ct = default)
     {
         var order = BlockHelpers.ComputeNextOrder(existingOrders);
         var block = new Block
@@ -176,9 +174,9 @@ public sealed class BlockService : IBlockService
             BatchID     = batchId,
             AnimalID    = preBooked.AnimalID,
             BlockRef    = preBooked.BlockRef,
-            CustomerRef = customerRef,
-            Comment     = comment,
-            RepeatBlock = repeatBlock,
+            CustomerRef = options?.CustomerRef,
+            Comment     = options?.Comment,
+            RepeatBlock = options?.RepeatBlock ?? false,
             Status      = BlockStatus.PreBookedUsed,
             Order       = order,
         };
@@ -214,9 +212,10 @@ public sealed class BlockService : IBlockService
         CancellationToken ct = default)
     {
         var newBlockRef = BlockHelpers.ComputeNextBlockRef(existingBlockRefs);
-        return await AddBlockAsync(
+        // Legacy only checks the current submission, so a ref used on another submission (e.g. 01) is still allowed.
+        return await AddBlockKeepingRefAsync(
             newBatchId, newAnimalId, newBlockRef, existingOrders, userId,
-            source.CustomerRef, source.Comment, source.RepeatBlock, ct);
+            new BlockOptions(source.CustomerRef, source.Comment, source.RepeatBlock), ct);
     }
 
     /// <summary>Deletes a block.</summary>

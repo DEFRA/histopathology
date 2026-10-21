@@ -615,4 +615,25 @@ public class QualityDataModelTests
 
         _batches.Verify(b => b.SetCompletedAsync(42, new DateTime(2026, 5, 1), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    /// <summary>
+    /// Legacy: QualityData.aspx.vb::btnSave_Click always calls UpdateSubmissionStatus (sets the
+    /// batch InProgress) on every save, regardless of whether every test ends up dispatched.
+    /// </summary>
+    [Fact]
+    public async Task OnPostUpdateAsync_NotAllTestsDispatched_StillSetsBatchInProgress()
+    {
+        _tests.Setup(t => t.GetByBatchAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BlockTest>)[MakeTest(1, dispatched: false)]);
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync((Batch?)null);
+        var sut = CreateSut();
+        sut.SelectedIds = [1];
+        sut.StainRef = "S1";
+        sut.NumberOfSlides = 1;
+
+        await sut.OnPostUpdateAsync();
+
+        _batches.Verify(b => b.SetInProgressAsync(42, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+        _batches.Verify(b => b.SetCompletedAsync(It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

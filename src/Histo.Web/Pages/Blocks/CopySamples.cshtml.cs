@@ -168,9 +168,7 @@ public class CopySamplesModel : HistoPageModel
             catch (InvalidOperationException ex)
             {
                 await _submissions.UpdateAnimalAsync(target, userId);
-                Error = blocksCopied == 0
-                    ? ex.Message
-                    : $"{ex.Message} {blocksCopied} block(s) were copied successfully before this failure.";
+                Error = FailureMessage(ex.Message, blocksCopied);
                 return Page();
             }
 
@@ -188,6 +186,9 @@ public class CopySamplesModel : HistoPageModel
     }
 
     public IActionResult OnPostCancel() => RedirectToPage("/Batches/BatchBlocks");
+
+    private static string FailureMessage(string message, int blocksCopied) =>
+        blocksCopied == 0 ? message : $"{message} {blocksCopied} block(s) were copied successfully before this failure.";
 
     private void SetTitle()
     {

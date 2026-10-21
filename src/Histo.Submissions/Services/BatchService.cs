@@ -140,6 +140,12 @@ public sealed class BatchService : IBatchService
         catch (Exception ex) { _logger.LogError("Failed to mark batch {BatchId} completed.", ex, batchId); return false; }
     }
 
+    public async Task<bool> SetInProgressAsync(int batchId, int userId, CancellationToken ct = default)
+    {
+        try { await _batches.SetInProgressAsync(batchId, userId, ct); return true; }
+        catch (Exception ex) { _logger.LogError("Failed to mark batch {BatchId} in progress.", ex, batchId); return false; }
+    }
+
     public async Task<bool> SetByPassSortAsync(int batchId, bool byPassSort, int userId, CancellationToken ct = default)
     {
         try { await _batches.SetByPassSortAsync(batchId, byPassSort, userId, ct); return true; }
@@ -214,23 +220,21 @@ public sealed class BatchService : IBatchService
 
     /// <inheritdoc/>
     public async Task<IReadOnlyList<TestPremiumChargeCount>> GetTestPremiumChargeCountsAsync(
-        string? projectDesc, int batchType,
-        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        string? projectDesc, int batchType, TestCodeSelection codes,
         DateTime? startDate = null, DateTime? endDate = null,
         CancellationToken ct = default)
     {
-        try { return await _batches.GetTestPremiumChargeCountsAsync(projectDesc, batchType, histologyCodes, antibodyCodes, stainCodes, startDate, endDate, ct); }
+        try { return await _batches.GetTestPremiumChargeCountsAsync(projectDesc, batchType, codes.HistologyCodes, codes.AntibodyCodes, codes.StainCodes, startDate, endDate, ct); }
         catch (Exception ex) { _logger.LogError("Failed to count tests by premium charge.", ex); return []; }
     }
 
     /// <inheritdoc/>
     public async Task<IReadOnlyList<TestPremiumChargeBatchRef>> GetTestPremiumChargeBatchesAsync(
-        string? projectDesc, int batchType,
-        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        string? projectDesc, int batchType, TestCodeSelection codes,
         DateTime? startDate = null, DateTime? endDate = null,
         CancellationToken ct = default)
     {
-        try { return await _batches.GetTestPremiumChargeBatchesAsync(projectDesc, batchType, histologyCodes, antibodyCodes, stainCodes, startDate, endDate, ct); }
+        try { return await _batches.GetTestPremiumChargeBatchesAsync(projectDesc, batchType, codes.HistologyCodes, codes.AntibodyCodes, codes.StainCodes, startDate, endDate, ct); }
         catch (Exception ex) { _logger.LogError("Failed to list submissions by premium charge.", ex); return []; }
     }
 

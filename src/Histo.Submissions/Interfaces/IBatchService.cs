@@ -42,15 +42,13 @@ public interface IBatchService
 
     /// <summary>See <see cref="Histo.Submissions.Interfaces.IBatchRepository.GetTestPremiumChargeCountsAsync"/>.</summary>
     Task<IReadOnlyList<TestPremiumChargeCount>> GetTestPremiumChargeCountsAsync(
-        string? projectDesc, int batchType,
-        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        string? projectDesc, int batchType, TestCodeSelection codes,
         DateTime? startDate = null, DateTime? endDate = null,
         CancellationToken ct = default);
 
     /// <summary>See <see cref="Histo.Submissions.Interfaces.IBatchRepository.GetTestPremiumChargeBatchesAsync"/>.</summary>
     Task<IReadOnlyList<TestPremiumChargeBatchRef>> GetTestPremiumChargeBatchesAsync(
-        string? projectDesc, int batchType,
-        IReadOnlyList<string> histologyCodes, IReadOnlyList<string> antibodyCodes, IReadOnlyList<string> stainCodes,
+        string? projectDesc, int batchType, TestCodeSelection codes,
         DateTime? startDate = null, DateTime? endDate = null,
         CancellationToken ct = default);
 
@@ -92,6 +90,12 @@ public interface IBatchService
     /// Legacy source: <c>QualityData.aspx.vb</c> — <c>UpdateSessionWithQualityData</c>.
     /// </summary>
     Task<bool> SetCompletedAsync(int batchId, DateTime completedDate, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Marks a batch In progress, leaving all other fields intact. Returns <see langword="false"/>
+    /// on failure. Legacy source: <c>QualityData.aspx.vb</c> — <c>UpdateSubmissionStatus</c>.
+    /// </summary>
+    Task<bool> SetInProgressAsync(int batchId, int userId, CancellationToken ct = default);
 
     // -----------------------------------------------------------------------
     // Batch-level test type selections (Histology / Antibodies / Special Stains)

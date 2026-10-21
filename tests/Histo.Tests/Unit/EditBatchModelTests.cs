@@ -20,6 +20,7 @@ namespace Histo.Tests.Unit;
 /// </summary>
 public class EditBatchModelTests
 {
+
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<IBatchService> _batches = new();
     private readonly Mock<ILookupService> _lookups = new();
@@ -51,6 +52,17 @@ _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(It.IsAny<int>(), It.IsAny<
             .ReturnsAsync(new BatchTestSelections());
         _batches.Setup(b => b.TryGetBatchTestSelectionsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new BatchTestSelections());
+    }
+
+    [Fact]
+    public void LockHelpers_NothingLocked_ReportsEveryCodeAsUnlocked()
+    {
+        var sut = CreateSut();
+        sut.SelectedAntibodyCodes = ["A1"];
+        sut.SelectedStainCodes = ["S1"];
+
+        Assert.False(sut.IsAntibodyLocked("A1"));
+        Assert.False(sut.IsStainLocked("S1"));
     }
 
     private EditBatchModel CreateSut()

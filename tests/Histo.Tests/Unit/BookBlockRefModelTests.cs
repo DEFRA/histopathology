@@ -12,6 +12,8 @@ namespace Histo.Tests.Unit;
 /// <summary>Unit tests for <see cref="BookBlockRefModel"/> — pre-books block placeholders for a Sender Ref range.</summary>
 public class BookBlockRefModelTests
 {
+    private static readonly int[] RefsOneAndTwo = [1, 2];
+
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<IBlockService> _blocks = new();
 
@@ -67,7 +69,7 @@ public class BookBlockRefModelTests
         Assert.Null(sut.Error);
         _blocks.Verify(b => b.BookPreBookedBlocksAsync(
             "PLAINREF",
-            It.Is<IReadOnlyList<int>>(r => r.SequenceEqual(new[] { 1, 2 })),
+            It.Is<IReadOnlyList<int>>(r => r.SequenceEqual(RefsOneAndTwo)),
             It.IsAny<CancellationToken>()), Times.Once);
         Assert.Contains(sut.ResultMessages, m => m.Contains("2 blocks booked, 0 blocks not booked"));
     }
