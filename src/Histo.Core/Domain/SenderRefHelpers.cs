@@ -21,6 +21,9 @@ public static partial class SenderRefHelpers
     [System.Text.RegularExpressions.GeneratedRegex("^[0-9]{2}/[0-9]{5}/[0-9]{2}$", System.Text.RegularExpressions.RegexOptions.None, RegexTimeoutMs)]
     private static partial System.Text.RegularExpressions.Regex TbDiagnosticsRegex();
 
+    [System.Text.RegularExpressions.GeneratedRegex("^PG[0-9]{4,}/[0-9]{2}$", System.Text.RegularExpressions.RegexOptions.IgnoreCase, RegexTimeoutMs)]
+    private static partial System.Text.RegularExpressions.Regex PgNumberRegex();
+
     /// <summary>True when the sender ref starts with "PG" (case-insensitive), e.g. "PG0123/24".</summary>
     public static bool IsPgNumber(string senderRef) =>
         senderRef.Length > 2 && senderRef[..2].Equals("PG", StringComparison.OrdinalIgnoreCase);
@@ -46,6 +49,19 @@ public static partial class SenderRefHelpers
         var idPart = remainder[..slash];
         year = remainder[(slash + 1)..];
         return int.TryParse(idPart, out id);
+    }
+
+    /// <summary>
+    /// Histology ref for a "PGNNNN/YY" sender ref ("YY/0NNNN"), or <see langword="null"/> when it isn't
+    /// that format. The ID may have more than four digits ("PG00201/24" gives "24/00201"), matching how
+    /// the "use pg number" option reverses a sender ref. Legacy: <c>GenerateHistoFromPG</c>.
+    /// </summary>
+    public static string? HistologyRefFromPgNumber(string? senderRef)
+    {
+        var trimmed = senderRef?.Trim();
+        if (trimmed is null || !PgNumberRegex().IsMatch(trimmed)) return null;
+        var slash = trimmed.IndexOf('/');
+        return $"{trimmed[(slash + 1)..]}/0{int.Parse(trimmed[2..slash], System.Globalization.CultureInfo.InvariantCulture):D4}";
     }
 
     /// <summary>Parses a Mouse number ("MCNNNNNN") into its numeric ID.</summary>
