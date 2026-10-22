@@ -50,6 +50,8 @@ else
         }
     </form>
 
+    @if (Model.IsWetTissue)
+    {
     <h2 class="govuk-heading-m">Tissues</h2>
 
     @* Inline GOV.UK confirmation panel — replaces the browser confirm() dialog for Delete tissue. *@
@@ -175,5 +177,6 @@ else
             </div>
             <button type="submit" class="govuk-button" data-module="govuk-button">Add tissue</button>
         </form>
+    }
     }
 }

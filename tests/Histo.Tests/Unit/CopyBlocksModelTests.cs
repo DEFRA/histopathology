@@ -53,6 +53,73 @@ public class CopyBlocksModelTests
         };
 
     [Fact]
+    public async Task OnPostAsync_AutoGenerateChecked_PgSource_GivesPgTargetsTheirOwnReversedPgNumber()
+    {
+        // Legacy GenerateHistoFromPG: PG0201/25 -> 25/00201, no counter draw.
+        var pgTarget = new Animal { ID = 20, SenderRef = "PG0201/25", HistoRefSet = false };
+        var otherTarget = new Animal { ID = 30, SenderRef = "S3", HistoRefSet = false };
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[
+                new Animal { ID = 10, SenderRef = "PG0200/25", HistologyRef = "25/00200", HistoRefSet = true },
+                pgTarget, otherTarget]);
+        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        var sut = CreateSut();
+        sut.TargetAnimalIds = [20, 30];
+        sut.AutoGenerateHistologyRefs = true;
+
+        await sut.OnPostAsync();
+
+        _histologyRefs.Verify(h => h.GetNextAvailableRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _submissions.Verify(s => s.UpdateAnimalAsync(
+            It.Is<Animal>(a => a.ID == 20 && a.HistologyRef == "25/00201" && a.HistoRefSet), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+        _submissions.Verify(s => s.UpdateAnimalAsync(
+            It.Is<Animal>(a => a.ID == 30 && a.HistologyRef == null), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_AutoGenerateChecked_FiveDigitPgSource_GivesPgTargetItsReversedNumber()
+    {
+        // Defect 766934: PG00201/24 (5-digit ID) was not recognised, so it got no histology ref.
+        var pgTarget = new Animal { ID = 20, SenderRef = "PG00201/24", HistoRefSet = false };
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[
+                new Animal { ID = 10, SenderRef = "PG00200/24", HistologyRef = "24/00200", HistoRefSet = true },
+                pgTarget]);
+        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        var sut = CreateSut();
+        sut.TargetAnimalIds = [20];
+        sut.AutoGenerateHistologyRefs = true;
+
+        await sut.OnPostAsync();
+
+        _submissions.Verify(s => s.UpdateAnimalAsync(
+            It.Is<Animal>(a => a.ID == 20 && a.HistologyRef == "24/00201" && a.HistoRefSet), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_AutoGenerateChecked_FiveDigitPgSenderRefs_ReverseToHistologyRef()
+    {
+        // UAT report: source PG00200/24 (24/00200) -> target PG00201/24 must get 24/00201.
+        var target = new Animal { ID = 20, SenderRef = "PG00201/24", HistoRefSet = false };
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[
+                new Animal { ID = 10, SenderRef = "PG00200/24", HistologyRef = "24/00200", HistoRefSet = true },
+                target]);
+        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        var sut = CreateSut();
+        sut.TargetAnimalIds = [20];
+        sut.AutoGenerateHistologyRefs = true;
+
+        await sut.OnPostAsync();
+
+        _submissions.Verify(s => s.UpdateAnimalAsync(
+            It.Is<Animal>(a => a.ID == 20 && a.HistologyRef == "24/00201" && a.HistoRefSet), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task OnPostAsync_AutoGenerateUnchecked_LeavesTargetHistologyRefUnchanged()
     {
         var target = new Animal { ID = 20, SenderRef = "S2", HistoRefSet = false };
@@ -128,6 +195,23 @@ public class CopyBlocksModelTests
         await sut.OnPostAsync();
 
         Assert.Contains("the reference type could not be determined from sample S1", sut.TempData["StatusMessage"] as string);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_AutoGenerateChecked_UnclassifiableSourceRef_StillCopiesBlocks()
+    {
+        // Defect 766934: a "25/00200" source ref has no type, which used to abort the whole copy.
+        var target = new Animal { ID = 20, SenderRef = "S2", HistologyRef = "25/00201", HistoRefSet = true };
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 10, SenderRef = "S1", HistologyRef = "25/00200", HistoRefSet = true }, target]);
+
+        var sut = CreateSut();
+        sut.TargetAnimalIds = [20];
+        sut.AutoGenerateHistologyRefs = true;
+
+        await sut.OnPostAsync();
+
+        _blocks.Verify(b => b.CopyBlockAsync(It.IsAny<Block>(), 5, 20, It.IsAny<IEnumerable<string>>(), It.IsAny<IEnumerable<int>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
     }
 
     [Fact]

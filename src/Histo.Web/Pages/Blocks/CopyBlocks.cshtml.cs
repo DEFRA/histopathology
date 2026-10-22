@@ -16,10 +16,9 @@ namespace Histo.Web.Pages.Blocks;
 ///
 /// Also reproduces legacy's <c>cbAutoGenerateHisto</c> "Auto Generate Histology Refs" option:
 /// when ticked, every target sample that doesn't already have a histology ref is assigned the
-/// next available ref of the same type as the source sample's own ref. The PG-number-reversal
-/// fallback (<c>DefaultHistoRefPGReverse</c>) is NOT reproduced — that path was deliberately
-/// removed app-wide with the Neuropath/Mouse Bioassay area (see
-/// docs/Mouse-Bioassay-Neuropath-Removal-Analysis.md); only the counter-draw path applies here.
+/// next available ref of the same type as the source sample's own ref. When the source sample's
+/// ref is its own PG number reversed (legacy <c>IsPGNumber</c>), each PG-format target instead
+/// gets its own PG number reversed (legacy <c>GenerateHistoFromPG</c>), not a counter draw.
 /// </summary>
 public class CopyBlocksModel : HistoPageModel
 {
@@ -158,18 +157,18 @@ public class CopyBlocksModel : HistoPageModel
         IReadOnlyList<Animal> animals,
         Animal? sourceAnimal)
     {
-        var histologyType = AutoGenerateHistologyRefs && sourceBlocks.Count > 0
+        // Legacy's IsPGNumber is a session-only flag, so a PG source is also recognised by its ref being its own sender ref reversed.
+        var pgOwnRef = SenderRefHelpers.HistologyRefFromPgNumber(sourceAnimal?.SenderRef);
+        var sourceIsPg = AutoGenerateHistologyRefs && sourceAnimal is not null
+            && (sourceAnimal.IsPGNumber || (pgOwnRef is not null && string.Equals(pgOwnRef, sourceAnimal.HistologyRef?.Trim(), StringComparison.Ordinal)));
+        var histologyType = AutoGenerateHistologyRefs && !sourceIsPg && sourceBlocks.Count > 0
             ? HistologyRefTypeCode.FromExistingRef(sourceAnimal?.HistologyRef)
             : null;
-        if (AutoGenerateHistologyRefs && sourceBlocks.Count > 0 && histologyType is null)
-        {
-            return (0, $"No histology refs were generated because the reference type could not be determined from sample {sourceAnimal?.SenderRef ?? "the source sample"}. Give that sample a histology reference first.", 0, 0, null);
-        }
-
         var histoRefsAssigned = 0;
         var skippedExisting = 0;
         var copiedTo = 0;
         string? histoRefProblem = null;
+        var typeUnknown = AutoGenerateHistologyRefs && !sourceIsPg && sourceBlocks.Count > 0 && histologyType is null;
         string? errorMessage = null;
 
         foreach (var targetAnimalId in TargetAnimalIds)
@@ -192,8 +191,28 @@ public class CopyBlocksModel : HistoPageModel
                 return (histoRefsAssigned, histoRefProblem, skippedExisting, copiedTo, errorMessage);
             }
 
+            // The block copy above must never be skipped because a ref can't be drawn (e.g. a PG-style source ref).
+            if (typeUnknown && !target.HistoRefSet)
+                histoRefProblem = $"No histology refs were generated because the reference type could not be determined from sample {sourceAnimal?.SenderRef ?? "the source sample"}. Give that sample a histology reference first.";
+
             var drawRef = histologyType is not null && !target.HistoRefSet;
-            if (histologyType is not null && target.HistoRefSet) skippedExisting++;
+            if (AutoGenerateHistologyRefs && target.HistoRefSet) skippedExisting++;
+
+            if (sourceIsPg && !target.HistoRefSet)
+            {
+                // Legacy: PG source gives each PG-format target its own PG number reversed (YY/0NNNN).
+                var pgRef = SenderRefHelpers.HistologyRefFromPgNumber(target.SenderRef);
+                if (pgRef is null)
+                {
+                    histoRefProblem = $"No histology ref was generated for sample {target.SenderRef} because its sender ref is not in PG number format (PGNNNN/NN).";
+                }
+                else
+                {
+                    target.HistologyRef = pgRef;
+                    target.HistoRefSet = true;
+                    histoRefsAssigned++;
+                }
+            }
 
             if (drawRef)
             {
