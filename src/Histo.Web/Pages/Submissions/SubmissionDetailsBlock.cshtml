@@ -9,7 +9,7 @@
     <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
 }
 
-@if (TempData["StatusMessage"] is string statusMessage && !string.IsNullOrEmpty(statusMessage))
+@if (TempData["CopyBlocksStatusMessage"] is string statusMessage && !string.IsNullOrEmpty(statusMessage))
 {
     <div class="govuk-notification-banner govuk-notification-banner--success" role="alert" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
         <div class="govuk-notification-banner__header">
