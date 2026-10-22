@@ -284,9 +284,11 @@ public class BlockDetailsModel : HistoPageModel
                 .Concat(await GetOtherBatchRefsAsync(Animal.ID));
             if (!IsPreCassetted)
                 usedRefs = usedRefs.Concat((await _blocks.GetPreBookedByAnimalAsync(Animal.ID) ?? []).Select(b => b.BlockRef));
+            // Always the lowest ref not used or booked (e.g. after a block was deleted or skipped), so the
+            // animal's NextBlockRef high-water mark is deliberately not applied; the user can still override it.
             NewBlockRef = IsPreCassetted
                 ? FirstPreBookedRef()
-                : BlockHelpers.ComputeNextBlockRef(usedRefs, Animal.NextBlockRef);
+                : BlockHelpers.ComputeNextBlockRef(usedRefs);
 
             if (string.IsNullOrWhiteSpace(NewBlockRef))
             {
@@ -844,8 +846,9 @@ public class BlockDetailsModel : HistoPageModel
         var usedRefs = animalBlocks.Where(b => batchTissues.Any(t => t.OwnerID == b.ID)).Select(b => b.BlockRef)
             .Concat(await GetOtherBatchRefsAsync(animal.ID))
             .Concat((await _blocks.GetPreBookedByAnimalAsync(animal.ID) ?? []).Select(b => b.BlockRef));
-        var nextRef = BlockHelpers.ComputeNextBlockRef(usedRefs, animal.NextBlockRef,
-            allBlocks.FirstOrDefault(b => b.ID == BlockId)?.BlockRef);
+        // Lowest unused, unbooked ref, never the block being left (it may have no tissues, e.g. a repeat block).
+        var currentRef = allBlocks.FirstOrDefault(b => b.ID == BlockId)?.BlockRef;
+        var nextRef = BlockHelpers.ComputeNextBlockRef(currentRef is null ? usedRefs : usedRefs.Append(currentRef));
 
         // Resume an existing, never-finished (zero-tissue) block with this exact ref instead of
         // inserting a duplicate row for it — same pattern as OnGetAsync.

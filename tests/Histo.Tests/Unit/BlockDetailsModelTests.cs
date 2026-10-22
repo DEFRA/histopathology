@@ -572,15 +572,18 @@ public class BlockDetailsModelTests
     }
 
     [Fact]
-    public async Task OnPostNextBlockAsync_NewBlockRef_NeverGoesBelowTheAnimalsStoredNextBlockRef()
+    public async Task OnPostNextBlockAsync_NewBlockRef_IsTheLowestUnusedRef_EvenBelowTheStoredNextBlockRef()
     {
-        // 01/02 remain after 03 was deleted, and the animal's counter says 04: the next block must be 04.
+        // 01 and 02 are used, 03 was skipped/deleted and the animal's counter says 04: the next block is the lowest free, 03.
         _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2", NextBlockRef = "04" }]);
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
         _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
-        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 1, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+            new Tissue { ID = 2, OwnerID = 2, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
             new Block { ID = 1, BatchID = 5, AnimalID = 2, BlockRef = "01" },
             new Block { ID = 2, BatchID = 5, AnimalID = 2, BlockRef = "02" },
@@ -588,7 +591,7 @@ public class BlockDetailsModelTests
         _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 2, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
             new Tissue { ID = 1, OwnerID = 2, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
         ]);
-        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, "03", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(9);
         var sut = CreateSut(animalId: 2, blockId: 2);
         sut.NewBlockRef = "02";
@@ -596,7 +599,7 @@ public class BlockDetailsModelTests
 
         await sut.OnPostNextBlockAsync();
 
-        _blocks.Verify(b => b.AddBlockAsync(5, 2, "04", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _blocks.Verify(b => b.AddBlockAsync(5, 2, "03", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -826,10 +829,10 @@ public class BlockDetailsModelTests
     }
 
     [Fact]
-    public async Task OnGetAsync_AddMode_PreviousBlockWasDeleted_NextRefContinuesPastIt()
+    public async Task OnGetAsync_AddMode_PreviousBlockWasDeleted_LowestUnusedRefIsOfferedAgain()
     {
         // Block "01" was added and then deleted, which advanced the animal's NextBlockRef to "02".
-        // With no blocks left, a computed max+1 alone would hand "01" out again.
+        // The lowest unused ref ("01") is offered again; the user can still override it.
         _session.Setup(s => s.UserArea).Returns("Neuropath");
         _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
@@ -838,14 +841,14 @@ public class BlockDetailsModelTests
         _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
-        _blocks.Setup(b => b.AddBlockAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, "01", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(400);
         var sut = CreateSut(animalId: 2, blockId: 0);
 
         await sut.OnGetAsync();
 
-        Assert.Equal("02", sut.NewBlockRef);
-        _blocks.Verify(b => b.AddBlockAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal("01", sut.NewBlockRef);
+        _blocks.Verify(b => b.AddBlockAsync(5, 2, "01", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -942,14 +945,18 @@ public class BlockDetailsModelTests
     [Fact]
     public async Task OnPostNextBlockAsync_NotPreCassetted_SkipsPreBookedRefs_LandsOnFirstGenuinelyFreeRef()
     {
-        // User-reported scenario continued: the sample's current block is "02"; refs 03/04 are
+        // User-reported scenario continued: the sample has blocks "01" and "02"; refs 03/04 are
         // pre-booked for this sample, so "Next block" must skip both and land on "05".
         _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
         _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
-        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 8, OwnerID = 319180, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+            new Tissue { ID = 9, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319180, BatchID = 5, AnimalID = 2, BlockRef = "01" },
             new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "02" },
         ]);
         _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
