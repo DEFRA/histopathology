@@ -9,6 +9,18 @@
     <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
 }
 
+@if (TempData["StatusMessage"] is string statusMessage && !string.IsNullOrEmpty(statusMessage))
+{
+    <div class="govuk-notification-banner govuk-notification-banner--success" role="alert" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
+        <div class="govuk-notification-banner__header">
+            <h2 class="govuk-notification-banner__title" id="govuk-notification-banner-title">Success</h2>
+        </div>
+        <div class="govuk-notification-banner__content">
+            <p class="govuk-notification-banner__heading">@statusMessage</p>
+        </div>
+    </div>
+}
+
 @* Batch-wide overview — replaces legacy's BatchBlocks.aspx. Reached only from BatchDetails'
    "Assign blocks" button; each row's Select checkbox drives the Edit sample/Delete sample/
    Copy selected blocks actions below the grid, matching legacy's single-select grid + action

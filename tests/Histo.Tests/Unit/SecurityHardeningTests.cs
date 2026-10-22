@@ -53,10 +53,10 @@ public class SecurityHardeningTests
     {
         var headers = await RunHeadersMiddlewareAsync(sendHsts: true);
 
-        Assert.Equal("nosniff", headers["X-Content-Type-Options"]);
-        Assert.Equal("DENY", headers["X-Frame-Options"]);
-        Assert.Contains("frame-ancestors 'none'", headers["Content-Security-Policy"].ToString());
-        Assert.Contains("max-age=", headers["Strict-Transport-Security"].ToString());
+        Assert.Equal("nosniff", headers.XContentTypeOptions);
+        Assert.Equal("DENY", headers.XFrameOptions);
+        Assert.Contains("frame-ancestors 'none'", headers.ContentSecurityPolicy.ToString());
+        Assert.Contains("max-age=", headers.StrictTransportSecurity.ToString());
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public class SecurityHardeningTests
         Assert.True(headers.ContainsKey("X-Content-Type-Options"));
     }
 
-    private static IDistributedCache NewCache() =>
+    private static MemoryDistributedCache NewCache() =>
         new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions()));
 
     private static CookieValidatePrincipalContext ContextFor(string? userId, string? stamp, IDistributedCache cache)

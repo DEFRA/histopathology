@@ -153,9 +153,11 @@ public class SampleSummaryModel : GridPageModel
         // already had a block. Union by ID instead — keep the richer block-animal rows (correct
         // SenderRef/HistologyRef per legacy CreateSenderHistoRefData) and append anything not
         // yet block-assigned from the plain animal list.
-        var animals = blockAnimals.Count > 0
-            ? MergeAnimals(blockAnimals, allAnimals)
-            : allAnimals;
+        // Once blocks are assigned (Done) legacy BatchBlockSummary lists only the block animals; the
+        // submission animal of a migrated batch is a placeholder whose "sender ref" is a histology ref.
+        var animals = blockAnimals.Count == 0 ? allAnimals
+            : Batch?.IsBlocked == true ? blockAnimals
+            : MergeAnimals(blockAnimals, allAnimals);
 
         // Default sort: SenderRef ASC then HistologyRef ASC, matching legacy ByPassSort=false behaviour.
         // When ByPassSort=true the user has explicitly requested block-insertion order — preserve SP order.

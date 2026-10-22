@@ -15,11 +15,11 @@ public static class SecurityHeadersExtensions
             context.Response.OnStarting(() =>
             {
                 var headers = context.Response.Headers;
-                headers["X-Content-Type-Options"] = "nosniff";
-                headers["X-Frame-Options"] = "DENY";
+                headers.XContentTypeOptions = "nosniff";
+                headers.XFrameOptions = "DENY";
                 headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
-                headers["Content-Security-Policy"] = ContentSecurityPolicy;
-                if (sendHsts) headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+                headers.ContentSecurityPolicy = ContentSecurityPolicy;
+                if (sendHsts) headers.StrictTransportSecurity = "max-age=31536000; includeSubDomains";
                 return Task.CompletedTask;
             });
             return next();

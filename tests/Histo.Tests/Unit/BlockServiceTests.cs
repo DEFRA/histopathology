@@ -16,6 +16,8 @@ public class BlockServiceTests
 
     private BlockService CreateSut() => new(_repo.Object, _logger.Object);
 
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
     [Fact]
     public async Task AddBlockAsync_SavesUsedBlockWithNextOrder_AndReturnsNewId()
     {
@@ -24,7 +26,7 @@ public class BlockServiceTests
             .Callback<Block, int, bool, CancellationToken>((b, _, _, _) => saved = b)
             .ReturnsAsync(99);
 
-        var id = await CreateSut().AddBlockAsync(5, 2, "01", ExistingOrders, 7, "CUST", "note", true);
+        var id = await CreateSut().AddBlockAsync(5, 2, "01", ExistingOrders, 7, "CUST", "note", true, Ct);
 
         Assert.Equal(99, id);
         Assert.NotNull(saved);
@@ -46,7 +48,7 @@ public class BlockServiceTests
             .Callback<Block, int, bool, CancellationToken>((b, _, _, _) => saved = b)
             .ReturnsAsync(55);
 
-        var id = await CreateSut().AddBlockKeepingRefAsync(5, 2, "02", ExistingOrders, 7, new BlockOptions("CUST", "note", true));
+        var id = await CreateSut().AddBlockKeepingRefAsync(5, 2, "02", ExistingOrders, 7, new BlockOptions("CUST", "note", true), Ct);
 
         Assert.Equal(55, id);
         Assert.NotNull(saved);
@@ -63,7 +65,7 @@ public class BlockServiceTests
             .Callback<Block, int, bool, CancellationToken>((b, _, _, _) => saved = b)
             .ReturnsAsync(55);
 
-        var id = await CreateSut().CopyBlockAsync(new Block { BlockRef = "01" }, 5, 2, [], ExistingOrders, 7);
+        var id = await CreateSut().CopyBlockAsync(new Block { BlockRef = "01" }, 5, 2, [], ExistingOrders, 7, Ct);
 
         Assert.Equal(55, id);
         Assert.Equal("01", saved?.BlockRef);
@@ -77,7 +79,7 @@ public class BlockServiceTests
             .Callback<Block, int, bool, CancellationToken>((b, _, _, _) => saved = b)
             .ReturnsAsync(55);
 
-        await CreateSut().AddBlockKeepingRefAsync(5, 2, "02", ExistingOrders, 7);
+        await CreateSut().AddBlockKeepingRefAsync(5, 2, "02", ExistingOrders, 7, ct: Ct);
 
         Assert.NotNull(saved);
         Assert.Null(saved.CustomerRef);
@@ -91,7 +93,7 @@ public class BlockServiceTests
         _repo.Setup(r => r.SaveAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var id = await CreateSut().AddBlockAsync(5, 2, "01", ExistingOrders, 7);
+        var id = await CreateSut().AddBlockAsync(5, 2, "01", ExistingOrders, 7, ct: Ct);
 
         Assert.Equal(0, id);
     }
@@ -101,7 +103,7 @@ public class BlockServiceTests
     {
         var block = new Block { ID = 3 };
 
-        var ok = await CreateSut().UpdateBlockAsync(block, 7);
+        var ok = await CreateSut().UpdateBlockAsync(block, 7, Ct);
 
         Assert.True(ok);
         _repo.Verify(r => r.SaveAsync(block, 7, false, It.IsAny<CancellationToken>()), Times.Once);
@@ -113,7 +115,7 @@ public class BlockServiceTests
         _repo.Setup(r => r.SaveAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        Assert.False(await CreateSut().UpdateBlockAsync(new Block { ID = 3 }, 7));
+        Assert.False(await CreateSut().UpdateBlockAsync(new Block { ID = 3 }, 7, Ct));
     }
 
     [Fact]
@@ -125,7 +127,7 @@ public class BlockServiceTests
             .ReturnsAsync(1);
         var preBooked = new Block { ID = 40, AnimalID = 2, BlockRef = "03", Status = BlockStatus.PreBooked };
 
-        var ok = await CreateSut().ClaimPreBookedBlockAsync(preBooked, 5, ExistingOrders, 7, new BlockOptions("CUST", "note", true));
+        var ok = await CreateSut().ClaimPreBookedBlockAsync(preBooked, 5, ExistingOrders, 7, new BlockOptions("CUST", "note", true), Ct);
 
         Assert.True(ok);
         Assert.NotNull(saved);
@@ -144,7 +146,7 @@ public class BlockServiceTests
         _repo.Setup(r => r.SaveAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var ok = await CreateSut().ClaimPreBookedBlockAsync(new Block { ID = 40 }, 5, ExistingOrders, 7);
+        var ok = await CreateSut().ClaimPreBookedBlockAsync(new Block { ID = 40 }, 5, ExistingOrders, 7, ct: Ct);
 
         Assert.False(ok);
     }
