@@ -2,6 +2,7 @@ using Histo.Reporting.Reports;
 using Histo.Reporting.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 
 namespace Histo.Web.Pages.Reports;
 
@@ -34,6 +35,9 @@ public class QCNoteModel : HistoPageModel
         var ds  = await _dataSetBuilder.BuildAsync(qcNoteRef, ct);
         var pdf = await QCNoteRenderer.RenderAsync(ds);
 
-        return File(pdf, "application/pdf", $"QCNote-{qcNoteRef}.pdf");
+        // "inline" makes the browser display the PDF; the filename is used if the user saves it.
+        Response.Headers[HeaderNames.ContentDisposition] =
+            new ContentDispositionHeaderValue("inline") { FileName = $"QCNote-{qcNoteRef}.pdf" }.ToString();
+        return File(pdf, "application/pdf");
     }
 }

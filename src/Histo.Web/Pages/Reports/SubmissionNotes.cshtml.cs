@@ -2,6 +2,7 @@ using Histo.Reporting.Reports;
 using Histo.Reporting.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 
 namespace Histo.Web.Pages.Reports;
 
@@ -38,6 +39,9 @@ public class SubmissionNotesModel : HistoPageModel
         var ds  = await _dataSetBuilder.BuildAsync(batchId.Value, ct);
         var pdf = await _renderer.RenderAsync(ds);
 
-        return File(pdf, "application/pdf", $"SubmissionNotes-{batchId}.pdf");
+        // "inline" makes the browser display the PDF; the filename is used if the user saves it.
+        Response.Headers[HeaderNames.ContentDisposition] =
+            new ContentDispositionHeaderValue("inline") { FileName = $"SubmissionNotes-{batchId}.pdf" }.ToString();
+        return File(pdf, "application/pdf");
     }
 }

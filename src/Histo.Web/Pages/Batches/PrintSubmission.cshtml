@@ -26,11 +26,11 @@ else
     </div>
 
     <div class="govuk-button-group">
-        <a href="@Url.Page("/Reports/HistologyReport")" class="govuk-button" data-module="govuk-button">Print submission</a>
+        <a href="@Url.Page("/Reports/HistologyReport")" class="govuk-button" data-module="govuk-button" target="_blank" rel="noopener noreferrer">Print submission<span class="govuk-visually-hidden"> (opens in new tab)</span></a>
 
         @if (Model.HasNotes)
         {
-            <a href="@Url.Page("/Reports/SubmissionNotes")" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print submission notes</a>
+            <a href="@Url.Page("/Reports/SubmissionNotes")" class="govuk-button govuk-button--secondary" data-module="govuk-button" target="_blank" rel="noopener noreferrer">Print submission notes<span class="govuk-visually-hidden"> (opens in new tab)</span></a>
         }
         else
         {
