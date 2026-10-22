@@ -94,27 +94,34 @@ public class BlockDetailsModel : HistoPageModel
     [BindProperty] public string EditTissueCode { get; set; } = string.Empty;
     [BindProperty] public short EditNoPieces { get; set; } = 1;
 
-    /// <summary>Legacy: chkUseWholeTissueList. Defaults to the full lookup list; the user opts in
-    /// to filtering the dropdown down to codes already used on this submission.</summary>
-    [BindProperty(SupportsGet = true)] public bool UseWholeTissueList { get; set; } = true;
+    /// <summary>Legacy: chkUseWholeTissueList. Defaults to the full lookup list, except in the Assign Tissues
+    /// to Blocks journey where it defaults to the submission's own tissues; either way the user can switch.</summary>
+    [BindProperty(SupportsGet = true)]
+    public bool UseWholeTissueList
+    {
+        get => _useWholeTissueList ?? !IsAssignTissueMode;
+        set => _useWholeTissueList = value;
+    }
+
+    private bool? _useWholeTissueList;
 
     /// <summary>
     /// True when reached via the batch-wide "Assign Tissues to Blocks" journey (BatchBlocks) — same
-    /// breadcrumb test as <c>SubmissionDetailsBlockModel.IsAssignTissueMode</c>. There the tissue
-    /// list is always limited to the submission's own tissues, with no option to widen it.
+    /// breadcrumb test as <c>SubmissionDetailsBlockModel.IsAssignTissueMode</c>. The tissue list
+    /// starts as the submission's own tissues there, with the option to widen it.
     /// </summary>
     public bool IsAssignTissueMode => (Session.SampleDetailReturnPage ?? string.Empty)
         .Contains("/Batches/BatchBlocks", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Whether the tissue dropdown shows the entire lookup rather than the submission's tissues.</summary>
-    public bool ShowWholeTissueList => UseWholeTissueList && !IsAssignTissueMode;
+    public bool ShowWholeTissueList => UseWholeTissueList;
 
     [BindProperty] public List<string> SelectedHistologyCodes { get; set; } = [];
     [BindProperty] public List<string> SelectedAntibodyCodes { get; set; } = [];
     [BindProperty] public List<string> SelectedStainCodes { get; set; } = [];
 
-    /// <summary>Legacy: chkbCarryTests — "Use these tests for the next block?", read by the Next Block handler.</summary>
-    [BindProperty] public bool CarryTestsToNextBlock { get; set; }
+    /// <summary>Legacy: chkbCarryTests — "Use these tests for the next block?", read by the Next Block handler. Carried on the URL so it stays ticked from block to block until the user clears it.</summary>
+    [BindProperty(SupportsGet = true)] public bool CarryTestsToNextBlock { get; set; }
 
     /// <summary>Histology Reference for the sample (NN/NNNNN format). Stored on Animal record.</summary>
     [BindProperty] public string? EditHistologyRef { get; set; }
@@ -647,7 +654,7 @@ public class BlockDetailsModel : HistoPageModel
         }
 
         StashDraft();
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow, isFromNextBlock = IsFromNextBlock, useWholeTissueList = UseWholeTissueList });
+        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow, isFromNextBlock = IsFromNextBlock, useWholeTissueList = UseWholeTissueList, carryTestsToNextBlock = CarryTestsToNextBlock });
     }
 
     public async Task<IActionResult> OnPostDeleteTissueAsync(int tissueId)
@@ -655,7 +662,7 @@ public class BlockDetailsModel : HistoPageModel
         await _submissions.DeleteTissueAsync(tissueId, TissueOwner.Block, Session.UserID);
         await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
         StashDraft();
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow, isFromNextBlock = IsFromNextBlock, useWholeTissueList = UseWholeTissueList });
+        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow, isFromNextBlock = IsFromNextBlock, useWholeTissueList = UseWholeTissueList, carryTestsToNextBlock = CarryTestsToNextBlock });
     }
 
     private const string DraftKey = "BlockDetails_Draft";
@@ -729,7 +736,7 @@ public class BlockDetailsModel : HistoPageModel
         };
         await _submissions.UpdateTissueAsync(updated, Session.UserID);
         await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
-        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow, isFromNextBlock = IsFromNextBlock, useWholeTissueList = UseWholeTissueList });
+        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow, isFromNextBlock = IsFromNextBlock, useWholeTissueList = UseWholeTissueList, carryTestsToNextBlock = CarryTestsToNextBlock });
     }
 
     /// <summary>
@@ -792,8 +799,8 @@ public class BlockDetailsModel : HistoPageModel
         // isFromNextBlock=true tells LoadEditModeDataAsync not to fall back to the batch-level test
         // defaults for it — it must start blank unless CarryTestsToNextBlock already saved codes.
         return newBlockId > 0
-            ? RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = newBlockId, isAddFlow = true, isFromNextBlock = true })
-            : RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow, isFromNextBlock = IsFromNextBlock });
+            ? RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = newBlockId, isAddFlow = true, isFromNextBlock = true, carryTestsToNextBlock = CarryTestsToNextBlock })
+            : RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow, isFromNextBlock = IsFromNextBlock, carryTestsToNextBlock = CarryTestsToNextBlock });
     }
 
     /// <summary>Re-renders the edit page with an error, restoring the values the user posted (LoadEditModeDataAsync overwrites them from the saved Block row).</summary>

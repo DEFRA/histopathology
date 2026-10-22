@@ -226,8 +226,39 @@ public class BlockDetailsModelTests
     [Fact]
     public async Task LoadSupportingData_AssignTissueJourney_OnlyOffersTheSubmissionsTissues()
     {
-        // Reached from Assign Tissues to Blocks (BatchBlocks): the list is the submission's tissues
-        // only, even though the whole-list default is on and no toggle is offered.
+        // Reached from Assign Tissues to Blocks (BatchBlocks): the list defaults to the submission's tissues
+        // only; the entire list is opt-in.
+        _session.Setup(s => s.SampleDetailReturnPage).Returns("/Batches/BatchBlocks?batchId=5");
+        var animal = new Animal { ID = 2, SenderRef = "S2" };
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[animal]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[
+            new BatchSubmission { ID = 69945, BatchID = 5, AnimalID = 2, Order = 1 },
+        ]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 69945, Owner = TissueOwner.Submission, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01", Order = 1 },
+        ]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _lookups.Setup(l => l.GetLookupDataAsync(9, It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[
+            new LookupItem { Code = "AGAR", Name = "Agar" },
+            new LookupItem { Code = "OTHER", Name = "Other tissue" },
+        ]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+
+        await sut.OnGetAsync();
+
+        Assert.True(sut.IsAssignTissueMode);
+        Assert.False(sut.UseWholeTissueList);
+        Assert.Contains(sut.TissueOptions, o => o.Code == "AGAR");
+        Assert.DoesNotContain(sut.TissueOptions, o => o.Code == "OTHER");
+    }
+
+    [Fact]
+    public async Task LoadSupportingData_AssignTissueJourney_EntireListOptedIn_OffersEveryTissue()
+    {
         _session.Setup(s => s.SampleDetailReturnPage).Returns("/Batches/BatchBlocks?batchId=5");
         var animal = new Animal { ID = 2, SenderRef = "S2" };
         _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
@@ -251,9 +282,7 @@ public class BlockDetailsModelTests
 
         await sut.OnGetAsync();
 
-        Assert.True(sut.IsAssignTissueMode);
-        Assert.Contains(sut.TissueOptions, o => o.Code == "AGAR");
-        Assert.DoesNotContain(sut.TissueOptions, o => o.Code == "OTHER");
+        Assert.Contains(sut.TissueOptions, o => o.Code == "OTHER");
     }
 
     [Fact]
