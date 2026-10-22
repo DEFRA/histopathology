@@ -17,6 +17,7 @@ namespace Histo.Web.Pages.Reports;
 /// Crystal Reports <c>HistologyReport.rpt</c> (with embedded sub-report
 /// <c>HistologySubReport.rpt</c>) and streamed the PDF via <c>Response.WriteFile</c>.
 /// </summary>
+[ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
 public class HistologyReportModel : HistoPageModel
 {
     private readonly HistologyReportDataSetBuilder _dataSetBuilder;
@@ -32,9 +33,14 @@ public class HistologyReportModel : HistoPageModel
         _config         = config;
     }
 
+    // In the URL so a refreshed report tab keeps showing the batch it was opened for.
+    [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
+
+    protected override int? RequestedBatchId => BatchId is > 0 ? BatchId : Session.BatchID;
+
     public async Task<IActionResult> OnGetAsync(CancellationToken ct = default)
     {
-        var batchId = Session.BatchID;
+        var batchId = RequestedBatchId;
         if (batchId is null or <= 0)
             return RedirectToPage("/Index");
 

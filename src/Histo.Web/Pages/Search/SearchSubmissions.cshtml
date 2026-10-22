@@ -278,7 +278,7 @@
               @* Print submission — Rejected submissions have no printable form *@
             @if (Model.CanPrintSubmission)
             {
-                <a asp-page="/Reports/HistologyReport" class="govuk-button govuk-button--secondary" data-module="govuk-button" target="_blank" rel="noopener noreferrer">Print submission<span class="govuk-visually-hidden"> (opens in new tab)</span></a>
+                <a asp-page="/Reports/HistologyReport" asp-route-batchId="@Model.SelectedBatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button" target="_blank" rel="noopener noreferrer">Print submission<span class="govuk-visually-hidden"> (opens in new tab)</span></a>
             }
             else
             {
@@ -290,7 +290,7 @@
                mirroring legacy FinalPrintBatch.aspx's EnableSubmissionNotes and ViewSubmissions.cshtml. *@
             @if (Model.HasNotes)
             {
-                <a asp-page="/Reports/SubmissionNotes" class="govuk-button govuk-button--secondary" data-module="govuk-button" target="_blank" rel="noopener noreferrer">Print submission notes<span class="govuk-visually-hidden"> (opens in new tab)</span></a>
+                <a asp-page="/Reports/SubmissionNotes" asp-route-batchId="@Model.SelectedBatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button" target="_blank" rel="noopener noreferrer">Print submission notes<span class="govuk-visually-hidden"> (opens in new tab)</span></a>
             }
             else
             {

@@ -15,6 +15,7 @@ namespace Histo.Web.Pages.Reports;
 /// Legacy equivalent: <c>QCNoteForm.aspx.vb — CreateReport(iQCNoteRef)</c> which called
 /// Crystal Reports <c>QCNote.rpt</c> and streamed the PDF via <c>Response.WriteFile</c>.
 /// </summary>
+[ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
 public class QCNoteModel : HistoPageModel
 {
     private readonly QCNoteDataSetBuilder _dataSetBuilder;

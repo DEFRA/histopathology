@@ -233,14 +233,14 @@
 
             @* Print Submission — now that BatchDetails no longer duplicates these, this is the
                single entry point. Relies on Session.BatchID, set by OnPostSelect above. *@
-            <a asp-page="/Reports/HistologyReport" class="govuk-button govuk-button--secondary" data-module="govuk-button" target="_blank" rel="noopener noreferrer">Print submission<span class="govuk-visually-hidden"> (opens in new tab)</span></a>
+            <a asp-page="/Reports/HistologyReport" asp-route-batchId="@Model.SelectedBatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button" target="_blank" rel="noopener noreferrer">Print submission<span class="govuk-visually-hidden"> (opens in new tab)</span></a>
 
             @* Print Submission Notes — see Print Submission comment above. Only enabled when the
                submission has recorded notes at ANY level (header comments, or any block/tissue/
                antibody/histology/stain test comment), mirroring legacy EnableSubmissionNotes. *@
             @if (Model.HasNotes)
             {
-                <a asp-page="/Reports/SubmissionNotes" class="govuk-button govuk-button--secondary" data-module="govuk-button" target="_blank" rel="noopener noreferrer">Print submission notes<span class="govuk-visually-hidden"> (opens in new tab)</span></a>
+                <a asp-page="/Reports/SubmissionNotes" asp-route-batchId="@Model.SelectedBatchId" class="govuk-button govuk-button--secondary" data-module="govuk-button" target="_blank" rel="noopener noreferrer">Print submission notes<span class="govuk-visually-hidden"> (opens in new tab)</span></a>
             }
             else
             {

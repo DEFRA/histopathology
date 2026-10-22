@@ -15,6 +15,7 @@ namespace Histo.Web.Pages.Reports;
 /// Legacy equivalent: <c>SubmissionNotes.aspx.vb — CreateReport(iBatchID)</c> which called
 /// Crystal Reports <c>SubmissionNotesReport.rpt</c> and streamed the PDF via <c>Response.WriteFile</c>.
 /// </summary>
+[ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
 public class SubmissionNotesModel : HistoPageModel
 {
     private readonly SubmissionNotesDataSetBuilder _dataSetBuilder;
@@ -30,9 +31,14 @@ public class SubmissionNotesModel : HistoPageModel
         _renderer       = renderer;
     }
 
+    // In the URL so a refreshed report tab keeps showing the batch it was opened for.
+    [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
+
+    protected override int? RequestedBatchId => BatchId is > 0 ? BatchId : Session.BatchID;
+
     public async Task<IActionResult> OnGetAsync(CancellationToken ct = default)
     {
-        var batchId = Session.BatchID;
+        var batchId = RequestedBatchId;
         if (batchId is null or <= 0)
             return RedirectToPage("/Index");
 
