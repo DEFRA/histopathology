@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Histo.Administration.Interfaces;
+using Histo.Administration.Models;
 using Microsoft.AspNetCore.Authentication;
 
 namespace Histo.Web.Auth;
@@ -16,7 +17,7 @@ namespace Histo.Web.Auth;
 ///
 /// SECURITY:
 ///   - Never log raw assertion XML, email addresses, or full claim values.
-///   - Log only the opaque NameIdentifier GUID — see Defra SDS Logging Standards.
+///   - Log only the opaque Entra object ID — see Defra SDS Logging Standards.
 ///   - UK GDPR: claim values (name, email) must not be stored beyond session lifetime
 ///     without a documented lawful basis.
 /// </summary>
@@ -38,13 +39,13 @@ public sealed class HistopathologyClaimsTransformation : IClaimsTransformation
         if (principal.Identity?.IsAuthenticated != true)
             return principal;
 
-        var email = ExtractEmail(principal);
+        var email = EntraIdClaims.Email(principal);
         if (string.IsNullOrWhiteSpace(email))
         {
-            // Log only the opaque NameIdentifier — never the email or display name.
+            // Log only the opaque object ID — never the email or display name.
             _logger.LogWarning(
-                "Authenticated principal has no email/UPN claim. NameIdentifier: {NameId}",
-                principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? "(none)");
+                "Authenticated principal has no email/UPN claim. ObjectId: {ObjectId}",
+                EntraIdClaims.ObjectId(principal));
             return principal; // no GroupName added → HistoPageModel redirects to AccessDenied
         }
 
@@ -52,16 +53,19 @@ public sealed class HistopathologyClaimsTransformation : IClaimsTransformation
         if (user is null)
         {
             _logger.LogWarning(
-                "Authenticated principal not found or inactive in application database. NameIdentifier: {NameId}",
-                principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? "(none)");
+                "Authenticated principal not found or inactive in application database. ObjectId: {ObjectId}",
+                EntraIdClaims.ObjectId(principal));
             return principal; // no GroupName added → HistoPageModel redirects to AccessDenied
         }
 
-        var identity = (ClaimsIdentity)principal.Identity!;
+        ApplyAppClaims((ClaimsIdentity)principal.Identity!, user);
+        return principal;
+    }
 
-        // Drop any app claims carried in the auth cookie from a previous request before
-        // re-adding them. AddClaim appends rather than replaces, and FindFirst returns the
-        // earliest match — so without this the stale Group/Area would continue to win.
+    /// <summary>Replaces any app claims on <paramref name="identity"/> with the values from <paramref name="user"/>.</summary>
+    public static void ApplyAppClaims(ClaimsIdentity identity, User user)
+    {
+        // AddClaim appends and FindFirst returns the earliest match, so stale claims must go first.
         foreach (var stale in identity.FindAll(c => AppClaimTypes.All.Contains(c.Type)).ToList())
             identity.RemoveClaim(stale);
 
@@ -70,13 +74,5 @@ public sealed class HistopathologyClaimsTransformation : IClaimsTransformation
         identity.AddClaim(new Claim(AppClaimTypes.GroupId,    user.GroupCode.ToString()));
         identity.AddClaim(new Claim(AppClaimTypes.UserArea,   user.AreaName));
         identity.AddClaim(new Claim(AppClaimTypes.UserAreaId, user.AreaCode.ToString()));
-
-        return principal;
     }
-
-    // Try email claim first, then UPN — matches both internal and B2B guest accounts.
-    private static string? ExtractEmail(ClaimsPrincipal principal) =>
-        principal.FindFirstValue(ClaimTypes.Email)
-        ?? principal.FindFirstValue("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")
-        ?? principal.FindFirstValue("preferred_username");
 }
