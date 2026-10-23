@@ -58,6 +58,9 @@ public class SubmissionDetailsModel : HistoPageModel
     public IReadOnlyList<Tissue> Tissues { get; private set; } = [];
     public IReadOnlyList<LookupItem> TissueOptions { get; private set; } = [];
 
+    /// <summary>Tissue information only applies to Wet Tissue submissions; block types carry tissues on their blocks.</summary>
+    public bool IsWetTissue { get; private set; }
+
     /// <summary>Resolves a tissue code to its description, matching legacy's GetListType(TissueCode, LOOKUP_TISSUE_CODE).</summary>
     public string TissueName(string code) => TissueOptions.FirstOrDefault(o => o.Code == code)?.Name ?? code;
 
@@ -79,6 +82,9 @@ public class SubmissionDetailsModel : HistoPageModel
         if (Animal is null) return Page();
 
         PMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
+        var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(BatchId ?? 0);
+        var submittedAs = (await _lookups.GetLookupDataAsync(11, includeInactive: true)).FirstOrDefault(i => i.Code == submittedAsCode)?.Name; // 11 = LOOKUP_SUBMITTEDAS
+        IsWetTissue = ValidationHelpers.IsWetTissueDescription(submittedAs);
         Tissues = await _submissions.GetTissuesBySubmissionAsync(BatchId ?? 0, Animal.BatchSubmissionID);
         TissueOptions = await _lookups.GetLookupDataAsync(LookupTissueCode);
 
