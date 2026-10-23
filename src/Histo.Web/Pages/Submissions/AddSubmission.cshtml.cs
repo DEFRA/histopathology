@@ -462,7 +462,10 @@ public class AddSubmissionModel : HistoPageModel
                     return Page();
                 }
 
-                Session.SampleDetailReturnPage = BackLinkPage;
+                // Back on Sample Blocks must return to the Sample Summary the copy started from.
+                Session.SampleDetailReturnPage = IsCopyBatchReturn
+                    ? BackLinkPage
+                    : $"/Submissions/SampleSummary?batchId={batchId}";
                 await _batches.RefreshAllTissuesAssignedAsync(batchId, Session.UserID);
                 return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = newAnimalId });
             }
