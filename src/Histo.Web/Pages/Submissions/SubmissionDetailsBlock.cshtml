@@ -6,10 +6,22 @@
 }
 
 @section BeforeHeading {
-    <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
+    @if (!Model.IsViewMode && Model.HrAssignedThisVisit && Model.Animal is { HistoRefSet: true } && !Model.Blocks.Any())
+    {
+        <form method="post" asp-page-handler="Back" class="govuk-!-display-inline">
+            <input type="hidden" asp-for="BatchId" />
+            <input type="hidden" asp-for="AnimalId" />
+            <input type="hidden" name="HrAssignedThisVisit" value="true" />
+            <button type="submit" class="govuk-back-link" style="border:0;background:none;cursor:pointer;font-family:inherit">Back</button>
+        </form>
+    }
+    else
+    {
+        <a href="@Model.BackLinkPage" class="govuk-back-link">Back</a>
+    }
 }
 
-@if (TempData["StatusMessage"] is string statusMessage && !string.IsNullOrEmpty(statusMessage))
+@if (TempData["CopyBlocksStatusMessage"] is string statusMessage && !string.IsNullOrEmpty(statusMessage))
 {
     <div class="govuk-notification-banner govuk-notification-banner--success" role="alert" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
         <div class="govuk-notification-banner__header">
@@ -63,6 +75,7 @@ else
     <form method="post" asp-page-handler="SaveHistologyDetails" class="govuk-!-margin-bottom-6">
         <input type="hidden" asp-for="BatchId" />
         <input type="hidden" asp-for="AnimalId" />
+        <input type="hidden" name="HrAssignedThisVisit" value="@(Model.HrAssignedThisVisit ? "true" : "false")" />
         <div class="govuk-grid-row">
             <div class="govuk-grid-column-one-half">
                 <div class="govuk-form-group">
@@ -127,6 +140,7 @@ else
     {
         <form method="post" asp-page-handler="GetNextHistologyRef" id="get-next-histology-ref-form" class="govuk-visually-hidden">
             <input type="hidden" name="BatchId" value="@Model.BatchId" />
+            <input type="hidden" name="HrAssignedThisVisit" value="@(Model.HrAssignedThisVisit ? "true" : "false")" />
             <input type="hidden" name="AnimalId" value="@Model.AnimalId" />
         </form>
     }

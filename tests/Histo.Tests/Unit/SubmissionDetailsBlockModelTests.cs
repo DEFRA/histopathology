@@ -252,12 +252,71 @@ public class SubmissionDetailsBlockModelTests
         // only accepts a bare page name and throws InvalidOperationException ("No page named
         // '...' matches the supplied values") when handed one with a query string attached.
         var animal = new Animal { ID = 1, SenderRef = "S1" };
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 100, BatchID = 5, AnimalID = 1, BlockRef = "01" }]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 100, Owner = TissueOwner.Block, TissueCode = "AGAR" },
+        ]);
         var sut = CreateSut(1, animal, "/Submissions/SampleSummary?batchId=5");
 
         var result = await sut.OnPostSaveHistologyDetailsAsync();
 
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.LocalRedirectResult>(result);
         Assert.Equal("/Submissions/SampleSummary?batchId=5", redirect.Url);
+    }
+
+    [Fact]
+    public async Task OnPostSaveHistologyDetailsAsync_NoBlocks_IsRejected()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        var sut = CreateSut(1, animal, "/Submissions/SampleSummary?batchId=5");
+
+        var result = await sut.OnPostSaveHistologyDetailsAsync();
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RazorPages.PageResult>(result);
+        Assert.Equal("At least one block must be added against the sample.", sut.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task OnPostBackAsync_HistologyRefButNoBlocks_ClearsRefAndReturns()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "S1", HistoRefSet = true, HistologyRef = "26/40001" };
+        var sut = CreateSut(1, animal, "/Submissions/SampleSummary?batchId=5");
+        sut.HrAssignedThisVisit = true;
+
+        var result = await sut.OnPostBackAsync();
+
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.Is<Animal>(a => a.ID == 1 && !a.HistoRefSet && a.HistologyRef == null),
+            It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal("/Submissions/SampleSummary?batchId=5", Assert.IsType<Microsoft.AspNetCore.Mvc.LocalRedirectResult>(result).Url);
+    }
+
+    [Fact]
+    public async Task OnPostBackAsync_PreExistingHistologyRefNoBlocks_LeavesRefAlone()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "S1", HistoRefSet = true, HistologyRef = "26/40001" };
+        var sut = CreateSut(1, animal, "/Submissions/SampleSummary?batchId=5");
+
+        var result = await sut.OnPostBackAsync();
+
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal("/Submissions/SampleSummary?batchId=5", Assert.IsType<Microsoft.AspNetCore.Mvc.LocalRedirectResult>(result).Url);
+    }
+
+    [Fact]
+    public async Task OnPostBackAsync_HistologyRefWithBlock_LeavesRefAlone()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "S1", HistoRefSet = true, HistologyRef = "26/40001" };
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 100, BatchID = 5, AnimalID = 1, BlockRef = "01" }]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 100, Owner = TissueOwner.Block, TissueCode = "AGAR" },
+        ]);
+        var sut = CreateSut(1, animal, "/Submissions/SampleSummary?batchId=5");
+
+        await sut.OnPostBackAsync();
+
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

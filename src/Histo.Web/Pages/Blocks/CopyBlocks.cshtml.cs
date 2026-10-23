@@ -128,7 +128,8 @@ public class CopyBlocksModel : HistoPageModel
         }
 
         var statusMessage = BuildCopyStatusMessage(sourceBlocks.Count, copyResult);
-        TempData["StatusMessage"] = statusMessage;
+        // Own key: the shared "StatusMessage" is read by the admin pages (e.g. User maintenance), which would otherwise show this if left unread.
+        TempData["CopyBlocksStatusMessage"] = statusMessage;
         return RedirectToOrigin(batchId);
     }
 

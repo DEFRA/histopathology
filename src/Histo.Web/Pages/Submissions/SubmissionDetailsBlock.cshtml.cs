@@ -81,6 +81,9 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
     /// </summary>
     public IReadOnlyList<LookupItem> HistologyRefTypeOptions { get; private set; } = [];
 
+    /// <summary>True once "Get next ref" assigned the HR on this visit; only such an HR is cleared by Back when no block was added.</summary>
+    [BindProperty] public bool HrAssignedThisVisit { get; set; }
+
     /// <summary>Histology Reference for the sample (NN/NNNNN format). Only postable while unset — see <see cref="HistologyRefLocked"/>.</summary>
     [BindProperty] public string? EditHistologyRef { get; set; }
 
@@ -255,6 +258,12 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         if (PMDateLocked) EditPMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
 
         var histoRefError = await ValidateHistologyRefAsync(EditHistologyRef);
+        if (histoRefError is null)
+        {
+            // Legacy btSubmit_Click → ValidateData: Done needs at least one block on the sample.
+            if (!await HasCompletedBlockAsync(Animal.ID))
+                histoRefError = "At least one block must be added against the sample.";
+        }
         if (histoRefError is not null)
         {
             ErrorMessage = histoRefError;
@@ -287,6 +296,50 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         return string.IsNullOrWhiteSpace(Session.SampleDetailReturnPage)
             ? RedirectToPage(new { batchId = BatchId, animalId = AnimalId })
             : LocalRedirect(Session.SampleDetailReturnPage);
+    }
+
+    /// <summary>A block counts only once it has tissues — same rule as the grid, which hides never-completed blocks.</summary>
+    private async Task<bool> HasCompletedBlockAsync(int animalId)
+    {
+        var blocks = (await _blocks.GetByBatchAsync(BatchId ?? 0)).Where(b => b.AnimalID == animalId).ToList();
+        if (blocks.Count == 0) return false;
+        var tissues = await _submissions.GetTissuesByBatchAsync(BatchId ?? 0);
+        return blocks.Any(b => tissues.Any(t => t.OwnerID == b.ID));
+    }
+
+    /// <summary>
+    /// Back on a sample whose HR was just assigned here but which still has no block. Legacy <c>btnCancel_Click</c>
+    /// dropped such a sample (and freed its HR) from its unsaved working set; here the sample is kept and only that
+    /// new HR is cleared. A pre-existing HR (booked, imported, or from an earlier visit) is never touched.
+    /// </summary>
+    public async Task<IActionResult> OnPostBackAsync()
+    {
+        var redirect = await LoadAnimalAsync();
+        if (redirect is not null) return redirect;
+
+        if (!IsViewMode && HrAssignedThisVisit && Animal is { HistoRefSet: true })
+        {
+            if (!await HasCompletedBlockAsync(Animal.ID))
+            {
+                await _submissions.UpdateAnimalAsync(new Animal
+                {
+                    ID = Animal.ID,
+                    BatchSubmissionID = Animal.BatchSubmissionID,
+                    SenderRef = Animal.SenderRef,
+                    NextBlockRef = Animal.NextBlockRef,
+                    HistoRefSet = false,
+                    HistologyRef = null,
+                    OnHold = Animal.OnHold,
+                    PMDate = Animal.PMDate,
+                    PMDateSet = Animal.PMDateSet,
+                    IsPGNumber = Animal.IsPGNumber,
+                    BookedHistologyRef = Animal.BookedHistologyRef,
+                    RowStamp = Animal.RowStamp,
+                }, Session.UserID);
+            }
+        }
+
+        return LocalRedirect(BackLinkPage);
     }
 
     /// <summary>
@@ -496,6 +549,7 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
                 Animal.HistologyRef = nextRef;
                 Animal.HistoRefSet = true;
                 Animal.IsPGNumber = isPgNumber;
+                HrAssignedThisVisit = true;
             }
         }
 

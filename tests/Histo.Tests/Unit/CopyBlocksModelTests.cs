@@ -194,7 +194,7 @@ public class CopyBlocksModelTests
 
         await sut.OnPostAsync();
 
-        Assert.Contains("the reference type could not be determined from sample S1", sut.TempData["StatusMessage"] as string);
+        Assert.Contains("the reference type could not be determined from sample S1", sut.TempData["CopyBlocksStatusMessage"] as string);
     }
 
     [Fact]
@@ -230,9 +230,27 @@ public class CopyBlocksModelTests
 
         await sut.OnPostAsync();
 
-        Assert.Contains("No more histology references are available", sut.TempData["StatusMessage"] as string);
+        Assert.Contains("No more histology references are available", sut.TempData["CopyBlocksStatusMessage"] as string);
         _submissions.Verify(s => s.UpdateAnimalAsync(
             It.Is<Animal>(a => a.ID == 20 && a.HistologyRef == null), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_Success_StatusIsKeptOffTheSharedAdminStatusMessage()
+    {
+        // Defect 767117: the shared "StatusMessage" key surfaced on User maintenance.
+        var target = new Animal { ID = 20, SenderRef = "S2", HistologyRef = "26/60050", HistoRefSet = true };
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 10, SenderRef = "S1", HistologyRef = "26/60001", HistoRefSet = true }, target]);
+        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        var sut = CreateSut();
+        sut.TargetAnimalIds = [20];
+
+        await sut.OnPostAsync();
+
+        Assert.NotNull(sut.TempData["CopyBlocksStatusMessage"]);
+        Assert.Null(sut.TempData["StatusMessage"]);
     }
 
     [Fact]
@@ -253,6 +271,7 @@ public class CopyBlocksModelTests
 
         Assert.IsType<PageResult>(result);
         Assert.Contains("Could not copy block '01' to sample 'S2'", sut.Error);
+        Assert.Null(sut.TempData["CopyBlocksStatusMessage"]);
         Assert.Null(sut.TempData["StatusMessage"]);
     }
 
