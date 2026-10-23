@@ -594,4 +594,81 @@ public class HistologyReportDataSetBuilderTests
         Assert.Equal(["A", "A", "B", "B", "B"], table.Rows.Cast<DataRow>().Select(r => (string)r["BlockRef"]));
         Assert.Equal(["Obex", "Obex", "Adrenal", "Adrenal", "Adrenal"], table.Rows.Cast<DataRow>().Select(r => (string)r["TissueDetails"]));
     }
+
+    // ── Incomplete submissions (defect 766965 / legacy SubmissionForm.aspx.vb parity) ──
+
+    [Fact]
+    public void BuildSubmissionTable_BlocksAssigned_SampleWithHistologyRefButNoBlock_IsOmitted()
+    {
+        // Legacy CreateBatchBlocksDataTable emits rows per block→tissue only, so a sample that has an
+        // HR but no block yet never reaches the print-out; the sample with a block does.
+        var withBlock = Row(("ID", (object)1), ("SenderRef", "S-1"), ("HistologyRef", "26/40001"));
+        var noBlock   = Row(("ID", (object)2), ("SenderRef", "S-2"), ("HistologyRef", "26/40002"));
+        var block     = Row(("ID", (object)900), ("AnimalID", (object)1), ("BlockRef", "01"), ("RepeatBlock", (object)false));
+        var bTissue   = Row(("BlockID", (object)900), ("ID", (object)10), ("TissueCode", "Obex"), ("NoPieces", (object)1), ("Comment", ""));
+        var subTissues = new[]
+        {
+            Row(("AnimalID", (object)1), ("ID", (object)1), ("TissueCode", "Obex"), ("Comment", "")),
+            Row(("AnimalID", (object)2), ("ID", (object)2), ("TissueCode", "Obex"), ("Comment", "")),
+        };
+
+        var table = HistologyReportDataSetBuilder.BuildSubmissionTable(
+            [], subTissues, [withBlock, noBlock], [block], [bTissue], 7, blocksAssigned: true);
+
+        var row = Assert.Single(table.Rows.Cast<DataRow>());
+        Assert.Equal("S-1", row["SenderRef"]);
+        Assert.Equal("26/40001", row["HistologyRef"]);
+        Assert.Equal("01", row["BlockRef"]);
+    }
+
+    [Fact]
+    public void BuildSubmissionTable_BlocksAssigned_BlockWithoutTissues_ProducesNoRow()
+    {
+        // A block with no tissues (never completed) has nothing to list under it in legacy either.
+        var animal = Row(("ID", (object)1), ("SenderRef", "S-1"), ("HistologyRef", "26/40001"));
+        var done   = Row(("ID", (object)900), ("AnimalID", (object)1), ("BlockRef", "01"), ("RepeatBlock", (object)false));
+        var empty  = Row(("ID", (object)901), ("AnimalID", (object)1), ("BlockRef", "02"), ("RepeatBlock", (object)false));
+        var tissue = Row(("BlockID", (object)900), ("ID", (object)10), ("TissueCode", "Obex"), ("NoPieces", (object)1), ("Comment", ""));
+
+        var table = HistologyReportDataSetBuilder.BuildSubmissionTable(
+            [], [], [animal], [done, empty], [tissue], 7, blocksAssigned: true);
+
+        Assert.Equal(["01"], table.Rows.Cast<DataRow>().Select(r => (string)r["BlockRef"]));
+    }
+
+    [Fact]
+    public void BuildSubmissionTable_NotBlocked_ListsEverySampleWithItsCurrentHistologyRef()
+    {
+        // Wet Tissue before Done: legacy CreateBatchSubmissionDataTable lists every sample's tissues,
+        // the HR shown as it stands (blank when unassigned) and never a block ref.
+        var assigned   = Row(("ID", (object)1), ("SenderRef", "S-1"), ("HistologyRef", "26/40001"));
+        var unassigned = Row(("ID", (object)2), ("SenderRef", "S-2"), ("HistologyRef", ""));
+        var subTissues = new[]
+        {
+            Row(("AnimalID", (object)1), ("ID", (object)1), ("TissueCode", "Obex"), ("Comment", "")),
+            Row(("AnimalID", (object)2), ("ID", (object)2), ("TissueCode", "Obex"), ("Comment", "")),
+        };
+
+        var table = HistologyReportDataSetBuilder.BuildSubmissionTable(
+            [], subTissues, [assigned, unassigned], [], [], 7, blocksAssigned: false);
+
+        Assert.Equal(["S-1", "S-2"], table.Rows.Cast<DataRow>().Select(r => (string)r["SenderRef"]));
+        Assert.Equal(["26/40001", ""], table.Rows.Cast<DataRow>().Select(r => (string)r["HistologyRef"]));
+        Assert.All(table.Rows.Cast<DataRow>(), r => Assert.Equal("", r["BlockRef"]));
+    }
+
+    [Fact]
+    public void BuildSubmissionTable_HistologyRefAssignedAfterFirstPrint_AppearsOnNextBuild()
+    {
+        // Defect 766965: the HR must come from the animal as it is now, not a stale copy.
+        var tissue = Row(("AnimalID", (object)1), ("ID", (object)1), ("TissueCode", "Obex"), ("Comment", ""));
+        var before = Row(("ID", (object)1), ("SenderRef", "S-1"), ("HistologyRef", ""));
+        var after  = Row(("ID", (object)1), ("SenderRef", "S-1"), ("HistologyRef", "26/40009"));
+
+        var first  = HistologyReportDataSetBuilder.BuildSubmissionTable([], [tissue], [before], [], [], 7, blocksAssigned: false);
+        var second = HistologyReportDataSetBuilder.BuildSubmissionTable([], [tissue], [after],  [], [], 7, blocksAssigned: false);
+
+        Assert.Equal("", first.Rows[0]["HistologyRef"]);
+        Assert.Equal("26/40009", second.Rows[0]["HistologyRef"]);
+    }
 }
