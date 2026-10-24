@@ -48,6 +48,9 @@ public class CopyBlocksModel : HistoPageModel
     /// </summary>
     [BindProperty(SupportsGet = true)] public int? AnimalId { get; set; }
 
+    /// <summary>No-JavaScript "Select all" link: pre-ticks every target sample.</summary>
+    [BindProperty(SupportsGet = true)] public bool SelectAll { get; set; }
+
     [BindProperty] public List<int> BlockIds { get; set; } = [];
     [BindProperty] public List<int> TargetAnimalIds { get; set; } = [];
 

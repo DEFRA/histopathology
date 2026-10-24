@@ -4,12 +4,12 @@
     function labelTables(root) {
         root.querySelectorAll('table.govuk-table').forEach(function (table) {
             var headRow = table.querySelector('thead tr');
-            if (!headRow || table.querySelector('[colspan], [rowspan]')) {
+            if (!headRow || table.classList.contains('app-table--scroll') || table.querySelector('[colspan], [rowspan]')) {
                 return;
             }
 
             var labels = Array.prototype.map.call(headRow.children, function (th) {
-                return th.textContent.replace(/\s+/g, ' ').trim();
+                return th.getAttribute('data-label') || th.textContent.replace(/\s+/g, ' ').trim();
             });
 
             table.querySelectorAll('tbody tr').forEach(function (row) {
