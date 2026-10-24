@@ -54,7 +54,7 @@
                         <input class="govuk-checkboxes__input" type="checkbox" id="select-all-samples" />
                         <label class="govuk-label govuk-checkboxes__label" for="select-all-samples"><strong>Select all</strong></label>
                     </div>
-                    <p class="govuk-body app-no-js"><a asp-page="/Blocks/CopyBlocks" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-SelectAll="true" class="govuk-link">Select all</a></p>
+                    <p class="govuk-body app-no-js"><a asp-page="/Blocks/CopyBlocks" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-SelectAll="true" class="govuk-link">Select all</a> | <a asp-page="/Blocks/CopyBlocks" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" class="govuk-link">Clear selection</a></p>
                 }
                 @foreach (var a in Model.TargetAnimals)
                 {

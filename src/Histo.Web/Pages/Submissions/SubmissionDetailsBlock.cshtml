@@ -210,6 +210,8 @@ else
                             </div>
                             <div class="app-no-js govuk-!-margin-top-1">
                                 <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-SelectAll="true" class="govuk-link govuk-body-s">Select all<span class="govuk-visually-hidden"> blocks</span></a>
+                                <br />
+                                <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" class="govuk-link govuk-body-s">Clear<span class="govuk-visually-hidden"> block selection</span></a>
                             </div>
                         }
                     </th>
