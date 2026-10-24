@@ -50,9 +50,13 @@
 </table>
 
 <form method="post" asp-page="/Bookings/BookHistologyRef">
-    <div class="govuk-form-group">
+    <div class="govuk-form-group @(string.IsNullOrEmpty(Model.Error) ? "" : "govuk-form-group--error")">
         <label class="govuk-label" for="HistologyType">Histology Ref Range Type</label>
-        <select name="HistologyType" id="HistologyType" class="govuk-select" required>
+        @if (!string.IsNullOrEmpty(Model.Error))
+        {
+            <p id="HistologyType-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @Model.Error</p>
+        }
+        <select name="HistologyType" id="HistologyType" class="govuk-select @(string.IsNullOrEmpty(Model.Error) ? "" : "govuk-select--error")" aria-describedby="@(string.IsNullOrEmpty(Model.Error) ? null : "HistologyType-error")" required>
             <option value="">-- Select --</option>
             @foreach (var c in Model.Counters)
             {

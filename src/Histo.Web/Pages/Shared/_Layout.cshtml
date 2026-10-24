@@ -1,11 +1,23 @@
 @inject Histo.Web.Services.ISessionService SessionSvc
+@{
+    // Rendered up front so <title> can reflect a visible error summary in the body (WCAG 2.4.2).
+    var bodyContent = RenderBody();
+    string bodyHtml;
+    using (var bodyWriter = new System.IO.StringWriter())
+    {
+        bodyContent.WriteTo(bodyWriter, System.Text.Encodings.Web.HtmlEncoder.Default);
+        bodyHtml = bodyWriter.ToString();
+    }
+    var hasVisibleErrorSummary = System.Text.RegularExpressions.Regex.IsMatch(
+        bodyHtml, "<div class=\"govuk-error-summary\"(?![^>]*\\bhidden)");
+}
 <!DOCTYPE html>
 <html lang="en" class="govuk-template">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#1d70b8" />
-    <title>@(ViewData["HasErrors"] is true ? "Error: " : "")@ViewData["Title"] — Histopathology System</title>
+    <title>@(ViewData["HasErrors"] is true || hasVisibleErrorSummary ? "Error: " : "")@ViewData["Title"] — Histopathology System</title>
     <link rel="icon" sizes="48x48" href="~/assets/images/favicon.ico">
     <link rel="icon" sizes="any" href="~/assets/images/favicon.svg" type="image/svg+xml">
     <link rel="mask-icon" href="~/assets/images/govuk-icon-mask.svg" color="#1d70b8">
@@ -90,7 +102,7 @@
                 }
                 <h1 class="govuk-heading-xl">@pt</h1>
             }
-            @RenderBody()
+            @Html.Raw(bodyHtml)
         </main>
     </div>
 

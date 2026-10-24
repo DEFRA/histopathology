@@ -50,9 +50,13 @@
 <form method="post" asp-page="/Bookings/BookBlockRef" id="book-block-ref-form">
     <div class="govuk-grid-row">
         <div class="govuk-grid-column-one-half">
-            <div class="govuk-form-group">
+            <div class="govuk-form-group @(string.IsNullOrEmpty(Model.Error) ? "" : "govuk-form-group--error")">
                 <label class="govuk-label" for="SenderRefFrom">Sender Ref from</label>
-                <input class="govuk-input" id="SenderRefFrom" name="SenderRefFrom" type="text" value="@Model.SenderRefFrom" />
+                @if (!string.IsNullOrEmpty(Model.Error))
+                {
+                    <p id="SenderRefFrom-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @Model.Error</p>
+                }
+                <input class="govuk-input @(string.IsNullOrEmpty(Model.Error) ? "" : "govuk-input--error")" id="SenderRefFrom" name="SenderRefFrom" type="text" value="@Model.SenderRefFrom" aria-describedby="@(string.IsNullOrEmpty(Model.Error) ? null : "SenderRefFrom-error")" />
             </div>
         </div>
         <div class="govuk-grid-column-one-half">
