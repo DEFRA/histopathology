@@ -155,6 +155,11 @@ body:not(.js-enabled) .app-js-only {
     display: none;
 }
 
+/* Fallback links shown only when script is off. */
+.js-enabled .app-no-js {
+    display: none;
+}
+
 /* These sections are revealed by script when a Histology test is ticked; without script the
  * user can't reveal them, so always show them. */
 body:not(.js-enabled) #create-antibodies-section,

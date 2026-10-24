@@ -69,7 +69,7 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
     /// <summary>Set when the user has requested the inline "Check used block refs" lookup for this sample.</summary>
     [BindProperty(SupportsGet = true)] public bool ShowUsedRefs { get; set; }
 
-    /// <summary>Pre-ticks every block row's checkbox (the "Select all" link).</summary>
+    /// <summary>No-JavaScript "Select all" link: pre-ticks every block checkbox.</summary>
     [BindProperty(SupportsGet = true)] public bool SelectAll { get; set; }
 
     /// <summary>Histology Ref Type selected from the "or Pick" dropdown — legacy Common.vb::HistologyRefType.</summary>
