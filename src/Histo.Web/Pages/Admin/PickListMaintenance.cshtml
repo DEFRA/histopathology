@@ -25,11 +25,11 @@
                 <td class="govuk-table__cell govuk-table__cell--numeric">
                     @if (l.TableName == "Species")
                     {
-                        <a asp-page="/Admin/SpeciesItems" class="govuk-link">Edit items</a>
+                        <a asp-page="/Admin/SpeciesItems" class="govuk-link">Edit items<span class="govuk-visually-hidden"> for @l.TableName</span></a>
                     }
                     else
                     {
-                        <a asp-page="/Admin/LookupItems" asp-route-tableId="@l.ID" class="govuk-link">Edit items</a>
+                        <a asp-page="/Admin/LookupItems" class="govuk-link">Edit items<span class="govuk-visually-hidden"> for @l.TableName</span></a>
                     }
                 </td>
             </tr>
