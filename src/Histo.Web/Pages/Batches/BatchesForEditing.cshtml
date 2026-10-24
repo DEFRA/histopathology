@@ -71,7 +71,7 @@ else
                     <td class="govuk-table__cell">
                         <form method="post" asp-antiforgery="true">
                             <input type="hidden" name="batchId" value="@b.ID" />
-                            <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-page-handler="Select">Select</button>
+                            <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-page-handler="Select">Select<span class="govuk-visually-hidden"> submission @b.ID</span></button>
                         </form>
                     </td>
                 </tr>
