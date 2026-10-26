@@ -278,6 +278,68 @@ public class SubmissionDetailsBlockModelTests
     }
 
     [Fact]
+    public async Task OnPostSaveHistologyDetailsAsync_UpdateFails_ShowsErrorAndDoesNotRedirect()
+    {
+        // DEFECT: EditAnimal reports a duplicate Histology Ref / concurrency clash via its return code, which
+        // surfaces as UpdateAnimalAsync == false. The handler ignored that and redirected as if it had saved.
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        ArrangeCompletedBlock();
+        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        var sut = CreateSut(1, animal, "/Submissions/SampleSummary?batchId=5");
+        sut.EditHistologyRef = "26/40004";
+
+        var result = await sut.OnPostSaveHistologyDetailsAsync();
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RazorPages.PageResult>(result);
+        Assert.False(string.IsNullOrWhiteSpace(sut.ErrorMessage));
+    }
+
+    [Fact]
+    public async Task OnPostSaveHistologyDetailsAsync_HistologyRefUsedByAnotherSample_ShowsErrorAndDoesNotSave()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        ArrangeCompletedBlock();
+        _submissions.Setup(s => s.IsHistologyRefInUseAsync("26/40004", It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        var sut = CreateSut(1, animal, "/Submissions/SampleSummary?batchId=5");
+        sut.EditHistologyRef = "26/40004";
+
+        var result = await sut.OnPostSaveHistologyDetailsAsync();
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RazorPages.PageResult>(result);
+        Assert.Equal("The Histology Ref entered already exists. Please enter an alternative reference.", sut.ErrorMessage);
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostSaveHistologyDetailsAsync_HistologyRefNotInUse_SavesAndRedirects()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        ArrangeCompletedBlock();
+        _submissions.Setup(s => s.IsHistologyRefInUseAsync("26/40004", It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        var sut = CreateSut(1, animal, "/Submissions/SampleSummary?batchId=5");
+        sut.EditHistologyRef = "26/40004";
+
+        var result = await sut.OnPostSaveHistologyDetailsAsync();
+
+        Assert.Equal("/Submissions/SampleSummary?batchId=5", Assert.IsType<Microsoft.AspNetCore.Mvc.LocalRedirectResult>(result).Url);
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.Is<Animal>(a => a.HistologyRef == "26/40004"), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    private void ArrangeCompletedBlock()
+    {
+        _histologyRefs.Setup(h => h.GetCountersAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<HistologyRefCounter>)[
+            new HistologyRefCounter { Type = 4, Description = "General Pool", NextHistologyRef = "40010" },
+        ]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 100, BatchID = 5, AnimalID = 1, BlockRef = "01" }]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 100, Owner = TissueOwner.Block, TissueCode = "AGAR" },
+        ]);
+    }
+
+    [Fact]
     public async Task OnPostBackAsync_HistologyRefButNoBlocks_ClearsRefAndReturns()
     {
         var animal = new Animal { ID = 1, SenderRef = "S1", HistoRefSet = true, HistologyRef = "26/40001" };

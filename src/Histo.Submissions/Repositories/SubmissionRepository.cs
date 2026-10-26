@@ -677,20 +677,31 @@ public sealed class SubmissionRepository : ISubmissionRepository
             ? parsedPmDate
             : DBNull.Value;
 
-        await conn.ExecuteAsync(
-            "EditAnimal",
-            new
-            {
-                animal.ID,
-                animal.SenderRef,
-                animal.NextBlockRef,
-                HistologyRef = (object?)animal.HistologyRef ?? DBNull.Value,
-                animal.OnHold,
-                PMDate = pmDateParam,
-                animal.RowStamp,
-                UserID = userId,
-            },
-            commandType: System.Data.CommandType.StoredProcedure);
+        // DEFECT-FIX: EditAnimal reports a duplicate Histology Ref (2) or a stale RowStamp (1) through its
+        // return code, not an exception; ignoring it made a rejected save look successful.
+        var parameters = new DynamicParameters();
+        parameters.Add(ReturnValueParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
+        parameters.AddDynamicParams(new
+        {
+            animal.ID,
+            animal.SenderRef,
+            animal.NextBlockRef,
+            HistologyRef = (object?)animal.HistologyRef ?? DBNull.Value,
+            animal.OnHold,
+            PMDate = pmDateParam,
+            animal.RowStamp,
+            UserID = userId,
+        });
+
+        await conn.ExecuteAsync("EditAnimal", parameters, commandType: System.Data.CommandType.StoredProcedure);
+
+        switch (parameters.Get<int>(ReturnValueParam))
+        {
+            case 1:
+                throw new AnimalConcurrencyException();
+            case 2:
+                throw new AnimalRefUpdateException($"Edit Animal: Another Animal is already assigned the Histology Ref: {animal.HistologyRef}.");
+        }
     }
 
     /// <inheritdoc/>
@@ -811,6 +822,17 @@ public sealed class SubmissionRepository : ISubmissionRepository
             case 3:
                 throw new AnimalRefUpdateException("The new Histology Reference has already been used for another sample.");
         }
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> IsHistologyRefInUseAsync(string histologyRef, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var count = await conn.ExecuteScalarAsync<int>(
+            "CountAnimalsByHistologyRef",
+            new { HistologyRef = histologyRef },
+            commandType: System.Data.CommandType.StoredProcedure);
+        return count > 0;
     }
 
     // -----------------------------------------------------------------------
