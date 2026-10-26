@@ -111,6 +111,12 @@ public sealed class HistologyReportDataSetBuilder
         var rawBlockTissues = (await conn.QueryAsync<dynamic>(
             "GetBatchBlockTissues", new { ID = batchId }, commandType: CommandType.StoredProcedure))
             .Cast<IDictionary<string, object>>().ToList();
+        // Legacy SubmissionForm reads each block's Sender/Histology Ref from BATCH_BLOCK_ANIMAL, not the
+        // submission animals: migrated batches hold their tissues on one placeholder animal and the real
+        // samples only exist as block animals.
+        var rawBlockAnimals = (await conn.QueryAsync<dynamic>(
+            "GetBatchBlockAnimal", new { ID = batchId }, commandType: CommandType.StoredProcedure))
+            .Cast<IDictionary<string, object>>().ToList();
 
         // ── 2a. ID→name lookups — tblBatch stores raw codes (Species ID, Project code,
         // Pathologist/Contact ID, Submitted-By user ID), not display names; GetCommonBatchTablesByID
@@ -165,17 +171,23 @@ public sealed class HistologyReportDataSetBuilder
         // ── 3. Assemble the report DataSet ───────────────────────────────────
         var ds = new DataSet("HistologyReport");
 
-        // Total Samples = the batch's animal (sample) count — the header SP returns no such
-        // column, matching BatchDetails.SampleCount = GetAnimalsByBatchAsync().Count.
-        ds.Tables.Add(BuildBatchTable(rawBatch, rawSubmittedAs, batchId, speciesById, projectsById, contactsById, userById, fixationByCode, timeReceivedByCode, submittedAsByCode, rawAnimals.Count));
-        ds.Tables.Add(BuildPostFixationTable(rawPostFix, batchId));
-        ds.Tables.Add(BuildHistologyTable(rawHistology, batchId, rawAntibodies, rawStains, batchType,
-            histologyByCode, specialStainByCode, tseAntibodiesByCode, nonTseAntibodiesByCode));
         // Legacy prints the block listing only once blocks are assigned (IsBlocked) or the batch is
         // Cassetted; otherwise the submission's own tissues.
         var blocksAssigned = rawBatch.Count > 0 && (Bool(rawBatch[0], "IsBlocked") || Bool(rawBatch[0], "Cassetted"));
+        var useBlockAnimals = blocksAssigned && rawBlockAnimals.Count > 0;
 
-        ds.Tables.Add(BuildSubmissionTable(rawBatchSubmissions, rawTissues, rawAnimals, rawBlocks, rawBlockTissues, batchId, blocksAssigned));
+        // Total Samples = the batch's animal (sample) count — the header SP returns no such
+        // column, matching BatchDetails.SampleCount = GetAnimalsByBatchAsync().Count.
+        ds.Tables.Add(BuildBatchTable(rawBatch, rawSubmittedAs, batchId, speciesById, projectsById, contactsById, userById, fixationByCode, timeReceivedByCode, submittedAsByCode, useBlockAnimals ? rawBlockAnimals.Count : rawAnimals.Count));
+        ds.Tables.Add(BuildPostFixationTable(rawPostFix, batchId));
+        ds.Tables.Add(BuildHistologyTable(rawHistology, batchId, rawAntibodies, rawStains, batchType,
+            histologyByCode, specialStainByCode, tseAntibodiesByCode, nonTseAntibodiesByCode));
+        // Lookup only (never iterated for rows): block animals first, submission animals as fallback.
+        var blockAnimalIds = rawBlockAnimals.Select(a => IntOrZero(a, "ID")).ToHashSet();
+        var rowAnimals = useBlockAnimals
+            ? [.. rawBlockAnimals, .. rawAnimals.Where(a => !blockAnimalIds.Contains(IntOrZero(a, "ID")))]
+            : rawAnimals;
+        ds.Tables.Add(BuildSubmissionTable(rawBatchSubmissions, rawTissues, rowAnimals, rawBlocks, rawBlockTissues, batchId, blocksAssigned));
         ds.Tables.Add(BuildVersionTable(rawBatch));
 
         return ds;

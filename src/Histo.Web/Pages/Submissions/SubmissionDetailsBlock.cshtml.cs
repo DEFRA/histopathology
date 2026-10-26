@@ -69,6 +69,9 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
     /// <summary>Set when the user has requested the inline "Check used block refs" lookup for this sample.</summary>
     [BindProperty(SupportsGet = true)] public bool ShowUsedRefs { get; set; }
 
+    /// <summary>Pre-ticks every block row's checkbox (the "Select all" link).</summary>
+    [BindProperty(SupportsGet = true)] public bool SelectAll { get; set; }
+
     /// <summary>Histology Ref Type selected from the "or Pick" dropdown — legacy Common.vb::HistologyRefType.</summary>
     [BindProperty] public int? HistologyRefType { get; set; }
 
@@ -80,6 +83,9 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
     /// <see cref="LoadSupportingDataAsync"/>.
     /// </summary>
     public IReadOnlyList<LookupItem> HistologyRefTypeOptions { get; private set; } = [];
+
+    /// <summary>True once "Get next ref" assigned the HR on this visit; only such an HR is cleared by Back when no block was added.</summary>
+    [BindProperty] public bool HrAssignedThisVisit { get; set; }
 
     /// <summary>Histology Reference for the sample (NN/NNNNN format). Only postable while unset — see <see cref="HistologyRefLocked"/>.</summary>
     [BindProperty] public string? EditHistologyRef { get; set; }
@@ -254,7 +260,13 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         if (HistologyRefLocked) EditHistologyRef = Animal.HistologyRef;
         if (PMDateLocked) EditPMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
 
-        var histoRefError = await ValidateHistologyRefAsync(EditHistologyRef);
+        var histoRefError = await ValidateHistologyRefAsync(EditHistologyRef, Animal.HistologyRef);
+        if (histoRefError is null)
+        {
+            // Legacy btSubmit_Click → ValidateData: Done needs at least one block on the sample.
+            if (!await HasCompletedBlockAsync(Animal.ID))
+                histoRefError = "At least one block must be added against the sample.";
+        }
         if (histoRefError is not null)
         {
             ErrorMessage = histoRefError;
@@ -281,7 +293,15 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
                 BookedHistologyRef = Animal.BookedHistologyRef,
                 RowStamp = Animal.RowStamp,
             };
-            await _submissions.UpdateAnimalAsync(updated, Session.UserID);
+            // DEFECT-FIX: a rejected save (duplicate Histology Ref, stale row) must not look like success.
+            if (!await _submissions.UpdateAnimalAsync(updated, Session.UserID))
+            {
+                ErrorMessage = "The sample details could not be saved. The Histology Ref may already be assigned to another sample, or the sample was changed by another user. Please try again.";
+                var blocksAfterFailedSave = await _blocks.GetByBatchAsync(BatchId ?? 0);
+                Blocks = blocksAfterFailedSave.Where(b => b.AnimalID == Animal.ID).ToList();
+                await LoadSupportingDataAsync();
+                return Page();
+            }
         }
 
         return string.IsNullOrWhiteSpace(Session.SampleDetailReturnPage)
@@ -289,12 +309,56 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
             : LocalRedirect(Session.SampleDetailReturnPage);
     }
 
+    /// <summary>A block counts only once it has tissues — same rule as the grid, which hides never-completed blocks.</summary>
+    private async Task<bool> HasCompletedBlockAsync(int animalId)
+    {
+        var blocks = (await _blocks.GetByBatchAsync(BatchId ?? 0)).Where(b => b.AnimalID == animalId).ToList();
+        if (blocks.Count == 0) return false;
+        var tissues = await _submissions.GetTissuesByBatchAsync(BatchId ?? 0);
+        return blocks.Any(b => tissues.Any(t => t.OwnerID == b.ID));
+    }
+
+    /// <summary>
+    /// Back on a sample whose HR was just assigned here but which still has no block. Legacy <c>btnCancel_Click</c>
+    /// dropped such a sample (and freed its HR) from its unsaved working set; here the sample is kept and only that
+    /// new HR is cleared. A pre-existing HR (booked, imported, or from an earlier visit) is never touched.
+    /// </summary>
+    public async Task<IActionResult> OnPostBackAsync()
+    {
+        var redirect = await LoadAnimalAsync();
+        if (redirect is not null) return redirect;
+
+        if (!IsViewMode && HrAssignedThisVisit && Animal is { HistoRefSet: true })
+        {
+            if (!await HasCompletedBlockAsync(Animal.ID))
+            {
+                await _submissions.UpdateAnimalAsync(new Animal
+                {
+                    ID = Animal.ID,
+                    BatchSubmissionID = Animal.BatchSubmissionID,
+                    SenderRef = Animal.SenderRef,
+                    NextBlockRef = Animal.NextBlockRef,
+                    HistoRefSet = false,
+                    HistologyRef = null,
+                    OnHold = Animal.OnHold,
+                    PMDate = Animal.PMDate,
+                    PMDateSet = Animal.PMDateSet,
+                    IsPGNumber = Animal.IsPGNumber,
+                    BookedHistologyRef = Animal.BookedHistologyRef,
+                    RowStamp = Animal.RowStamp,
+                }, Session.UserID);
+            }
+        }
+
+        return LocalRedirect(BackLinkPage);
+    }
+
     /// <summary>
     /// Validates Histology Reference format (NN/NNNNN) and business rules — mirrors
     /// <c>Blocks/BlockDetails.cshtml.cs::ValidateHistologyRefAsync</c>. Returns an error message if
     /// invalid, null if valid (including when empty — clearing the field is allowed).
     /// </summary>
-    private async Task<string?> ValidateHistologyRefAsync(string? histologyRef)
+    private async Task<string?> ValidateHistologyRefAsync(string? histologyRef, string? currentHistologyRef)
     {
         if (string.IsNullOrWhiteSpace(histologyRef))
             return null;
@@ -326,6 +390,11 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
             if (counter is not null && int.TryParse(counter.NextHistologyRef, out var nextRef) && refNumber >= nextRef)
                 return $"Histology Reference entered ({histologyRef}) must be less than the next available reference number ({counter.NextHistologyRef}) for this type.";
         }
+
+        // DEFECT-FIX: legacy ValidateData rejected a Histology Ref already held by another sample.
+        if (!string.Equals(histologyRef, currentHistologyRef, StringComparison.OrdinalIgnoreCase)
+            && await _submissions.IsHistologyRefInUseAsync(histologyRef))
+            return "The Histology Ref entered already exists. Please enter an alternative reference.";
 
         return null;
     }
@@ -496,6 +565,7 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
                 Animal.HistologyRef = nextRef;
                 Animal.HistoRefSet = true;
                 Animal.IsPGNumber = isPgNumber;
+                HrAssignedThisVisit = true;
             }
         }
 

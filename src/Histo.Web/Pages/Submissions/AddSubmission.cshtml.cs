@@ -379,7 +379,7 @@ public class AddSubmissionModel : HistoPageModel
     }
 
     /// <summary>Gives one newly created sample the source sample's blocks and its own histology ref.</summary>
-    private async Task CopySourceSampleToAsync(int batchId, int newAnimalId)
+    private async Task CopySourceSampleToAsync(int batchId, int newAnimalId, bool drawHistologyRef = true)
     {
         var animals = await _submissions.GetAnimalsByBatchAsync(batchId);
         var source = animals.FirstOrDefault(a => a.ID == SourceAnimalId);
@@ -387,7 +387,7 @@ public class AddSubmissionModel : HistoPageModel
         if (source is null || target is null) return;
 
         var allBlocks = await _blocks.GetByBatchAsync(batchId);
-        await CopySourceSampleToTargetAsync(batchId, allBlocks, source, target);
+        await CopySourceSampleToTargetAsync(batchId, allBlocks, source, target, drawHistologyRef: drawHistologyRef);
     }
 
     /// <summary>
@@ -444,6 +444,30 @@ public class AddSubmissionModel : HistoPageModel
                 var sourceTissues = await _submissions.GetTissuesBySubmissionAsync(batchId, sourceSubmission.ID);
                 foreach (var tissue in sourceTissues)
                     await _submissions.CopyTissueAsync(tissue, ownSubmissionId, Session.UserID);
+            }
+
+            // Once blocks are assigned the copy must carry the source's blocks too (legacy Copy Sample),
+            // otherwise the tissues sit unassigned and the user rebuilds every block by hand. The histology ref
+            // is left for the user to pick on Sample Blocks, as legacy does.
+            var batchBlocks = await _blocks.GetByBatchAsync(batchId);
+            if (batchBlocks.Any(b => b.AnimalID == SourceAnimalId))
+            {
+                try
+                {
+                    await CopySourceSampleToAsync(batchId, newAnimalId, drawHistologyRef: false);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    ModelError = $"Sample '{SenderRef}' was created, but the copy did not finish. {ex.Message}";
+                    return Page();
+                }
+
+                // Back on Sample Blocks must return to the Sample Summary the copy started from.
+                Session.SampleDetailReturnPage = IsCopyBatchReturn
+                    ? BackLinkPage
+                    : $"/Submissions/SampleSummary?batchId={batchId}";
+                await _batches.RefreshAllTissuesAssignedAsync(batchId, Session.UserID);
+                return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId, animalId = newAnimalId });
             }
 
             // The "Change" flow must return to the batch copy list so the user can still press
