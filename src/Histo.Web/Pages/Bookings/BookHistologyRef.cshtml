@@ -64,7 +64,9 @@
         <label class="govuk-label" for="NumberToBook">Number required</label>
         <input class="govuk-input govuk-input--width-4" id="NumberToBook" name="NumberToBook" type="number" min="1" step="1" value="@Model.NumberToBook" required />
     </div>
-    <button type="submit" class="govuk-button" data-module="govuk-button">Book</button>
+    @* DEFECT-FIX: legacy PromptBeforeSaveScript asked for confirmation before booking. *@
+    <button type="submit" class="govuk-button" data-module="govuk-button"
+            onclick="return confirm('Are you sure you want to book the specified histology numbers. Continue?');">Book</button>
 </form>
 
 <p class="govuk-body">
