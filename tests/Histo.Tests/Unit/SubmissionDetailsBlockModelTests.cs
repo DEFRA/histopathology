@@ -605,4 +605,19 @@ public class SubmissionDetailsBlockModelTests
         _submissions.Verify(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         Assert.Null(sut.Animal!.HistologyRef);
     }
+
+    [Fact]
+    public void BlockSelectCheckbox_IsDisabledInViewSubmissionMode()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "src", "Histo.Web", "Pages", "Submissions", "SubmissionDetailsBlock.cshtml")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+
+        var markup = File.ReadAllText(Path.Combine(dir!.FullName, "src", "Histo.Web", "Pages", "Submissions", "SubmissionDetailsBlock.cshtml"));
+        var checkbox = System.Text.RegularExpressions.Regex.Match(markup, @"<input[^>]*type=""checkbox""[^>]*name=""blockIds""[^>]*/>");
+
+        Assert.True(checkbox.Success, "Block select checkbox not found.");
+        Assert.Contains("disabled=\"@(Model.IsViewMode ? \"disabled\" : null)\"", checkbox.Value);
+    }
 }
