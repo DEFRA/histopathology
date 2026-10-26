@@ -71,10 +71,19 @@
     @if (!Model.IsAssignTissueMode)
     {
         <p class="govuk-body">
-            <a asp-page="/Search/SearchSender" asp-route-returnPage="/Submissions/AddSubmission" asp-route-SenderRef="@Model.SenderRef" class="govuk-link">
+            <a id="search-sender-link" asp-page="/Search/SearchSender" asp-route-returnPage="/Submissions/AddSubmission" asp-route-SenderRef="@Model.SenderRef" class="govuk-link">
                 Search for a previously used sender reference
             </a>
         </p>
+        <script>
+            // The href is rendered before the user types, so add the current Sender Ref on click.
+            document.getElementById('search-sender-link').addEventListener('click', function () {
+                var input = document.getElementById('SenderRef');
+                var url = new URL(this.href, window.location.href);
+                url.searchParams.set('SenderRef', input ? input.value.trim() : '');
+                this.href = url.toString();
+            });
+        </script>
     }
     @if (!Model.IsAssignTissueMode && Model.ShowMouseRange)
     {
