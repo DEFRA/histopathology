@@ -400,6 +400,26 @@ public class BatchDetailsModel : HistoPageModel
         TempData[CreateIsPreCassettedKey] = sourceBatch.IsPreCassetted.ToString();
     }
 
+    // DEFECT-FIX: area-scoped lists omit a copied value from another area (or since deactivated), so it showed as "-- Select --".
+    private async Task EnsureSelectedProjectAndContactListedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(Create_ProjectContractCode)
+            && !Create_Projects.Any(p => p.ID.ToString() == Create_ProjectContractCode))
+        {
+            var all = await _lookups.GetLookupDataAsync(LookupProjects, includeInactive: true);
+            var match = all.FirstOrDefault(p => p.ID.ToString() == Create_ProjectContractCode);
+            if (match is not null) Create_Projects = [.. Create_Projects, match];
+        }
+
+        if (!string.IsNullOrWhiteSpace(Create_ContactName)
+            && !Create_Contacts.Any(c => c.ID.ToString() == Create_ContactName))
+        {
+            var all = await _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true);
+            var match = all.FirstOrDefault(c => c.ID.ToString() == Create_ContactName);
+            if (match is not null) Create_Contacts = [.. Create_Contacts, match];
+        }
+    }
+
     /// <summary>
     /// Resolves a <c>luSubmittedAs</c> code to its description. <c>includeInactive</c> is required:
     /// a batch may have been created against a type that has since been deactivated (e.g. code 6,
@@ -591,6 +611,7 @@ public class BatchDetailsModel : HistoPageModel
                     Create_OtherSubmittedArea = Session.UserAreaID.ToString();
                 }
             }
+            await EnsureSelectedProjectAndContactListedAsync();
             // Resolve SubmittedAs name from TempData for display
             if (TempData.TryGetValue(CreateSubmittedAsCodeKey, out var saCode))
             {
@@ -740,6 +761,7 @@ public class BatchDetailsModel : HistoPageModel
         ViewData["Title"]     = "New submission";
         ViewData["PageTitle"] = "New submission";
         await LoadCreateLookupsAsync();
+        await EnsureSelectedProjectAndContactListedAsync();
 
         // Read type-selection values from TempData (set by Cassetted step)
         var submittedAsCode = TempData[CreateSubmittedAsCodeKey]?.ToString() ?? "";
