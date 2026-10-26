@@ -197,6 +197,39 @@ public class BatchDetailsModelTests
         Assert.Equal(["S1"], sut.Create_CopiedSamples.Select(s => s.SenderRef));
     }
 
+    [Fact]
+    public async Task OnGetAsync_PendingCopyWithProjectAndPathologistOutsideUserArea_ListsAndSelectsThem()
+    {
+        // DEFECT: Projects/Pathologists are scoped to the user's area, so a copied value from another
+        // area (or since deactivated) was missing from the dropdown and the copy showed "-- Select --".
+        var source = new Batch { ID = 10, ProjectContractCode = "34", ContactName = "61", Species = "Mouse" };
+        _batches.Setup(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(source);
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(new BatchTestSelections());
+        _lookups.Setup(l => l.GetProjectsByAreaAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 5, Code = "5", Name = "Own area project" }]);
+        _lookups.Setup(l => l.GetContactsByAreaAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 7, Code = "7", Name = "Own area pathologist" }]);
+        _lookups.Setup(l => l.GetLookupDataAsync(19, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 34, Code = "34", Name = "Other area project" }]);
+        _lookups.Setup(l => l.GetLookupDataAsync(18, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 61, Code = "61", Name = "Other area pathologist" }]);
+
+        var sut = CreateSut();
+        sut.Mode = "create";
+        sut.CopyToken = "tok-1";
+        var pending = new CopyBatchModel.PendingCopy(10, [new CopyBatchModel.AnimalRow { AnimalId = 1, SenderRef = "S1" }], "tok-1");
+        sut.TempData["CopyBatch_PendingCopy"] = System.Text.Json.JsonSerializer.Serialize(pending);
+
+        await sut.OnGetAsync();
+
+        Assert.Equal("34", sut.Create_ProjectContractCode);
+        Assert.Equal("61", sut.Create_ContactName);
+        Assert.Contains(sut.Create_Projects, p => p.ID == 34);
+        Assert.Contains(sut.Create_Contacts, c => c.ID == 61);
+        Assert.Contains(sut.Create_Projects, p => p.ID == 5);
+        Assert.Contains(sut.Create_Contacts, c => c.ID == 7);
+    }
+
     /// <summary>
     /// Regression: an abandoned pending copy (Cancel/navigate away before submitting the
     /// pre-filled form) must not resurface on a later, unrelated Create Submission visit that
