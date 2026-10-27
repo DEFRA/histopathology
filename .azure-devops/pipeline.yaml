@@ -207,9 +207,9 @@ stages:
     - name: appId
       value: '89060d89-195d-47f4-a900-2f66fba81a75'
     - name: oidcClientId
-      value: '__CLIENT_ID__'
+      value: '$(AzureAdClientId)'
     - name: oidcClientSecretUri
-      value: '__KEYVAULT_SECRET_URI__'
+      value: '$(AzureAdClientSecretUri)'
     - name: sqlServer
       value: 'devcdeinfsq1401.database.windows.net,1433'
     - name: sqlServerHost
@@ -344,6 +344,10 @@ stages:
       value: '770a2450-0227-4c62-90c7-4e38537f1102'
     - name: appId
       value: '2f7f564e-38a4-4cc7-aa92-0ee8c8cfc974'
+    - name: oidcClientId
+      value: '$(AzureAdClientId)'
+    - name: oidcClientSecretUri
+      value: '$(AzureAdClientSecretUri)'
     - name: sqlServer
       value: 'tstcdeinfsq1401.database.windows.net,1433'
     - name: sqlServerHost
@@ -456,10 +460,10 @@ stages:
                     runtimeStack: 'DOTNETCORE|10.0'
                     deploymentMethod: 'zipDeploy'
                     appSettings: >-
-                      -Saml2__SPEntityId "https://tst-cde.azure.defra.cloud"
-                      -Saml2__PublicOrigin "https://tst-cde.azure.defra.cloud"
-                      -Saml2__IdPEntityId "https://sts.windows.net/$(tenantId)/"
-                      -Saml2__IdPMetadataUrl "https://login.microsoftonline.com/$(tenantId)/federationmetadata/2007-06/federationmetadata.xml?appid=$(appId)"
+                      -AzureAd__TenantId "$(tenantId)"
+                      -AzureAd__ClientId "$(oidcClientId)"
+                      -AzureAd__ClientSecret "@Microsoft.KeyVault(SecretUri=$(oidcClientSecretUri))"
+                      -AzureAd__PublicOrigin "https://tst-cde.azure.defra.cloud"
                       -Authentication__Bypass "false"
                       -ConnectionStrings__HistologyDb "Server=tcp:$(sqlServer);Database=$(dbName);Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Managed Identity;"
 
@@ -477,6 +481,10 @@ stages:
       value: '770a2450-0227-4c62-90c7-4e38537f1102'
     - name: appId
       value: 'f7c254a0-c424-4f68-b38c-842e01824a2b'
+    - name: oidcClientId
+      value: '$(AzureAdClientId)'
+    - name: oidcClientSecretUri
+      value: '$(AzureAdClientSecretUri)'
     - name: sqlServer
       value: 'precdeinfsq1401.database.windows.net,1433'
     - name: sqlServerHost
@@ -589,10 +597,10 @@ stages:
                     runtimeStack: 'DOTNETCORE|10.0'
                     deploymentMethod: 'zipDeploy'
                     appSettings: >-
-                      -Saml2__SPEntityId "https://pre-cde.azure.defra.cloud"
-                      -Saml2__PublicOrigin "https://pre-cde.azure.defra.cloud"
-                      -Saml2__IdPEntityId "https://sts.windows.net/$(tenantId)/"
-                      -Saml2__IdPMetadataUrl "https://login.microsoftonline.com/$(tenantId)/federationmetadata/2007-06/federationmetadata.xml?appid=$(appId)"
+                      -AzureAd__TenantId "$(tenantId)"
+                      -AzureAd__ClientId "$(oidcClientId)"
+                      -AzureAd__ClientSecret "@Microsoft.KeyVault(SecretUri=$(oidcClientSecretUri))"
+                      -AzureAd__PublicOrigin "https://pre-cde.azure.defra.cloud"
                       -Authentication__Bypass "false"
                       -ConnectionStrings__HistologyDb "Server=tcp:$(sqlServer);Database=$(dbName);Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Managed Identity;"
 
