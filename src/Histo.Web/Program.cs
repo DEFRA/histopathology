@@ -406,6 +406,33 @@ try
         await next();
     });
 
+    // Local-only Entra ID bypass: signs every request in as DevAuth:Email (must exist in tblUser).
+    if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("DevAuth:BypassEntraId"))
+    {
+        var devEmail = app.Configuration["DevAuth:Email"];
+        if (string.IsNullOrWhiteSpace(devEmail))
+            throw new InvalidOperationException("DevAuth:Email must be set when DevAuth:BypassEntraId is true.");
+
+        Log.Warning("DevAuth:BypassEntraId is ON — Entra ID authentication is bypassed. Never enable outside local development.");
+
+        app.Use(async (context, next) =>
+        {
+            if (context.User.Identity?.IsAuthenticated != true)
+            {
+                var identity = new System.Security.Claims.ClaimsIdentity(
+                [
+                    new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, "dev-bypass"),
+                    new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Email, devEmail)
+                ], "DevBypass");
+
+                var transformation = context.RequestServices.GetRequiredService<IClaimsTransformation>();
+                context.User = await transformation.TransformAsync(new System.Security.Claims.ClaimsPrincipal(identity));
+            }
+
+            await next();
+        });
+    }
+
     app.UseAuthorization();
 
     app.MapHealthChecks("/health");
