@@ -179,4 +179,50 @@ public class ArchiveBlocksModelTests
 
         Assert.Equal(["01", "02", "03"], sut.PagedEntries.Select(b => b.BlockRef));
     }
+
+    [Theory]
+    [InlineData(null, true, false)]
+    [InlineData("L1", false, false)]
+    [InlineData(null, false, false)]
+    [InlineData(null, true, true)]
+    [InlineData("L1", false, true)]
+    public async Task OnPostUpdateAsync_MissingLocationOrDate_IsRejectedAndNothingIsSaved(string? location, bool withDate, bool allRows)
+    {
+        _session.Object.BatchID = 5;
+        _batches.Setup(b => b.GetByIdAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 5 });
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[
+                new Block { ID = 1, BlockRef = "01", ArchiveLocation = "L2", ArchivedDate = new DateTime(2024, 1, 2) },
+                new Block { ID = 2, BlockRef = "02", ArchiveLocation = "L2", ArchivedDate = new DateTime(2024, 1, 2) }]);
+        var sut = CreateSut();
+        await sut.OnGetAsync();
+        if (allRows) sut.SelectAllAcrossPages = true; else sut.SelectedIds = [1];
+        sut.ArchiveLocationCode = location;
+        sut.ArchivedDate = withDate ? DateTime.Today : null;
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Equal("Select an archive location and enter an archived date.", sut.Error);
+        Assert.Null(sut.SuccessMessage);
+        _blocks.Verify(b => b.UpdateBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_LocationAndDateGiven_UpdatesTheSelectedBlock()
+    {
+        _session.Object.BatchID = 5;
+        _batches.Setup(b => b.GetByIdAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 5 });
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 1, BlockRef = "01", ArchiveLocation = "L2", ArchivedDate = new DateTime(2024, 1, 2) }]);
+        var sut = CreateSut();
+        await sut.OnGetAsync();
+        sut.SelectedIds = [1];
+        sut.ArchiveLocationCode = "L1";
+        sut.ArchivedDate = DateTime.Today;
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Null(sut.Error);
+        _blocks.Verify(b => b.UpdateBlockAsync(It.Is<Block>(x => x.ID == 1 && x.ArchiveLocation == "L1" && x.ArchivedDate == DateTime.Today), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

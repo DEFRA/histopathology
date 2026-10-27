@@ -9,6 +9,19 @@
     <a asp-page="@Model.BackLinkPage" asp-route-batchId="@Model.BatchId" class="govuk-back-link">Back</a>
 }
 
+@* GOV.UK: the error summary goes at the top of the main content, above everything else. *@
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list"><li><a href="#ArchiveLocationCode">@Model.Error</a></li></ul>
+            </div>
+        </div>
+    </div>
+}
+
 @if (!string.IsNullOrEmpty(Model.SuccessMessage))
 {
     <div class="govuk-panel govuk-panel--confirmation govuk-!-margin-bottom-6">
@@ -60,18 +73,6 @@
             <dd class="govuk-summary-list__value">@(Model.SubmittedAreaName ?? "—")</dd>
         </div>
     </dl>
-}
-
-@if (!string.IsNullOrEmpty(Model.Error))
-{
-    <div class="govuk-error-summary" data-module="govuk-error-summary">
-        <div role="alert">
-            <h2 class="govuk-error-summary__title">There is a problem</h2>
-            <div class="govuk-error-summary__body">
-                <ul class="govuk-list govuk-error-summary__list"><li><a href="#ArchiveLocationCode">@Model.Error</a></li></ul>
-            </div>
-        </div>
-    </div>
 }
 
 @* Legacy ddlHistologyRefList + ddlTissueList + "Go". GET so the criteria sit in the query
@@ -188,7 +189,7 @@
     @if (!Model.IsViewMode)
     {
         <h2 class="govuk-heading-m">Archive selected tissues</h2>
-        <p class="govuk-hint">Select the "All" checkbox to select every row across all pages. Selecting one tissue lets you edit its existing archive details. Selecting two or more applies only the fields you fill in below to every selected tissue, leaving blanks unchanged.</p>
+        <p class="govuk-hint">Select the "All" checkbox to select every row across all pages. Selecting one tissue lets you edit its existing archive details. Archive location and Archived date are required. Selecting two or more applies them to every selected tissue; a blank Comment leaves each tissue's comment unchanged.</p>
         <div class="govuk-form-group">
             <label class="govuk-label" for="ArchiveLocationCode">Archive location</label>
             <select class="govuk-select" id="ArchiveLocationCode" name="ArchiveLocationCode">
@@ -260,12 +261,13 @@
                     });
                     applySelection();
                 });
-                if (selectAll.checked) checkboxes.forEach(function (cb) { cb.disabled = true; });
+                if (selectAll.checked) checkboxes.forEach(function (cb) { cb.checked = true; cb.disabled = true; });
             }
 
-            // Reflect whatever came back checked from a validation-error postback immediately,
-            // not just after the user's next change event.
-            applySelection();
+            // After a postback the server has already rendered the submitted selection and values;
+            // re-applying here would overwrite them with the row's stored values or blanks.
+            var posted = @(Model.PageContext.HttpContext.Request.Method == "POST" ? "true" : "false");
+            if (!posted) applySelection();
         })();
     </script>
 }
