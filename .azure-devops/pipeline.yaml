@@ -200,7 +200,7 @@ stages:
     displayName: DEV
     dependsOn: Build
     # develop-only: DEV/TST deploy from develop, Pre-Prod/Prod deploy from main.
-    condition: and(succeeded(), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranchName'], 'develop','feature/OIDC'), eq('${{ parameters.deployToDev }}', true))
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranchName'], 'develop'), eq('${{ parameters.deployToDev }}', true))
     variables:
     - name: appName
       value: 'DEVCDEWEBAW1401'
