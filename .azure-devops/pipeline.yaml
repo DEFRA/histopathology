@@ -200,7 +200,8 @@ stages:
     displayName: DEV
     dependsOn: Build
     # Only deploy the OIDC feature branch to DEV for this migration work.
-    condition: and(succeeded(), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranchName'], 'feature/OIDC'), eq('${{ parameters.deployToDev }}', true))
+    # Azure DevOps exposes the full branch ref in Build.SourceBranch (e.g. refs/heads/feature/OIDC).
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranch'], 'refs/heads/feature/OIDC'), eq('${{ parameters.deployToDev }}', true))
     variables:
     - name: appName
       value: 'DEVCDEWEBAW1401'
