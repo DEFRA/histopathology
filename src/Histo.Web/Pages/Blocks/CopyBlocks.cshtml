@@ -23,26 +23,17 @@
     </div>
 }
 
-<h2 class="govuk-heading-m">Blocks to copy</h2>
-<table class="govuk-table">
-    <thead class="govuk-table__head">
-        <tr class="govuk-table__row">
-            <th scope="col" class="govuk-table__header">Block ref</th>
-            <th scope="col" class="govuk-table__header">Customer ref</th>
-            <th scope="col" class="govuk-table__header">Comment</th>
-        </tr>
-    </thead>
-    <tbody class="govuk-table__body">
-        @foreach (var b in Model.SourceBlocks)
-        {
-            <tr class="govuk-table__row">
-                <td class="govuk-table__cell">@b.BlockRef</td>
-                <td class="govuk-table__cell">@b.CustomerRef</td>
-                <td class="govuk-table__cell">@b.Comment</td>
-            </tr>
-        }
-    </tbody>
-</table>
+@* Legacy CopyBlocks.aspx's lblSenderRef / lblHistologyRef: the sample the blocks are copied from. *@
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Copy block from Sender Ref</dt>
+        <dd class="govuk-summary-list__value">@Model.SourceAnimal?.SenderRef</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Histology Ref</dt>
+        <dd class="govuk-summary-list__value">@Model.SourceAnimal?.HistologyRef</dd>
+    </div>
+</dl>
 
 <form method="post" asp-antiforgery="true">
     <input type="hidden" asp-for="BatchId" />

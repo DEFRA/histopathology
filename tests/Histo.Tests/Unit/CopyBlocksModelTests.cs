@@ -324,5 +324,40 @@ public class CopyBlocksModelTests
         _submissions.Verify(s => s.UpdateAnimalAsync(
             It.Is<Animal>(a => a.ID == 20 && a.HistologyRef == "26/60002" && a.HistoRefSet), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task OnGetAsync_LoadsTheSourceSampleSoItsSenderRefAndHistologyRefAreShown()
+    {
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[
+                new Animal { ID = 10, SenderRef = "S1", HistologyRef = "26/60001", HistoRefSet = true },
+                new Animal { ID = 20, SenderRef = "S2" }]);
+        var sut = CreateSut();
+        sut.TempData["CopyBlockIds"] = "1";
+
+        await sut.OnGetAsync();
+
+        Assert.NotNull(sut.SourceAnimal);
+        Assert.Equal("S1", sut.SourceAnimal!.SenderRef);
+        Assert.Equal("26/60001", sut.SourceAnimal.HistologyRef);
+        Assert.Equal([20], sut.TargetAnimals.Select(a => a.ID));
+    }
+
+    [Fact]
+    public void Markup_ShowsLegacySourceSampleFieldsAndNotTheBlockTable()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "src", "Histo.Web", "Pages", "Blocks", "CopyBlocks.cshtml")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+
+        var markup = File.ReadAllText(Path.Combine(dir!.FullName, "src", "Histo.Web", "Pages", "Blocks", "CopyBlocks.cshtml"));
+
+        Assert.Contains("Copy block from Sender Ref", markup);
+        Assert.Contains("Histology Ref", markup);
+        Assert.DoesNotContain(">Block ref<", markup);
+        Assert.DoesNotContain(">Customer ref<", markup);
+        Assert.DoesNotContain(">Comment<", markup);
+    }
 }
 
