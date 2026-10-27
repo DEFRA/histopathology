@@ -295,4 +295,24 @@ public class ArchiveTissuesModelTests
 
         Assert.Matches(@"if\s*\(\s*selectAll\.checked\s*\)\s*checkboxes\.forEach\(function\s*\(cb\)\s*\{\s*cb\.checked\s*=\s*true;", markup);
     }
+
+    [Theory]
+    [InlineData("ArchiveTissues.cshtml")]
+    [InlineData("ArchiveBlocks.cshtml")]
+    public void Markup_RowCheckboxesStayEnabledWhenAllIsTicked_AsInLegacy(string view)
+    {
+        var markup = ReadArchiveView(view);
+
+        Assert.DoesNotContain("cb.disabled", markup);
+    }
+
+    [Theory]
+    [InlineData("ArchiveTissues.cshtml")]
+    [InlineData("ArchiveBlocks.cshtml")]
+    public void Markup_UntickingARowUnticksAll_SoTheServerUsesTheRowsStillTicked(string view)
+    {
+        var markup = ReadArchiveView(view);
+
+        Assert.Matches(@"selectAll\.checked\s*=\s*false", markup);
+    }
 }

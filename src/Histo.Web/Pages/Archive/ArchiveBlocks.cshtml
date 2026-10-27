@@ -232,8 +232,8 @@
         // Selecting exactly one block pre-fills its existing archive details for editing;
         // selecting zero or multiple clears the fields back to bulk mode's blank-is-unchanged default.
         // The "All" checkbox only ever reaches the server as the SelectAllAcrossPages flag (rows on
-        // other pages aren't in the DOM to check individually), so here it just mirrors the visual
-        // checked/disabled state onto this page's row checkboxes for feedback.
+        // other pages aren't in the DOM to check individually), so here it just mirrors the
+        // checked state onto this page's row checkboxes for feedback.
         (function () {
             var selectAll = document.getElementById('select-all');
             var checkboxes = document.querySelectorAll('input[name="SelectedIds"]');
@@ -258,15 +258,20 @@
 
             checkboxes.forEach(function (cb) { cb.addEventListener('change', applySelection); });
 
+            // The server ignores the row list while All is posted, so unticking a row drops All and
+            // lets the rows still ticked decide what is updated (legacy rows were individually togglable).
+            if (selectAll) checkboxes.forEach(function (cb) {
+                cb.addEventListener('change', function () { if (!cb.checked) selectAll.checked = false; });
+            });
+
             if (selectAll) {
                 selectAll.addEventListener('change', function () {
                     checkboxes.forEach(function (cb) {
                         cb.checked = selectAll.checked;
-                        cb.disabled = selectAll.checked;
                     });
                     applySelection();
                 });
-                if (selectAll.checked) checkboxes.forEach(function (cb) { cb.checked = true; cb.disabled = true; });
+                if (selectAll.checked) checkboxes.forEach(function (cb) { cb.checked = true; });
             }
 
             // After a postback the server has already rendered the submitted selection and values;
