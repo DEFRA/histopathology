@@ -25,8 +25,8 @@ public sealed class ArchiveBlockRow
 /// <summary>
 /// Replaces <c>ArchiveBlocks.aspx</c> — archives physical blocks (cassetted/blocked batches) by
 /// recording their Archive Location/Archived Date/Comment. Selecting exactly one row lets its
-/// existing values be edited; selecting two or more applies only the fields actually entered
-/// (blank fields left unchanged) to every selected row — mirrors legacy's <c>btnUpdate_Click</c>.
+/// existing values be edited; selecting two or more applies the entered Location/Date to every
+/// selected row, with a blank Comment left unchanged. Location and Date are always required.
 ///
 /// Deviation from legacy (consistent with this app's established immediate-write architecture):
 /// "Update selected" persists immediately rather than staging in a session DataSet until "Done".
@@ -154,9 +154,10 @@ public class ArchiveBlocksModel : GridPageModel
         // so SelectedIds alone can't carry them across a page boundary.
         var selectedIds = SelectAllAcrossPages ? FilteredRows.Select(r => r.ID).ToList() : SelectedIds;
         if (selectedIds.Count == 0) { Error = "Select at least one block to update."; return Page(); }
-        if (string.IsNullOrWhiteSpace(ArchiveLocationCode) && ArchivedDate is null && string.IsNullOrWhiteSpace(Comment))
+        // Legacy requires both: rfvArchiveLocation, and a blank date shows the red star and skips the update.
+        if (string.IsNullOrWhiteSpace(ArchiveLocationCode) || ArchivedDate is null)
         {
-            Error = "Enter an Archive Location, Archived Date, or Comment to apply.";
+            Error = "Select an archive location and enter an archived date.";
             return Page();
         }
 
