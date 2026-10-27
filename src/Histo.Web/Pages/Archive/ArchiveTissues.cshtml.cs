@@ -155,7 +155,7 @@ public class ArchiveTissuesModel : GridPageModel
         // so SelectedIds alone can't carry them across a page boundary.
         var selectedIds = SelectAllAcrossPages ? FilteredRows.Select(r => r.ID).ToList() : SelectedIds;
         if (selectedIds.Count == 0) { Error = "Select at least one tissue to update."; return Page(); }
-        // DEFECT-FIX: legacy allowed blank location/date (unassigning archive details); both are now mandatory.
+        // Legacy requires both: rfvArchiveLocation, and a blank date shows the red star and skips the update.
         if (string.IsNullOrWhiteSpace(ArchiveLocationCode) || ArchivedDate is null)
         {
             Error = "Select an archive location and enter an archived date.";
