@@ -70,6 +70,7 @@ public sealed class HistopathologyClaimsTransformation : IClaimsTransformation
         identity.AddClaim(new Claim(AppClaimTypes.GroupId,    user.GroupCode.ToString()));
         identity.AddClaim(new Claim(AppClaimTypes.UserArea,   user.AreaName));
         identity.AddClaim(new Claim(AppClaimTypes.UserAreaId, user.AreaCode.ToString()));
+        identity.AddClaim(new Claim(AppClaimTypes.UserName,   user.Name));
 
         return principal;
     }

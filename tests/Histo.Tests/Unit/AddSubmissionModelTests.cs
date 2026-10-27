@@ -1122,4 +1122,19 @@ public class AddSubmissionModelTests
         Assert.IsType<RedirectToPageResult>(result);
         Assert.Null(sut.ModelError);
     }
+
+    [Fact]
+    public void SearchSenderLink_CarriesTheTypedSenderRefWhenClicked()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "src", "Histo.Web", "Pages", "Submissions", "AddSubmission.cshtml")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+
+        var markup = File.ReadAllText(Path.Combine(dir!.FullName, "src", "Histo.Web", "Pages", "Submissions", "AddSubmission.cshtml"));
+
+        Assert.Matches(@"<a[^>]*id=""search-sender-link""[^>]*asp-page=""/Search/SearchSender""", markup);
+        Assert.Contains("getElementById('search-sender-link')", markup);
+        Assert.Contains("searchParams.set('SenderRef'", markup);
+    }
 }
