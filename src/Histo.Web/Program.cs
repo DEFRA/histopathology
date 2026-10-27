@@ -119,6 +119,8 @@ try
                     {
                         options.Conventions.AddFolderApplicationModelConvention(
                             "/Admin", model => model.Filters.Add(new Histo.Web.Auth.MaintenanceOnlyPageFilter()));
+                        options.Conventions.AddFolderApplicationModelConvention(
+                            "/AuditLog", model => model.Filters.Add(new Histo.Web.Auth.MaintenanceOnlyPageFilter()));
                     })
                     .AddSessionStateTempDataProvider();
     builder.Services.AddControllers(); // AuthController (/auth/login, /auth/signout)

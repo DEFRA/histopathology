@@ -309,7 +309,7 @@ else
                         <td class="govuk-table__cell">
                             <div class="govuk-checkboxes govuk-checkboxes--small">
                                 <div class="govuk-checkboxes__item">
-                                    <input class="govuk-checkboxes__input" type="checkbox" name="blockIds" value="@b.ID" form="blocks-grid-form" />
+                                    <input class="govuk-checkboxes__input" type="checkbox" name="blockIds" value="@b.ID" form="blocks-grid-form" disabled="@(Model.IsViewMode ? "disabled" : null)" />
                                     <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">Select block @b.BlockRef</span></label>
                                 </div>
                             </div>
