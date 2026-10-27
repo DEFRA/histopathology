@@ -199,8 +199,8 @@ stages:
   - stage: DEV
     displayName: DEV
     dependsOn: Build
-    # Deploy to DEV from develop or the OIDC feature branch while validating the auth migration.
-    condition: and(succeeded(), ne(variables['Build.Reason'], 'Schedule'), or(eq(variables['Build.SourceBranchName'], 'develop'), eq(variables['Build.SourceBranchName'], 'feature/OIDC')), eq('${{ parameters.deployToDev }}', true))
+    # Only deploy the OIDC feature branch to DEV for this migration work.
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranchName'], 'feature/OIDC'), eq('${{ parameters.deployToDev }}', true))
     variables:
     - name: appName
       value: 'DEVCDEWEBAW1401'
