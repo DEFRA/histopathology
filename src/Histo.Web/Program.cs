@@ -123,6 +123,7 @@ try
                             "/Admin", model => model.Filters.Add(new Histo.Web.Auth.MaintenanceOnlyPageFilter()));
                         options.Conventions.AddFolderApplicationModelConvention(
                             "/AuditLog", model => model.Filters.Add(new Histo.Web.Auth.MaintenanceOnlyPageFilter()));
+                        Histo.Web.Auth.GroupRestrictedPages.Apply(options);
                     })
                     .AddSessionStateTempDataProvider();
     builder.Services.AddControllers(); // AuthController (SAML2 protocol endpoints)
