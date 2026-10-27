@@ -1,6 +1,7 @@
 trigger:
   branches:
     include:
+      - feature/OIDC
       - develop
       - main
 
@@ -14,6 +15,7 @@ schedules:
     branches:
       include:
         - develop
+        - feature/OIDC
     always: true
 
 parameters:
