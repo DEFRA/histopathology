@@ -56,6 +56,7 @@ public class CopyBlocksModel : HistoPageModel
 
     public IReadOnlyList<Block> SourceBlocks { get; private set; } = [];
     public IReadOnlyList<Animal> TargetAnimals { get; private set; } = [];
+    public Animal? SourceAnimal { get; private set; }
     public string? Error { get; private set; }
 
     public string BackLinkPage => AnimalId is > 0
@@ -253,6 +254,7 @@ public class CopyBlocksModel : HistoPageModel
 
         var sourceAnimalId = SourceBlocks[0].AnimalID;
         var animals = await GetAllAnimalsAsync(batchId);
+        SourceAnimal = animals.FirstOrDefault(a => a.ID == sourceAnimalId);
         TargetAnimals = animals.Where(a => a.ID != sourceAnimalId).OrderBy(a => a.SenderRef).ToList();
         return true;
     }
