@@ -175,7 +175,7 @@ else
     <form method="post" asp-page="/Submissions/SubmissionDetailsBlock" id="blocks-grid-form">
         <input type="hidden" asp-for="BatchId" />
         <input type="hidden" asp-for="AnimalId" />
-        <table class="govuk-table">
+        <table class="govuk-table app-table--scroll">
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
                     <th scope="col" class="govuk-table__header">Block ref</th>
@@ -196,17 +196,22 @@ else
                         }
                         <th scope="col" class="govuk-table__header">Special stain</th>
                     }
-                    <th scope="col" class="govuk-table__header">
+                    <th scope="col" class="govuk-table__header" data-label="Select">
                         Select
                         @if (!Model.IsViewMode && Model.Blocks.Any())
                         {
-                            <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-top-1">
+                            <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-top-1 app-js-only">
                                 <div class="govuk-checkboxes__item">
                                     <input class="govuk-checkboxes__input" type="checkbox" id="select-all-blocks" />
                                     <label class="govuk-label govuk-checkboxes__label" for="select-all-blocks">
                                         <span class="govuk-visually-hidden">Select all blocks (for Delete block)</span>
                                     </label>
                                 </div>
+                            </div>
+                            <div class="app-no-js govuk-!-margin-top-1">
+                                <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-SelectAll="true" class="govuk-link govuk-body-s">Select all<span class="govuk-visually-hidden"> blocks</span></a>
+                                <br />
+                                <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" class="govuk-link govuk-body-s">Clear<span class="govuk-visually-hidden"> block selection</span></a>
                             </div>
                         }
                     </th>
@@ -309,7 +314,7 @@ else
                         <td class="govuk-table__cell">
                             <div class="govuk-checkboxes govuk-checkboxes--small">
                                 <div class="govuk-checkboxes__item">
-                                    <input class="govuk-checkboxes__input" type="checkbox" name="blockIds" value="@b.ID" form="blocks-grid-form" disabled="@(Model.IsViewMode ? "disabled" : null)" />
+                                    <input class="govuk-checkboxes__input" type="checkbox" name="blockIds" value="@b.ID" form="blocks-grid-form" checked="@Model.SelectAll" disabled="@(Model.IsViewMode ? "disabled" : null)" />
                                     <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">Select block @b.BlockRef</span></label>
                                 </div>
                             </div>
@@ -350,6 +355,7 @@ else
             var selectAll = document.getElementById('select-all-blocks');
             var checkboxes = document.querySelectorAll('input[name="blockIds"]');
             if (!selectAll || !checkboxes.length) return;
+            selectAll.checked = Array.prototype.every.call(checkboxes, function (cb) { return cb.checked; });
             selectAll.addEventListener('change', function () {
                 checkboxes.forEach(function (cb) { cb.checked = selectAll.checked; });
             });

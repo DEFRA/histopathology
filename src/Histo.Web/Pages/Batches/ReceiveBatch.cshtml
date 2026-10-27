@@ -158,7 +158,7 @@ else
                         @{
                             var receiptHidden = Model.Status is not (BatchStatus.Received or BatchStatus.Rejected);
                         }
-                        <div class="govuk-radios__conditional @(receiptHidden ? "govuk-radios__conditional--hidden" : "")" id="receipt-details" aria-hidden="@(receiptHidden ? "true" : "false")">
+                        <div class="govuk-radios__conditional @(receiptHidden ? "govuk-radios__conditional--hidden" : "")" id="receipt-details">
 
                             @* Receipt details — required when status is Received or Rejected. *@
                             <div class="govuk-form-group">

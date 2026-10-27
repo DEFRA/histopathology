@@ -49,17 +49,17 @@
             <div class="govuk-checkboxes" data-module="govuk-checkboxes">
                 @if (Model.TargetAnimals.Any())
                 {
-                    @* Legacy CopyBlocks.aspx's cbSelectAll. Starts hidden so it never appears as a
-                       dead control when JavaScript is unavailable. *@
-                    <div class="govuk-checkboxes__item" id="select-all-samples-item" hidden>
+                    @* Legacy CopyBlocks.aspx's cbSelectAll. *@
+                    <div class="govuk-checkboxes__item app-js-only" id="select-all-samples-item">
                         <input class="govuk-checkboxes__input" type="checkbox" id="select-all-samples" />
                         <label class="govuk-label govuk-checkboxes__label" for="select-all-samples"><strong>Select all</strong></label>
                     </div>
+                    <p class="govuk-body app-no-js"><a asp-page="/Blocks/CopyBlocks" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-SelectAll="true" class="govuk-link">Select all</a> | <a asp-page="/Blocks/CopyBlocks" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" class="govuk-link">Clear selection</a></p>
                 }
                 @foreach (var a in Model.TargetAnimals)
                 {
                     <div class="govuk-checkboxes__item">
-                        <input class="govuk-checkboxes__input" type="checkbox" name="TargetAnimalIds" value="@a.ID" id="target-@a.ID" />
+                        <input class="govuk-checkboxes__input" type="checkbox" name="TargetAnimalIds" value="@a.ID" id="target-@a.ID" checked="@Model.SelectAll" />
                         <label class="govuk-label govuk-checkboxes__label" for="target-@a.ID">@a.SenderRef</label>
                     </div>
                 }
@@ -103,7 +103,7 @@
             var targets = Array.prototype.slice.call(document.querySelectorAll('input[name="TargetAnimalIds"]'));
             if (!selectAll || targets.length === 0) return;
 
-            item.hidden = false;
+            selectAll.checked = targets.every(function (x) { return x.checked; });
 
             selectAll.addEventListener('change', function () {
                 targets.forEach(function (t) { t.checked = selectAll.checked; });
