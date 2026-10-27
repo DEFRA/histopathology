@@ -25,3 +25,15 @@ Microsoft.Identity.Web instead of ITfoxtec SAML. Authorisation is unchanged — 
 `/auth/login?ReturnUrl=…` → 302 Entra `/oauth2/v2.0/authorize` with `response_type=code`, `code_challenge_method=S256`,
 `response_mode=form_post`, `prompt=login`, `redirect_uri=https://dev-cde.azure.defra.cloud/signin-oidc`.
 Full sign-in, timeout, single-session and sign-out flows still to be verified in dev.
+
+## 2026-10-27 — Harden live Azure OIDC configuration guard
+
+**Behaviour change:** startup now rejects placeholder or missing Entra values before the app starts, preventing broken live deployments from silently accepting invalid `AzureAd__*` settings.
+
+| File | Change |
+|---|---|
+| `src/Histo.Web/Auth/AzureAdConfigurationValidator.cs` | New validator for `TenantId`, `ClientId`, `ClientSecret`, and placeholder `PublicOrigin` detection |
+| `src/Histo.Web/Program.cs` | Replaced ad hoc startup checks with the shared validator |
+| `tests/Histo.Tests/Unit/AzureAdConfigurationValidatorTests.cs` | Added regression tests for placeholder rejection and valid configuration acceptance |
+
+**Validation:** `dotnet test tests/Histo.Tests/Histo.Tests.csproj --filter "AzureAdConfigurationValidatorTests" --nologo` plus the existing OIDC/session tests. This catches the exact live-environment issue where placeholder values can slip through and break the Entra redirect flow.

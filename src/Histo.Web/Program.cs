@@ -128,14 +128,7 @@ try
     // -- Entra ID OpenID Connect authentication -------------------------------
     // Authorization code flow + PKCE via Microsoft.Identity.Web. See docs/ENTRA-REGISTRATION.md.
     var azureAdSection = builder.Configuration.GetSection("AzureAd");
-    foreach (var key in new[] { "TenantId", "ClientId" })
-    {
-        var value = azureAdSection[key];
-        if (string.IsNullOrWhiteSpace(value) || value.StartsWith("__", StringComparison.Ordinal))
-            throw new InvalidOperationException(
-                $"AzureAd:{key} is not configured. Set it in appsettings.Development.json (local) " +
-                "or via App Service configuration (AzureAd__" + key + ").");
-    }
+    AzureAdConfigurationValidator.Validate(builder.Configuration);
     var publicOrigin = azureAdSection["PublicOrigin"];
     var forceLogin = azureAdSection.GetValue("ForceLogin", true);
 
