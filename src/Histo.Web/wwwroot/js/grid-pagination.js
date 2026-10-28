@@ -12,12 +12,12 @@
     // The clicked link is replaced by the refresh, which would drop keyboard focus to <body> and give
     // screen-reader users no sign that anything changed.
     function restoreFocusAndAnnounce(container, clickedLabel) {
-        var candidates = container.querySelectorAll("a[href], button");
-        var refocused = false;
-        for (var i = 0; i < candidates.length; i++) {
-            var label = candidates[i].getAttribute("aria-label") || candidates[i].textContent.trim();
-            if (label === clickedLabel && candidates[i].getAttribute("aria-disabled") !== "true") {
-                candidates[i].focus();
+        const candidates = container.querySelectorAll("a[href], button");
+        let refocused = false;
+        for (const candidate of candidates) {
+            const label = candidate.getAttribute("aria-label") || candidate.textContent.trim();
+            if (label === clickedLabel && candidate.getAttribute("aria-disabled") !== "true") {
+                candidate.focus();
                 refocused = true;
                 break;
             }
@@ -30,7 +30,7 @@
             container.focus({ preventScroll: true });
         }
 
-        var region = document.getElementById("grid-status");
+        let region = document.getElementById("grid-status");
         if (!region) {
             region = document.createElement("div");
             region.id = "grid-status";
@@ -38,43 +38,38 @@
             region.setAttribute("role", "status");
             document.body.appendChild(region);
         }
-        var summary = container.querySelector(".app-pagination-window__summary");
+        const summary = container.querySelector(".app-pagination-window__summary");
         region.textContent = "Results updated" + (summary ? ". " + summary.textContent.trim() : "");
+    }
+
+    // Only same-page query-string links (pagination/sort) are intercepted; real navigation links
+    // (e.g. "Change", "Return to submission") and row-action links to other pages are left alone.
+    function isGridQueryLink(link) {
+        return link.search?.startsWith("?") && link.pathname === window.location.pathname;
     }
 
     function initGridContainer(container) {
         container.addEventListener("click", function (event) {
-            var link = event.target.closest("a[href]");
-            if (!link || !container.contains(link)) {
+            const link = event.target.closest("a[href]");
+            if (!link || !container.contains(link) || !isGridQueryLink(link)) {
                 return;
             }
 
-            var href = link.search;
-            // Only intercept same-page query-string links (pagination/sort) — real
-            // navigation links (e.g. "Change", "Return to submission") are left alone.
-            if (!href || !href.startsWith("?") || href === "#") {
-                return;
-            }
-            // Row-action links (e.g. "Change") also carry query-string state (returnUrl,
-            // sortColumn, etc.) but point at a different page — only the query string alone
-            // isn't enough to identify a pagination/sort link, so the pathname must match too.
-            if (link.pathname !== window.location.pathname) {
-                return;
-            }
+            const href = link.search;
 
             event.preventDefault();
             if (link.classList.contains("app-pagination-window__nav-link--disabled")) {
                 return;
             }
 
-            var gridUrl = container.dataset.gridUrl;
+            const gridUrl = container.dataset.gridUrl;
             if (!gridUrl) {
                 return;
             }
 
-            var query = href.slice(1); // drop leading "?"
-            var requestUrl = gridUrl + (gridUrl.includes("?") ? "&" : "?") + query;
-            var clickedLabel = link.getAttribute("aria-label") || link.textContent.trim();
+            const query = href.slice(1); // drop leading "?"
+            const requestUrl = gridUrl + (gridUrl.includes("?") ? "&" : "?") + query;
+            const clickedLabel = link.getAttribute("aria-label") || link.textContent.trim();
 
             fetch(requestUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } })
                 .then(function (response) {
@@ -91,7 +86,7 @@
                     restoreFocusAndAnnounce(container, clickedLabel);
                     // Keep the browser URL/history in sync with the current page/sort state
                     // without triggering a navigation or reload.
-                    var displayUrl = `${window.location.pathname}?${query}`;
+                    const displayUrl = `${window.location.pathname}?${query}`;
                     window.history.replaceState(null, "", displayUrl);
                 })
                 .catch(function (err) {

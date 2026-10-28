@@ -1,4 +1,4 @@
-/****** Object:  StoredProcedure [dbo].[CountAnimalsByHistologyRef] ******/
+-- Object:  StoredProcedure [dbo].[CountAnimalsByHistologyRef]
 -- ============================================================================
 -- dbo.CountAnimalsByHistologyRef
 -- ============================================================================

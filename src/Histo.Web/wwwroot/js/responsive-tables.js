@@ -3,19 +3,19 @@
 (function () {
     function labelTables(root) {
         root.querySelectorAll('table.govuk-table').forEach(function (table) {
-            var headRow = table.querySelector('thead tr');
+            const headRow = table.querySelector('thead tr');
             if (!headRow || table.classList.contains('app-table--scroll') || table.querySelector('[colspan], [rowspan]')) {
                 return;
             }
 
-            var labels = Array.prototype.map.call(headRow.children, function (th) {
-                return th.getAttribute('data-label') || th.textContent.replace(/\s+/g, ' ').trim();
+            const labels = Array.prototype.map.call(headRow.children, function (th) {
+                return th.dataset.label || th.textContent.replace(/\s+/g, ' ').trim();
             });
 
             table.querySelectorAll('tbody tr').forEach(function (row) {
                 Array.prototype.forEach.call(row.children, function (cell, i) {
-                    if (labels[i] && !cell.hasAttribute('data-label')) {
-                        cell.setAttribute('data-label', labels[i]);
+                    if (labels[i] && !('label' in cell.dataset)) {
+                        cell.dataset.label = labels[i];
                     }
                 });
             });

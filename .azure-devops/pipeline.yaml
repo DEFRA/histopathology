@@ -161,7 +161,7 @@ stages:
               # deployment stages can skip applying database scripts when there are no
               # script changes to deploy.
               if [ "$(Build.Reason)" = "PullRequest" ]; then
-                DIFF_RANGE="origin/$(System.PullRequest.TargetBranch)...HEAD"
+                DIFF_RANGE="origin/${PR_TARGET_BRANCH}...HEAD"
               else
                 DIFF_RANGE="HEAD~1...HEAD"
               fi
@@ -178,6 +178,8 @@ stages:
               fi
             name: detectDbChanges
             displayName: 'Detect database script changes'
+            env:
+              PR_TARGET_BRANCH: $(System.PullRequest.TargetBranch)
 
           - publish: '$(Build.ArtifactStagingDirectory)'
             artifact: drop

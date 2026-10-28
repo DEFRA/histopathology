@@ -1,4 +1,4 @@
-/****** Object:  StoredProcedure [dbo].[DeleteSampleFromBatch] ******/
+-- Object:  StoredProcedure [dbo].[DeleteSampleFromBatch]
 -- ============================================================================
 -- dbo.DeleteSampleFromBatch
 -- ============================================================================
