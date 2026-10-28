@@ -326,7 +326,7 @@ else
         <div class="govuk-form-group">
             <fieldset class="govuk-fieldset">
                 <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Antibodies</legend>
-                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes" id="block-antibodies-section" style="@(Model.ShowAntibodies ? "" : "display:none")">
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes" id="block-antibodies-section" hidden="@(Model.ShowAntibodies ? null : "hidden")">
                     @foreach (var opt in antibodyOptions)
                     {
                         <div class="govuk-checkboxes__item">
@@ -344,7 +344,7 @@ else
         <div class="govuk-form-group">
             <fieldset class="govuk-fieldset">
                 <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Special stain</legend>
-                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes" id="block-stains-section" style="@(Model.ShowStains ? "" : "display:none")">
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes" id="block-stains-section" hidden="@(Model.ShowStains ? null : "hidden")">
                     @foreach (var opt in stainOptions)
                     {
                         <div class="govuk-checkboxes__item">

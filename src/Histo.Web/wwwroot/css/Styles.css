@@ -150,7 +150,7 @@ body:not(.js-enabled) #antibodies-section,
 body:not(.js-enabled) #stains-section,
 body:not(.js-enabled) #block-antibodies-section,
 body:not(.js-enabled) #block-stains-section {
-    display: block !important;
+    display: block;
 }
 
 .govuk-service-navigation__list[hidden] {

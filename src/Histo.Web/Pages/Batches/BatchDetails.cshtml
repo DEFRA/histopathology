@@ -327,7 +327,7 @@
                 @* Antibodies — conditional on IHC histology selection *@
                 <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_Antibodies") ? "govuk-form-group--error" : "")"
                      id="create-antibodies-section"
-                     style="@(Model.Create_ShowAntibodies ? "" : "display:none")">
+                     hidden="@(Model.Create_ShowAntibodies ? null : "hidden")">
                     <fieldset class="govuk-fieldset">
                         <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Antibodies</legend>
                         <div class="govuk-hint">Required when IHC is selected above.</div>
@@ -355,7 +355,7 @@
                 @* Special stains — conditional on Special Stain histology selection *@
                 <div class="govuk-form-group @(Model.Errors.ContainsKey("Create_Stains") ? "govuk-form-group--error" : "")"
                      id="create-stains-section"
-                     style="@(Model.Create_ShowStains ? "" : "display:none")">
+                     hidden="@(Model.Create_ShowStains ? null : "hidden")">
                     <fieldset class="govuk-fieldset">
                         <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Special stains</legend>
                         <div class="govuk-hint">Required when Special Stain is selected above.</div>
@@ -477,8 +477,8 @@
                 var ihc   = ['@Histo.Submissions.Models.HistologyCode.IhcPrp','@Histo.Submissions.Models.HistologyCode.IhcOther'];
             var showAntibodies = codes.some(function(c){ return ihc.indexOf(c) >= 0; });
             var showStains     = codes.indexOf('@Histo.Submissions.Models.HistologyCode.SpecialStain') >= 0;
-            document.getElementById('create-antibodies-section').style.display = showAntibodies ? '' : 'none';
-            document.getElementById('create-stains-section').style.display     = showStains ? '' : 'none';
+            document.getElementById('create-antibodies-section').hidden = !showAntibodies;
+            document.getElementById('create-stains-section').hidden     = !showStains;
             // Clear stale selections in sections that are now hidden, so they don't persist
             // in the "Selected test types" summary or get submitted on Save.
             if (!showAntibodies) {
