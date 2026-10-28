@@ -33,6 +33,8 @@ public sealed class ArchiveBlockRow
 /// </summary>
 public class ArchiveBlocksModel : GridPageModel
 {
+    private const string ArchiveBlocksTitle = "Archive blocks";
+
     private const int LookupArchiveLocation = 16;
 
     private readonly IBlockService _blocks;
@@ -104,7 +106,7 @@ public class ArchiveBlocksModel : GridPageModel
 
     public int TotalCount => FilteredRows.Count;
 
-    public IReadOnlyList<ArchiveBlockRow> PagedEntries =>
+    public IReadOnlyList<ArchiveBlockRow> GetPagedEntries() =>
         (SortColumn switch
         {
             "SenderRef"       => SortDesc ? FilteredRows.OrderByDescending(r => r.SenderRef)       : FilteredRows.OrderBy(r => r.SenderRef),
@@ -130,8 +132,8 @@ public class ArchiveBlocksModel : GridPageModel
 
     public async Task OnGetAsync()
     {
-        ViewData["Title"] = "Archive blocks";
-        ViewData["PageTitle"] = "Archive blocks";
+        ViewData["Title"] = ArchiveBlocksTitle;
+        ViewData["PageTitle"] = ArchiveBlocksTitle;
         if (BatchId is > 0)
         {
             Session.BatchID = BatchId;
@@ -144,8 +146,8 @@ public class ArchiveBlocksModel : GridPageModel
 
     public async Task<IActionResult> OnPostUpdateAsync()
     {
-        ViewData["Title"] = "Archive blocks";
-        ViewData["PageTitle"] = "Archive blocks";
+        ViewData["Title"] = ArchiveBlocksTitle;
+        ViewData["PageTitle"] = ArchiveBlocksTitle;
         await LoadAsync();
 
         if (IsViewMode) return RedirectToPage(new { batchId = Session.BatchID });
@@ -154,26 +156,11 @@ public class ArchiveBlocksModel : GridPageModel
         // so SelectedIds alone can't carry them across a page boundary.
         var selectedIds = SelectAllAcrossPages ? FilteredRows.Select(r => r.ID).ToList() : SelectedIds;
         if (selectedIds.Count == 0) { Error = "Select at least one block to update."; return Page(); }
-        // Legacy requires both: rfvArchiveLocation, and a blank date shows the red star and skips the update.
-        if (string.IsNullOrWhiteSpace(ArchiveLocationCode) || ArchivedDate is null)
+        var validationError = ValidateArchiveUpdate();
+        if (validationError is not null)
         {
-            Error = "Select an archive location and enter an archived date.";
+            Error = validationError;
             return Page();
-        }
-
-        if (ArchivedDate is not null)
-        {
-            var earliest = Batch?.ReceivedDate?.Date;
-            if (earliest is not null && ArchivedDate.Value.Date < earliest)
-            {
-                Error = $"Archive date must be the same or later than the Submission received date of {earliest:d}.";
-                return Page();
-            }
-            if (ArchivedDate.Value.Date > DateTime.Today)
-            {
-                Error = "Archive date must be today or earlier.";
-                return Page();
-            }
         }
 
         var all = await _blocks.GetByBatchAsync(Session.BatchID ?? 0);
@@ -181,29 +168,41 @@ public class ArchiveBlocksModel : GridPageModel
         var bulkMode = selected.Count >= 2;
 
         foreach (var block in selected)
-        {
-            var updated = new Block
-            {
-                ID = block.ID,
-                BatchID = block.BatchID,
-                AnimalID = block.AnimalID,
-                BlockRef = block.BlockRef,
-                CustomerRef = block.CustomerRef,
-                RepeatBlock = block.RepeatBlock,
-                Comment = block.Comment,
-                Status = block.Status,
-                Order = block.Order,
-                ArchiveLocation = !bulkMode || !string.IsNullOrWhiteSpace(ArchiveLocationCode) ? ArchiveLocationCode : block.ArchiveLocation,
-                ArchivedDate = !bulkMode || ArchivedDate is not null ? ArchivedDate : block.ArchivedDate,
-                ArchiveComment = !bulkMode || !string.IsNullOrWhiteSpace(Comment) ? Comment : block.ArchiveComment,
-            };
-            await _blocks.UpdateBlockAsync(updated, Session.UserID);
-        }
+            await _blocks.UpdateBlockAsync(BuildUpdatedBlock(block, bulkMode), Session.UserID);
 
         SuccessMessage = $"Archive information updated for {selected.Count} block(s).";
         await LoadAsync();
         return Page();
     }
+
+    private string? ValidateArchiveUpdate()
+    {
+        // Legacy requires both: rfvArchiveLocation, and a blank date shows the red star and skips the update.
+        if (string.IsNullOrWhiteSpace(ArchiveLocationCode) || ArchivedDate is null)
+            return "Select an archive location and enter an archived date.";
+
+        var earliest = Batch?.ReceivedDate?.Date;
+        if (earliest is not null && ArchivedDate.Value.Date < earliest)
+            return $"Archive date must be the same or later than the Submission received date of {earliest:d}.";
+
+        return ArchivedDate.Value.Date > DateTime.Today ? "Archive date must be today or earlier." : null;
+    }
+
+    private Block BuildUpdatedBlock(Block block, bool bulkMode) => new()
+    {
+        ID = block.ID,
+        BatchID = block.BatchID,
+        AnimalID = block.AnimalID,
+        BlockRef = block.BlockRef,
+        CustomerRef = block.CustomerRef,
+        RepeatBlock = block.RepeatBlock,
+        Comment = block.Comment,
+        Status = block.Status,
+        Order = block.Order,
+        ArchiveLocation = !bulkMode || !string.IsNullOrWhiteSpace(ArchiveLocationCode) ? ArchiveLocationCode : block.ArchiveLocation,
+        ArchivedDate = !bulkMode || ArchivedDate is not null ? ArchivedDate : block.ArchivedDate,
+        ArchiveComment = !bulkMode || !string.IsNullOrWhiteSpace(Comment) ? Comment : block.ArchiveComment,
+    };
 
     private async Task LoadAsync()
     {

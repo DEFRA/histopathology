@@ -11,6 +11,8 @@ namespace Histo.Web.Pages.Batches;
 /// </summary>
 public class BatchesForEditingModel : GridPageModel
 {
+    private const string BatchesForEditingTitle = "Submissions available for editing";
+
     private readonly IBatchService _batches;
 
     public BatchesForEditingModel(ISessionService session, IBatchService batches)
@@ -20,7 +22,7 @@ public class BatchesForEditingModel : GridPageModel
 
     public int TotalCount => Batches.Count;
 
-    public IReadOnlyList<BatchListResult> PagedEntries =>
+    public IReadOnlyList<BatchListResult> GetPagedEntries() =>
         (SortColumn switch
         {
             "ProjectDescription" => SortDesc ? Batches.OrderByDescending(b => b.ProjectDescription) : Batches.OrderBy(b => b.ProjectDescription),
@@ -44,8 +46,8 @@ public class BatchesForEditingModel : GridPageModel
 
     public async Task OnGetAsync()
     {
-        ViewData["Title"] = "Submissions available for editing";
-        ViewData["PageTitle"] = "Submissions available for editing";
+        ViewData["Title"] = BatchesForEditingTitle;
+        ViewData["PageTitle"] = BatchesForEditingTitle;
         // ISS-044: use GetAllBatchesAsync (maps to GetAllBatches SP) — legacy showed all statuses
         Batches = await _batches.GetAllBatchesAsync();
         PopulateGridViewData(TotalCount);
@@ -63,8 +65,8 @@ public class BatchesForEditingModel : GridPageModel
 
     public async Task<IActionResult> OnPostGoAsync()
     {
-        ViewData["Title"] = "Submissions available for editing";
-        ViewData["PageTitle"] = "Submissions available for editing";
+        ViewData["Title"] = BatchesForEditingTitle;
+        ViewData["PageTitle"] = BatchesForEditingTitle;
         Batches = await _batches.GetAllBatchesAsync();
         PopulateGridViewData(TotalCount);
 

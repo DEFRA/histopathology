@@ -585,9 +585,7 @@
         <div class="govuk-summary-list__row">
             <dt class="govuk-summary-list__key">Is it adequately fixed?</dt>
             <dd class="govuk-summary-list__value">
-                @(Model.Batch.SafeToHandle == true ? "Yes" :
-                  Model.Batch.SafeToHandle == false ? "No" :
-                  "Not specified")
+                @(Model.Batch.SafeToHandle switch { true => "Yes", false => "No", _ => "Not specified" })
             </dd>
         </div>
         <div class="govuk-summary-list__row">
@@ -635,9 +633,9 @@
                 }
                 else
                 {
-                    foreach (var row in Model.TestSelections.Histology)
+                    foreach (var code in Model.TestSelections.Histology.Select(row => row.Code))
                     {
-                        var name = Model.HistologyNames.TryGetValue(row.Code, out var h) ? h : row.Code;
+                        var name = Model.HistologyNames.TryGetValue(code, out var h) ? h : code;
                         <strong class="govuk-tag govuk-tag--blue govuk-!-margin-right-1">@name</strong>
                     }
                 }
@@ -652,9 +650,9 @@
                 }
                 else
                 {
-                    foreach (var row in Model.TestSelections.Antibodies)
+                    foreach (var code in Model.TestSelections.Antibodies.Select(row => row.Code))
                     {
-                        var name = Model.AntibodyNames.TryGetValue(row.Code, out var a) ? a : row.Code;
+                        var name = Model.AntibodyNames.TryGetValue(code, out var a) ? a : code;
                         <strong class="govuk-tag govuk-tag--purple govuk-!-margin-right-1">@name</strong>
                     }
                 }
@@ -669,9 +667,9 @@
                 }
                 else
                 {
-                    foreach (var row in Model.TestSelections.Stains)
+                    foreach (var code in Model.TestSelections.Stains.Select(row => row.Code))
                     {
-                        var name = Model.StainNames.TryGetValue(row.Code, out var s) ? s : row.Code;
+                        var name = Model.StainNames.TryGetValue(code, out var s) ? s : code;
                         <strong class="govuk-tag govuk-tag--green govuk-!-margin-right-1">@name</strong>
                     }
                 }

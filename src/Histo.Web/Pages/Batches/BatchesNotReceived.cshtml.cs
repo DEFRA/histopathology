@@ -12,6 +12,8 @@ namespace Histo.Web.Pages.Batches;
 /// </summary>
 public class BatchesNotReceivedModel : GridPageModel
 {
+    private const string BatchesNotReceivedTitle = "Batches not received";
+
     private readonly IBatchService _batches;
 
     public BatchesNotReceivedModel(ISessionService session, IBatchService batches)
@@ -26,7 +28,7 @@ public class BatchesNotReceivedModel : GridPageModel
 
     public int TotalCount => Batches.Count;
 
-    public IReadOnlyList<BatchListResult> PagedEntries =>
+    public IReadOnlyList<BatchListResult> GetPagedEntries() =>
         (SortColumn switch
         {
             "ProjectDescription" => SortDesc ? Batches.OrderByDescending(b => b.ProjectDescription) : Batches.OrderBy(b => b.ProjectDescription),
@@ -49,8 +51,8 @@ public class BatchesNotReceivedModel : GridPageModel
 
     public async Task OnGetAsync()
     {
-        ViewData["Title"] = "Batches not received";
-        ViewData["PageTitle"] = "Batches not received";
+        ViewData["Title"] = BatchesNotReceivedTitle;
+        ViewData["PageTitle"] = BatchesNotReceivedTitle;
         Batches = await _batches.GetNotReceivedAsync();
         PopulateGridViewData(TotalCount);
     }
@@ -63,8 +65,8 @@ public class BatchesNotReceivedModel : GridPageModel
 
     public async Task<IActionResult> OnPostGoAsync()
     {
-        ViewData["Title"] = "Batches not received";
-        ViewData["PageTitle"] = "Batches not received";
+        ViewData["Title"] = BatchesNotReceivedTitle;
+        ViewData["PageTitle"] = BatchesNotReceivedTitle;
         Batches = await _batches.GetNotReceivedAsync();
         PopulateGridViewData(TotalCount);
 

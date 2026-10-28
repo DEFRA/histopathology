@@ -23,7 +23,7 @@ public class AuditLogByDateModel : GridPageModel
 
     public int TotalCount => Results.Count;
 
-    public IReadOnlyList<AuditLogEntry> PagedEntries =>
+    public IReadOnlyList<AuditLogEntry> GetPagedEntries() =>
         (SortColumn switch
         {
             "FieldName"   => SortDesc ? Results.OrderByDescending(e => e.FieldName)   : Results.OrderBy(e => e.FieldName),

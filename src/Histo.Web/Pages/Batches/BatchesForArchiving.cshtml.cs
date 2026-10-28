@@ -8,6 +8,8 @@ namespace Histo.Web.Pages.Batches;
 /// <summary>Replaces <c>BatchesForArchiving.aspx</c>.</summary>
 public class BatchesForArchivingModel : GridPageModel
 {
+    private const string BatchesForArchivingTitle = "Batches for Archiving";
+
     private readonly IBatchService _batches;
 
     public BatchesForArchivingModel(ISessionService session, IBatchService batches)
@@ -17,7 +19,7 @@ public class BatchesForArchivingModel : GridPageModel
 
     public int TotalCount => Batches.Count;
 
-    public IReadOnlyList<BatchListResult> PagedEntries =>
+    public IReadOnlyList<BatchListResult> GetPagedEntries() =>
         (SortColumn switch
         {
             "ProjectDescription" => SortDesc ? Batches.OrderByDescending(b => b.ProjectDescription) : Batches.OrderBy(b => b.ProjectDescription),
@@ -41,16 +43,16 @@ public class BatchesForArchivingModel : GridPageModel
 
     public async Task OnGetAsync()
     {
-        ViewData["Title"] = "Batches for Archiving";
-        ViewData["PageTitle"] = "Batches for Archiving";
+        ViewData["Title"] = BatchesForArchivingTitle;
+        ViewData["PageTitle"] = BatchesForArchivingTitle;
         Batches = await _batches.GetCompletedAsync();
         PopulateGridViewData(TotalCount);
     }
 
     public async Task<IActionResult> OnPostGoAsync()
     {
-        ViewData["Title"] = "Batches for Archiving";
-        ViewData["PageTitle"] = "Batches for Archiving";
+        ViewData["Title"] = BatchesForArchivingTitle;
+        ViewData["PageTitle"] = BatchesForArchivingTitle;
         Batches = await _batches.GetCompletedAsync();
         PopulateGridViewData(TotalCount);
 

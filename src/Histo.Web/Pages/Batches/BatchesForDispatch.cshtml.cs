@@ -11,6 +11,8 @@ namespace Histo.Web.Pages.Batches;
 /// </summary>
 public class BatchesForDispatchModel : GridPageModel
 {
+    private const string BatchesForDispatchTitle = "Submissions available for quality data entry";
+
     private readonly IBatchService _batches;
 
     public BatchesForDispatchModel(ISessionService session, IBatchService batches)
@@ -20,7 +22,7 @@ public class BatchesForDispatchModel : GridPageModel
 
     public int TotalCount => Batches.Count;
 
-    public IReadOnlyList<BatchListResult> PagedEntries =>
+    public IReadOnlyList<BatchListResult> GetPagedEntries() =>
         (SortColumn switch
         {
             "ProjectDescription" => SortDesc ? Batches.OrderByDescending(b => b.ProjectDescription) : Batches.OrderBy(b => b.ProjectDescription),
@@ -44,8 +46,8 @@ public class BatchesForDispatchModel : GridPageModel
 
     public async Task OnGetAsync()
     {
-        ViewData["Title"] = "Submissions available for quality data entry";
-        ViewData["PageTitle"] = "Submissions available for quality data entry";
+        ViewData["Title"] = BatchesForDispatchTitle;
+        ViewData["PageTitle"] = BatchesForDispatchTitle;
         Batches = await _batches.GetForDispatchAsync();
         PopulateGridViewData(TotalCount);
     }
@@ -60,8 +62,8 @@ public class BatchesForDispatchModel : GridPageModel
 
     public async Task<IActionResult> OnPostGoAsync()
     {
-        ViewData["Title"] = "Submissions available for quality data entry";
-        ViewData["PageTitle"] = "Submissions available for quality data entry";
+        ViewData["Title"] = BatchesForDispatchTitle;
+        ViewData["PageTitle"] = BatchesForDispatchTitle;
         Batches = await _batches.GetForDispatchAsync();
         PopulateGridViewData(TotalCount);
 

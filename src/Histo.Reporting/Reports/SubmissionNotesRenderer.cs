@@ -20,7 +20,7 @@
 //     ├── Left : bold "Submission notes for Submission:" + bold SubmissionNumber
 //     └── Right: today's date "dd/MM/yyyy"
 //   Content:
-//     ├── Two-column row: left = "Submission Comments" (bold) + text;
+//     ├── Two-column row: left = "Submission Comments" (bold) + text,
 //     │                   right = "Submission Status Comments" (bold) + text
 //     └── 5 sections, always rendered regardless of row count (confirmed against
 //         SubmissionNotes-image.png reference — legacy always prints heading/column
@@ -63,10 +63,13 @@ namespace Histo.Reporting.Reports;
 /// </summary>
 public sealed class SubmissionNotesRenderer
 {
-    private static readonly string[] TissueCommentHeaders = ["SenderRef", "Tissue Code", "Tissue Comment", "Tissue Archive Comment"];
-    private static readonly string[] BlockCommentHeaders = ["SenderRef", "Block Ref", "Block Comment", "Block Archive Comment"];
+    private const string SenderRefColumn = "SenderRef";
+    private const string BlockRefColumn = "BlockRef";
+
+    private static readonly string[] TissueCommentHeaders = [SenderRefColumn, "Tissue Code", "Tissue Comment", "Tissue Archive Comment"];
+    private static readonly string[] BlockCommentHeaders = [SenderRefColumn, "Block Ref", "Block Comment", "Block Archive Comment"];
     private static readonly string[] TestCommentHeaders = ["Block Ref", "Test", "Test Comment", "Test Archive Comment"];
-    private static readonly string[] TestCommentHeadersWithoutBlockRef = ["BlockRef", "Test", "Test Comment", "Test Archive Comment"];
+    private static readonly string[] TestCommentHeadersWithoutBlockRef = [BlockRefColumn, "Test", "Test Comment", "Test Archive Comment"];
 
     static SubmissionNotesRenderer()
     {
@@ -190,7 +193,7 @@ public sealed class SubmissionNotesRenderer
 
                             foreach (var r in tissueRows)
                             {
-                                t.Cell().PaddingVertical(2).Text(Field(r, "SenderRef"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, SenderRefColumn));
                                 t.Cell().PaddingVertical(2).Text(Field(r, "TissueCode"));
                                 t.Cell().PaddingVertical(2).Text(Field(r, "TissueComment"));
                                 t.Cell().PaddingVertical(2).Text(Field(r, "TissueArchiveComment"));
@@ -223,8 +226,8 @@ public sealed class SubmissionNotesRenderer
 
                             foreach (var r in blockRows)
                             {
-                                t.Cell().PaddingVertical(2).Text(Field(r, "SenderRef"));
-                                t.Cell().PaddingVertical(2).Text(Field(r, "BlockRef"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, SenderRefColumn));
+                                t.Cell().PaddingVertical(2).Text(Field(r, BlockRefColumn));
                                 t.Cell().PaddingVertical(2).Text(Field(r, "BlockComment"));
                                 t.Cell().PaddingVertical(2).Text(Field(r, "BlockArchiveComment"));
                             }
@@ -256,7 +259,7 @@ public sealed class SubmissionNotesRenderer
 
                             foreach (var r in histologyRows)
                             {
-                                t.Cell().PaddingVertical(2).Text(Field(r, "BlockRef"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, BlockRefColumn));
                                 t.Cell().PaddingVertical(2).Text(Field(r, "Test"));
                                 t.Cell().PaddingVertical(2).Text(Field(r, "TestComment"));
                                 t.Cell().PaddingVertical(2).Text(Field(r, "TestArchiveComment"));
@@ -289,7 +292,7 @@ public sealed class SubmissionNotesRenderer
 
                             foreach (var r in specialStainRows)
                             {
-                                t.Cell().PaddingVertical(2).Text(Field(r, "BlockRef"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, BlockRefColumn));
                                 t.Cell().PaddingVertical(2).Text(Field(r, "Test"));
                                 t.Cell().PaddingVertical(2).Text(Field(r, "TestComment"));
                                 t.Cell().PaddingVertical(2).Text(Field(r, "TestArchiveComment"));
@@ -322,7 +325,7 @@ public sealed class SubmissionNotesRenderer
 
                             foreach (var r in antibodyRows)
                             {
-                                t.Cell().PaddingVertical(2).Text(Field(r, "BlockRef"));
+                                t.Cell().PaddingVertical(2).Text(Field(r, BlockRefColumn));
                                 t.Cell().PaddingVertical(2).Text(Field(r, "Test"));
                                 t.Cell().PaddingVertical(2).Text(Field(r, "TestComment"));
                                 t.Cell().PaddingVertical(2).Text(Field(r, "TestArchiveComment"));

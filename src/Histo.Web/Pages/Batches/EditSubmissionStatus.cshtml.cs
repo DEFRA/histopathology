@@ -17,6 +17,8 @@ namespace Histo.Web.Pages.Batches;
 /// </summary>
 public class EditSubmissionStatusModel : HistoPageModel
 {
+    private const string EditSubmissionStatusTitle = "Edit submission status";
+
     private readonly IBatchService  _batches;
     private readonly ILookupService _lookups;
     private readonly IUserService   _users;
@@ -60,8 +62,8 @@ public class EditSubmissionStatusModel : HistoPageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
-        ViewData["Title"]     = "Edit submission status";
-        ViewData["PageTitle"] = "Edit submission status";
+        ViewData["Title"]     = EditSubmissionStatusTitle;
+        ViewData["PageTitle"] = EditSubmissionStatusTitle;
         if (Session.BatchID <= 0) return RedirectToPage("/Index");
 
         Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0);
@@ -77,8 +79,8 @@ public class EditSubmissionStatusModel : HistoPageModel
 
     public async Task<IActionResult> OnPostSaveAsync()
     {
-        ViewData["Title"]     = "Edit submission status";
-        ViewData["PageTitle"] = "Edit submission status";
+        ViewData["Title"]     = EditSubmissionStatusTitle;
+        ViewData["PageTitle"] = EditSubmissionStatusTitle;
 
         Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0);
         if (Batch?.RowStamp is null) return RedirectToPage("/Index");

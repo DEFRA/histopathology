@@ -28,6 +28,11 @@ namespace Histo.Reporting.Services;
 /// </summary>
 public sealed class HistologyReportDataSetBuilder
 {
+    private const string BatchTypeColumn = "BatchType";
+    private const string CommentsColumn = "Comments";
+    private const string BatchIdColumn = "BatchID";
+    private const string OtherColumn = "Other";
+
     // Legacy source: HistopathologySystem/Common.vb — LOOKUP_CONTACTS / LOOKUP_PROJECTS
     private const int LookupContacts = 18;
     private const int LookupProjects = 19;
@@ -165,7 +170,7 @@ public sealed class HistologyReportDataSetBuilder
         var tseAntibodiesByCode     = ByCode(tseAntibodiesTask.Result);
         var nonTseAntibodiesByCode  = ByCode(nonTseAntibodiesTask.Result);
 
-        int batchType = rawBatch.Count > 0 && rawBatch[0].TryGetValue("BatchType", out var btVal)
+        int batchType = rawBatch.Count > 0 && rawBatch[0].TryGetValue(BatchTypeColumn, out var btVal)
             ? Convert.ToInt32(btVal ?? 0) : 0;
 
         // ── 3. Assemble the report DataSet ───────────────────────────────────
@@ -178,10 +183,26 @@ public sealed class HistologyReportDataSetBuilder
 
         // Total Samples = the batch's animal (sample) count — the header SP returns no such
         // column, matching BatchDetails.SampleCount = GetAnimalsByBatchAsync().Count.
-        ds.Tables.Add(BuildBatchTable(rawBatch, rawSubmittedAs, batchId, speciesById, projectsById, contactsById, userById, fixationByCode, timeReceivedByCode, submittedAsByCode, useBlockAnimals ? rawBlockAnimals.Count : rawAnimals.Count));
+        var batchLookups = new BatchLookups
+        {
+            SpeciesById = speciesById,
+            ProjectsById = projectsById,
+            ContactsById = contactsById,
+            UserById = userById,
+            FixationByCode = fixationByCode,
+            TimeReceivedByCode = timeReceivedByCode,
+            SubmittedAsByCode = submittedAsByCode,
+        };
+        ds.Tables.Add(BuildBatchTable(rawBatch, rawSubmittedAs, batchId, batchLookups, useBlockAnimals ? rawBlockAnimals.Count : rawAnimals.Count));
         ds.Tables.Add(BuildPostFixationTable(rawPostFix, batchId));
-        ds.Tables.Add(BuildHistologyTable(rawHistology, batchId, rawAntibodies, rawStains, batchType,
-            histologyByCode, specialStainByCode, tseAntibodiesByCode, nonTseAntibodiesByCode));
+        var histologyLookups = new HistologyLookups
+        {
+            HistologyByCode = histologyByCode,
+            SpecialStainByCode = specialStainByCode,
+            TseAntibodiesByCode = tseAntibodiesByCode,
+            NonTseAntibodiesByCode = nonTseAntibodiesByCode,
+        };
+        ds.Tables.Add(BuildHistologyTable(rawHistology, batchId, rawAntibodies, rawStains, batchType, histologyLookups));
         // Lookup only (never iterated for rows): block animals first, submission animals as fallback.
         var blockAnimalIds = rawBlockAnimals.Select(a => IntOrZero(a, "ID")).ToHashSet();
         var rowAnimals = useBlockAnimals
@@ -195,17 +216,49 @@ public sealed class HistologyReportDataSetBuilder
 
     // ── Table builders ───────────────────────────────────────────────────────
 
+    internal sealed record BatchLookups
+    {
+        public IReadOnlyDictionary<string, string>? SpeciesById { get; init; }
+        public IReadOnlyDictionary<string, string>? ProjectsById { get; init; }
+        public IReadOnlyDictionary<string, string>? ContactsById { get; init; }
+        public IReadOnlyDictionary<int, string>? UserById { get; init; }
+        public IReadOnlyDictionary<string, string>? FixationByCode { get; init; }
+        public IReadOnlyDictionary<string, string>? TimeReceivedByCode { get; init; }
+        public IReadOnlyDictionary<string, string>? SubmittedAsByCode { get; init; }
+    }
+
+    internal sealed record HistologyLookups
+    {
+        public IReadOnlyDictionary<string, string>? HistologyByCode { get; init; }
+        public IReadOnlyDictionary<string, string>? SpecialStainByCode { get; init; }
+        public IReadOnlyDictionary<string, string>? TseAntibodiesByCode { get; init; }
+        public IReadOnlyDictionary<string, string>? NonTseAntibodiesByCode { get; init; }
+    }
+
+    private static string ResolveOrRaw(IReadOnlyDictionary<string, string>? lookup, string raw) =>
+        lookup is not null && lookup.TryGetValue(raw, out var resolved) ? resolved : raw;
+
+    private static string ResolveSubmittedBy(IReadOnlyDictionary<int, string>? userById, string rawSubmittedBy) =>
+        userById is not null
+        && int.TryParse(rawSubmittedBy, out var submittedByUserId)
+        && userById.TryGetValue(submittedByUserId, out var sbn)
+            ? sbn : rawSubmittedBy;
+
+    private static string JoinSubmittedAs(
+        IList<IDictionary<string, object>> rawSubmittedAs, int batchId, IReadOnlyDictionary<string, string>? submittedAsByCode)
+    {
+        var submittedAsNames = rawSubmittedAs
+            .Where(r => r.TryGetValue(BatchIdColumn, out var bid) && Convert.ToInt32(bid) == batchId)
+            .Select(r => ResolveOrRaw(submittedAsByCode, Str(r, "Code")))
+            .Where(s => !string.IsNullOrWhiteSpace(s));
+        return string.Join(", ", submittedAsNames);
+    }
+
     internal static DataTable BuildBatchTable(
         IList<IDictionary<string, object>> rawBatch,
         IList<IDictionary<string, object>> rawSubmittedAs,
         int batchId,
-        IReadOnlyDictionary<string, string>? speciesById = null,
-        IReadOnlyDictionary<string, string>? projectsById = null,
-        IReadOnlyDictionary<string, string>? contactsById = null,
-        IReadOnlyDictionary<int, string>? userById = null,
-        IReadOnlyDictionary<string, string>? fixationByCode = null,
-        IReadOnlyDictionary<string, string>? timeReceivedByCode = null,
-        IReadOnlyDictionary<string, string>? submittedAsByCode = null,
+        BatchLookups? lookups = null,
         int sampleCount = 0)
     {
         var dt = new DataTable("Batch");
@@ -216,14 +269,14 @@ public sealed class HistologyReportDataSetBuilder
         dt.Columns.Add("DateReceived");
         dt.Columns.Add("TimeReceived");
         dt.Columns.Add("SafeToHandle", typeof(bool));
-        dt.Columns.Add("Comments");
+        dt.Columns.Add(CommentsColumn);
         dt.Columns.Add("Fixation");
         dt.Columns.Add("ID");
         dt.Columns.Add("PostFixationOther");
         dt.Columns.Add("CommentLengthOK");
         dt.Columns.Add("OtherSubmittedBy");
         dt.Columns.Add("NumberSamples");
-        dt.Columns.Add("BatchType");
+        dt.Columns.Add(BatchTypeColumn);
         dt.Columns.Add("SubmittedAs");
         dt.Columns.Add("MoreHistology");
 
@@ -243,56 +296,35 @@ public sealed class HistologyReportDataSetBuilder
         // the source column, which otherwise fails the exact-string dictionary match and silently
         // falls back to displaying the raw (padded) ID instead of the resolved project name.
         var rawProjectCode    = Str(src, "ProjectContractCode").Trim();
-        dr["ProjectContractCode"] = projectsById is not null && projectsById.TryGetValue(rawProjectCode, out var pn)
-            ? pn : rawProjectCode;
-        var rawContactCode    = Str(src, "ContactName");
-        dr["ContactName"]      = contactsById is not null && contactsById.TryGetValue(rawContactCode, out var cn)
-            ? cn : rawContactCode;
+        dr["ProjectContractCode"] = ResolveOrRaw(lookups?.ProjectsById, rawProjectCode);
+        dr["ContactName"]      = ResolveOrRaw(lookups?.ContactsById, Str(src, "ContactName"));
         dr["BatchDate"]        = Str(src, "BatchDate");
-        var rawSpecies        = Str(src, "Species");
-        dr["Species"]          = speciesById is not null && speciesById.TryGetValue(rawSpecies, out var sn)
-            ? sn : rawSpecies;
+        dr["Species"]          = ResolveOrRaw(lookups?.SpeciesById, Str(src, "Species"));
         dr["DateReceived"]     = Str(src, "DateReceived");
         // TimeReceived is a Code (foreign key to LOOKUP_TIME_RECEIVED = 3) — resolve to its
         // display text (e.g. "before 11.00"); falls back to the raw code when unresolved.
-        var rawTimeReceived   = Str(src, "TimeReceived");
-        dr["TimeReceived"]     = timeReceivedByCode is not null && timeReceivedByCode.TryGetValue(rawTimeReceived, out var trn)
-            ? trn : rawTimeReceived;
+        dr["TimeReceived"]     = ResolveOrRaw(lookups?.TimeReceivedByCode, Str(src, "TimeReceived"));
         dr["SafeToHandle"]     = Bool(src, "SafeToHandle");
-        dr["Comments"]         = Str(src, "Comments");
+        dr[CommentsColumn]         = Str(src, CommentsColumn);
         // Fixation is a Code (foreign key to LOOKUP_FIXATION = 10, keyed on Code not ID) —
         // resolve to its display text (e.g. "Other"); falls back to the raw code when unresolved.
-        var rawFixation       = Str(src, "Fixation");
-        dr["Fixation"]         = fixationByCode is not null && fixationByCode.TryGetValue(rawFixation, out var fxn)
-            ? fxn : rawFixation;
+        dr["Fixation"]         = ResolveOrRaw(lookups?.FixationByCode, Str(src, "Fixation"));
         dr["PostFixationOther"] = Str(src, "PostFixationOther");
-        var rawSubmittedBy     = Str(src, "OtherSubmittedBy");
-        dr["OtherSubmittedBy"] = userById is not null
-            && int.TryParse(rawSubmittedBy, out var submittedByUserId)
-            && userById.TryGetValue(submittedByUserId, out var sbn)
-                ? sbn : rawSubmittedBy;
+        dr["OtherSubmittedBy"] = ResolveSubmittedBy(lookups?.UserById, Str(src, "OtherSubmittedBy"));
         dr["NumberSamples"]    = sampleCount.ToString();
         dr["MoreHistology"]    = string.Empty; // set below if any histology overflows
 
         // BatchType label — matches legacy "TSE" / "NON TSE" display
-        int batchType = src.TryGetValue("BatchType", out var btVal)
+        int batchType = src.TryGetValue(BatchTypeColumn, out var btVal)
             ? Convert.ToInt32(btVal ?? 0) : 0;
-        dr["BatchType"] = batchType == 0 ? "TSE" : "NON TSE";
+        dr[BatchTypeColumn] = batchType == 0 ? "TSE" : "NON TSE";
 
         // SubmittedAs — GetBatchSubmittedAs returns Code only (no Description); resolve each
         // Code to its display name via LOOKUP_SUBMITTEDAS (table 11), then concatenate.
-        var submittedAsNames = rawSubmittedAs
-            .Where(r => r.TryGetValue("BatchID", out var bid) && Convert.ToInt32(bid) == batchId)
-            .Select(r =>
-            {
-                var code = Str(r, "Code");
-                return submittedAsByCode is not null && submittedAsByCode.TryGetValue(code, out var n) ? n : code;
-            })
-            .Where(s => !string.IsNullOrWhiteSpace(s));
-        dr["SubmittedAs"] = string.Join(", ", submittedAsNames);
+        dr["SubmittedAs"] = JoinSubmittedAs(rawSubmittedAs, batchId, lookups?.SubmittedAsByCode);
 
         // CommentLengthOK — flag if comments exceed the visible limit (150 chars, matches legacy)
-        var comments = dr["Comments"]?.ToString() ?? string.Empty;
+        var comments = dr[CommentsColumn]?.ToString() ?? string.Empty;
         dr["CommentLengthOK"] = comments.Length > 150 ? "\u2713" : string.Empty;
 
         dt.Rows.Add(dr);
@@ -304,14 +336,14 @@ public sealed class HistologyReportDataSetBuilder
         int batchId)
     {
         var dt = new DataTable("BatchPostFixation");
-        dt.Columns.Add("BatchID");
+        dt.Columns.Add(BatchIdColumn);
         dt.Columns.Add("Decal");
         dt.Columns.Add("Phenol");
         dt.Columns.Add("Formic");
-        dt.Columns.Add("Other");
+        dt.Columns.Add(OtherColumn);
 
         var dr = dt.NewRow();
-        dr["BatchID"] = batchId.ToString();
+        dr[BatchIdColumn] = batchId.ToString();
 
         // Legacy: Chr(252) Wingdings tick per post-fixation code row.
         // Modern: renderer substitutes Chr(252) → U+2713; we pass "1" (truthy) here.
@@ -323,7 +355,7 @@ public sealed class HistologyReportDataSetBuilder
                 case "1": dr["Formic"] = "1"; break;
                 case "2": dr["Decal"]  = "1"; break;
                 case "3": dr["Phenol"] = "1"; break;
-                case "Other": dr["Other"] = "1"; break;
+                case OtherColumn: dr[OtherColumn] = "1"; break;
             }
         }
 
@@ -346,38 +378,15 @@ public sealed class HistologyReportDataSetBuilder
         IList<IDictionary<string, object>>? rawAntibodies = null,
         IList<IDictionary<string, object>>? rawStains = null,
         int batchType = 0,
-        IReadOnlyDictionary<string, string>? histologyByCode = null,
-        IReadOnlyDictionary<string, string>? specialStainByCode = null,
-        IReadOnlyDictionary<string, string>? tseAntibodiesByCode = null,
-        IReadOnlyDictionary<string, string>? nonTseAntibodiesByCode = null)
+        HistologyLookups? lookups = null)
     {
         const int MaxRows = 8; // legacy caps the Histology Required list at 8 entries
         var dt = new DataTable("BatchHistology");
-        dt.Columns.Add("BatchID", typeof(int));
+        dt.Columns.Add(BatchIdColumn, typeof(int));
         dt.Columns.Add("Code"); // holds the resolved DESCRIPTION (matches legacy sub-report shape)
 
         rawAntibodies ??= [];
         rawStains ??= [];
-
-        string ResolveHistology(string code) =>
-            histologyByCode is not null && histologyByCode.TryGetValue(code, out var d) ? d : code;
-        string ResolveStain(string code) =>
-            code == "Other" ? "Special Other"
-            : specialStainByCode is not null && specialStainByCode.TryGetValue(code, out var d) ? d : code;
-        string ResolveAntibody(string code)
-        {
-            if (code == "Other") return "IHC-PrP Other";
-            var lookup = batchType == 0 ? tseAntibodiesByCode : nonTseAntibodiesByCode;
-            return lookup is not null && lookup.TryGetValue(code, out var d) ? d : code;
-        }
-
-        void Add(string description)
-        {
-            var dr = dt.NewRow();
-            dr["BatchID"] = batchId;
-            dr["Code"]    = description;
-            dt.Rows.Add(dr);
-        }
 
         foreach (var hrow in rawHistology)
         {
@@ -385,32 +394,52 @@ public sealed class HistologyReportDataSetBuilder
             var code = Str(hrow, "Code");
             switch (code)
             {
-                // Direct histology tests (EO/H&E/H&E-BSE/Archive) — resolve to description.
+                // Direct histology tests (EO/H&E/H&E-BSE/Archive) - resolve to description.
                 case "1" or "2" or "5" or "7":
-                    Add(ResolveHistology(code));
+                    AddHistologyRow(dt, batchId, ResolveOrRaw(lookups?.HistologyByCode, code));
                     break;
 
-                // Special Stain flag — expand into the batch's actual special-stain rows.
+                // Special Stain flag - expand into the batch's actual special-stain rows.
                 case "3":
-                    foreach (var srow in rawStains)
-                    {
-                        if (dt.Rows.Count >= MaxRows) break;
-                        Add(ResolveStain(Str(srow, "Code")));
-                    }
+                    AddExpandedRows(dt, batchId, rawStains, MaxRows, c => ResolveStain(lookups, c));
                     break;
 
-                // IHC-PrP / IHC-Other flags — expand into the batch's actual antibody rows.
+                // IHC-PrP / IHC-Other flags - expand into the batch's actual antibody rows.
                 case "4" or "6":
-                    foreach (var arow in rawAntibodies)
-                    {
-                        if (dt.Rows.Count >= MaxRows) break;
-                        Add(ResolveAntibody(Str(arow, "Code")));
-                    }
+                    AddExpandedRows(dt, batchId, rawAntibodies, MaxRows, c => ResolveAntibody(lookups, batchType, c));
                     break;
             }
         }
 
         return dt;
+    }
+
+    private static string ResolveStain(HistologyLookups? lookups, string code) =>
+        code == OtherColumn ? "Special Other" : ResolveOrRaw(lookups?.SpecialStainByCode, code);
+
+    private static string ResolveAntibody(HistologyLookups? lookups, int batchType, string code)
+    {
+        if (code == OtherColumn) return "IHC-PrP Other";
+        var lookup = batchType == 0 ? lookups?.TseAntibodiesByCode : lookups?.NonTseAntibodiesByCode;
+        return ResolveOrRaw(lookup, code);
+    }
+
+    private static void AddHistologyRow(DataTable dt, int batchId, string description)
+    {
+        var dr = dt.NewRow();
+        dr[BatchIdColumn] = batchId;
+        dr["Code"]    = description;
+        dt.Rows.Add(dr);
+    }
+
+    private static void AddExpandedRows(
+        DataTable dt, int batchId, IList<IDictionary<string, object>> sourceRows, int maxRows, Func<string, string> resolve)
+    {
+        foreach (var row in sourceRows)
+        {
+            if (dt.Rows.Count >= maxRows) break;
+            AddHistologyRow(dt, batchId, resolve(Str(row, "Code")));
+        }
     }
 
     private const string ColSenderRef = "SenderRef";
@@ -431,7 +460,7 @@ public sealed class HistologyReportDataSetBuilder
         bool blocksAssigned = true)
     {
         var dt = new DataTable("BatchSubmission");
-        dt.Columns.Add("BatchID");
+        dt.Columns.Add(BatchIdColumn);
         dt.Columns.Add(ColSenderRef);
         dt.Columns.Add(ColHistologyRef);
         dt.Columns.Add(ColBlockRef);
@@ -537,7 +566,7 @@ public sealed class HistologyReportDataSetBuilder
         string blockRef, string repeatBlock, string customerRef)
     {
         var dr = dt.NewRow();
-        dr["BatchID"]       = batchId.ToString();
+        dr[BatchIdColumn]       = batchId.ToString();
         dr[ColSenderRef]    = animal is not null ? Str(animal, ColSenderRef) : string.Empty;
         dr[ColHistologyRef] = animal is not null ? Str(animal, ColHistologyRef) : string.Empty;
         dr[ColBlockRef]     = blockRef;
@@ -579,7 +608,7 @@ public sealed class HistologyReportDataSetBuilder
 
         // Version sourced from configuration (matches legacy web.config AppSettings).
         // TSE batches use SubmissionFormVersionTSE; Non-TSE use SubmissionFormVersionNonTSE.
-        int batchType = rawBatch.Count > 0 && rawBatch[0].TryGetValue("BatchType", out var btv)
+        int batchType = rawBatch.Count > 0 && rawBatch[0].TryGetValue(BatchTypeColumn, out var btv)
             ? Convert.ToInt32(btv ?? 0) : 0;
 
         var versionKey = batchType == 0

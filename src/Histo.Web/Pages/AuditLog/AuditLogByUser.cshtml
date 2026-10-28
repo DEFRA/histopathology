@@ -1,6 +1,14 @@
 @page
 @model AuditLogByUserModel
 @{
+    static string? ErrorAnchor(string error)
+    {
+        if (error.Contains("user", StringComparison.OrdinalIgnoreCase)) return "UserID";
+        if (error.Contains("start", StringComparison.OrdinalIgnoreCase)) return "StartDate";
+        if (error.Contains("end", StringComparison.OrdinalIgnoreCase)) return "EndDate";
+        return null;
+    }
+
     ViewData["Title"] = "Audit log by user";
     ViewData["PageTitle"] = "Audit log — by user";
 }
@@ -18,10 +26,7 @@
                 <ul class="govuk-list govuk-error-summary__list">
                     @foreach (var e in Model.Errors)
                     {
-                        var anchor = e.Contains("user", StringComparison.OrdinalIgnoreCase) ? "UserID"
-                                   : e.Contains("start", StringComparison.OrdinalIgnoreCase) ? "StartDate"
-                                   : e.Contains("end", StringComparison.OrdinalIgnoreCase) ? "EndDate"
-                                   : null;
+                        var anchor = ErrorAnchor(e);
                         <li>
                             @if (anchor is not null)
                             {
@@ -115,7 +120,7 @@
             </tr>
         </thead>
         <tbody class="govuk-table__body">
-            @foreach (var e in Model.PagedEntries)
+            @foreach (var e in Model.GetPagedEntries())
             {
                 <tr class="govuk-table__row">
                     <td class="govuk-table__cell">@e.TableName</td>

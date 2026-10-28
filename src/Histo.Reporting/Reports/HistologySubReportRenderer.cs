@@ -7,7 +7,7 @@
 // Generated        : 2026-08-05
 // Status           : stub — callingPageContext absent (Histo.Reporting is a stub project)
 //
-// TODO: wire data source — re-run Stage 3 after migration completes.
+// Note: data source is not wired here; re-run Stage 3 after migration completes.
 //
 // IMPORTANT: In normal production use the sub-report section is composed inline
 // within HistologyReportRenderer.RenderAsync() — no separate render pass.
@@ -55,7 +55,7 @@ public sealed class HistologySubReportRenderer
     /// <summary>
     /// Renders the sub-report to a PDF byte array.
     /// <para>
-    /// TODO: wire data source — re-run Stage 3 after migration completes.
+    /// Note: data source is not wired here; re-run Stage 3 after migration completes.
     /// The calling controller/page must populate <paramref name="ds"/> before
     /// calling this method.
     /// </para>

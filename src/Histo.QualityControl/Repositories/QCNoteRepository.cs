@@ -89,15 +89,16 @@ public sealed class QCNoteRepository : IQCNoteRepository
         var s = value.ToString();
         if (string.IsNullOrWhiteSpace(s)) return null;
 
-        return DateTime.TryParseExact(
-            s, DateFormats,
-            System.Globalization.CultureInfo.InvariantCulture,
-            System.Globalization.DateTimeStyles.None,
-            out var parsed)
-            ? parsed
-            : DateTime.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var fallback)
-                ? fallback
-                : null;
+        if (DateTime.TryParseExact(
+                s, DateFormats,
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None,
+                out var parsed))
+            return parsed;
+
+        return DateTime.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var fallback)
+            ? fallback
+            : null;
     }
 
     /// <summary>

@@ -23,6 +23,8 @@ namespace Histo.Web.Pages.Admin;
 /// </summary>
 public class PickListUserAreaModel : GridPageModel
 {
+    private const string PickListTitle = "Pick List";
+
     private readonly ILookupService _lookups;
 
     public PickListUserAreaModel(ISessionService session, ILookupService lookups)
@@ -51,7 +53,7 @@ public class PickListUserAreaModel : GridPageModel
 
     public int TotalCount => Items.Count;
 
-    public IReadOnlyList<LookupItem> PagedEntries =>
+    public IReadOnlyList<LookupItem> GetPagedEntries() =>
         (SortColumn switch
         {
             "Active" => SortDesc ? Items.OrderByDescending(i => i.Active) : Items.OrderBy(i => i.Active),
@@ -65,8 +67,8 @@ public class PickListUserAreaModel : GridPageModel
 
     public async Task OnGetAsync()
     {
-        ViewData["Title"] = "Pick List";
-        ViewData["PageTitle"] = "Pick List";
+        ViewData["Title"] = PickListTitle;
+        ViewData["PageTitle"] = PickListTitle;
         StatusMessage = TempData["StatusMessage"] as string;
         await LoadTableNameAsync();
         await LoadItemsAsync();
@@ -90,8 +92,8 @@ public class PickListUserAreaModel : GridPageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Pick List";
-        ViewData["PageTitle"] = "Pick List";
+        ViewData["Title"] = PickListTitle;
+        ViewData["PageTitle"] = PickListTitle;
         await LoadTableNameAsync();
         await LoadItemsAsync();
 

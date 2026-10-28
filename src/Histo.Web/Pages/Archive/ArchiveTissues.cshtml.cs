@@ -35,6 +35,8 @@ public sealed class ArchiveTissueRow
 /// </summary>
 public class ArchiveTissuesModel : GridPageModel
 {
+    private const string ArchiveTissuesTitle = "Archive tissues";
+
     private const int LookupArchiveLocation = 16;
     private const int LookupTissueCode = 9;
 
@@ -106,7 +108,7 @@ public class ArchiveTissuesModel : GridPageModel
 
     public int TotalCount => FilteredRows.Count;
 
-    public IReadOnlyList<ArchiveTissueRow> PagedEntries =>
+    public IReadOnlyList<ArchiveTissueRow> GetPagedEntries() =>
         (SortColumn switch
         {
             "HistologyRef"    => SortDesc ? FilteredRows.OrderByDescending(r => r.HistologyRef)    : FilteredRows.OrderBy(r => r.HistologyRef),
@@ -131,8 +133,8 @@ public class ArchiveTissuesModel : GridPageModel
 
     public async Task OnGetAsync()
     {
-        ViewData["Title"] = "Archive tissues";
-        ViewData["PageTitle"] = "Archive tissues";
+        ViewData["Title"] = ArchiveTissuesTitle;
+        ViewData["PageTitle"] = ArchiveTissuesTitle;
         if (BatchId is > 0)
         {
             Session.BatchID = BatchId;
@@ -145,8 +147,8 @@ public class ArchiveTissuesModel : GridPageModel
 
     public async Task<IActionResult> OnPostUpdateAsync()
     {
-        ViewData["Title"] = "Archive tissues";
-        ViewData["PageTitle"] = "Archive tissues";
+        ViewData["Title"] = ArchiveTissuesTitle;
+        ViewData["PageTitle"] = ArchiveTissuesTitle;
         await LoadAsync();
 
         if (IsViewMode) return RedirectToPage(new { batchId = Session.BatchID });
@@ -155,26 +157,11 @@ public class ArchiveTissuesModel : GridPageModel
         // so SelectedIds alone can't carry them across a page boundary.
         var selectedIds = SelectAllAcrossPages ? FilteredRows.Select(r => r.ID).ToList() : SelectedIds;
         if (selectedIds.Count == 0) { Error = "Select at least one tissue to update."; return Page(); }
-        // Legacy requires both: rfvArchiveLocation, and a blank date shows the red star and skips the update.
-        if (string.IsNullOrWhiteSpace(ArchiveLocationCode) || ArchivedDate is null)
+        var validationError = ValidateArchiveUpdate();
+        if (validationError is not null)
         {
-            Error = "Select an archive location and enter an archived date.";
+            Error = validationError;
             return Page();
-        }
-
-        if (ArchivedDate is not null)
-        {
-            var earliest = Batch?.ReceivedDate?.Date;
-            if (earliest is not null && ArchivedDate.Value.Date < earliest)
-            {
-                Error = $"Archive date must be the same or later than the Submission received date of {earliest:d}.";
-                return Page();
-            }
-            if (ArchivedDate.Value.Date > DateTime.Today)
-            {
-                Error = "Archive date must be today or earlier.";
-                return Page();
-            }
         }
 
         var all = await _submissions.GetBatchSubmissionTissuesAsync(Session.BatchID ?? 0);
@@ -182,27 +169,39 @@ public class ArchiveTissuesModel : GridPageModel
         var bulkMode = selected.Count >= 2;
 
         foreach (var tissue in selected)
-        {
-            var updated = new Tissue
-            {
-                ID = tissue.ID,
-                OwnerID = tissue.OwnerID,
-                Owner = tissue.Owner,
-                TissueCode = tissue.TissueCode,
-                NoPieces = tissue.NoPieces,
-                Comment = tissue.Comment,
-                RowStamp = tissue.RowStamp,
-                ArchiveLocation = !bulkMode || !string.IsNullOrWhiteSpace(ArchiveLocationCode) ? ArchiveLocationCode : tissue.ArchiveLocation,
-                ArchivedDate = !bulkMode || ArchivedDate is not null ? ArchivedDate : tissue.ArchivedDate,
-                ArchiveComment = !bulkMode || !string.IsNullOrWhiteSpace(Comment) ? Comment : tissue.ArchiveComment,
-            };
-            await _submissions.UpdateTissueAsync(updated, Session.UserID);
-        }
+            await _submissions.UpdateTissueAsync(BuildUpdatedTissue(tissue, bulkMode), Session.UserID);
 
         SuccessMessage = $"Archive information updated for {selected.Count} tissue(s).";
         await LoadAsync();
         return Page();
     }
+
+    private string? ValidateArchiveUpdate()
+    {
+        // Legacy requires both: rfvArchiveLocation, and a blank date shows the red star and skips the update.
+        if (string.IsNullOrWhiteSpace(ArchiveLocationCode) || ArchivedDate is null)
+            return "Select an archive location and enter an archived date.";
+
+        var earliest = Batch?.ReceivedDate?.Date;
+        if (earliest is not null && ArchivedDate.Value.Date < earliest)
+            return $"Archive date must be the same or later than the Submission received date of {earliest:d}.";
+
+        return ArchivedDate.Value.Date > DateTime.Today ? "Archive date must be today or earlier." : null;
+    }
+
+    private Tissue BuildUpdatedTissue(Tissue tissue, bool bulkMode) => new()
+    {
+        ID = tissue.ID,
+        OwnerID = tissue.OwnerID,
+        Owner = tissue.Owner,
+        TissueCode = tissue.TissueCode,
+        NoPieces = tissue.NoPieces,
+        Comment = tissue.Comment,
+        RowStamp = tissue.RowStamp,
+        ArchiveLocation = !bulkMode || !string.IsNullOrWhiteSpace(ArchiveLocationCode) ? ArchiveLocationCode : tissue.ArchiveLocation,
+        ArchivedDate = !bulkMode || ArchivedDate is not null ? ArchivedDate : tissue.ArchivedDate,
+        ArchiveComment = !bulkMode || !string.IsNullOrWhiteSpace(Comment) ? Comment : tissue.ArchiveComment,
+    };
 
     private async Task LoadAsync()
     {

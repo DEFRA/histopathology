@@ -18,23 +18,23 @@
         </tr>
     </thead>
     <tbody class="govuk-table__body">
-        @foreach (var l in Model.PagedEntries)
+        @foreach (var tableName in Model.GetPagedEntries().Select(l => l.TableName))
         {
             <tr class="govuk-table__row">
-                <td class="govuk-table__cell">@l.TableName</td>
+                <td class="govuk-table__cell">@tableName</td>
                 <td class="govuk-table__cell govuk-table__cell--numeric">
-                    @if (l.TableName == "Species")
+                    @if (tableName == "Species")
                     {
-                        <a asp-page="/Admin/SpeciesItems" class="govuk-link">Edit items<span class="govuk-visually-hidden"> for @l.TableName</span></a>
+                        <a asp-page="/Admin/SpeciesItems" class="govuk-link">Edit items<span class="govuk-visually-hidden"> for @tableName</span></a>
                     }
                     else
                     {
-                        <a asp-page="/Admin/LookupItems" class="govuk-link">Edit items<span class="govuk-visually-hidden"> for @l.TableName</span></a>
+                        <a asp-page="/Admin/LookupItems" class="govuk-link">Edit items<span class="govuk-visually-hidden"> for @tableName</span></a>
                     }
                 </td>
             </tr>
         }
-        @if (!Model.PagedEntries.Any())
+        @if (!Model.GetPagedEntries().Any())
         {
             <tr class="govuk-table__row"><td colspan="2" class="govuk-table__cell">No editable pick lists found.</td></tr>
         }

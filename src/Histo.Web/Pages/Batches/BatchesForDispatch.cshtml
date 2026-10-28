@@ -55,7 +55,7 @@ else
             </tr>
         </thead>
         <tbody class="govuk-table__body">
-            @foreach (var b in Model.PagedEntries)
+            @foreach (var b in Model.GetPagedEntries())
             {
                 <tr class="govuk-table__row">
                     <td class="govuk-table__cell">@b.ID</td>

@@ -15,6 +15,8 @@ namespace Histo.Web.Pages.Bookings;
 /// </summary>
 public class BookHistologyRefModel : HistoPageModel
 {
+    private const string BookHistologyRefsTitle = "Block book histology refs";
+
     private readonly IHistologyRefService _refs;
 
     public BookHistologyRefModel(ISessionService session, IHistologyRefService refs)
@@ -30,15 +32,15 @@ public class BookHistologyRefModel : HistoPageModel
 
     public async Task OnGetAsync()
     {
-        ViewData["Title"] = "Block book histology refs";
-        ViewData["PageTitle"] = "Block book histology refs";
+        ViewData["Title"] = BookHistologyRefsTitle;
+        ViewData["PageTitle"] = BookHistologyRefsTitle;
         Counters = await _refs.GetCountersAsync();
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Block book histology refs";
-        ViewData["PageTitle"] = "Block book histology refs";
+        ViewData["Title"] = BookHistologyRefsTitle;
+        ViewData["PageTitle"] = BookHistologyRefsTitle;
 
         if (HistologyType <= 0)
         {

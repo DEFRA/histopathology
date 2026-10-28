@@ -23,21 +23,23 @@ public class AuditLogBySubmissionModel : GridPageModel
 
     public int TotalCount => Results.Count;
 
-    public IReadOnlyList<AuditLogEntry> PagedEntries =>
-        (SortColumn switch
-        {
-            "FieldName"   => SortDesc ? Results.OrderByDescending(e => e.FieldName)   : Results.OrderBy(e => e.FieldName),
-            "UserName"    => SortDesc ? Results.OrderByDescending(e => e.UserName)    : Results.OrderBy(e => e.UserName),
-            "TableName"   => SortDesc ? Results.OrderByDescending(e => e.TableName)   : Results.OrderBy(e => e.TableName),
-            "BeforeValue" => SortDesc ? Results.OrderByDescending(e => e.BeforeValue) : Results.OrderBy(e => e.BeforeValue),
-            "AfterValue"  => SortDesc ? Results.OrderByDescending(e => e.AfterValue)  : Results.OrderBy(e => e.AfterValue),
-            "Reason"      => SortDesc ? Results.OrderByDescending(e => e.Reason)      : Results.OrderBy(e => e.Reason),
-            "KeyID"       => SortDesc ? Results.OrderByDescending(e => e.KeyID)       : Results.OrderBy(e => e.KeyID),
-            _             => SortDesc ? Results.OrderByDescending(e => e.ChangedAt)  : Results.OrderBy(e => e.ChangedAt),
-        })
+    public IReadOnlyList<AuditLogEntry> GetPagedEntries() =>
+        (SortDesc ? Results.OrderByDescending(SortKey(SortColumn)) : Results.OrderBy(SortKey(SortColumn)))
         .Skip((PageNumber - 1) * PageSize)
         .Take(PageSize)
         .ToList();
+
+    private static Func<AuditLogEntry, object?> SortKey(string? column) => column switch
+    {
+        "FieldName"   => e => e.FieldName,
+        "UserName"    => e => e.UserName,
+        "TableName"   => e => e.TableName,
+        "BeforeValue" => e => e.BeforeValue,
+        "AfterValue"  => e => e.AfterValue,
+        "Reason"      => e => e.Reason,
+        "KeyID"       => e => e.KeyID,
+        _             => e => e.ChangedAt,
+    };
 
     public void OnGet()
     {

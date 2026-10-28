@@ -39,21 +39,23 @@ public partial class ViewImportedDataModel : GridPageModel
     public IReadOnlyList<LookupItem> Tables { get; private set; } = [];
     public IReadOnlyList<ImportedDataRow> Results { get; private set; } = [];
 
-    public IReadOnlyList<ImportedDataRow> PagedResults =>
-        (SortColumn switch
-        {
-            "HistologyRef"  => SortDesc ? Results.OrderByDescending(r => r.HistologyRef)  : Results.OrderBy(r => r.HistologyRef),
-            "BlockRef"      => SortDesc ? Results.OrderByDescending(r => r.BlockRef)      : Results.OrderBy(r => r.BlockRef),
-            "Project"       => SortDesc ? Results.OrderByDescending(r => r.Project)       : Results.OrderBy(r => r.Project),
-            "DateSubmitted" => SortDesc ? Results.OrderByDescending(r => r.DateSubmitted) : Results.OrderBy(r => r.DateSubmitted),
-            "Species"       => SortDesc ? Results.OrderByDescending(r => r.Species)       : Results.OrderBy(r => r.Species),
-            "Tissue"        => SortDesc ? Results.OrderByDescending(r => r.Tissue)        : Results.OrderBy(r => r.Tissue),
-            "Comments" => SortDesc ? Results.OrderByDescending(r => r.Comments) : Results.OrderBy(r => r.Comments),
-            _               => SortDesc ? Results.OrderByDescending(r => r.SenderRef)     : Results.OrderBy(r => r.SenderRef),
-        })
+    public IReadOnlyList<ImportedDataRow> GetPagedResults() =>
+        (SortDesc ? Results.OrderByDescending(SortKey(SortColumn)) : Results.OrderBy(SortKey(SortColumn)))
         .Skip((PageNumber - 1) * PageSize)
         .Take(PageSize)
         .ToList();
+
+    private static Func<ImportedDataRow, object?> SortKey(string? column) => column switch
+    {
+        "HistologyRef"  => r => r.HistologyRef,
+        "BlockRef"      => r => r.BlockRef,
+        "Project"       => r => r.Project,
+        "DateSubmitted" => r => r.DateSubmitted,
+        "Species"       => r => r.Species,
+        "Tissue"        => r => r.Tissue,
+        "Comments"      => r => r.Comments,
+        _               => r => r.SenderRef,
+    };
 
     public async Task OnGetAsync()
     {

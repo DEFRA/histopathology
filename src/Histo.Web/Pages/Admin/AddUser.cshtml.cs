@@ -12,6 +12,8 @@ namespace Histo.Web.Pages.Admin;
 /// </summary>
 public class AddUserModel : HistoPageModel, IUserFormFields
 {
+    private const string AddUserTitle = "Add user";
+
     private readonly IUserService _users;
     private readonly ILookupService _lookups;
 
@@ -52,16 +54,16 @@ public class AddUserModel : HistoPageModel, IUserFormFields
 
     public async Task OnGetAsync()
     {
-        ViewData["Title"] = "Add user";
-        ViewData["PageTitle"] = "Add user";
+        ViewData["Title"] = AddUserTitle;
+        ViewData["PageTitle"] = AddUserTitle;
         Active = true;
         await LoadLookupsAsync();
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Add user";
-        ViewData["PageTitle"] = "Add user";
+        ViewData["Title"] = AddUserTitle;
+        ViewData["PageTitle"] = AddUserTitle;
         await LoadLookupsAsync();
 
         Validate();

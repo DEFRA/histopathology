@@ -729,8 +729,8 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         // summary; a block that completed Done always has at least one tissue by construction.
         Blocks = Blocks.Where(b => allTissues.Any(t => t.OwnerID == b.ID)).ToList();
         var tissuesByBlockId = new Dictionary<int, IReadOnlyList<Tissue>>();
-        foreach (var block in Blocks)
-            tissuesByBlockId[block.ID] = allTissues.Where(t => t.OwnerID == block.ID).ToList();
+        foreach (var blockId in Blocks.Select(b => b.ID))
+            tissuesByBlockId[blockId] = allTissues.Where(t => t.OwnerID == blockId).ToList();
         TissuesByBlockId = tissuesByBlockId;
 
         // All 7 grid indicator columns (Archive/EO/H&E/H&E-BSE/IHC-PrP/IHC-Other/Special Stain)
@@ -744,8 +744,8 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
             // these grid checkboxes need every code, so they must use GetAllSelectionsByBatchAsync.
             var allTests = await _blockTests.GetAllSelectionsByBatchAsync(BatchId ?? 0);
             var histologyByBlock = new Dictionary<int, IReadOnlyList<string>>();
-            foreach (var block in Blocks)
-                histologyByBlock[block.ID] = allTests.Where(t => t.BlockID == block.ID && t.TestType == BlockTestType.Histology).Select(t => t.Code).ToList();
+            foreach (var blockId in Blocks.Select(b => b.ID))
+                histologyByBlock[blockId] = allTests.Where(t => t.BlockID == blockId && t.TestType == BlockTestType.Histology).Select(t => t.Code).ToList();
             HistologyCodesByBlockId = histologyByBlock;
         }
         catch (Exception ex)

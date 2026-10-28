@@ -27,6 +27,8 @@ namespace Histo.Web.Pages.Batches;
 /// </summary>
 public class DateReturnedModel : HistoPageModel
 {
+    private const string DateReturnedTitle = "Date returned";
+
     private const int LookupContacts = 18;  // Legacy source: HistopathologySystem/Common.vb — LOOKUP_CONTACTS
     private const int LookupProjects = 19;  // Legacy source: HistopathologySystem/Common.vb — LOOKUP_PROJECTS
 
@@ -75,8 +77,8 @@ public class DateReturnedModel : HistoPageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
-        ViewData["Title"] = "Date returned";
-        ViewData["PageTitle"] = "Date returned";
+        ViewData["Title"] = DateReturnedTitle;
+        ViewData["PageTitle"] = DateReturnedTitle;
 
         if (Session.BatchID is null or <= 0)
             return RedirectToPage("/Submissions/ViewSubmissions");
@@ -103,8 +105,8 @@ public class DateReturnedModel : HistoPageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Date returned";
-        ViewData["PageTitle"] = "Date returned";
+        ViewData["Title"] = DateReturnedTitle;
+        ViewData["PageTitle"] = DateReturnedTitle;
 
         // Defensive — the read-only view never renders this form, so this only guards against a
         // direct/replayed POST while in that mode.

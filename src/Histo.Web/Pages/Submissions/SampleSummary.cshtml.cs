@@ -155,9 +155,7 @@ public class SampleSummaryModel : GridPageModel
         // yet block-assigned from the plain animal list.
         // Once blocks are assigned (Done) legacy BatchBlockSummary lists only the block animals; the
         // submission animal of a migrated batch is a placeholder whose "sender ref" is a histology ref.
-        var animals = blockAnimals.Count == 0 ? allAnimals
-            : Batch?.IsBlocked == true ? blockAnimals
-            : MergeAnimals(blockAnimals, allAnimals);
+        var animals = SelectAnimals(blockAnimals, allAnimals);
 
         // Default sort: SenderRef ASC then HistologyRef ASC, matching legacy ByPassSort=false behaviour.
         // When ByPassSort=true the user has explicitly requested block-insertion order — preserve SP order.
@@ -357,6 +355,13 @@ public class SampleSummaryModel : GridPageModel
         if (current is not null)
             await _batches.SetByPassSortAsync(batchId.Value, !current.ByPassSort, Session.UserID);
         return RedirectToPage(new { batchId });
+    }
+
+    private IReadOnlyList<Animal> SelectAnimals(IReadOnlyList<Animal> blockAnimals, IReadOnlyList<Animal> allAnimals)
+    {
+        if (blockAnimals.Count == 0) return allAnimals;
+        if (Batch?.IsBlocked == true) return blockAnimals;
+        return MergeAnimals(blockAnimals, allAnimals);
     }
 
     /// <summary>Unions two animal lists by ID, keeping the first list's entries and appending any not already present.</summary>

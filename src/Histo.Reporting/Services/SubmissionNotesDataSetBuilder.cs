@@ -31,6 +31,15 @@ namespace Histo.Reporting.Services;
 /// </summary>
 public sealed class SubmissionNotesDataSetBuilder
 {
+    private const string SenderRefColumn = "SenderRef";
+    private const string CommentColumn = "Comment";
+    private const string ArchiveCommentColumn = "ArchiveComment";
+    private const string BlockRefColumn = "BlockRef";
+    private const string TestCommentColumn = "TestComment";
+    private const string TestArchiveCommentColumn = "TestArchiveComment";
+    
+    private static readonly string[] NoteTableNames = ["SubmissionTissues", "SubmissionBlocks", "BlockAntibodies", "BlockHistology", "BlockSpecialStain"];
+
     private readonly IDbConnectionFactory _db;
 
     public SubmissionNotesDataSetBuilder(IDbConnectionFactory db) => _db = db;
@@ -86,19 +95,19 @@ public sealed class SubmissionNotesDataSetBuilder
 
         // ── SubmissionTissues (result set 1) — filter non-blank Comment/ArchiveComment ──
         var tissues = new DataTable("SubmissionTissues");
-        tissues.Columns.Add("SenderRef");
+        tissues.Columns.Add(SenderRefColumn);
         tissues.Columns.Add("TissueCode");
         tissues.Columns.Add("TissueComment");
         tissues.Columns.Add("TissueArchiveComment");
 
         foreach (var src in rawTissues)
         {
-            var comment = Str(src, "Comment").Trim();
-            var archive = Str(src, "ArchiveComment").Trim();
+            var comment = Str(src, CommentColumn).Trim();
+            var archive = Str(src, ArchiveCommentColumn).Trim();
             if (comment == string.Empty && archive == string.Empty) continue;
 
             var r = tissues.NewRow();
-            r["SenderRef"]           = Str(src, "SenderRef");
+            r[SenderRefColumn]           = Str(src, SenderRefColumn);
             r["TissueCode"]          = Str(src, "TissueCode");
             r["TissueComment"]       = comment;
             r["TissueArchiveComment"] = archive;
@@ -108,20 +117,20 @@ public sealed class SubmissionNotesDataSetBuilder
 
         // ── SubmissionBlocks (result set 2) ──────────────────────────────────
         var blocks = new DataTable("SubmissionBlocks");
-        blocks.Columns.Add("SenderRef");
-        blocks.Columns.Add("BlockRef");
+        blocks.Columns.Add(SenderRefColumn);
+        blocks.Columns.Add(BlockRefColumn);
         blocks.Columns.Add("BlockComment");
         blocks.Columns.Add("BlockArchiveComment");
 
         foreach (var src in rawBlocks)
         {
-            var comment = Str(src, "Comment").Trim();
-            var archive = Str(src, "ArchiveComment").Trim();
+            var comment = Str(src, CommentColumn).Trim();
+            var archive = Str(src, ArchiveCommentColumn).Trim();
             if (comment == string.Empty && archive == string.Empty) continue;
 
             var r = blocks.NewRow();
-            r["SenderRef"]          = Str(src, "SenderRef");
-            r["BlockRef"]           = Str(src, "BlockRef");
+            r[SenderRefColumn]          = Str(src, SenderRefColumn);
+            r[BlockRefColumn]           = Str(src, BlockRefColumn);
             r["BlockComment"]       = comment;
             r["BlockArchiveComment"] = archive;
             blocks.Rows.Add(r);
@@ -130,66 +139,66 @@ public sealed class SubmissionNotesDataSetBuilder
 
         // ── BlockAntibodies (result set 3) ───────────────────────────────────
         var antibodies = new DataTable("BlockAntibodies");
-        antibodies.Columns.Add("BlockRef");
+        antibodies.Columns.Add(BlockRefColumn);
         antibodies.Columns.Add("Test");
-        antibodies.Columns.Add("TestComment");
-        antibodies.Columns.Add("TestArchiveComment");
+        antibodies.Columns.Add(TestCommentColumn);
+        antibodies.Columns.Add(TestArchiveCommentColumn);
 
         foreach (var src in rawAntibodies)
         {
-            var comment = Str(src, "Comment").Trim();
-            var archive = Str(src, "ArchiveComment").Trim();
+            var comment = Str(src, CommentColumn).Trim();
+            var archive = Str(src, ArchiveCommentColumn).Trim();
             if (comment == string.Empty && archive == string.Empty) continue;
 
             var r = antibodies.NewRow();
-            r["BlockRef"]           = Str(src, "BlockRef");
+            r[BlockRefColumn]           = Str(src, BlockRefColumn);
             r["Test"]               = Str(src, "Description");
-            r["TestComment"]        = comment;
-            r["TestArchiveComment"] = archive;
+            r[TestCommentColumn]        = comment;
+            r[TestArchiveCommentColumn] = archive;
             antibodies.Rows.Add(r);
         }
         ds.Tables.Add(antibodies);
 
         // ── BlockHistology (result set 4) ─────────────────────────────────────
         var histology = new DataTable("BlockHistology");
-        histology.Columns.Add("BlockRef");
+        histology.Columns.Add(BlockRefColumn);
         histology.Columns.Add("Test");
-        histology.Columns.Add("TestComment");
-        histology.Columns.Add("TestArchiveComment");
+        histology.Columns.Add(TestCommentColumn);
+        histology.Columns.Add(TestArchiveCommentColumn);
 
         foreach (var src in rawHistology)
         {
-            var comment = Str(src, "Comment").Trim();
-            var archive = Str(src, "ArchiveComment").Trim();
+            var comment = Str(src, CommentColumn).Trim();
+            var archive = Str(src, ArchiveCommentColumn).Trim();
             if (comment == string.Empty && archive == string.Empty) continue;
 
             var r = histology.NewRow();
-            r["BlockRef"]           = Str(src, "BlockRef");
+            r[BlockRefColumn]           = Str(src, BlockRefColumn);
             r["Test"]               = Str(src, "Description");
-            r["TestComment"]        = comment;
-            r["TestArchiveComment"] = archive;
+            r[TestCommentColumn]        = comment;
+            r[TestArchiveCommentColumn] = archive;
             histology.Rows.Add(r);
         }
         ds.Tables.Add(histology);
 
         // ── BlockSpecialStain (result set 5) ──────────────────────────────────
         var stains = new DataTable("BlockSpecialStain");
-        stains.Columns.Add("BlockRef");
+        stains.Columns.Add(BlockRefColumn);
         stains.Columns.Add("Test");
-        stains.Columns.Add("TestComment");
-        stains.Columns.Add("TestArchiveComment");
+        stains.Columns.Add(TestCommentColumn);
+        stains.Columns.Add(TestArchiveCommentColumn);
 
         foreach (var src in rawStains)
         {
-            var comment = Str(src, "Comment").Trim();
-            var archive = Str(src, "ArchiveComment").Trim();
+            var comment = Str(src, CommentColumn).Trim();
+            var archive = Str(src, ArchiveCommentColumn).Trim();
             if (comment == string.Empty && archive == string.Empty) continue;
 
             var r = stains.NewRow();
-            r["BlockRef"]           = Str(src, "BlockRef");
+            r[BlockRefColumn]           = Str(src, BlockRefColumn);
             r["Test"]               = Str(src, "Description");
-            r["TestComment"]        = comment;
-            r["TestArchiveComment"] = archive;
+            r[TestCommentColumn]        = comment;
+            r[TestArchiveCommentColumn] = archive;
             stains.Rows.Add(r);
         }
         ds.Tables.Add(stains);
@@ -218,7 +227,7 @@ public sealed class SubmissionNotesDataSetBuilder
                 return true;
         }
 
-        return new[] { "SubmissionTissues", "SubmissionBlocks", "BlockAntibodies", "BlockHistology", "BlockSpecialStain" }
+        return NoteTableNames
             .Any(name => ds.Tables[name] is { Rows.Count: > 0 });
     }
 

@@ -22,6 +22,8 @@ namespace Histo.Web.Pages.Blocks;
 /// </summary>
 public class CopyBlocksModel : HistoPageModel
 {
+    private const string CopyBlocksTitle = "Copy Blocks";
+
     private readonly IBlockService _blocks;
     private readonly ISubmissionService _submissions;
     private readonly IBatchService _batches;
@@ -68,8 +70,8 @@ public class CopyBlocksModel : HistoPageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
-        ViewData["Title"] = "Copy Blocks";
-        ViewData["PageTitle"] = "Copy Blocks";
+        ViewData["Title"] = CopyBlocksTitle;
+        ViewData["PageTitle"] = CopyBlocksTitle;
 
         var blockIdsCsv = TempData.Peek("CopyBlockIds") as string;
         var batchId = BatchId ?? Session.BatchID;
@@ -88,8 +90,8 @@ public class CopyBlocksModel : HistoPageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Copy Blocks";
-        ViewData["PageTitle"] = "Copy Blocks";
+        ViewData["Title"] = CopyBlocksTitle;
+        ViewData["PageTitle"] = CopyBlocksTitle;
 
         var batchId = BatchId ?? Session.BatchID;
         if (batchId is null || BlockIds.Count == 0)

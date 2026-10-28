@@ -57,7 +57,7 @@ public sealed class HistopathologyClaimsTransformation : IClaimsTransformation
             return principal; // no GroupName added → HistoPageModel redirects to AccessDenied
         }
 
-        var identity = (ClaimsIdentity)principal.Identity!;
+        var identity = (ClaimsIdentity)principal.Identity;
 
         // Drop any app claims carried in the auth cookie from a previous request before
         // re-adding them. AddClaim appends rather than replaces, and FindFirst returns the

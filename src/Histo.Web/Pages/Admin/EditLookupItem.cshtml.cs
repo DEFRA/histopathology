@@ -48,14 +48,20 @@ public class EditLookupItemModel : HistoPageModel
 
     private IReadOnlyList<LookupItem> _existingItems = [];
 
+    private LookupItem? FindExistingItem()
+    {
+        if (TableHasCodes && ItemCode is not null)
+            return _existingItems.FirstOrDefault(i => string.Equals(i.Code, ItemCode, StringComparison.OrdinalIgnoreCase));
+
+        return ItemId is int id ? _existingItems.FirstOrDefault(i => i.ID == id) : null;
+    }
+
     public async Task<IActionResult> OnGetAsync()
     {
         SetTitle();
         await LoadTableAsync();
 
-        LookupItem? item = TableHasCodes && ItemCode is not null
-            ? _existingItems.FirstOrDefault(i => string.Equals(i.Code, ItemCode, StringComparison.OrdinalIgnoreCase))
-            : ItemId is int id ? _existingItems.FirstOrDefault(i => i.ID == id) : null;
+        var item = FindExistingItem();
 
         if (item is null) return RedirectToPage("/Admin/LookupItems", new { tableId = TableId, ReturnUrl });
 

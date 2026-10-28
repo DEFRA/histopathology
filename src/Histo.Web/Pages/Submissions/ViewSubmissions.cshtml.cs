@@ -26,6 +26,10 @@ namespace Histo.Web.Pages.Submissions;
 /// </summary>
 public class ViewSubmissionsModel : HistoPageModel
 {
+    private const string SpeciesColumn = "Species";
+    private const string StatusColumn = "Status";
+    private const string ViewSubmissionsTitle = "View submissions";
+
     private readonly IBatchService   _batches;
     private readonly IUserService    _users;
     private readonly ILookupService  _lookups;
@@ -39,12 +43,12 @@ public class ViewSubmissionsModel : HistoPageModel
         ("Sub. Number",              "ID"),
         ("Project Code",             "ProjectDescription"),
         ("Pathologist",              "ContactDescription"),
-        ("Species",                  "Species"),
+        (SpeciesColumn,                  SpeciesColumn),
         ("Date Submitted",           "BatchDate"),
         ("Date Received / Rejected", "DateReceived"),
         ("Date Completed",           "DateCompleted"),
         ("Customer Received Date",   "CustomerReceivedDate"),
-        ("Status",                   "Status"),
+        (StatusColumn,                   StatusColumn),
     ];
 
     // Constants matching Common.vb
@@ -88,18 +92,18 @@ public class ViewSubmissionsModel : HistoPageModel
     [BindProperty(SupportsGet = true)] public bool    SortDesc   { get; set; }
     [BindProperty(SupportsGet = true)] public int     PageNumber { get; set; } = 1;
 
-    public IReadOnlyList<BatchSearchResult> PagedResults =>
+    public IReadOnlyList<BatchSearchResult> GetPagedResults() =>
         (SortColumn switch
         {
             "ID"                 => SortDesc ? Results.OrderByDescending(r => r.ID)                  : Results.OrderBy(r => r.ID),
             "ProjectDescription" => SortDesc ? Results.OrderByDescending(r => r.ProjectDescription) : Results.OrderBy(r => r.ProjectDescription),
             "ContactDescription" => SortDesc ? Results.OrderByDescending(r => r.ContactDescription) : Results.OrderBy(r => r.ContactDescription),
-            "Species"            => SortDesc ? Results.OrderByDescending(r => r.Species)            : Results.OrderBy(r => r.Species),
+            SpeciesColumn            => SortDesc ? Results.OrderByDescending(r => r.Species)            : Results.OrderBy(r => r.Species),
             "BatchDate"          => SortDesc ? Results.OrderByDescending(r => r.BatchDate)           : Results.OrderBy(r => r.BatchDate),
             "DateReceived"       => SortDesc ? Results.OrderByDescending(r => r.DateReceived)        : Results.OrderBy(r => r.DateReceived),
             "DateCompleted"      => SortDesc ? Results.OrderByDescending(r => r.DateCompleted)       : Results.OrderBy(r => r.DateCompleted),
             "CustomerReceivedDate" => SortDesc ? Results.OrderByDescending(r => r.CustomerReceivedDate) : Results.OrderBy(r => r.CustomerReceivedDate),
-            "Status"             => SortDesc ? Results.OrderByDescending(r => r.Status)              : Results.OrderBy(r => r.Status),
+            StatusColumn             => SortDesc ? Results.OrderByDescending(r => r.Status)              : Results.OrderBy(r => r.Status),
             // No column clicked yet — legacy default: dvBatchesView.Sort = "ID DESC" (newest first).
             _                    => Results.OrderByDescending(r => r.ID),
         })
@@ -186,8 +190,8 @@ public class ViewSubmissionsModel : HistoPageModel
 
     public async Task OnGetAsync()
     {
-        ViewData["Title"] = "View submissions";
-        ViewData["PageTitle"] = "View submissions";
+        ViewData["Title"] = ViewSubmissionsTitle;
+        ViewData["PageTitle"] = ViewSubmissionsTitle;
         RestoreCriteria();
         var lookupsTask = LoadLookupsAsync();
         // Show the unfiltered list on first load, matching legacy — a search isn't mandatory
@@ -210,8 +214,8 @@ public class ViewSubmissionsModel : HistoPageModel
 
     public async Task<IActionResult> OnPostSearchAsync()
     {
-        ViewData["Title"] = "View submissions";
-        ViewData["PageTitle"] = "View submissions";
+        ViewData["Title"] = ViewSubmissionsTitle;
+        ViewData["PageTitle"] = ViewSubmissionsTitle;
         var lookupsTask = LoadLookupsAsync();
         var resultsTask = _batches.SearchAsync(BuildCriteria());
         await Task.WhenAll(lookupsTask, resultsTask);
@@ -299,9 +303,9 @@ public class ViewSubmissionsModel : HistoPageModel
         var results = await _batches.SearchAsync(BuildCriteria());
         return ExcelExportHelper.BuildXlsx(
             "view-submissions.xlsx",
-            ["Submission Number", "Project/Contract", "Pathologist", "Species", "Submitted Date",
+            ["Submission Number", "Project/Contract", "Pathologist", SpeciesColumn, "Submitted Date",
              "Submission Type", "Submitted By", "Safe To Handle", "Received Date", "Time Received/Rejected",
-             "Received By", "Other Submitted By", "Comments", "Customer Received Date", "Status", "Completed Date"],
+             "Received By", "Other Submitted By", "Comments", "Customer Received Date", StatusColumn, "Completed Date"],
             results.Select(r => (IReadOnlyList<object?>)new object?[]
             {
                 r.ID,

@@ -587,18 +587,16 @@ public class AddSubmissionModel : HistoPageModel
             // A sender ref can match more than one animal row (e.g. an unrelated past submission
             // with no pre-booked blocks, alongside the actual pre-booked placeholder) — check each
             // candidate rather than assuming the first match is the pre-booked one.
-            Block[] preBookedBlocks = [];
             SenderSearchResult? preBookedAnimal = null;
             foreach (var candidate in await _submissions.GetAnimalBySenderAsync(senderRef))
             {
                 var candidateBlocks = await _blocks.GetPreBookedByAnimalAsync(candidate.ID);
                 if (candidateBlocks.Count == 0) continue;
                 preBookedAnimal = candidate;
-                preBookedBlocks = [.. candidateBlocks];
                 break;
             }
 
-            if (preBookedAnimal is null || preBookedBlocks.Length == 0)
+            if (preBookedAnimal is null)
                 return (0, "This sender reference has no pre-booked block. Book a block reference for this sender before adding the sample.");
 
             return (preBookedAnimal.ID, null);

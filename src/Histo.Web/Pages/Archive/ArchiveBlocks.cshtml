@@ -148,7 +148,7 @@
             </tr>
         </thead>
         <tbody class="govuk-table__body">
-            @foreach (var r in Model.PagedEntries)
+            @foreach (var r in Model.GetPagedEntries())
             {
                 <tr class="govuk-table__row">
                     <td class="govuk-table__cell">
@@ -168,7 +168,7 @@
                     <td class="govuk-table__cell">@r.ArchiveLocationName</td>
                 </tr>
             }
-            @if (!Model.PagedEntries.Any())
+            @if (!Model.GetPagedEntries().Any())
             {
                 <tr class="govuk-table__row"><td colspan="6" class="govuk-table__cell">@(Model.FilterApplied ? "No blocks match the selected filter." : "No blocks to archive.")</td></tr>
             }

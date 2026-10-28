@@ -27,6 +27,8 @@ namespace Histo.Web.Pages.Search;
 /// </summary>
 public class SearchSubmissionsModel : HistoPageModel
 {
+    private const string SearchSubmissionsTitle = "Search Submissions";
+
     private readonly IBatchService _batches;
     private readonly IUserService _users;
     private readonly ILookupService _lookups;
@@ -90,7 +92,7 @@ public class SearchSubmissionsModel : HistoPageModel
     public string BackLinkPage =>
         !string.IsNullOrWhiteSpace(ReturnPage) && Url.IsLocalUrl(ReturnPage) ? ReturnPage : "/Search/SearchMenu";
 
-    public IReadOnlyList<BatchSearchResult> PagedResults =>
+    public IReadOnlyList<BatchSearchResult> GetPagedResults() =>
         (SortColumn switch
         {
             "ProjectDescription" => SortDesc ? Results.OrderByDescending(r => r.ProjectDescription) : Results.OrderBy(r => r.ProjectDescription),
@@ -235,8 +237,8 @@ public class SearchSubmissionsModel : HistoPageModel
 
     public async Task OnGetAsync()
     {
-        ViewData["Title"] = "Search Submissions";
-        ViewData["PageTitle"] = "Search Submissions";
+        ViewData["Title"] = SearchSubmissionsTitle;
+        ViewData["PageTitle"] = SearchSubmissionsTitle;
         await LoadLookupsAsync();
 
         // Show the unfiltered result set by default on first load — all filter-criteria
@@ -250,8 +252,8 @@ public class SearchSubmissionsModel : HistoPageModel
 
     public async Task<IActionResult> OnPostSearchAsync()
     {
-        ViewData["Title"] = "Search Submissions";
-        ViewData["PageTitle"] = "Search Submissions";
+        ViewData["Title"] = SearchSubmissionsTitle;
+        ViewData["PageTitle"] = SearchSubmissionsTitle;
         await LoadLookupsAsync();
         SelectedBatchId = 0;
 
@@ -271,8 +273,8 @@ public class SearchSubmissionsModel : HistoPageModel
     /// </summary>
     public async Task<IActionResult> OnPostSelectAsync()
     {
-        ViewData["Title"] = "Search Submissions";
-        ViewData["PageTitle"] = "Search Submissions";
+        ViewData["Title"] = SearchSubmissionsTitle;
+        ViewData["PageTitle"] = SearchSubmissionsTitle;
         await LoadLookupsAsync();
 
         if (SelectedBatchId > 0)

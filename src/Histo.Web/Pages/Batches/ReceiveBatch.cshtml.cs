@@ -27,6 +27,8 @@ namespace Histo.Web.Pages.Batches;
 /// </summary>
 public class ReceiveBatchModel : HistoPageModel
 {
+    private const string BatchesNotReceivedPage = "/Batches/BatchesNotReceived";
+
     private const int LookupTimeReceived = 3;  // Legacy source: HistopathologySystem/Common.vb — LOOKUP_TIME_RECEIVED
     private const int LookupPostFixation = 12; // Legacy source: HistopathologySystem/Common.vb — LOOKUP_POSTFIXATION
 
@@ -71,7 +73,7 @@ public class ReceiveBatchModel : HistoPageModel
 
     /// <summary>Page path for the back link / cancel target — set by the list page before navigating here.</summary>
     public string BackLinkPage => string.IsNullOrWhiteSpace(Session.ReturnPage)
-        ? "/Batches/BatchesNotReceived"
+        ? BatchesNotReceivedPage
         : Session.ReturnPage;
 
     // ── Bind properties (the receive/reject form) ──────────────────────────
@@ -87,10 +89,10 @@ public class ReceiveBatchModel : HistoPageModel
     public async Task<IActionResult> OnGetAsync()
     {
         SetTitle();
-        if (Session.BatchID is null or <= 0) return RedirectToPage("/Batches/BatchesNotReceived");
+        if (Session.BatchID is null or <= 0) return RedirectToPage(BatchesNotReceivedPage);
 
         Batch = await _batches.GetByIdAsync(Session.BatchID.Value);
-        if (Batch is null) return RedirectToPage("/Batches/BatchesNotReceived");
+        if (Batch is null) return RedirectToPage(BatchesNotReceivedPage);
 
         // Clears the one-shot pointer OnPostEditSubmission left behind, otherwise this page's
         // own BackLinkPage/Cancel would target itself on every visit after an Edit Submission trip.
@@ -201,7 +203,7 @@ public class ReceiveBatchModel : HistoPageModel
             return Page();
         }
 
-        Session.ReturnPage = "/Batches/BatchesNotReceived";
+        Session.ReturnPage = BatchesNotReceivedPage;
         return RedirectToPage("/Batches/PrintSubmission");
     }
 

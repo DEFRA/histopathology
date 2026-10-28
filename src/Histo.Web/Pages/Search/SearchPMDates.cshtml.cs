@@ -43,7 +43,7 @@ public class SearchPMDatesModel : GridPageModel
     public string BackLinkPage =>
         !string.IsNullOrWhiteSpace(ReturnPage) && Url.IsLocalUrl(ReturnPage) ? ReturnPage : "/Search/SearchMenu";
 
-    public IReadOnlyList<PmDateSearchResult> PagedResults =>
+    public IReadOnlyList<PmDateSearchResult> GetPagedResults() =>
         (SortColumn switch
         {
             "SenderRef"            => SortDesc ? Results.OrderByDescending(r => r.SenderRef)            : Results.OrderBy(r => r.SenderRef),

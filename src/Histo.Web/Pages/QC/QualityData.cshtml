@@ -179,7 +179,7 @@
                 </tr>
             </thead>
             <tbody class="govuk-table__body">
-                @foreach (var t in Model.PagedEntries)
+                @foreach (var t in Model.GetPagedEntries())
                 {
                     var noHistologyRef = string.IsNullOrWhiteSpace(t.HistologyRef);
                     var locked = t.OnHold || noHistologyRef;

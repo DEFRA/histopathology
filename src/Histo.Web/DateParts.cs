@@ -46,10 +46,10 @@ public sealed class DateParts
             return false;
 
         // GDS specifies a four-digit year field; rejecting shorter input avoids "26" being read as year 26.
-        if (year!.Length != 4) return false;
+        if (year.Length != 4) return false;
         if (m is < 1 or > 12 || d < 1 || d > DateTime.DaysInMonth(y, m)) return false;
 
-        value = new DateTime(y, m, d);
+        value = new DateTime(y, m, d, 0, 0, 0, DateTimeKind.Unspecified);
         return true;
     }
 }

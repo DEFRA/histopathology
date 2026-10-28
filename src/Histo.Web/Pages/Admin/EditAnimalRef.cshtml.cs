@@ -29,6 +29,8 @@ namespace Histo.Web.Pages.Admin;
 /// </summary>
 public class EditAnimalRefModel : HistoPageModel
 {
+    private const string OriginalSenderRefField = "OriginalSenderRef";
+
     private readonly ISubmissionService _submissions;
 
     public EditAnimalRefModel(ISessionService session, ISubmissionService submissions)
@@ -58,7 +60,7 @@ public class EditAnimalRefModel : HistoPageModel
         if (string.IsNullOrWhiteSpace(OriginalSenderRef))
         {
             Error = "You must enter a Sample Ref.";
-            ErrorField = "OriginalSenderRef";
+            ErrorField = OriginalSenderRefField;
             return Page();
         }
 
@@ -68,12 +70,12 @@ public class EditAnimalRefModel : HistoPageModel
         // matching the legacy EditHistologyRef.aspx::getHistologyRef behaviour which called
         // clsAnimal.GetAnimalBySender with the exact sender ref supplied.
         var matches = await _submissions.GetAnimalBySenderAsync(OriginalSenderRef);
-        var match = matches.FirstOrDefault();
+        var match = matches.Count > 0 ? matches[0] : null;
 
         if (match is null)
         {
             Error = "Sample Ref. not found.";
-            ErrorField = "OriginalSenderRef";
+            ErrorField = OriginalSenderRefField;
             return Page();
         }
 
@@ -89,7 +91,7 @@ public class EditAnimalRefModel : HistoPageModel
         if (string.IsNullOrWhiteSpace(OriginalSenderRef))
         {
             Error = "You must enter a Sample Ref.";
-            ErrorField = "OriginalSenderRef";
+            ErrorField = OriginalSenderRefField;
             return Page();
         }
 
@@ -128,7 +130,7 @@ public class EditAnimalRefModel : HistoPageModel
         if (string.IsNullOrWhiteSpace(OriginalSenderRef))
         {
             Error = "You must enter a Sample Ref.";
-            ErrorField = "OriginalSenderRef";
+            ErrorField = OriginalSenderRefField;
             return Page();
         }
 

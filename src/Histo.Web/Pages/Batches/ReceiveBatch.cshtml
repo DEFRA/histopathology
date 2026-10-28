@@ -140,19 +140,17 @@ else
                     <div class="govuk-radios" data-module="govuk-radios">
                         <div class="govuk-radios__item">
                             <input class="govuk-radios__input" type="radio" id="status-submitted" name="Status"
-                                   value="@BatchStatus.Submitted" @(Model.Status == BatchStatus.Submitted ? "checked" : null) aria-expanded="false" />
+                                   value="@BatchStatus.Submitted" @(Model.Status == BatchStatus.Submitted ? "checked" : null) />
                             <label class="govuk-label govuk-radios__label" for="status-submitted">Not received</label>
                         </div>
                         <div class="govuk-radios__item">
                             <input class="govuk-radios__input" type="radio" id="status-received" name="Status"
-                                   value="@BatchStatus.Received" @(Model.Status == BatchStatus.Received ? "checked" : null)
-                                   aria-expanded="@(Model.Status == BatchStatus.Received ? "true" : "false")" />
+                                   value="@BatchStatus.Received" @(Model.Status == BatchStatus.Received ? "checked" : null) />
                             <label class="govuk-label govuk-radios__label" for="status-received">Received</label>
                         </div>
                         <div class="govuk-radios__item">
                             <input class="govuk-radios__input" type="radio" id="status-rejected" name="Status"
-                                   value="@BatchStatus.Rejected" @(Model.Status == BatchStatus.Rejected ? "checked" : null)
-                                   aria-expanded="@(Model.Status == BatchStatus.Rejected ? "true" : "false")" />
+                                   value="@BatchStatus.Rejected" @(Model.Status == BatchStatus.Rejected ? "checked" : null) />
                             <label class="govuk-label govuk-radios__label" for="status-rejected">Rejected</label>
                         </div>
                         @{
@@ -247,8 +245,6 @@ else
                 var timeReceived = document.getElementById('TimeReceived');
                 var receiptFields = [dateReceived, receivedBy, timeReceived];
                 var receiptDetails = document.getElementById('receipt-details');
-                var receivedRadio = document.getElementById('status-received');
-                var rejectedRadio = document.getElementById('status-rejected');
                 var statusRadios = document.querySelectorAll('input[name="Status"]');
 
                 // Reveal is handled here rather than via native govuk-radios aria-controls, because
@@ -258,9 +254,6 @@ else
 
                     receiptDetails.classList.toggle('govuk-radios__conditional--hidden', !isReceivedOrRejected);
                     receiptDetails.setAttribute('aria-hidden', (!isReceivedOrRejected).toString());
-
-                    receivedRadio.setAttribute('aria-expanded', (statusValue === '@BatchStatus.Received').toString());
-                    rejectedRadio.setAttribute('aria-expanded', (statusValue === '@BatchStatus.Rejected').toString());
 
                     receiptFields.forEach(function (field) { field.disabled = !isReceivedOrRejected; });
                     if (isReceivedOrRejected) {

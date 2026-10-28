@@ -21,6 +21,8 @@ namespace Histo.Web.Pages.Batches;
 /// </summary>
 public class CopyBatchModel : HistoPageModel
 {
+    private const string CopySubmissionTitle = "Copy Submission";
+
     private readonly IBatchService _batches;
     private readonly ISubmissionService _submissions;
     private readonly ILookupService _lookups;
@@ -51,8 +53,8 @@ public class CopyBatchModel : HistoPageModel
 
     public async Task<IActionResult> OnGetAsync(int sourceBatchId)
     {
-        ViewData["Title"] = "Copy Submission";
-        ViewData["PageTitle"] = "Copy Submission";
+        ViewData["Title"] = CopySubmissionTitle;
+        ViewData["PageTitle"] = CopySubmissionTitle;
 
         SourceBatchId = sourceBatchId;
 
@@ -143,8 +145,8 @@ public class CopyBatchModel : HistoPageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Copy Submission";
-        ViewData["PageTitle"] = "Copy Submission";
+        ViewData["Title"] = CopySubmissionTitle;
+        ViewData["PageTitle"] = CopySubmissionTitle;
 
         SourceBatch = await _batches.GetByIdAsync(SourceBatchId);
         if (SourceBatch is null)
