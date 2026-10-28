@@ -97,7 +97,7 @@ public class BatchRepositoryQueryTests
         Assert.Equal(77, id);
         var add = Assert.Single(db.Commands, c => c.Text == "AddBatch");
         Assert.Equal(7, add.Parameters["SubmittedBy"]);
-        Assert.Equal(false, add.Parameters["SafeToHandle"]);
+        Assert.False(Assert.IsType<bool>(add.Parameters["SafeToHandle"]));
         Assert.Equal(1, add.Parameters["BatchStatus"]);
         Assert.Equal(string.Empty, add.Parameters["Species"]);
         Assert.Equal(0, add.Parameters["OtherSubmittedBy"]);
@@ -115,7 +115,7 @@ public class BatchRepositoryQueryTests
         var add = Assert.Single(db.Commands, c => c.Text == "AddBatch");
         Assert.Equal(9, add.Parameters["SubmittedBy"]);
         Assert.Equal("4", add.Parameters["SubmittedArea"]);
-        Assert.Equal(true, add.Parameters["SafeToHandle"]);
+        Assert.True(Assert.IsType<bool>(add.Parameters["SafeToHandle"]));
         Assert.Equal("Bovine", add.Parameters["Species"]);
         Assert.Equal(3, add.Parameters["OtherSubmittedBy"]);
     }

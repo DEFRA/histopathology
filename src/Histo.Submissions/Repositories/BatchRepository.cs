@@ -309,8 +309,7 @@ public sealed class BatchRepository : IBatchRepository
         var existing = await GetByIdAsync(batchId, ct);
         if (existing is null) return;
         // Construct new Batch with only CustomerReceivedDate changed; preserve everything else.
-        var updated = CloneBatch(existing, existing.Status, existing.CompletedDate, existing.ByPassSort,
-            rowStamp, date, existing.IsBlocked, existing.AllTissuesAssigned);
+        var updated = CloneBatch(existing, BatchOverrides.Of(existing) with { RowStamp = rowStamp, CustomerReceivedDate = date });
         await UpdateAsync(updated, userId, ct);
     }
 
@@ -319,8 +318,7 @@ public sealed class BatchRepository : IBatchRepository
     {
         var existing = await GetByIdAsync(batchId, ct);
         if (existing is null) return;
-        var updated = CloneBatch(existing, existing.Status, existing.CompletedDate, byPassSort,
-            existing.RowStamp, existing.CustomerReceivedDate, existing.IsBlocked, existing.AllTissuesAssigned);
+        var updated = CloneBatch(existing, BatchOverrides.Of(existing) with { ByPassSort = byPassSort });
         await UpdateAsync(updated, userId, ct);
     }
 
@@ -411,8 +409,7 @@ public sealed class BatchRepository : IBatchRepository
         var allTissuesAssigned = animals.Count > 0 && unassignedAnimals.Count == 0;
         if (allTissuesAssigned == existing.AllTissuesAssigned) return;
 
-        var updated = CloneBatch(existing, existing.Status, existing.CompletedDate, existing.ByPassSort,
-            existing.RowStamp, existing.CustomerReceivedDate, existing.IsBlocked, allTissuesAssigned);
+        var updated = CloneBatch(existing, BatchOverrides.Of(existing) with { AllTissuesAssigned = allTissuesAssigned });
 
         await UpdateAsync(updated, userId, ct);
     }
@@ -421,22 +418,28 @@ public sealed class BatchRepository : IBatchRepository
     /// Full <see cref="Batch"/> row-clone of <paramref name="existing"/> for EditBatch's parameter
     /// carry-forward; only the explicitly passed fields differ from <paramref name="existing"/>.
     /// </summary>
-    private static Batch CloneBatch(Batch existing, string status, DateTime? completedDate, bool byPassSort,
-        byte[]? rowStamp, DateTime? customerReceivedDate, bool isBlocked, bool allTissuesAssigned) => new()
+    private sealed record BatchOverrides(string Status, DateTime? CompletedDate, bool ByPassSort,
+        byte[]? RowStamp, DateTime? CustomerReceivedDate, bool IsBlocked, bool AllTissuesAssigned)
     {
-        ID = existing.ID, Status = status, Comments = existing.Comments,
+        public static BatchOverrides Of(Batch b) => new(b.Status, b.CompletedDate, b.ByPassSort,
+            b.RowStamp, b.CustomerReceivedDate, b.IsBlocked, b.AllTissuesAssigned);
+    }
+
+    private static Batch CloneBatch(Batch existing, BatchOverrides o) => new()
+    {
+        ID = existing.ID, Status = o.Status, Comments = existing.Comments,
         StatusComments = existing.StatusComments, BatchDate = existing.BatchDate,
-        ReceivedDate = existing.ReceivedDate, CompletedDate = completedDate,
+        ReceivedDate = existing.ReceivedDate, CompletedDate = o.CompletedDate,
         SubmittedByUserID = existing.SubmittedByUserID, UserAreaCode = existing.UserAreaCode,
-        IsCassetted = existing.IsCassetted, ByPassSort = byPassSort,
-        RowStamp = rowStamp, BatchType = existing.BatchType,
+        IsCassetted = existing.IsCassetted, ByPassSort = o.ByPassSort,
+        RowStamp = o.RowStamp, BatchType = existing.BatchType,
         ProjectContractCode = existing.ProjectContractCode, ContactName = existing.ContactName,
         Species = existing.Species, Fixation = existing.Fixation,
-        CustomerReceivedDate = customerReceivedDate,
+        CustomerReceivedDate = o.CustomerReceivedDate,
         SubmittedBy = existing.SubmittedBy, SubmittedArea = existing.SubmittedArea,
         OtherSubmittedBy = existing.OtherSubmittedBy, OtherSubmittedArea = existing.OtherSubmittedArea,
-        SafeToHandle = existing.SafeToHandle, IsBlocked = isBlocked,
-        SampleSameProjects = existing.SampleSameProjects, AllTissuesAssigned = allTissuesAssigned,
+        SafeToHandle = existing.SafeToHandle, IsBlocked = o.IsBlocked,
+        SampleSameProjects = existing.SampleSameProjects, AllTissuesAssigned = o.AllTissuesAssigned,
         TimeReceived = existing.TimeReceived, ReceivedBy = existing.ReceivedBy,
         PostFixationOther = existing.PostFixationOther,
     };
@@ -446,8 +449,7 @@ public sealed class BatchRepository : IBatchRepository
     /// overridden — shared by <see cref="SetCompletedAsync"/>/<see cref="SetInProgressAsync"/>.
     /// </summary>
     private static Batch CloneWithStatus(Batch existing, string status, DateTime? completedDate) =>
-        CloneBatch(existing, status, completedDate ?? existing.CompletedDate, existing.ByPassSort,
-            existing.RowStamp, existing.CustomerReceivedDate, existing.IsBlocked, existing.AllTissuesAssigned);
+        CloneBatch(existing, BatchOverrides.Of(existing) with { Status = status, CompletedDate = completedDate ?? existing.CompletedDate });
 
     /// <inheritdoc/>
     public async Task SetCompletedAsync(int batchId, DateTime completedDate, int userId, CancellationToken ct = default)
@@ -788,8 +790,10 @@ public sealed class BatchRepository : IBatchRepository
         // both persist a blocked/in-progress state together with the all-tissues-assigned flag.
         // This is the real transition, not the generic EditBatchStatus path, which never updates
         // those fields and therefore cannot advance the batch to the correct workflow state.
-        var updated = CloneBatch(existing, BatchStatus.InProgress, existing.CompletedDate, existing.ByPassSort,
-            existing.RowStamp, existing.CustomerReceivedDate, isBlocked: true, allTissuesAssigned);
+        var updated = CloneBatch(existing, BatchOverrides.Of(existing) with
+        {
+            Status = BatchStatus.InProgress, IsBlocked = true, AllTissuesAssigned = allTissuesAssigned,
+        });
 
         await UpdateAsync(updated, userId, ct);
     }

@@ -108,15 +108,15 @@ public class EditSubmissionStatusModel : HistoPageModel
 
         // Full field carry-forward — this page never touches header fields, so every field
         // EditBatch owns must be passed through unchanged (EditBatch SP takes the whole row).
-        var updated = BatchCarryForward.Create(Batch,
-            status:            Status ?? Batch.Status,
-            customerRef:       string.Empty,
-            statusComments:    StatusComments,
-            receivedDate:      Batch.ReceivedDate,
-            completedDate:     completedDate,
-            timeReceived:      Batch.TimeReceived,
-            receivedBy:        Batch.ReceivedBy,
-            postFixationOther: Batch.PostFixationOther);
+        var updated = BatchCarryForward.Create(Batch, new BatchCarryForward.Edits(
+            Status:            Status ?? Batch.Status,
+            CustomerRef:       string.Empty,
+            StatusComments:    StatusComments,
+            ReceivedDate:      Batch.ReceivedDate,
+            CompletedDate:     completedDate,
+            TimeReceived:      Batch.TimeReceived,
+            ReceivedBy:        Batch.ReceivedBy,
+            PostFixationOther: Batch.PostFixationOther));
 
         try
         {

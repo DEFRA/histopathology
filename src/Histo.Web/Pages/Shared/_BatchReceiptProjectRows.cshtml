@@ -3,15 +3,6 @@
     Model = (project, pathologist, species).
 *@
 @model (string? Project, string? Pathologist, string? Species)
-<div class="govuk-summary-list__row">
-    <dt class="govuk-summary-list__key">Project or contract code</dt>
-    <dd class="govuk-summary-list__value">@Model.Project</dd>
-</div>
-<div class="govuk-summary-list__row">
-    <dt class="govuk-summary-list__key">Pathologist</dt>
-    <dd class="govuk-summary-list__value">@Model.Pathologist</dd>
-</div>
-<div class="govuk-summary-list__row">
-    <dt class="govuk-summary-list__key">Species</dt>
-    <dd class="govuk-summary-list__value">@Model.Species</dd>
-</div>
+@SummaryList.Row("Project or contract code", Model.Project)
+@SummaryList.Row("Pathologist", Model.Pathologist)
+@SummaryList.Row("Species", Model.Species)

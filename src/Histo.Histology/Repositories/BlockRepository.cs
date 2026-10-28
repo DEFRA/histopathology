@@ -108,11 +108,7 @@ public sealed class BlockRepository : IBlockRepository
         return blockAnimals.Where(a => a.ID == animalId).Select(a => a.SenderRef?.Trim()).FirstOrDefault();
     }
 
-    private sealed class AnimalSenderRow
-    {
-        public int ID { get; init; }
-        public string? SenderRef { get; init; }
-    }
+    private sealed record AnimalSenderRow(int ID, string? SenderRef);
 
     /// <summary>Refs held by the animal on other submissions, including unclaimed pre-booked placeholders.</summary>
     private static async Task<List<string>> OtherBatchRefsAsync(IDbConnection conn, IDbTransaction tx, int animalId, int batchId) =>

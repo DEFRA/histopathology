@@ -61,7 +61,7 @@ namespace Histo.Reporting.Reports;
 /// </list>
 /// </para>
 /// </summary>
-public sealed class SubmissionNotesRenderer
+public static class SubmissionNotesRenderer
 {
     private const string SenderRefColumn = "SenderRef";
     private const string BlockRefColumn = "BlockRef";

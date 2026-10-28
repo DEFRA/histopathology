@@ -59,7 +59,7 @@ public class BatchesReceivedModel : BatchListPageModelBase
 
         if (IsQuickGoIdMissing()) return Page();
 
-        var batch = await BatchService.GetByIdAsync(QuickGoId!.Value);
+        var batch = await BatchService.GetByIdAsync(QuickGoId.Value);
         // Legacy CheckBatchExists(..., Cassetted = 0): block-type (cassetted) submissions never go through Assign blocks.
         if (batch is null || batch.IsCassetted || batch.Status is not (BatchStatus.Received or BatchStatus.InProgress))
         {

@@ -8,20 +8,23 @@ namespace Histo.Web.Pages.Batches;
 /// </summary>
 public static class BatchCarryForward
 {
-    public static Batch Create(Batch source, string status, string customerRef, string? statusComments,
-        DateTime? receivedDate, DateTime? completedDate, string? timeReceived, int? receivedBy, string? postFixationOther) => new()
+    /// <summary>The fields a page edits; every other field is carried forward from the source batch.</summary>
+    public sealed record Edits(string Status, string CustomerRef, string? StatusComments,
+        DateTime? ReceivedDate, DateTime? CompletedDate, string? TimeReceived, int? ReceivedBy, string? PostFixationOther);
+
+    public static Batch Create(Batch source, Edits edits) => new()
     {
         ID                  = source.ID,
-        Status              = status,
-        CustomerRef         = customerRef,
+        Status              = edits.Status,
+        CustomerRef         = edits.CustomerRef,
         Comments            = source.Comments,
-        StatusComments      = statusComments,
+        StatusComments      = edits.StatusComments,
         BatchDate           = source.BatchDate,
-        ReceivedDate        = receivedDate,
-        TimeReceived        = timeReceived,
-        ReceivedBy          = receivedBy,
-        PostFixationOther   = postFixationOther,
-        CompletedDate       = completedDate,
+        ReceivedDate        = edits.ReceivedDate,
+        TimeReceived        = edits.TimeReceived,
+        ReceivedBy          = edits.ReceivedBy,
+        PostFixationOther   = edits.PostFixationOther,
+        CompletedDate       = edits.CompletedDate,
         SubmittedByUserID   = source.SubmittedByUserID,
         UserAreaCode        = source.UserAreaCode,
         IsCassetted         = source.IsCassetted,

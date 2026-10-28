@@ -50,7 +50,7 @@ public class BatchesNotReceivedModel : BatchListPageModelBase
 
         if (IsQuickGoIdMissing()) return Page();
 
-        var batch = await BatchService.GetByIdAsync(QuickGoId!.Value);
+        var batch = await BatchService.GetByIdAsync(QuickGoId.Value);
         if (batch is null || batch.Status != BatchStatus.Submitted)
         {
             GoError = $"Submission {QuickGoId.Value} could not be found or is not awaiting receipt.";

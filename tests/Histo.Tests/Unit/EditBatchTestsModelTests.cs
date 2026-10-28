@@ -236,8 +236,11 @@ public class EditBatchTestsModelTests
 
         _batches.Verify(b => b.SaveBatchTestSelectionsAsync(5,
             It.IsAny<IReadOnlyList<string>>(),
-            It.Is<IReadOnlyList<string>>(a => a.SequenceEqual(new[] { "X" })),
-            It.Is<IReadOnlyList<string>>(s => s.SequenceEqual(new[] { "S1" })),
+            It.Is<IReadOnlyList<string>>(a => a.SequenceEqual(AntibodyCodes)),
+            It.Is<IReadOnlyList<string>>(s => s.SequenceEqual(StainCodes)),
             9, It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    private static readonly string[] AntibodyCodes = ["X"];
+    private static readonly string[] StainCodes = ["S1"];
 }

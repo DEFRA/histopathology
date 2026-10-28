@@ -18,10 +18,14 @@ namespace Histo.Tests.Integration;
 /// </summary>
 public class HealthCheckTests
 {
-    private static readonly string BaseUrl =
-        Environment.GetEnvironmentVariable("HISTO_TEST_BASE_URL") ?? "https://localhost:5000";
+    private static readonly string? ConfiguredBaseUrl = Environment.GetEnvironmentVariable("HISTO_TEST_BASE_URL");
 
-    [Fact(Skip = "Phase 1 gate: scaffold Histo.Web and configure HISTO_TEST_BASE_URL before enabling.")]
+    private static readonly string BaseUrl = ConfiguredBaseUrl ?? "https://localhost:5000";
+
+    // Runs only when HISTO_TEST_BASE_URL points at a running Histo.Web.
+    public static bool IsAppConfigured => !string.IsNullOrWhiteSpace(ConfiguredBaseUrl);
+
+    [Fact(SkipUnless = nameof(IsAppConfigured), Skip = "Set HISTO_TEST_BASE_URL to a running Histo.Web to enable.")]
     public async Task HealthEndpoint_WhenApplicationIsRunning_Returns200()
     {
         using var client = new HttpClient();

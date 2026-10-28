@@ -151,15 +151,15 @@ public class ReceiveBatchModel : HistoPageModel
 
         // Full field carry-forward (mirrors legacy ReceiveBatch.aspx → UpdateBatchDetails → EditBatch SP)
         // so EditBatch's exhaustive parameter set doesn't null out fields this page doesn't edit.
-        var updated = BatchCarryForward.Create(Batch,
-            status:            Status,
-            customerRef:       Batch.CustomerRef,
-            statusComments:    Reason,
-            receivedDate:      DateReceived,
-            completedDate:     Batch.CompletedDate,
-            timeReceived:      TimeReceived,
-            receivedBy:        ReceivedByUserId,
-            postFixationOther: otherText);
+        var updated = BatchCarryForward.Create(Batch, new BatchCarryForward.Edits(
+            Status:            Status,
+            CustomerRef:       Batch.CustomerRef,
+            StatusComments:    Reason,
+            ReceivedDate:      DateReceived,
+            CompletedDate:     Batch.CompletedDate,
+            TimeReceived:      TimeReceived,
+            ReceivedBy:        ReceivedByUserId,
+            PostFixationOther: otherText));
 
         // UpdateAsync rethrows on failure (see BatchService.UpdateAsync) rather than returning
         // false — matches the try/catch pattern already used by EditBatch.cshtml.cs.

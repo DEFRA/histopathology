@@ -3,19 +3,7 @@
     Model = (entered by, entered area, submitted by, submitted area); missing values render as "Not recorded".
 *@
 @model (string? EnteredBy, string? EnteredArea, string? SubmittedBy, string? SubmittedArea)
-<div class="govuk-summary-list__row">
-    <dt class="govuk-summary-list__key">Entered by</dt>
-    <dd class="govuk-summary-list__value">@(Model.EnteredBy ?? "Not recorded")</dd>
-</div>
-<div class="govuk-summary-list__row">
-    <dt class="govuk-summary-list__key">Entered area</dt>
-    <dd class="govuk-summary-list__value">@(Model.EnteredArea ?? "Not recorded")</dd>
-</div>
-<div class="govuk-summary-list__row">
-    <dt class="govuk-summary-list__key">Submitted by</dt>
-    <dd class="govuk-summary-list__value">@(Model.SubmittedBy ?? "Not recorded")</dd>
-</div>
-<div class="govuk-summary-list__row">
-    <dt class="govuk-summary-list__key">Submitted area</dt>
-    <dd class="govuk-summary-list__value">@(Model.SubmittedArea ?? "Not recorded")</dd>
-</div>
+@SummaryList.Row("Entered by", Model.EnteredBy ?? "Not recorded")
+@SummaryList.Row("Entered area", Model.EnteredArea ?? "Not recorded")
+@SummaryList.Row("Submitted by", Model.SubmittedBy ?? "Not recorded")
+@SummaryList.Row("Submitted area", Model.SubmittedArea ?? "Not recorded")

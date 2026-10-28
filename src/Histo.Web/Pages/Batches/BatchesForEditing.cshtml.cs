@@ -51,7 +51,7 @@ public class BatchesForEditingModel : BatchListPageModelBase
 
         if (IsQuickGoIdMissing()) return Page();
 
-        var batch = await BatchService.GetByIdAsync(QuickGoId!.Value);
+        var batch = await BatchService.GetByIdAsync(QuickGoId.Value);
         if (batch is null)
         {
             GoError = $"Submission {QuickGoId.Value} could not be found.";
