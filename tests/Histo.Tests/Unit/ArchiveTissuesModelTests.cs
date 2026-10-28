@@ -210,7 +210,7 @@ public class ArchiveTissuesModelTests
         sut.SortColumn = column;
         sut.SortDesc = desc;
 
-        Assert.Equal(expectedIds, sut.PagedEntries.Select(r => r.ID));
+        Assert.Equal(expectedIds, sut.GetPagedEntries().Select(r => r.ID));
     }
 
     [Fact]

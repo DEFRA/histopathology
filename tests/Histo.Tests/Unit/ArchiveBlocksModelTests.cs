@@ -177,7 +177,7 @@ public class ArchiveBlocksModelTests
         var sut = CreateSut();
         await sut.OnGetAsync();
 
-        Assert.Equal(["01", "02", "03"], sut.PagedEntries.Select(b => b.BlockRef));
+        Assert.Equal(["01", "02", "03"], sut.GetPagedEntries().Select(b => b.BlockRef));
     }
 
     [Theory]

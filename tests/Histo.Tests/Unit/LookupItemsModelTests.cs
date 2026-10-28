@@ -83,8 +83,8 @@ public class LookupItemsModelTests
         await sut.OnGetAsync();
 
         Assert.Equal(15, sut.TotalCount);
-        Assert.Equal(10, sut.PagedEntries.Count);
-        Assert.Equal("C01", sut.PagedEntries.First().Code);
+        Assert.Equal(10, sut.GetPagedEntries().Count);
+        Assert.Equal("C01", sut.GetPagedEntries()[0].Code);
     }
 
     [Fact]
@@ -104,7 +104,7 @@ public class LookupItemsModelTests
 
         await sut.OnGetAsync();
 
-        Assert.Equal("Beta", sut.PagedEntries.First().Name);
+        Assert.Equal("Beta", sut.GetPagedEntries()[0].Name);
     }
 
     [Fact]
@@ -124,7 +124,7 @@ public class LookupItemsModelTests
         await sut.OnGetAsync();
 
         Assert.Equal(1, sut.TotalCount);
-        Assert.Single(sut.PagedEntries);
+        Assert.Single(sut.GetPagedEntries());
     }
 }
 

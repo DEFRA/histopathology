@@ -27,7 +27,7 @@ public class HealthCheckTests
         using var client = new HttpClient();
         client.BaseAddress = new Uri(BaseUrl);
 
-        var response = await client.GetAsync("/health");
+        var response = await client.GetAsync("/health", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }

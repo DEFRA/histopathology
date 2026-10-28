@@ -228,7 +228,7 @@ public class SearchValidationTests
 
         await sut.OnPostSearchAsync();
 
-        Assert.Equal([3, 2, 1], sut.PagedResults.Select(r => r.ID));
+        Assert.Equal([3, 2, 1], sut.GetPagedResults().Select(r => r.ID));
     }
 
     [Fact]
@@ -242,7 +242,7 @@ public class SearchValidationTests
         await sut.OnPostSearchAsync();
 
         Assert.Equal(25, sut.Results.Count);
-        Assert.Equal(10, sut.PagedResults.Count);
+        Assert.Equal(10, sut.GetPagedResults().Count);
     }
 
     // ── SearchBlockRefs ──────────────────────────────────────────────────────────

@@ -61,4 +61,29 @@ public class ViewImportedDataModelTests
 
         Assert.Equal("/Search/SearchMenu", sut.BackLinkPage);
     }
+
+    [Theory]
+    [InlineData("Tissue", false, "B,C,A")]
+    [InlineData("Tissue", true, "A,C,B")]
+    [InlineData("DateSubmitted", false, "A,C,B")]
+    [InlineData(null, false, "A,B,C")]
+    public async Task PagedResults_SortsByRequestedColumn(string? column, bool desc, string expectedSenderRefs)
+    {
+        var rows = new List<Histo.Submissions.Models.ImportedDataRow>
+        {
+            new() { SenderRef = "B", Tissue = "A", DateSubmitted = new DateTime(2020, 1, 3) },
+            new() { SenderRef = "C", Tissue = "B", DateSubmitted = new DateTime(2020, 1, 2) },
+            new() { SenderRef = "A", Tissue = "C", DateSubmitted = new DateTime(2020, 1, 1) },
+        };
+        _lookups.Setup(l => l.GetImportedTablesAsync()).ReturnsAsync([]);
+        _submissions.Setup(s => s.GetImportedDataAsync("T")).ReturnsAsync(rows);
+        var sut = CreateSut();
+        sut.SelectedTable = "T";
+        sut.SortColumn = column;
+        sut.SortDesc = desc;
+
+        await sut.OnGetAsync();
+
+        Assert.Equal(expectedSenderRefs.Split(','), sut.GetPagedResults().Select(r => r.SenderRef).ToArray());
+    }
 }

@@ -24,6 +24,13 @@ namespace Histo.Tests.Unit;
 /// </summary>
 public class ViewSubmissionsModelTests
 {
+    private static readonly string[] ExpectedExportHeaders =
+    [
+        "Submission Number", "Project/Contract", "Pathologist", "Species", "Submitted Date",
+        "Submission Type", "Submitted By", "Safe To Handle", "Received Date", "Time Received/Rejected",
+        "Received By", "Other Submitted By", "Comments", "Customer Received Date", "Status", "Completed Date",
+    ];
+
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<IBatchService> _batches = new();
     private readonly Mock<IUserService> _users = new();
@@ -183,12 +190,7 @@ public class ViewSubmissionsModelTests
 
         Assert.Equal(2, table.Rows.Count); // header + 1 data row
         Assert.Equal(
-            new[]
-            {
-                "Submission Number", "Project/Contract", "Pathologist", "Species", "Submitted Date",
-                "Submission Type", "Submitted By", "Safe To Handle", "Received Date", "Time Received/Rejected",
-                "Received By", "Other Submitted By", "Comments", "Customer Received Date", "Status", "Completed Date",
-            },
+            ExpectedExportHeaders,
             table.Rows[0].ItemArray.Select(v => v?.ToString()));
         Assert.Equal("TSE", table.Rows[1][5]);
         Assert.Equal("Yes", table.Rows[1][7]);

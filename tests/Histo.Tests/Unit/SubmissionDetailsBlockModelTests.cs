@@ -20,8 +20,11 @@ namespace Histo.Tests.Unit;
 /// editable-only-while-unset behaviour for the Create/Edit/View Submission journey
 /// (<c>SampleSummary</c>), with zero change to that journey's outcome.
 /// </summary>
-public class SubmissionDetailsBlockModelTests
+public partial class SubmissionDetailsBlockModelTests
 {
+    [System.Text.RegularExpressions.GeneratedRegex(@"<input[^>]*type=""checkbox""[^>]*name=""blockIds""[^>]*/>")]
+    private static partial System.Text.RegularExpressions.Regex BlockIdsCheckboxRegex();
+
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<ISubmissionService> _submissions = new();
     private readonly Mock<IBlockService> _blocks = new();
@@ -639,7 +642,7 @@ public class SubmissionDetailsBlockModelTests
         Assert.NotNull(dir);
 
         var markup = File.ReadAllText(Path.Combine(dir!.FullName, "src", "Histo.Web", "Pages", "Submissions", "SubmissionDetailsBlock.cshtml"));
-        var checkbox = System.Text.RegularExpressions.Regex.Match(markup, @"<input[^>]*type=""checkbox""[^>]*name=""blockIds""[^>]*/>");
+        var checkbox = BlockIdsCheckboxRegex().Match(markup);
 
         Assert.True(checkbox.Success, "Block select checkbox not found.");
         Assert.Contains("disabled=\"@(Model.IsViewMode ? \"disabled\" : null)\"", checkbox.Value);
