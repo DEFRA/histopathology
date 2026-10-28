@@ -10,7 +10,7 @@ namespace Histo.Web.Pages.Admin;
 /// <c>UserMaintenance.aspx</c> inline grid (<c>Pager.AllowAddNew</c> /
 /// <c>clsUser.SaveUserData</c> insert path via the <c>AddUser</c> stored procedure).
 /// </summary>
-public class AddUserModel : HistoPageModel, IUserFormFields
+public class AddUserModel : HistoPageModel, IUserForm
 {
     private const string AddUserTitle = "Add user";
 

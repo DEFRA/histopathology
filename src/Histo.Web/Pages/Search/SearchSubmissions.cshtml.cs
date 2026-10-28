@@ -111,21 +111,10 @@ public class SearchSubmissionsModel : HistoPageModel
     /// controllable), so they're percent-encoded before being embedded in the query string —
     /// otherwise a value containing '&amp;' could inject extra query parameters.
     /// </summary>
-    public string SelectFormAction =>
-        $"?handler=Select&SortColumn={Uri.EscapeDataString(SortColumn ?? string.Empty)}&SortDesc={(SortDesc ? "true" : "false")}&PageNumber={PageNumber}";
+    public string SelectFormAction => BatchSearchGridHelper.BuildSelectFormAction(SortColumn, SortDesc, PageNumber);
 
-    private void PopulateGridViewData()
-    {
-        var totalPages = Results.Count == 0 ? 1 : (int)Math.Ceiling(Results.Count / (double)PageSize);
-        if (PageNumber < 1) PageNumber = 1;
-        else if (PageNumber > totalPages) PageNumber = totalPages;
-        ViewData["SortColumn"] = SortColumn;
-        ViewData["SortDesc"] = SortDesc;
-        ViewData["CurrentPage"] = PageNumber;
-        ViewData["TotalPages"] = totalPages;
-        ViewData["FormId"] = "submission-action-form";
-        ViewData["Handler"] = "Search";
-    }
+    private void PopulateGridViewData() =>
+        PageNumber = BatchSearchGridHelper.PopulateGridViewData(ViewData, Results.Count, PageNumber, SortColumn, SortDesc, "submission-action-form");
 
     public IReadOnlyList<Administration.Models.User> Users { get; private set; } = [];
     public IReadOnlyList<Administration.Models.LookupItem> Projects { get; private set; } = [];
@@ -311,30 +300,7 @@ public class SearchSubmissionsModel : HistoPageModel
     public async Task<IActionResult> OnPostExportExcelAsync()
     {
         var results = await _batches.SearchAsync(BuildCriteria());
-        return ExcelExportHelper.BuildXlsx(
-            "search-submissions.xlsx",
-            ["Submission Number", "Project/Contract", "Pathologist", "Species", "Submitted Date",
-             "Submission Type", "Submitted By", "Safe To Handle", "Received Date", "Time Received/Rejected",
-             "Received By", "Other Submitted By", "Comments", "Customer Received Date", "Status", "Completed Date"],
-            results.Select(r => (IReadOnlyList<object?>)new object?[]
-            {
-                r.ID,
-                r.ProjectDescription,
-                r.ContactDescription,
-                r.Species,
-                r.BatchDate,
-                r.BatchType == "0" ? "TSE" : "NON TSE",
-                r.SubmittedBy,
-                r.SafeToHandle is "1" or "true" or "True" or "yes" or "Yes" ? "Yes" : "No",
-                r.DateReceived,
-                r.ReceivedTime,
-                r.ReceivedBy,
-                r.OtherSubmittedBy,
-                r.Comments,
-                r.CustomerReceivedDate,
-                BatchStatus.DisplayName(r.Status ?? string.Empty),
-                r.DateCompleted
-            }));
+        return BatchSearchGridHelper.BuildExport("search-submissions.xlsx", results);
     }
 
     private BatchSearchCriteria BuildCriteria() => new()

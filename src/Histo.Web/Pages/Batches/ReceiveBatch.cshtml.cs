@@ -151,39 +151,15 @@ public class ReceiveBatchModel : HistoPageModel
 
         // Full field carry-forward (mirrors legacy ReceiveBatch.aspx → UpdateBatchDetails → EditBatch SP)
         // so EditBatch's exhaustive parameter set doesn't null out fields this page doesn't edit.
-        var updated = new Batch
-        {
-            ID                  = Batch.ID,
-            Status              = Status,
-            CustomerRef         = Batch.CustomerRef,
-            Comments            = Batch.Comments,
-            StatusComments      = Reason,
-            BatchDate           = Batch.BatchDate,
-            ReceivedDate        = DateReceived,
-            TimeReceived        = TimeReceived,
-            ReceivedBy          = ReceivedByUserId,
-            PostFixationOther   = otherText,
-            CompletedDate       = Batch.CompletedDate,
-            SubmittedByUserID   = Batch.SubmittedByUserID,
-            UserAreaCode        = Batch.UserAreaCode,
-            IsCassetted      = Batch.IsCassetted,
-            ByPassSort          = Batch.ByPassSort,
-            RowStamp            = Batch.RowStamp,
-            BatchType           = Batch.BatchType,
-            ProjectContractCode = Batch.ProjectContractCode,
-            ContactName         = Batch.ContactName,
-            Species             = Batch.Species,
-            Fixation            = Batch.Fixation,
-            CustomerReceivedDate = Batch.CustomerReceivedDate,
-            SubmittedBy         = Batch.SubmittedBy,
-            SubmittedArea       = Batch.SubmittedArea,
-            OtherSubmittedBy    = Batch.OtherSubmittedBy,
-            OtherSubmittedArea  = Batch.OtherSubmittedArea ?? "",
-            SafeToHandle        = Batch.SafeToHandle,
-            IsBlocked           = Batch.IsBlocked,
-            SampleSameProjects  = Batch.SampleSameProjects,
-            AllTissuesAssigned  = Batch.AllTissuesAssigned,
-        };
+        var updated = BatchCarryForward.Create(Batch,
+            status:            Status,
+            customerRef:       Batch.CustomerRef,
+            statusComments:    Reason,
+            receivedDate:      DateReceived,
+            completedDate:     Batch.CompletedDate,
+            timeReceived:      TimeReceived,
+            receivedBy:        ReceivedByUserId,
+            postFixationOther: otherText);
 
         // UpdateAsync rethrows on failure (see BatchService.UpdateAsync) rather than returning
         // false — matches the try/catch pattern already used by EditBatch.cshtml.cs.

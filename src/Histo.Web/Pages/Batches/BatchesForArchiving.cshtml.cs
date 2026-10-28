@@ -6,61 +6,36 @@ using Microsoft.AspNetCore.Mvc;
 namespace Histo.Web.Pages.Batches;
 
 /// <summary>Replaces <c>BatchesForArchiving.aspx</c>.</summary>
-public class BatchesForArchivingModel : GridPageModel
+public class BatchesForArchivingModel : BatchListPageModelBase
 {
     private const string BatchesForArchivingTitle = "Batches for Archiving";
 
-    private readonly IBatchService _batches;
-
     public BatchesForArchivingModel(ISessionService session, IBatchService batches)
-        : base(session) => _batches = batches;
+        : base(session, batches) { }
 
-    public IReadOnlyList<BatchListResult> Batches { get; private set; } = [];
+    protected override string ListTitle => BatchesForArchivingTitle;
 
-    public int TotalCount => Batches.Count;
+    protected override Task<IReadOnlyList<BatchListResult>> FetchBatchesAsync() => BatchService.GetCompletedAsync();
 
     public IReadOnlyList<BatchListResult> GetPagedEntries() =>
-        (SortColumn switch
+        TakePage(SortColumn switch
         {
-            "ProjectDescription" => SortDesc ? Batches.OrderByDescending(b => b.ProjectDescription) : Batches.OrderBy(b => b.ProjectDescription),
-            "ContactDescription" => SortDesc ? Batches.OrderByDescending(b => b.ContactDescription) : Batches.OrderBy(b => b.ContactDescription),
-            "Species"            => SortDesc ? Batches.OrderByDescending(b => b.Species)            : Batches.OrderBy(b => b.Species),
-            "CompletedDate"      => SortDesc ? Batches.OrderByDescending(b => b.CompletedDate)      : Batches.OrderBy(b => b.CompletedDate),
-            "ID"                 => SortDesc ? Batches.OrderByDescending(b => b.ID)                  : Batches.OrderBy(b => b.ID),
+            "ProjectDescription" => OrderBatches(b => b.ProjectDescription),
+            "ContactDescription" => OrderBatches(b => b.ContactDescription),
+            "Species"            => OrderBatches(b => b.Species),
+            "CompletedDate"      => OrderBatches(b => b.CompletedDate),
+            "ID"                 => OrderBatches(b => b.ID),
             // No column clicked yet — legacy default: dvBatchesView.Sort = "ID DESC".
             _                    => Batches.OrderByDescending(b => b.ID),
-        })
-        .Skip((PageNumber - 1) * PageSize)
-        .Take(PageSize)
-        .ToList();
+        }, PageNumber);
 
-    /// <summary>Quick-Go: direct navigation by submission number.</summary>
-    [BindProperty]
-    public int? QuickGoId { get; set; }
-
-    /// <summary>Inline error message for Quick-Go validation failures.</summary>
-    public string? GoError { get; private set; }
-
-    public async Task OnGetAsync()
-    {
-        ViewData["Title"] = BatchesForArchivingTitle;
-        ViewData["PageTitle"] = BatchesForArchivingTitle;
-        Batches = await _batches.GetCompletedAsync();
-        PopulateGridViewData(TotalCount);
-    }
+    public async Task OnGetAsync() => await LoadListAsync();
 
     public async Task<IActionResult> OnPostGoAsync()
     {
-        ViewData["Title"] = BatchesForArchivingTitle;
-        ViewData["PageTitle"] = BatchesForArchivingTitle;
-        Batches = await _batches.GetCompletedAsync();
-        PopulateGridViewData(TotalCount);
+        await LoadListAsync();
 
-        if (!QuickGoId.HasValue || QuickGoId.Value <= 0)
-        {
-            GoError = "Enter a submission number.";
-            return Page();
-        }
+        if (IsQuickGoIdMissing()) return Page();
 
         var batchInList = Batches.FirstOrDefault(b => b.ID == QuickGoId.Value);
         if (batchInList is null)

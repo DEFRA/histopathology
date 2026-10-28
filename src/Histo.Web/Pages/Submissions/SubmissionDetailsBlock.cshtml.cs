@@ -6,6 +6,7 @@ using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
+using Histo.Web.Pages.Shared;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.RegularExpressions;
 
@@ -728,10 +729,7 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         // abandoned (backed out of, or never finished) block never shows as a blank row in this
         // summary; a block that completed Done always has at least one tissue by construction.
         Blocks = Blocks.Where(b => allTissues.Any(t => t.OwnerID == b.ID)).ToList();
-        var tissuesByBlockId = new Dictionary<int, IReadOnlyList<Tissue>>();
-        foreach (var blockId in Blocks.Select(b => b.ID))
-            tissuesByBlockId[blockId] = allTissues.Where(t => t.OwnerID == blockId).ToList();
-        TissuesByBlockId = tissuesByBlockId;
+        TissuesByBlockId = BlockGridLoader.GroupTissuesByBlock(Blocks, allTissues);
 
         // All 7 grid indicator columns (Archive/EO/H&E/H&E-BSE/IHC-PrP/IHC-Other/Special Stain)
         // are Histology test-type codes — see the HistologyOptions doc comment. Wrapped because
@@ -739,14 +737,7 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         try
         {
             HistologyOptions = await _lookups.GetHistologyTypesAsync();
-
-            // GetByBatchAsync excludes Special Stain/IHC-PrP/IHC-Other (worklist-only exclusion) —
-            // these grid checkboxes need every code, so they must use GetAllSelectionsByBatchAsync.
-            var allTests = await _blockTests.GetAllSelectionsByBatchAsync(BatchId ?? 0);
-            var histologyByBlock = new Dictionary<int, IReadOnlyList<string>>();
-            foreach (var blockId in Blocks.Select(b => b.ID))
-                histologyByBlock[blockId] = allTests.Where(t => t.BlockID == blockId && t.TestType == BlockTestType.Histology).Select(t => t.Code).ToList();
-            HistologyCodesByBlockId = histologyByBlock;
+            HistologyCodesByBlockId = await BlockGridLoader.LoadHistologyCodesByBlockAsync(_blockTests, BatchId ?? 0, Blocks);
         }
         catch (Exception ex)
         {

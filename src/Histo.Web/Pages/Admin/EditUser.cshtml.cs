@@ -11,7 +11,7 @@ namespace Histo.Web.Pages.Admin;
 /// <c>UserMaintenance.aspx</c> grid (<c>clsUser.SaveUserData</c> update path via
 /// the <c>EditUser</c> stored procedure).
 /// </summary>
-public class EditUserModel : HistoPageModel, IUserFormFields
+public class EditUserModel : HistoPageModel, IUserForm
 {
     private const string EditUserTitle = "Edit user";
 

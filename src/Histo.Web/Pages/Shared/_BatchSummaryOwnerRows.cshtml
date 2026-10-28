@@ -1,0 +1,21 @@
+@*
+    Entered by / entered area / submitted by / submitted area rows of a batch summary list.
+    Model = (entered by, entered area, submitted by, submitted area); missing values render as an em dash.
+*@
+@model (string? EnteredBy, string? EnteredArea, string? SubmittedBy, string? SubmittedArea)
+<div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Entered by</dt>
+    <dd class="govuk-summary-list__value">@(Model.EnteredBy ?? "\u2014")</dd>
+</div>
+<div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Entered area</dt>
+    <dd class="govuk-summary-list__value">@(Model.EnteredArea ?? "\u2014")</dd>
+</div>
+<div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Submitted by</dt>
+    <dd class="govuk-summary-list__value">@(Model.SubmittedBy ?? "\u2014")</dd>
+</div>
+<div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Submitted area</dt>
+    <dd class="govuk-summary-list__value">@(Model.SubmittedArea ?? "\u2014")</dd>
+</div>

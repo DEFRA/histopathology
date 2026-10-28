@@ -9,48 +9,30 @@ namespace Histo.Web.Pages.Batches;
 /// Lists batches awaiting Quality Data entry — replaces <c>BatchesForDispatch.aspx</c>.
 /// Legacy source: <c>clsBatch.GetBatchesForDispatch</c> → <c>GetBatchesForDispatch</c> SP.
 /// </summary>
-public class BatchesForDispatchModel : GridPageModel
+public class BatchesForDispatchModel : BatchListPageModelBase
 {
     private const string BatchesForDispatchTitle = "Submissions available for quality data entry";
 
-    private readonly IBatchService _batches;
-
     public BatchesForDispatchModel(ISessionService session, IBatchService batches)
-        : base(session) => _batches = batches;
+        : base(session, batches) { }
 
-    public IReadOnlyList<BatchListResult> Batches { get; private set; } = [];
+    protected override string ListTitle => BatchesForDispatchTitle;
 
-    public int TotalCount => Batches.Count;
+    protected override Task<IReadOnlyList<BatchListResult>> FetchBatchesAsync() => BatchService.GetForDispatchAsync();
 
     public IReadOnlyList<BatchListResult> GetPagedEntries() =>
-        (SortColumn switch
+        TakePage(SortColumn switch
         {
-            "ProjectDescription" => SortDesc ? Batches.OrderByDescending(b => b.ProjectDescription) : Batches.OrderBy(b => b.ProjectDescription),
-            "ContactDescription" => SortDesc ? Batches.OrderByDescending(b => b.ContactDescription) : Batches.OrderBy(b => b.ContactDescription),
-            "Species"            => SortDesc ? Batches.OrderByDescending(b => b.Species)            : Batches.OrderBy(b => b.Species),
-            "BatchDate"          => SortDesc ? Batches.OrderByDescending(b => b.BatchDate)           : Batches.OrderBy(b => b.BatchDate),
-            "ID"                 => SortDesc ? Batches.OrderByDescending(b => b.ID)                  : Batches.OrderBy(b => b.ID),
+            "ProjectDescription" => OrderBatches(b => b.ProjectDescription),
+            "ContactDescription" => OrderBatches(b => b.ContactDescription),
+            "Species"            => OrderBatches(b => b.Species),
+            "BatchDate"          => OrderBatches(b => b.BatchDate),
+            "ID"                 => OrderBatches(b => b.ID),
             // No column clicked yet — legacy default: dvBatchesView.Sort = "ID DESC".
             _                    => Batches.OrderByDescending(b => b.ID),
-        })
-        .Skip((PageNumber - 1) * PageSize)
-        .Take(PageSize)
-        .ToList();
+        }, PageNumber);
 
-    /// <summary>Quick-Go: direct navigation by submission number.</summary>
-    [BindProperty]
-    public int? QuickGoId { get; set; }
-
-    /// <summary>Inline error message for Quick-Go validation failures.</summary>
-    public string? GoError { get; private set; }
-
-    public async Task OnGetAsync()
-    {
-        ViewData["Title"] = BatchesForDispatchTitle;
-        ViewData["PageTitle"] = BatchesForDispatchTitle;
-        Batches = await _batches.GetForDispatchAsync();
-        PopulateGridViewData(TotalCount);
-    }
+    public async Task OnGetAsync() => await LoadListAsync();
 
     public IActionResult OnPostSelect(int batchId)
     {
@@ -62,16 +44,9 @@ public class BatchesForDispatchModel : GridPageModel
 
     public async Task<IActionResult> OnPostGoAsync()
     {
-        ViewData["Title"] = BatchesForDispatchTitle;
-        ViewData["PageTitle"] = BatchesForDispatchTitle;
-        Batches = await _batches.GetForDispatchAsync();
-        PopulateGridViewData(TotalCount);
+        await LoadListAsync();
 
-        if (!QuickGoId.HasValue || QuickGoId.Value <= 0)
-        {
-            GoError = "Enter a submission number.";
-            return Page();
-        }
+        if (IsQuickGoIdMissing()) return Page();
 
         // Use the dispatch list itself as the validation source — if the SP returned it, it's ready.
         var batchInList = Batches.FirstOrDefault(b => b.ID == QuickGoId.Value);

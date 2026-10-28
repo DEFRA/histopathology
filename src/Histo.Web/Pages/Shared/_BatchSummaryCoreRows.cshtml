@@ -1,0 +1,21 @@
+@*
+    Species / project / pathologist / submission date rows of a batch summary list.
+    Model = (species, project, pathologist, submission date text).
+*@
+@model (string? Species, string? Project, string? Pathologist, string? SubmissionDate)
+<div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Species</dt>
+    <dd class="govuk-summary-list__value">@Model.Species</dd>
+</div>
+<div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Project/Contract Code</dt>
+    <dd class="govuk-summary-list__value">@Model.Project</dd>
+</div>
+<div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Pathologist</dt>
+    <dd class="govuk-summary-list__value">@Model.Pathologist</dd>
+</div>
+<div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Submission date</dt>
+    <dd class="govuk-summary-list__value">@Model.SubmissionDate</dd>
+</div>

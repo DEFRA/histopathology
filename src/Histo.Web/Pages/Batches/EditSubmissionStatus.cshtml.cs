@@ -108,38 +108,15 @@ public class EditSubmissionStatusModel : HistoPageModel
 
         // Full field carry-forward — this page never touches header fields, so every field
         // EditBatch owns must be passed through unchanged (EditBatch SP takes the whole row).
-        var updated = new Batch
-        {
-            ID                  = Batch.ID,
-            Status              = Status ?? Batch.Status,
-            Comments            = Batch.Comments,
-            StatusComments      = StatusComments,
-            BatchDate           = Batch.BatchDate,
-            ReceivedDate        = Batch.ReceivedDate,
-            CompletedDate       = completedDate,
-            SubmittedByUserID   = Batch.SubmittedByUserID,
-            UserAreaCode        = Batch.UserAreaCode,
-            IsCassetted      = Batch.IsCassetted,
-            ByPassSort          = Batch.ByPassSort,
-            RowStamp            = Batch.RowStamp,
-            BatchType           = Batch.BatchType,
-            ProjectContractCode = Batch.ProjectContractCode,
-            ContactName         = Batch.ContactName,
-            Species             = Batch.Species,
-            Fixation            = Batch.Fixation,
-            CustomerReceivedDate = Batch.CustomerReceivedDate,
-            SubmittedBy         = Batch.SubmittedBy,
-            SubmittedArea       = Batch.SubmittedArea,
-            OtherSubmittedBy    = Batch.OtherSubmittedBy,
-            OtherSubmittedArea  = Batch.OtherSubmittedArea ?? "",
-            SafeToHandle        = Batch.SafeToHandle,
-            IsBlocked           = Batch.IsBlocked,
-            SampleSameProjects  = Batch.SampleSameProjects,
-            AllTissuesAssigned  = Batch.AllTissuesAssigned,
-            TimeReceived        = Batch.TimeReceived,
-            ReceivedBy          = Batch.ReceivedBy,
-            PostFixationOther   = Batch.PostFixationOther,
-        };
+        var updated = BatchCarryForward.Create(Batch,
+            status:            Status ?? Batch.Status,
+            customerRef:       string.Empty,
+            statusComments:    StatusComments,
+            receivedDate:      Batch.ReceivedDate,
+            completedDate:     completedDate,
+            timeReceived:      Batch.TimeReceived,
+            receivedBy:        Batch.ReceivedBy,
+            postFixationOther: Batch.PostFixationOther);
 
         try
         {

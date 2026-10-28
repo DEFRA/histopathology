@@ -10,47 +10,25 @@ namespace Histo.Web.Pages.Admin;
 /// Add/Edit form on <c>EditLookupItem.cshtml</c> per GDS "one thing per page".
 /// Linked from <see cref="LookupItemsModel"/>'s "Add item" button.
 /// </summary>
-public class AddLookupItemModel : HistoPageModel
+public class AddLookupItemModel : LookupItemFormModelBase
 {
-    private readonly ILookupService _lookups;
+    private const string PageTitle = "Add pick list item";
 
     public AddLookupItemModel(ISessionService session, ILookupService lookups)
-        : base(session) => _lookups = lookups;
+        : base(session, lookups) { }
 
-    [BindProperty(SupportsGet = true)] public int TableId { get; set; }
-
-    /// <summary>Page this add was opened from (Pick list items page's own ReturnUrl), so the
-    /// round-trip back to LookupItems can continue returning there.</summary>
-    [BindProperty(SupportsGet = true)] public string? ReturnUrl { get; set; }
-
-    [BindProperty] public string Code { get; set; } = string.Empty;
-    [BindProperty] public string Description { get; set; } = string.Empty;
-    [BindProperty] public bool Active { get; set; } = true;
-    [BindProperty] public string? Area { get; set; }
-
-    public string TableName { get; private set; } = string.Empty;
-    public bool TableHasCodes { get; private set; }
-    public bool ShowAreaColumn => LookupTableSchema.ShowAreaColumn(TableId);
-    public IReadOnlyList<LookupItem> UserAreas { get; private set; } = [];
-
-    /// <summary>Field id → message, rendered via the shared clickable _ErrorSummary partial.</summary>
-    public Dictionary<string, string> Errors { get; } = new();
-
-    /// <summary>Not tied to a specific field, so shown separately (matches EditQualityDataTest's ConcurrencyError convention).</summary>
-    public string? SaveError { get; private set; }
-
-    private IReadOnlyList<LookupItem> _existingItems = [];
+    protected override bool DeriveTableHasCodes() => !ShowAreaColumn;
 
     public async Task OnGetAsync()
     {
-        SetTitle();
+        SetTitle(PageTitle);
         Active = true;
         await LoadTableAsync();
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        SetTitle();
+        SetTitle(PageTitle);
         await LoadTableAsync();
 
         Validate();
@@ -66,7 +44,7 @@ public class AddLookupItemModel : HistoPageModel
             Area = TableHasCodes ? null : (Area ?? Session.UserArea),
             Code = TableHasCodes ? Code.Trim() : null,
         };
-        var ok = await _lookups.CreateLookupItemAsync(TableId, item, Session.UserID);
+        var ok = await Lookups.CreateLookupItemAsync(TableId, item, Session.UserID);
 
         if (!ok)
         {
@@ -76,44 +54,5 @@ public class AddLookupItemModel : HistoPageModel
 
         TempData["StatusMessage"] = $"'{Description.Trim()}' was added.";
         return RedirectToPage("/Admin/LookupItems", new { tableId = TableId, ReturnUrl });
-    }
-
-    private void Validate()
-    {
-        if (string.IsNullOrWhiteSpace(Description)) Errors["Description"] = "Enter a description.";
-
-        if (TableHasCodes)
-        {
-            if (string.IsNullOrWhiteSpace(Code))
-            {
-                Errors["Code"] = "Enter a code.";
-            }
-            else
-            {
-                var trimmed = Code.Trim();
-                // Mirrors legacy PickListMaintenance.aspx Pager_RowSave: no two rows in the
-                // same table may share the same Code (case-insensitive).
-                if (_existingItems.Any(i => string.Equals(i.Code, trimmed, StringComparison.OrdinalIgnoreCase)))
-                    Errors["Code"] = "The code you have selected is already in use.";
-            }
-        }
-    }
-
-    private async Task LoadTableAsync()
-    {
-        var tables = await _lookups.ListEditableLookupsAsync();
-        TableName = tables.FirstOrDefault(t => t.ID == TableId)?.TableName ?? string.Empty;
-
-        _existingItems = await _lookups.GetLookupDataAsync(TableId, includeInactive: true);
-        TableHasCodes = !ShowAreaColumn;
-
-        if (ShowAreaColumn)
-            UserAreas = await _lookups.GetUserAreasAsync();
-    }
-
-    private void SetTitle()
-    {
-        ViewData["Title"] = "Add pick list item";
-        ViewData["PageTitle"] = "Add pick list item";
     }
 }

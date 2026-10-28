@@ -278,7 +278,10 @@ public class ArchiveTissuesModelTests
         while (dir != null && !File.Exists(Path.Combine(dir.FullName, "src", "Histo.Web", "Pages", "Archive", view)))
             dir = dir.Parent;
         Assert.NotNull(dir);
-        return File.ReadAllText(Path.Combine(dir!.FullName, "src", "Histo.Web", "Pages", "Archive", view));
+        var archiveDir = Path.Combine(dir!.FullName, "src", "Histo.Web", "Pages", "Archive");
+        // The page markup is shared via the _Archive*.cshtml partials, so the page and its partials are read together.
+        var partials = Directory.GetFiles(archiveDir, "_*.cshtml").OrderBy(p => p, StringComparer.Ordinal).Select(File.ReadAllText);
+        return File.ReadAllText(Path.Combine(archiveDir, view)) + string.Concat(partials);
     }
 
     [Theory]

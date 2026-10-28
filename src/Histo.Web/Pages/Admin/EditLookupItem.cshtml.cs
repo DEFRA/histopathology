@@ -10,55 +10,40 @@ namespace Histo.Web.Pages.Admin;
 /// Add/Edit form (see <see cref="AddLookupItemModel"/> for the Add counterpart) per GDS
 /// "one thing per page". Linked from <see cref="LookupItemsModel"/>'s per-row "Change" link.
 /// </summary>
-public class EditLookupItemModel : HistoPageModel
+public class EditLookupItemModel : LookupItemFormModelBase
 {
-    private readonly ILookupService _lookups;
+    private const string PageTitle = "Edit pick list item";
 
     public EditLookupItemModel(ISessionService session, ILookupService lookups)
-        : base(session) => _lookups = lookups;
-
-    [BindProperty(SupportsGet = true)] public int TableId { get; set; }
+        : base(session, lookups) { }
     // ID-keyed tables (Contacts 18, Projects 19): identify the row being edited.
     [BindProperty(SupportsGet = true)] public int? ItemId { get; set; }
     // Code-keyed tables (Archive Location 16, QC Code 14, etc.): identify the row by its
     // string code because these tables have no integer ID column.
     [BindProperty(SupportsGet = true)] public string? ItemCode { get; set; }
 
-    /// <summary>Page this edit was opened from (Pick list items page's own ReturnUrl), so the
-    /// round-trip back to LookupItems can continue returning there.</summary>
-    [BindProperty(SupportsGet = true)] public string? ReturnUrl { get; set; }
-
-    [BindProperty] public string Code { get; set; } = string.Empty;
     // Round-tripped via hidden field on POST so UpdateLookupItemAsync receives @Original_Code.
     [BindProperty] public string OriginalCode { get; set; } = string.Empty;
-    [BindProperty] public string Description { get; set; } = string.Empty;
-    [BindProperty] public bool Active { get; set; } = true;
-    [BindProperty] public string? Area { get; set; }
 
-    public string TableName { get; private set; } = string.Empty;
-    public bool TableHasCodes { get; private set; }
-    public bool ShowAreaColumn => LookupTableSchema.ShowAreaColumn(TableId);
-    public IReadOnlyList<LookupItem> UserAreas { get; private set; } = [];
+    protected override bool DeriveTableHasCodes() => LookupTableSchema.HasCodes(ExistingItems);
 
-    /// <summary>Field id → message, rendered via the shared clickable _ErrorSummary partial.</summary>
-    public Dictionary<string, string> Errors { get; } = new();
-
-    /// <summary>Not tied to a specific field, so shown separately (matches EditQualityDataTest's ConcurrencyError convention).</summary>
-    public string? SaveError { get; private set; }
-
-    private IReadOnlyList<LookupItem> _existingItems = [];
+    // Exclude the current row by its original code so users can re-save without
+    // changing the code (or change it to a different value).
+    protected override bool IsDuplicateCode(LookupItem item, string trimmedCode) =>
+        !string.Equals(item.Code, OriginalCode, StringComparison.OrdinalIgnoreCase)
+        && base.IsDuplicateCode(item, trimmedCode);
 
     private LookupItem? FindExistingItem()
     {
         if (TableHasCodes && ItemCode is not null)
-            return _existingItems.FirstOrDefault(i => string.Equals(i.Code, ItemCode, StringComparison.OrdinalIgnoreCase));
+            return ExistingItems.FirstOrDefault(i => string.Equals(i.Code, ItemCode, StringComparison.OrdinalIgnoreCase));
 
-        return ItemId is int id ? _existingItems.FirstOrDefault(i => i.ID == id) : null;
+        return ItemId is int id ? ExistingItems.FirstOrDefault(i => i.ID == id) : null;
     }
 
     public async Task<IActionResult> OnGetAsync()
     {
-        SetTitle();
+        SetTitle(PageTitle);
         await LoadTableAsync();
 
         var item = FindExistingItem();
@@ -76,7 +61,7 @@ public class EditLookupItemModel : HistoPageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
-        SetTitle();
+        SetTitle(PageTitle);
         await LoadTableAsync();
         await EnsureCurrentAreaVisibleAsync();
 
@@ -88,13 +73,13 @@ public class EditLookupItemModel : HistoPageModel
         {
             // Edit a Code-keyed row: pass OriginalCode as @Original_Code, new Code as @Code.
             var item = new LookupItem { Name = Description.Trim(), Active = Active, Code = Code.Trim() };
-            ok = await _lookups.UpdateLookupItemAsync(TableId, item, Session.UserID, originalCode: OriginalCode);
+            ok = await Lookups.UpdateLookupItemAsync(TableId, item, Session.UserID, originalCode: OriginalCode);
         }
         else
         {
             // Edit an ID-keyed row.
             var item = new LookupItem { ID = ItemId ?? 0, Name = Description.Trim(), Active = Active };
-            ok = await _lookups.UpdateLookupItemAsync(TableId, item, Session.UserID);
+            ok = await Lookups.UpdateLookupItemAsync(TableId, item, Session.UserID);
         }
 
         if (!ok)
@@ -107,46 +92,6 @@ public class EditLookupItemModel : HistoPageModel
         return RedirectToPage("/Admin/LookupItems", new { tableId = TableId, ReturnUrl });
     }
 
-    private void Validate()
-    {
-        if (string.IsNullOrWhiteSpace(Description)) Errors["Description"] = "Enter a description.";
-
-        if (TableHasCodes)
-        {
-            if (string.IsNullOrWhiteSpace(Code))
-            {
-                Errors["Code"] = "Enter a code.";
-            }
-            else
-            {
-                var trimmed = Code.Trim();
-                // Mirrors legacy PickListMaintenance.aspx Pager_RowSave: no two rows
-                // in the same table may share the same Code (case-insensitive).
-                // Exclude the current row by its original code so users can re-save without
-                // changing the code (or change it to a different value).
-                bool duplicate = _existingItems.Any(i =>
-                    !string.Equals(i.Code, OriginalCode, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(i.Code, trimmed, StringComparison.OrdinalIgnoreCase));
-                if (duplicate)
-                    Errors["Code"] = "The code you have selected is already in use.";
-            }
-        }
-    }
-
-    private async Task LoadTableAsync()
-    {
-        var tables = await _lookups.ListEditableLookupsAsync();
-        TableName = tables.FirstOrDefault(t => t.ID == TableId)?.TableName ?? string.Empty;
-
-        // Always load ALL items (active and inactive) so TableHasCodes is derived from the
-        // full table shape and the duplicate-code check is exhaustive.
-        _existingItems = await _lookups.GetLookupDataAsync(TableId, includeInactive: true);
-        TableHasCodes = LookupTableSchema.HasCodes(_existingItems);
-
-        if (ShowAreaColumn)
-            UserAreas = await _lookups.GetUserAreasAsync();
-    }
-
     /// <summary>
     /// If this item's stored Area isn't in the active list (a since-retired area like Mouse
     /// Bioassay/Neuropath), fetches its name and adds it to <see cref="UserAreas"/> so the
@@ -156,15 +101,9 @@ public class EditLookupItemModel : HistoPageModel
     {
         if (!ShowAreaColumn || string.IsNullOrEmpty(Area) || UserAreas.Any(a => a.ID.ToString() == Area)) return;
 
-        var allAreas = await _lookups.GetUserAreasAsync(includeInactive: true);
+        var allAreas = await Lookups.GetUserAreasAsync(includeInactive: true);
         var retired = allAreas.FirstOrDefault(a => a.ID.ToString() == Area);
         if (retired is not null) UserAreas = [.. UserAreas, retired];
-    }
-
-    private void SetTitle()
-    {
-        ViewData["Title"] = "Edit pick list item";
-        ViewData["PageTitle"] = "Edit pick list item";
     }
 }
 
