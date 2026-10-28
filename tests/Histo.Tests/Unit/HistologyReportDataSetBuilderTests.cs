@@ -529,9 +529,9 @@ public class HistologyReportDataSetBuilderTests
         var table = HistologyReportDataSetBuilder.BuildSubmissionTable(
             [], [sTiss], [animal], [block], [bTiss], 7, blocksAssigned);
 
-        Assert.Single(table.Rows);
-        Assert.Equal(expectedBlockRef, table.Rows[0]["BlockRef"]);
-        Assert.Equal(expectedTissue, table.Rows[0]["TissueDetails"]);
+        var row = Assert.Single(table.Rows.Cast<DataRow>());
+        Assert.Equal(expectedBlockRef, row["BlockRef"]);
+        Assert.Equal(expectedTissue, row["TissueDetails"]);
     }
 
     [Fact]
@@ -544,8 +544,8 @@ public class HistologyReportDataSetBuilderTests
         var table = HistologyReportDataSetBuilder.BuildSubmissionTable(
             [], [], [animal], [block], [bTiss], 7, blocksAssigned: false);
 
-        Assert.Single(table.Rows);
-        Assert.Equal("01", table.Rows[0]["BlockRef"]);
+        var row = Assert.Single(table.Rows.Cast<DataRow>());
+        Assert.Equal("01", row["BlockRef"]);
     }
 
     [Fact]

@@ -261,12 +261,9 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         if (PMDateLocked) EditPMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
 
         var histoRefError = await ValidateHistologyRefAsync(EditHistologyRef, Animal.HistologyRef);
-        if (histoRefError is null)
-        {
-            // Legacy btSubmit_Click → ValidateData: Done needs at least one block on the sample.
-            if (!await HasCompletedBlockAsync(Animal.ID))
-                histoRefError = "At least one block must be added against the sample.";
-        }
+        // Legacy btSubmit_Click → ValidateData: Done needs at least one block on the sample.
+        if (histoRefError is null && !await HasCompletedBlockAsync(Animal.ID))
+            histoRefError = "At least one block must be added against the sample.";
         if (histoRefError is not null)
         {
             ErrorMessage = histoRefError;
@@ -328,26 +325,23 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
 
-        if (!IsViewMode && HrAssignedThisVisit && Animal is { HistoRefSet: true })
+        if (!IsViewMode && HrAssignedThisVisit && Animal is { HistoRefSet: true } && !await HasCompletedBlockAsync(Animal.ID))
         {
-            if (!await HasCompletedBlockAsync(Animal.ID))
+            await _submissions.UpdateAnimalAsync(new Animal
             {
-                await _submissions.UpdateAnimalAsync(new Animal
-                {
-                    ID = Animal.ID,
-                    BatchSubmissionID = Animal.BatchSubmissionID,
-                    SenderRef = Animal.SenderRef,
-                    NextBlockRef = Animal.NextBlockRef,
-                    HistoRefSet = false,
-                    HistologyRef = null,
-                    OnHold = Animal.OnHold,
-                    PMDate = Animal.PMDate,
-                    PMDateSet = Animal.PMDateSet,
-                    IsPGNumber = Animal.IsPGNumber,
-                    BookedHistologyRef = Animal.BookedHistologyRef,
-                    RowStamp = Animal.RowStamp,
-                }, Session.UserID);
-            }
+                ID = Animal.ID,
+                BatchSubmissionID = Animal.BatchSubmissionID,
+                SenderRef = Animal.SenderRef,
+                NextBlockRef = Animal.NextBlockRef,
+                HistoRefSet = false,
+                HistologyRef = null,
+                OnHold = Animal.OnHold,
+                PMDate = Animal.PMDate,
+                PMDateSet = Animal.PMDateSet,
+                IsPGNumber = Animal.IsPGNumber,
+                BookedHistologyRef = Animal.BookedHistologyRef,
+                RowStamp = Animal.RowStamp,
+            }, Session.UserID);
         }
 
         return LocalRedirect(BackLinkPage);

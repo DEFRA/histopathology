@@ -354,6 +354,30 @@ public class SubmissionDetailsBlockModelTests
     }
 
     [Fact]
+    public async Task OnPostBackAsync_NoBatchInContext_RedirectsToIndex()
+    {
+        var sut = CreateSut(1, new Animal { ID = 1, SenderRef = "S1" }, "/Submissions/SampleSummary?batchId=5");
+        sut.BatchId = null;
+
+        var result = await sut.OnPostBackAsync();
+
+        Assert.Equal("/Index", Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result).PageName);
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostSaveHistologyDetailsAsync_NoBatchInContext_RedirectsToIndex()
+    {
+        var sut = CreateSut(1, new Animal { ID = 1, SenderRef = "S1" }, "/Submissions/SampleSummary?batchId=5");
+        sut.BatchId = null;
+
+        var result = await sut.OnPostSaveHistologyDetailsAsync();
+
+        Assert.Equal("/Index", Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result).PageName);
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task OnPostBackAsync_PreExistingHistologyRefNoBlocks_LeavesRefAlone()
     {
         var animal = new Animal { ID = 1, SenderRef = "S1", HistoRefSet = true, HistologyRef = "26/40001" };
