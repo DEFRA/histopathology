@@ -491,7 +491,7 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         {
             ErrorMessage = "Select exactly one block to edit.";
             var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
-            Blocks = allBlocks.Where(b => b.AnimalID == Animal!.ID).ToList();
+            Blocks = allBlocks.Where(b => b.AnimalID == Animal.ID).ToList();
             await LoadSupportingDataAsync();
             return Page();
         }

@@ -1051,12 +1051,14 @@ public sealed class SubmissionRepository : ISubmissionRepository
             var d = new Dictionary<string, object?>(
                 ((IDictionary<string, object>)r).ToDictionary(p => p.Key, p => (object?)p.Value),
                 StringComparer.OrdinalIgnoreCase);
+            string? histologyRef = null;
+            if (d.TryGetValue("HistologyRef", out var hr)) histologyRef = Convert.ToString(hr);
+            else if (d.TryGetValue("HistoRef", out var hr2)) histologyRef = Convert.ToString(hr2);
             return new SenderSearchResult
             {
                 ID = d.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0,
                 SenderRef = d.TryGetValue(SenderRefParam, out var sr) ? Convert.ToString(sr) : null,
-                HistologyRef = d.TryGetValue("HistologyRef", out var hr) ? Convert.ToString(hr) :
-                               d.TryGetValue("HistoRef", out var hr2) ? Convert.ToString(hr2) : null,
+                HistologyRef = histologyRef,
             };
         }).ToList();
     }

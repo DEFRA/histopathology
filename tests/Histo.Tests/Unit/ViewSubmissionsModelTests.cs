@@ -195,4 +195,43 @@ public class ViewSubmissionsModelTests
         Assert.Equal("TSE", table.Rows[1][5]);
         Assert.Equal("Yes", table.Rows[1][7]);
     }
+
+    private static BatchSearchResult SearchRow(int n) => new()
+    {
+        ID = n,
+        ProjectDescription = $"P{n}",
+        ContactDescription = $"C{n}",
+        Species = $"S{n}",
+        BatchDate = new DateTime(2024, 1, n),
+        DateReceived = new DateTime(2024, 2, n),
+        DateCompleted = new DateTime(2024, 3, n),
+        CustomerReceivedDate = new DateTime(2024, 4, n),
+        Status = $"T{n}",
+    };
+
+    [Theory]
+    [InlineData("ID", false, "1,2,3")]
+    [InlineData("ID", true, "3,2,1")]
+    [InlineData("ProjectDescription", false, "1,2,3")]
+    [InlineData("ContactDescription", false, "1,2,3")]
+    [InlineData("Species", false, "1,2,3")]
+    [InlineData("BatchDate", true, "3,2,1")]
+    [InlineData("DateReceived", false, "1,2,3")]
+    [InlineData("DateCompleted", false, "1,2,3")]
+    [InlineData("CustomerReceivedDate", false, "1,2,3")]
+    [InlineData("Status", true, "3,2,1")]
+    [InlineData(null, false, "3,2,1")]
+    public async Task OnPostSearchAsync_OrdersResultsByRequestedColumn(string? column, bool desc, string expected)
+    {
+        _batches.Setup(b => b.SearchAsync(It.IsAny<BatchSearchCriteria>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSearchResult>)[SearchRow(2), SearchRow(3), SearchRow(1)]);
+        var sut = CreateSut();
+        sut.SortColumn = column;
+        sut.SortDesc = desc;
+
+        await sut.OnPostSearchAsync();
+
+        Assert.True(sut.Searched);
+        Assert.Equal(expected, string.Join(",", sut.GetPagedResults().Select(r => r.ID)));
+    }
 }

@@ -253,6 +253,25 @@ public class ArchiveTissuesModelTests
         _submissions.Verify(s => s.UpdateTissueAsync(It.IsAny<Tissue>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task OnPostUpdateAsync_ArchivedDateBeforeReceivedDate_IsRejectedAndNothingIsSaved()
+    {
+        SetupArchivedFixture();
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Batch { ID = 42, ReceivedDate = new DateTime(2024, 6, 10) });
+        var sut = CreateSut();
+        sut.BatchId = 42;
+        await sut.OnGetAsync();
+        sut.SelectedIds = [1];
+        sut.ArchiveLocationCode = "L1";
+        sut.ArchivedDate = new DateTime(2024, 6, 1);
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.StartsWith("Archive date must be the same or later than the Submission received date of", sut.Error);
+        _submissions.Verify(s => s.UpdateTissueAsync(It.IsAny<Tissue>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private static string ReadArchiveView(string view)
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

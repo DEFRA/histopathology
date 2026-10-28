@@ -241,44 +241,38 @@ public class ReceiveBatchModel : HistoPageModel
 
         if (Status is BatchStatus.Received or BatchStatus.Rejected)
         {
-            if (ReceivedByUserId is null or <= 0)
+            var error = ReceivedOrRejectedError();
+            if (error is not null)
             {
-                Error = "Select who received or rejected the submission.";
-                return false;
-            }
-
-            if (string.IsNullOrWhiteSpace(TimeReceived))
-            {
-                Error = "Select the time the submission was received or rejected.";
-                return false;
-            }
-
-            if (DateReceived is null)
-            {
-                Error = "Enter the date the submission was received or rejected.";
-                return false;
-            }
-
-            if (Batch?.BatchDate is { } submitted && DateReceived < submitted.Date)
-            {
-                Error = $"The date received must be the same as or later than the submission date of {submitted:d}.";
-                return false;
-            }
-
-            if (DateReceived > DateTime.Today)
-            {
-                Error = "The date received must be today or earlier.";
-                return false;
-            }
-
-            if (Status == BatchStatus.Rejected && string.IsNullOrWhiteSpace(Reason))
-            {
-                Error = "Enter a reason for rejecting the submission.";
+                Error = error;
                 return false;
             }
         }
 
         return true;
+    }
+
+    private string? ReceivedOrRejectedError()
+    {
+        if (ReceivedByUserId is null or <= 0)
+            return "Select who received or rejected the submission.";
+
+        if (string.IsNullOrWhiteSpace(TimeReceived))
+            return "Select the time the submission was received or rejected.";
+
+        if (DateReceived is null)
+            return "Enter the date the submission was received or rejected.";
+
+        if (Batch?.BatchDate is { } submitted && DateReceived < submitted.Date)
+            return $"The date received must be the same as or later than the submission date of {submitted:d}.";
+
+        if (DateReceived > DateTime.Today)
+            return "The date received must be today or earlier.";
+
+        if (Status == BatchStatus.Rejected && string.IsNullOrWhiteSpace(Reason))
+            return "Enter a reason for rejecting the submission.";
+
+        return null;
     }
 
     private async Task LoadLookupsAsync()

@@ -7,6 +7,7 @@ using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace Histo.Web.Pages.Batches;
 
@@ -650,13 +651,13 @@ public class BatchDetailsModel : HistoPageModel
         Create_OtherSubmittedArea = Session.UserAreaID.ToString();
     }
 
-    private static string? LookupNameOrRaw(IReadOnlyDictionary<string, string> byKey, string? raw) =>
+    private static string? LookupNameOrRaw(Dictionary<string, string> byKey, string? raw) =>
         !string.IsNullOrWhiteSpace(raw) && byKey.TryGetValue(raw, out var name) ? name : raw;
 
-    private static string? LookupNameOrNull(IReadOnlyDictionary<string, string> byKey, string? raw) =>
+    private static string? LookupNameOrNull(Dictionary<string, string> byKey, string? raw) =>
         !string.IsNullOrEmpty(raw) && byKey.TryGetValue(raw, out var name) ? name : null;
 
-    private static string? LookupUserName(IReadOnlyDictionary<int, string> byId, int? userId) =>
+    private static string? LookupUserName(Dictionary<int, string> byId, int? userId) =>
         userId.HasValue && byId.TryGetValue(userId.Value, out var name) ? name : null;
 
     private async Task LoadBatchDisplayAsync(Batch batch, int batchId)
@@ -887,7 +888,7 @@ public class BatchDetailsModel : HistoPageModel
         Comments            = Create_Comments,
     };
 
-    private IActionResult CreateSaveError(string message)
+    private PageResult CreateSaveError(string message)
     {
         Errors = new Dictionary<string, string> { [CreateSaveErrorKey] = message };
         Mode = CreateMode;

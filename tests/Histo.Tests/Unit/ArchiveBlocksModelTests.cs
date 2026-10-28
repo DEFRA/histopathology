@@ -225,4 +225,24 @@ public class ArchiveBlocksModelTests
         Assert.Null(sut.Error);
         _blocks.Verify(b => b.UpdateBlockAsync(It.Is<Block>(x => x.ID == 1 && x.ArchiveLocation == "L1" && x.ArchivedDate == DateTime.Today), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_ArchivedDateBeforeReceivedDate_IsRejectedAndNothingIsSaved()
+    {
+        _session.Object.BatchID = 5;
+        _batches.Setup(b => b.GetByIdAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Batch { ID = 5, ReceivedDate = new DateTime(2024, 6, 10) });
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Block>)[new Block { ID = 1, BlockRef = "01" }]);
+        var sut = CreateSut();
+        await sut.OnGetAsync();
+        sut.SelectedIds = [1];
+        sut.ArchiveLocationCode = "L1";
+        sut.ArchivedDate = new DateTime(2024, 6, 1);
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.StartsWith("Archive date must be the same or later than the Submission received date of", sut.Error);
+        _blocks.Verify(b => b.UpdateBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

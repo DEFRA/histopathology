@@ -95,21 +95,24 @@ public class ViewSubmissionsModel : HistoPageModel
     public IReadOnlyList<BatchSearchResult> GetPagedResults() =>
         (SortColumn switch
         {
-            "ID"                 => SortDesc ? Results.OrderByDescending(r => r.ID)                  : Results.OrderBy(r => r.ID),
-            "ProjectDescription" => SortDesc ? Results.OrderByDescending(r => r.ProjectDescription) : Results.OrderBy(r => r.ProjectDescription),
-            "ContactDescription" => SortDesc ? Results.OrderByDescending(r => r.ContactDescription) : Results.OrderBy(r => r.ContactDescription),
-            SpeciesColumn            => SortDesc ? Results.OrderByDescending(r => r.Species)            : Results.OrderBy(r => r.Species),
-            "BatchDate"          => SortDesc ? Results.OrderByDescending(r => r.BatchDate)           : Results.OrderBy(r => r.BatchDate),
-            "DateReceived"       => SortDesc ? Results.OrderByDescending(r => r.DateReceived)        : Results.OrderBy(r => r.DateReceived),
-            "DateCompleted"      => SortDesc ? Results.OrderByDescending(r => r.DateCompleted)       : Results.OrderBy(r => r.DateCompleted),
-            "CustomerReceivedDate" => SortDesc ? Results.OrderByDescending(r => r.CustomerReceivedDate) : Results.OrderBy(r => r.CustomerReceivedDate),
-            StatusColumn             => SortDesc ? Results.OrderByDescending(r => r.Status)              : Results.OrderBy(r => r.Status),
+            "ID"                 => OrderResults(r => r.ID),
+            "ProjectDescription" => OrderResults(r => r.ProjectDescription),
+            "ContactDescription" => OrderResults(r => r.ContactDescription),
+            SpeciesColumn        => OrderResults(r => r.Species),
+            "BatchDate"          => OrderResults(r => r.BatchDate),
+            "DateReceived"       => OrderResults(r => r.DateReceived),
+            "DateCompleted"      => OrderResults(r => r.DateCompleted),
+            "CustomerReceivedDate" => OrderResults(r => r.CustomerReceivedDate),
+            StatusColumn         => OrderResults(r => r.Status),
             // No column clicked yet — legacy default: dvBatchesView.Sort = "ID DESC" (newest first).
             _                    => Results.OrderByDescending(r => r.ID),
         })
         .Skip((PageNumber - 1) * PageSize)
         .Take(PageSize)
         .ToList();
+
+    private IOrderedEnumerable<BatchSearchResult> OrderResults<TKey>(Func<BatchSearchResult, TKey> key) =>
+        SortDesc ? Results.OrderByDescending(key) : Results.OrderBy(key);
 
     /// <summary>
     /// formaction for each row's Select button. SortColumn/PageNumber are POST-bound (user

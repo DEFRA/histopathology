@@ -110,8 +110,8 @@ public sealed class BlockRepository : IBlockRepository
 
     private sealed class AnimalSenderRow
     {
-        public int ID { get; set; }
-        public string? SenderRef { get; set; }
+        public int ID { get; init; }
+        public string? SenderRef { get; init; }
     }
 
     /// <summary>Refs held by the animal on other submissions, including unclaimed pre-booked placeholders.</summary>

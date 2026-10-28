@@ -46,18 +46,21 @@ public class SearchPMDatesModel : GridPageModel
     public IReadOnlyList<PmDateSearchResult> GetPagedResults() =>
         (SortColumn switch
         {
-            "SenderRef"            => SortDesc ? Results.OrderByDescending(r => r.SenderRef)            : Results.OrderBy(r => r.SenderRef),
-            "PMDate"               => SortDesc ? Results.OrderByDescending(r => r.PMDate)               : Results.OrderBy(r => r.PMDate),
-            "BatchDate"            => SortDesc ? Results.OrderByDescending(r => r.BatchDate)            : Results.OrderBy(r => r.BatchDate),
-            "DateReceived"         => SortDesc ? Results.OrderByDescending(r => r.DateReceived)         : Results.OrderBy(r => r.DateReceived),
-            "TimeReceived"         => SortDesc ? Results.OrderByDescending(r => r.TimeReceived)         : Results.OrderBy(r => r.TimeReceived),
-            "CompletedDate"        => SortDesc ? Results.OrderByDescending(r => r.CompletedDate)        : Results.OrderBy(r => r.CompletedDate),
-            "CustomerReceivedDate" => SortDesc ? Results.OrderByDescending(r => r.CustomerReceivedDate) : Results.OrderBy(r => r.CustomerReceivedDate),
-            _                      => SortDesc ? Results.OrderByDescending(r => r.ID)                   : Results.OrderBy(r => r.ID),
+            "SenderRef"            => OrderResults(r => r.SenderRef),
+            "PMDate"               => OrderResults(r => r.PMDate),
+            "BatchDate"            => OrderResults(r => r.BatchDate),
+            "DateReceived"         => OrderResults(r => r.DateReceived),
+            "TimeReceived"         => OrderResults(r => r.TimeReceived),
+            "CompletedDate"        => OrderResults(r => r.CompletedDate),
+            "CustomerReceivedDate" => OrderResults(r => r.CustomerReceivedDate),
+            _                      => OrderResults(r => r.ID),
         })
         .Skip((PageNumber - 1) * PageSize)
         .Take(PageSize)
         .ToList();
+
+    private IOrderedEnumerable<PmDateSearchResult> OrderResults<TKey>(Func<PmDateSearchResult, TKey> key) =>
+        SortDesc ? Results.OrderByDescending(key) : Results.OrderBy(key);
 
     public async Task OnGetAsync()
     {

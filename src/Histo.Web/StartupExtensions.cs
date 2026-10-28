@@ -259,7 +259,7 @@ internal static class StartupExtensions
 
     private static async Task<bool> SessionExpiredAsync(HttpContext context)
     {
-        await context.Session.LoadAsync();
+        await context.Session.LoadAsync(context.RequestAborted);
         if (context.Session.GetString(SessionMarkerKey) is not null) return false;
 
         context.Session.SetString(SessionMarkerKey, "1");

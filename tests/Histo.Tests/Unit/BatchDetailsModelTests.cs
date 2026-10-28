@@ -752,4 +752,136 @@ public class BatchDetailsModelTests
         Assert.Equal(42, sut.NewBatchId);
         Assert.Equal(1, sut.SubmissionCount);
     }
+
+    private BatchDetailsModel CreateViewSut(int batchId)
+    {
+        var sut = CreateSut();
+        sut.BatchId = batchId;
+        return sut;
+    }
+
+    [Fact]
+    public async Task OnGetAsync_ExistingBatch_ResolvesDisplayNamesFromLookups()
+    {
+        var batch = new Batch
+        {
+            ID = 9, UserAreaCode = 5, Species = "3", SubmittedBy = 7, OtherSubmittedBy = 8,
+            SubmittedArea = "5", OtherSubmittedArea = "6", ProjectContractCode = "11", ContactName = "12", Fixation = "F1",
+        };
+        _batches.Setup(b => b.GetByIdAsync(9, It.IsAny<CancellationToken>())).ReturnsAsync(batch);
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(9, It.IsAny<CancellationToken>())).ReturnsAsync(new BatchTestSelections());
+        _batches.Setup(b => b.GetSubmittedAsCodeAsync(9, It.IsAny<CancellationToken>())).ReturnsAsync("2");
+        _lookups.Setup(l => l.GetSpeciesLookupAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 3, Name = "Cattle" }]);
+        _lookups.Setup(l => l.GetUserAreasAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 5, Name = "Area Five" }, new LookupItem { ID = 6, Name = "Area Six" }]);
+        _users.Setup(u => u.GetAllUsersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<User>)[new User { UserID = 7, Name = "Enterer" }, new User { UserID = 8, Name = "Submitter" }]);
+        _lookups.Setup(l => l.GetLookupDataAsync(11, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 0, Code = "2", Name = "Wax Block" }]);
+        _lookups.Setup(l => l.GetLookupDataAsync(19, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 11, Name = "Project X" }]);
+        _lookups.Setup(l => l.GetLookupDataAsync(18, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 12, Name = "Dr Who" }]);
+        _lookups.Setup(l => l.GetLookupDataAsync(10, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { ID = 0, Code = "F1", Name = "Formalin" }]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(9, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1 }, new Animal { ID = 2 }]);
+        var sut = CreateViewSut(9);
+
+        var result = await sut.OnGetAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal(2, sut.SampleCount);
+        Assert.Equal("Cattle", sut.SpeciesName);
+        Assert.Equal("Enterer", sut.EnteredByName);
+        Assert.Equal("Submitter", sut.SubmittedByName);
+        Assert.Equal("Area Five", sut.EnteredAreaName);
+        Assert.Equal("Area Six", sut.SubmittedAreaName);
+        Assert.Equal("Wax Block", sut.SubmittedAsDescription);
+        Assert.Equal("Project X", sut.ProjectName);
+        Assert.Equal("Dr Who", sut.PathologistName);
+        Assert.Equal("Formalin", sut.FixationName);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_ExistingBatchWithUnknownCodes_FallsBackToRawValuesOrNull()
+    {
+        var batch = new Batch
+        {
+            ID = 9, UserAreaCode = 5, Species = "99", SubmittedBy = 123, SubmittedArea = "77",
+            ProjectContractCode = "RAW-P", ContactName = "RAW-C", Fixation = "RAW-F",
+        };
+        _batches.Setup(b => b.GetByIdAsync(9, It.IsAny<CancellationToken>())).ReturnsAsync(batch);
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(9, It.IsAny<CancellationToken>())).ReturnsAsync(new BatchTestSelections());
+        _batches.Setup(b => b.GetSubmittedAsCodeAsync(9, It.IsAny<CancellationToken>())).ReturnsAsync("unmatched");
+        var sut = CreateViewSut(9);
+
+        await sut.OnGetAsync();
+
+        Assert.Equal("99", sut.SpeciesName);
+        Assert.Null(sut.EnteredByName);
+        Assert.Null(sut.EnteredAreaName);
+        Assert.Equal("unmatched", sut.SubmittedAsDescription);
+        Assert.Equal("RAW-P", sut.ProjectName);
+        Assert.Equal("RAW-C", sut.PathologistName);
+        Assert.Equal("RAW-F", sut.FixationName);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_BatchLoadFailsAfterAccessCheck_ShowsLoadError()
+    {
+        _batches.SetupSequence(b => b.GetByIdAsync(9, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Batch { ID = 9, UserAreaCode = 5 })
+            .ThrowsAsync(new InvalidOperationException("db down"));
+        var sut = CreateViewSut(9);
+
+        var result = await sut.OnGetAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("Failed to load the submission details. Please go back and try again.", sut.LoadError);
+    }
+
+    [Fact]
+    public void OnPostManagePickList_UnknownField_ReturnsToCreateForm()
+    {
+        var sut = CreateSut();
+        var url = new Mock<IUrlHelper>();
+        url.Setup(u => u.ActionContext).Returns(new ActionContext { RouteData = new Microsoft.AspNetCore.Routing.RouteData() });
+        url.Setup(u => u.Action(It.IsAny<Microsoft.AspNetCore.Mvc.Routing.UrlActionContext>())).Returns("/Batches/BatchDetails?mode=create");
+        sut.Url = url.Object;
+
+        var result = sut.OnPostManagePickList("other");
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Batches/BatchDetails", redirect.PageName);
+    }
+
+    [Fact]
+    public async Task OnPostCreateAsync_UnparseableBatchDate_ReportsDateError()
+    {
+        var sut = CreateSut();
+        sut.Create_BatchDateStr = "not-a-date";
+        sut.Create_SelectedHistologyCodes = [HistologyCode.EO];
+
+        var result = await sut.OnPostCreateAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("Enter a valid submission date.", sut.Errors["Create_BatchDateStr"]);
+        _batches.Verify(b => b.AddAsync(It.IsAny<Batch>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostCreateAsync_AddThrows_ReturnsPageWithSaveError()
+    {
+        _batches.Setup(b => b.AddAsync(It.IsAny<Batch>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("db down"));
+        var sut = CreateSut();
+        sut.Create_SelectedHistologyCodes = [HistologyCode.EO];
+
+        var result = await sut.OnPostCreateAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.NotEmpty(sut.Errors);
+    }
 }
