@@ -38,7 +38,7 @@
             <input class="govuk-checkboxes__input" type="checkbox" id="showDeactivated"
                    name="ShowDeactivated" value="true"
                    @(Model.ShowDeactivated ? "checked" : "")
-                   onchange="this.form.submit()" />
+                   data-auto-submit />
             <label class="govuk-label govuk-checkboxes__label" for="showDeactivated">Show deactivated items</label>
         </div>
     </div>

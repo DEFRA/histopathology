@@ -1,5 +1,6 @@
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Histo.Web.Auth;
+using Histo.Web.Security;
 using Histo.Web.Telemetry;
 using ITfoxtec.Identity.Saml2;
 using ITfoxtec.Identity.Saml2.Schemas.Metadata;
@@ -221,6 +222,7 @@ internal static class StartupExtensions
             });
         });
         app.UseStatusCodePagesWithReExecute("/Errors/ServiceProblem");
+        app.Use(SecurityHeadersExtensions.ForceGetWhenReExecuted);
     }
 
     private static void TrackUnhandledException(HttpContext context)

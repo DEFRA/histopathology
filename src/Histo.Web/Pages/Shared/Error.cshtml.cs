@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace Histo.Web.Pages.Shared;
 
 [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-[IgnoreAntiforgeryToken]
 public class ErrorModel : PageModel
 {
     public string? RequestId { get; private set; }
