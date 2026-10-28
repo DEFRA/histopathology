@@ -24,6 +24,7 @@ using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Localization;
 using Serilog;
+using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
 
 // Bootstrap Serilog before the host is built so startup errors are captured.
@@ -379,6 +380,28 @@ try
     app.UseAuthentication();
     app.UseSaml2();         // ITfoxtec SAML2 middleware — must follow UseAuthentication
 
+    var bypassEntraInDevelopment = app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("DevAuth:BypassEntraId");
+    if (bypassEntraInDevelopment)
+    {
+        app.Use(async (context, next) =>
+        {
+            if (context.User.Identity?.IsAuthenticated != true
+                && !context.Request.Path.StartsWithSegments("/Saml2")
+                && !context.Request.Path.StartsWithSegments("/health"))
+            {
+                var bypassEmail = app.Configuration["DevAuth:BypassUserEmail"];
+                var userService = context.RequestServices.GetRequiredService<Histo.Administration.Interfaces.IUserService>();
+                var resolvedUser = string.IsNullOrWhiteSpace(bypassEmail)
+                    ? null
+                    : await userService.ResolveUserByEmailAsync(bypassEmail, context.RequestAborted);
+
+                context.User = CreateDevBypassPrincipal(resolvedUser, bypassEmail);
+            }
+
+            await next();
+        });
+    }
+
     // The auth cookie can outlive the server-side session (restart, idle expiry). A request that
     // arrives signed in with a session cookie but no marker means the session expired -> timeout page.
     // Static files are served earlier by UseStaticFiles and non-HTML requests are ignored.
@@ -443,4 +466,24 @@ static bool IsAzureMonitorConfigured(IConfiguration configuration)
 {
     var connectionString = configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
     return !string.IsNullOrWhiteSpace(connectionString) && !connectionString.StartsWith("__", StringComparison.Ordinal);
+}
+
+static ClaimsPrincipal CreateDevBypassPrincipal(Histo.Administration.Models.User? user, string? bypassEmail)
+{
+    var claims = new List<Claim>
+    {
+        new(ClaimTypes.NameIdentifier, user?.UserID.ToString() ?? "dev-auth-bypass"),
+        new(ClaimTypes.Name, user?.Name ?? "Local Developer"),
+        new(ClaimTypes.Email, user?.Email ?? bypassEmail ?? "local.dev@apha.gov.uk"),
+        new(AppClaimTypes.GroupName, user?.GroupName ?? "Maintenance"),
+        new(AppClaimTypes.UserDbId, user?.UserID.ToString() ?? "1"),
+        new(AppClaimTypes.GroupId, user?.GroupCode.ToString() ?? "3"),
+        new(AppClaimTypes.UserArea, user?.AreaName ?? "All Areas"),
+        new(AppClaimTypes.UserAreaId, user?.AreaCode.ToString() ?? "0"),
+        new(ClaimTypes.Role, "Customer"),
+        new(ClaimTypes.Role, "Histopathology User"),
+        new(ClaimTypes.Role, "Maintenance")
+    };
+
+    return new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "DevAuthBypass"));
 }
