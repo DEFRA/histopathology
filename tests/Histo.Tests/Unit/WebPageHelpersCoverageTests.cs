@@ -173,6 +173,7 @@ public class WebPageHelpersCoverageTests
     {
         var sut = SearchSut(new Mock<IBatchService>());
         sut.SortColumn = "ID";
+        sut.SortDesc = false;
         sut.PageNumber = 4;
 
         Assert.Equal("?handler=Select&SortColumn=ID&SortDesc=false&PageNumber=4", sut.SelectFormAction);
