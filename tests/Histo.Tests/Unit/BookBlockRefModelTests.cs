@@ -52,6 +52,21 @@ public class BookBlockRefModelTests
         Assert.Equal("The requested block ref range cannot be created.", sut.Error);
     }
 
+    [Theory]
+    [InlineData("PGnoslash")]
+    [InlineData("MCabc")]
+    public async Task OnPostAsync_MalformedPgOrMouseSenderRef_ReturnsRangeCannotBeCreated(string senderRef)
+    {
+        var sut = CreateSut();
+        sut.SenderRefFrom = senderRef;
+        sut.BlockRefFrom = "01";
+
+        await sut.OnPostAsync();
+
+        Assert.Equal("The range requested cannot be created.", sut.Error);
+        _blocks.VerifyNoOtherCalls();
+    }
+
     [Fact]
     public async Task OnPostAsync_PlainSenderRef_BooksBlocksForFirstRefOnly()
     {

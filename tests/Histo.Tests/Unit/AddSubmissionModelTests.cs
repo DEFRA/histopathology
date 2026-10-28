@@ -428,6 +428,28 @@ public class AddSubmissionModelTests
     }
 
     [Fact]
+    public async Task OnPostAsync_WetTissueWithoutSourceSample_RedirectsToSubmissionDetailsAndRemembersReturnPage()
+    {
+        _batches.Setup(b => b.GetSubmittedAsCodeAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync("WT");
+        _lookups.Setup(l => l.GetLookupDataAsync(11, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[new LookupItem { Code = "WT", Name = "Wet Tissue" }]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        _submissions.Setup(s => s.AddAnimalAsync(99, "S1", 7, (string?)null, false, It.IsAny<CancellationToken>())).ReturnsAsync(101);
+        _submissions.Setup(s => s.AddSubmissionAsync(It.IsAny<BatchSubmission>(), 7, It.IsAny<CancellationToken>())).ReturnsAsync(200);
+        var sut = CreateSut(returnPage: "/Submissions/SampleSummary?batchId=5");
+        sut.BatchSubmissionId = 99;
+        sut.SenderRef = "S1";
+
+        var result = await sut.OnPostAsync();
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("/Submissions/SubmissionDetails", redirect.PageName);
+        Assert.Equal(101, redirect.RouteValues!["animalId"]);
+        Assert.Equal("/Submissions/SampleSummary?batchId=5", _session.Object.SampleDetailReturnPage);
+    }
+
+    [Fact]
     public async Task OnPostAsync_CopySubmissionReturnFlow_StagesTheUpdatedSenderRefWithoutCreatingSourceRecords()
     {
         _session.Object.BatchSubmissionID = 99;

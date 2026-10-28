@@ -86,4 +86,29 @@ public class ViewImportedDataModelTests
 
         Assert.Equal(expectedSenderRefs.Split(','), sut.GetPagedResults().Select(r => r.SenderRef).ToArray());
     }
+
+    [Theory]
+    [InlineData("HistologyRef", "A,B,C")]
+    [InlineData("BlockRef", "B,C,A")]
+    [InlineData("Project", "C,A,B")]
+    [InlineData("Species", "A,C,B")]
+    [InlineData("Comments", "C,B,A")]
+    public async Task PagedResults_SortsAscendingByEachRemainingColumn(string column, string expectedSenderRefs)
+    {
+        var rows = new List<Histo.Submissions.Models.ImportedDataRow>
+        {
+            new() { SenderRef = "A", HistologyRef = "1", BlockRef = "3", Project = "2", Species = "1", Comments = "3" },
+            new() { SenderRef = "B", HistologyRef = "2", BlockRef = "1", Project = "3", Species = "3", Comments = "2" },
+            new() { SenderRef = "C", HistologyRef = "3", BlockRef = "2", Project = "1", Species = "2", Comments = "1" },
+        };
+        _lookups.Setup(l => l.GetImportedTablesAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _submissions.Setup(s => s.GetImportedDataAsync("T", It.IsAny<CancellationToken>())).ReturnsAsync(rows);
+        var sut = CreateSut();
+        sut.SelectedTable = "T";
+        sut.SortColumn = column;
+
+        await sut.OnGetAsync();
+
+        Assert.Equal(expectedSenderRefs.Split(','), sut.GetPagedResults().Select(r => r.SenderRef).ToArray());
+    }
 }
