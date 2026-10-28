@@ -43,10 +43,9 @@ public class HistologySubReportRendererTests
     [Fact]
     public async Task RenderAsync_EmptyBatchHistologyTable_ReturnsPdf()
     {
-        var renderer = new HistologySubReportRenderer();
         var ds       = BuildTestDataSet(); // zero rows
 
-        var pdf = await renderer.RenderAsync(ds);
+        var pdf = await HistologySubReportRenderer.RenderAsync(ds);
 
         Assert.NotNull(pdf);
         Assert.True(pdf.Length > 0, "PDF byte array should not be empty.");
@@ -59,10 +58,9 @@ public class HistologySubReportRendererTests
     [Fact]
     public async Task RenderAsync_MultipleHistologyCodes_ReturnsPdf()
     {
-        var renderer = new HistologySubReportRenderer();
         var ds       = BuildTestDataSet("H&E", "PAS", "MT");
 
-        var pdf = await renderer.RenderAsync(ds);
+        var pdf = await HistologySubReportRenderer.RenderAsync(ds);
 
         Assert.True(pdf.Length > 0, "PDF with 3 histology codes should not be empty.");
         Assert.Equal((byte)'%', pdf[0]);
@@ -71,13 +69,12 @@ public class HistologySubReportRendererTests
     [Fact]
     public async Task RenderAsync_WritesReadablePdfToDisk()
     {
-        var renderer   = new HistologySubReportRenderer();
         var ds         = BuildTestDataSet("H&E", "PAS");
         var outputPath = Path.Combine(
             Path.GetDirectoryName(typeof(HistologySubReportRendererTests).Assembly.Location)!,
             "HistologySubReport-Test.pdf");
 
-        var pdf = await renderer.RenderAsync(ds);
+        var pdf = await HistologySubReportRenderer.RenderAsync(ds);
         await File.WriteAllBytesAsync(outputPath, pdf, TestContext.Current.CancellationToken);
 
         Assert.True(File.Exists(outputPath), "PDF file should exist on disk.");
@@ -89,11 +86,10 @@ public class HistologySubReportRendererTests
     [Fact]
     public async Task RenderAsync_MissingBatchHistologyTable_DoesNotThrow()
     {
-        var renderer = new HistologySubReportRenderer();
         // DataSet with no BatchHistology table at all — renderer should fall back to empty list
         var ds = new DataSet("HistologySubReport");
 
-        var pdf = await renderer.RenderAsync(ds);
+        var pdf = await HistologySubReportRenderer.RenderAsync(ds);
 
         Assert.True(pdf.Length > 0, "PDF should render even when BatchHistology table is absent.");
     }

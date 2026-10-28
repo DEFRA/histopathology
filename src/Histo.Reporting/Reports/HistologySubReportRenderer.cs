@@ -44,7 +44,7 @@ namespace Histo.Reporting.Reports;
 /// </list>
 /// </para>
 /// </summary>
-public sealed class HistologySubReportRenderer
+public static class HistologySubReportRenderer
 {
     static HistologySubReportRenderer()
     {
@@ -66,7 +66,7 @@ public sealed class HistologySubReportRenderer
     /// </summary>
     /// <param name="ds">DataSet containing at minimum a BatchHistology table.</param>
     /// <returns>PDF content as a byte array.</returns>
-    public Task<byte[]> RenderAsync(DataSet ds)
+    public static Task<byte[]> RenderAsync(DataSet ds)
     {
         var histologyRows = ds.Tables["BatchHistology"]?.Rows.Cast<DataRow>().ToList() ?? [];
 

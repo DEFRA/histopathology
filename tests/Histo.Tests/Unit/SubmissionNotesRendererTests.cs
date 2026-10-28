@@ -117,10 +117,9 @@ public class SubmissionNotesRendererTests
     [Fact]
     public async Task RenderAsync_FullDataSet_ReturnsPdf()
     {
-        var renderer = new SubmissionNotesRenderer();
         var ds       = BuildTestDataSet();
 
-        var pdf = await renderer.RenderAsync(ds);
+        var pdf = await SubmissionNotesRenderer.RenderAsync(ds);
 
         Assert.NotNull(pdf);
         Assert.True(pdf.Length > 0, "PDF byte array should not be empty.");
@@ -133,13 +132,12 @@ public class SubmissionNotesRendererTests
     [Fact]
     public async Task RenderAsync_WritesReadablePdfToDisk()
     {
-        var renderer   = new SubmissionNotesRenderer();
         var ds         = BuildTestDataSet();
         var outputPath = Path.Combine(
             Path.GetDirectoryName(typeof(SubmissionNotesRendererTests).Assembly.Location)!,
             "SubmissionNotes-Test.pdf");
 
-        var pdf = await renderer.RenderAsync(ds);
+        var pdf = await SubmissionNotesRenderer.RenderAsync(ds);
         await File.WriteAllBytesAsync(outputPath, pdf, TestContext.Current.CancellationToken);
 
         Assert.True(File.Exists(outputPath), "PDF file should exist on disk.");
@@ -151,7 +149,6 @@ public class SubmissionNotesRendererTests
     [Fact]
     public async Task RenderAsync_AllCommentSectionsEmpty_StillRendersHeadingsAndProducesPdf()
     {
-        var renderer = new SubmissionNotesRenderer();
         var ds       = BuildTestDataSet();
 
         // Clear all 5 detail sections — only Submission header row remains
@@ -161,7 +158,7 @@ public class SubmissionNotesRendererTests
         ds.Tables["BlockSpecialStain"]!.Rows.Clear();
         ds.Tables["BlockAntibodies"]!.Rows.Clear();
 
-        var pdf = await renderer.RenderAsync(ds);
+        var pdf = await SubmissionNotesRenderer.RenderAsync(ds);
 
         Assert.True(pdf.Length > 0, "PDF should render even when all comment sections are empty.");
     }
@@ -169,7 +166,6 @@ public class SubmissionNotesRendererTests
     [Fact]
     public async Task RenderAsync_OnlyTissueSectionPopulated_StillProducesPdf()
     {
-        var renderer = new SubmissionNotesRenderer();
         var ds       = BuildTestDataSet();
 
         // Clear all sections except tissues
@@ -178,7 +174,7 @@ public class SubmissionNotesRendererTests
         ds.Tables["BlockSpecialStain"]!.Rows.Clear();
         ds.Tables["BlockAntibodies"]!.Rows.Clear();
 
-        var pdf = await renderer.RenderAsync(ds);
+        var pdf = await SubmissionNotesRenderer.RenderAsync(ds);
 
         Assert.True(pdf.Length > 0, "PDF should render with only tissue section populated.");
     }

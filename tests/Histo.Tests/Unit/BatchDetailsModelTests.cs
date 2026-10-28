@@ -107,16 +107,6 @@ public class BatchDetailsModelTests
         Assert.Equal(expected, saved.IsBlocked);
     }
 
-    [Fact]
-    public async Task OnGetAsync_CreateMode_DoesNotShowExitWarningByDefault()
-    {
-        var sut = CreateSut();
-        sut.Mode = "create";
-
-        await sut.OnGetAsync();
-
-        Assert.False(sut.ShowLeaveWarning);
-    }
 
     [Fact]
     public async Task OnPostCreateAsync_Success_ClearsStaleSampleSummaryReturnPage()

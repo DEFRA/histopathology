@@ -82,7 +82,7 @@ public sealed class SubmissionNotesRenderer
     /// </summary>
     /// <param name="ds">Populated DataSet containing the 6 named tables described above.</param>
     /// <returns>PDF content as a byte array.</returns>
-    public Task<byte[]> RenderAsync(DataSet ds)
+    public static Task<byte[]> RenderAsync(DataSet ds)
     {
         DataRow? submissionRow = ds.Tables["Submission"]?.Rows.Count > 0
             ? ds.Tables["Submission"]!.Rows[0] : null;

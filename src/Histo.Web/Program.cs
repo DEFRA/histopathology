@@ -174,7 +174,6 @@ try
     builder.Services.AddTransient<HistologyReportDataSetBuilder>();
     builder.Services.AddTransient<QCNoteDataSetBuilder>();
     builder.Services.AddTransient<SubmissionNotesDataSetBuilder>();
-    builder.Services.AddTransient<SubmissionNotesRenderer>();
 
     builder.AddAzureMonitorIfConfigured();
 

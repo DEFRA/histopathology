@@ -73,7 +73,6 @@ public class BatchDetailsModel : HistoPageModel
     // ── Query param — "create" activates the new-batch form ──
     [BindProperty(SupportsGet = true)] public string? Mode { get; set; }
     public bool IsCreateMode => string.Equals(Mode, CreateMode, StringComparison.OrdinalIgnoreCase);
-    public bool ShowLeaveWarning => false;
 
     public const string CreateSubmissionLeaveWarning =
         "If you exit now all the data you have entered will be lost. Are you sure you wish to exit?";

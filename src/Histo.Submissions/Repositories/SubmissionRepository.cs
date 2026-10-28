@@ -139,7 +139,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         await conn.OpenAsync(ct);
         using var tx = await conn.BeginTransactionAsync(ct);
 
-        var step = "create the submission header";
+        var step = new CopyStep("create the submission header");
 
         try
         {
@@ -147,16 +147,16 @@ public sealed class SubmissionRepository : ISubmissionRepository
             if (newBatchId <= 0)
                 throw new InvalidOperationException("Failed to create the new submission header.");
 
-            step = await SaveSelectionCodesAsync(conn, tx, newBatchId, testCodes.HistologyCodes, "AddHistology", userId);
-            step = await SaveSelectionCodesAsync(conn, tx, newBatchId, testCodes.AntibodyCodes, "AddAntibodies", userId);
-            step = await SaveSelectionCodesAsync(conn, tx, newBatchId, testCodes.StainCodes, "AddSpecialStain", userId);
+            await SaveSelectionCodesAsync(conn, tx, newBatchId, testCodes.HistologyCodes, "AddHistology", userId, step);
+            await SaveSelectionCodesAsync(conn, tx, newBatchId, testCodes.AntibodyCodes, "AddAntibodies", userId, step);
+            await SaveSelectionCodesAsync(conn, tx, newBatchId, testCodes.StainCodes, "AddSpecialStain", userId, step);
 
-            step = "save the submission type";
+            step.Description = "save the submission type";
             if (!string.IsNullOrWhiteSpace(submittedAsCode))
                 await conn.ExecuteAsync("AddSubmittedAs", new { BatchID = newBatchId, Code = submittedAsCode, UserID = userId }, tx, commandType: System.Data.CommandType.StoredProcedure);
 
             foreach (var sample in plan)
-                step = await CopySamplePlanAsync(conn, tx, newBatchId, sample, userId);
+                await CopySamplePlanAsync(conn, tx, newBatchId, sample, userId, step);
 
             await tx.CommitAsync(ct);
             return newBatchId;
@@ -164,7 +164,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         catch (Microsoft.Data.SqlClient.SqlException ex)
         {
             await tx.RollbackAsync(ct);
-            throw new InvalidOperationException($"Could not {step} (database error {ex.Number}). Nothing was saved.", ex);
+            throw new InvalidOperationException($"Could not {step.Description} (database error {ex.Number}). Nothing was saved.", ex);
         }
         catch
         {
@@ -175,17 +175,21 @@ public sealed class SubmissionRepository : ISubmissionRepository
         }
     }
 
-    private static async Task<string> SaveSelectionCodesAsync(IDbConnection conn, IDbTransaction tx, int batchId, IReadOnlyList<string> codes, string storedProcedure, int userId)
+    private sealed class CopyStep(string description)
     {
-        var step = $"save the {storedProcedure.ToLowerInvariant()} selections";
-        foreach (var code in codes.Distinct(StringComparer.OrdinalIgnoreCase))
-            await conn.ExecuteAsync(storedProcedure, new { BatchID = batchId, Code = code, UserID = userId }, tx, commandType: System.Data.CommandType.StoredProcedure);
-        return step;
+        public string Description { get; set; } = description;
     }
 
-    private static async Task<string> CopySamplePlanAsync(IDbConnection conn, IDbTransaction tx, int newBatchId, CopiedSamplePlan sample, int userId)
+    private static async Task SaveSelectionCodesAsync(IDbConnection conn, IDbTransaction tx, int batchId, IReadOnlyList<string> codes, string storedProcedure, int userId, CopyStep step)
     {
-        var step = $"draw a histology ref for sample {sample.NewSenderRef}";
+        step.Description = $"save the {storedProcedure.ToLowerInvariant()} selections";
+        foreach (var code in codes.Distinct(StringComparer.OrdinalIgnoreCase))
+            await conn.ExecuteAsync(storedProcedure, new { BatchID = batchId, Code = code, UserID = userId }, tx, commandType: System.Data.CommandType.StoredProcedure);
+    }
+
+    private static async Task CopySamplePlanAsync(IDbConnection conn, IDbTransaction tx, int newBatchId, CopiedSamplePlan sample, int userId, CopyStep step)
+    {
+        step.Description = $"draw a histology ref for sample {sample.NewSenderRef}";
         var newHistologyRef = await DrawHistologyRefAsync(conn, tx, sample.HistologyRefType);
 
         var animal = new Animal
@@ -202,7 +206,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
             IsPGNumber = sample.SourceAnimal.IsPGNumber,
         };
 
-        step = $"create sample {sample.NewSenderRef}";
+        step.Description = $"create sample {sample.NewSenderRef}";
         var (newAnimalId, addResult) = await AddAnimalAsync(conn, tx, animal);
 
         if (addResult == 2)
@@ -221,17 +225,17 @@ public sealed class SubmissionRepository : ISubmissionRepository
             Order = sample.SourceSubmission.Order,
         };
 
-        step = $"link sample {sample.NewSenderRef} to the submission";
+        step.Description = $"link sample {sample.NewSenderRef} to the submission";
         var newSubmissionId = await AddSubmissionAsync(conn, tx, submission);
         if (newSubmissionId <= 0)
             throw new InvalidOperationException($"Failed to create the submission record for {sample.NewSenderRef}.");
 
-        step = $"copy the tissues for sample {sample.NewSenderRef}";
+        step.Description = $"copy the tissues for sample {sample.NewSenderRef}";
         await CopySourceTissuesAsync(conn, tx, sample.Tissues, newSubmissionId);
 
         foreach (var block in sample.Blocks)
         {
-            step = $"copy block {block.BlockRef} for sample {sample.NewSenderRef}";
+            step.Description = $"copy block {block.BlockRef} for sample {sample.NewSenderRef}";
             var newBlockId = await AddBlockAsync(conn, tx, newBatchId, newAnimalId, block);
             if (newBlockId <= 0)
                 throw new InvalidOperationException(
@@ -239,11 +243,9 @@ public sealed class SubmissionRepository : ISubmissionRepository
 
             await CopySourceTissuesAsync(conn, tx, block.Tissues, newBlockId);
 
-            step = $"copy the test selections for block {block.BlockRef}";
+            step.Description = $"copy the test selections for block {block.BlockRef}";
             await AddBlockTestsAsync(conn, tx, newBatchId, newBlockId, userId, block);
         }
-
-        return step;
     }
 
     /// <summary>
