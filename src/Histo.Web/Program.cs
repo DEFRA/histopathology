@@ -230,7 +230,7 @@ try
 
     // Renamed to /Submissions/SampleSummary — "Block" is meaningless for Wet Tissue submissions.
     app.MapGet("/Submissions/BatchBlockSummary", (HttpRequest request) =>
-        Results.Redirect($"/Submissions/SampleSummary{request.QueryString}", permanent: true));
+        Results.Redirect($"/Submissions/SampleSummary{request.QueryString}", permanent: true)).AllowAnonymous();
 
     await app.RunAsync();
 }

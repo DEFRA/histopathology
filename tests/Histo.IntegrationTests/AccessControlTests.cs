@@ -49,6 +49,15 @@ public class AccessControlTests(HistoWebFactory factory)
     }
 
     [Fact]
+    public async Task OldBatchBlockSummaryUrl_RedirectsAnonymousUsersStraightToSampleSummary()
+    {
+        var response = await GetAsync(null, "/Submissions/BatchBlockSummary?batchId=1");
+
+        Assert.Equal(HttpStatusCode.MovedPermanently, response.StatusCode);
+        Assert.Equal("/Submissions/SampleSummary?batchId=1", response.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
     public async Task SignedInUserWithNoUserRecord_IsSentToAccessDenied()
     {
         var response = await GetAsync(TestUser.UnknownUser, "/Index");
