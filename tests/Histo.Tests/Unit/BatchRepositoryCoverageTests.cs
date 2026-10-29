@@ -95,7 +95,7 @@ public class BatchRepositoryCoverageTests
 
         await new BatchRepository(db).RefreshAllTissuesAssignedAsync(42, 7, Ct);
 
-        Assert.Equal(true, SingleEdit(db).Parameters["AllTissuesAssigned"]);
+        Assert.True((bool)SingleEdit(db).Parameters["AllTissuesAssigned"]!);
     }
 
     [Fact]
@@ -117,8 +117,8 @@ public class BatchRepositoryCoverageTests
 
         var edit = SingleEdit(db);
         Assert.Equal(6, edit.Parameters["BatchStatus"]);
-        Assert.Equal(true, edit.Parameters["IsBlocked"]);
-        Assert.Equal(true, edit.Parameters["AllTissuesAssigned"]);
+        Assert.True((bool)edit.Parameters["IsBlocked"]!);
+        Assert.True((bool)edit.Parameters["AllTissuesAssigned"]!);
     }
 
     [Fact]
@@ -158,7 +158,7 @@ public class BatchRepositoryCoverageTests
         Assert.Equal("H1','H2", query.Parameters["Tests"]);
         Assert.Equal("TC 1401", query.Parameters["TestCode"]);
         Assert.Equal("Proj A", query.Parameters["ProjectContractCode"]);
-        Assert.Equal(true, query.Parameters["BatchType"]);
+        Assert.True((bool)query.Parameters["BatchType"]!);
         Assert.DoesNotContain(db.Commands, c => c.Text == "GetTestAntibodiesCounts");
     }
 
@@ -171,7 +171,7 @@ public class BatchRepositoryCoverageTests
 
         var query = Assert.Single(db.Commands, c => c.Text == "GetTestAntibodiesCounts");
         Assert.Equal(string.Empty, query.Parameters["ProjectContractCode"]);
-        Assert.Equal(false, query.Parameters["BatchType"]);
+        Assert.False((bool)query.Parameters["BatchType"]!);
         Assert.Contains(db.Commands, c => c.Text == "GetTestStainsCounts");
     }
 
