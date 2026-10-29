@@ -37,6 +37,7 @@
     <File Path="src/Database/StoredProcedures/dbo.GetUserByEmail.sql" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Histo.IntegrationTests/Histo.IntegrationTests.csproj" />
     <Project Path="tests/Histo.Tests/Histo.Tests.csproj" />
   </Folder>
 </Solution>
