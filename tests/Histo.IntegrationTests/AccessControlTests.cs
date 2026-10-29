@@ -2,7 +2,8 @@ using System.Net;
 
 namespace Histo.IntegrationTests;
 
-public class AccessControlTests(HistoWebFactory factory) : IClassFixture<HistoWebFactory>
+[Collection(HostCollection.Name)]
+public class AccessControlTests(HistoWebFactory factory)
 {
     private static bool IsDenied(HttpResponseMessage r) =>
         r.StatusCode == HttpStatusCode.Forbidden

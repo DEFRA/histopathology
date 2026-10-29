@@ -15,6 +15,13 @@ using Moq;
 
 namespace Histo.IntegrationTests;
 
+/// <summary>One host for the whole run: Program.cs sets Serilog's static logger, so concurrent hosts race on it.</summary>
+[CollectionDefinition(Name)]
+public sealed class HostCollection : ICollectionFixture<HistoWebFactory>
+{
+    public const string Name = "Histo host";
+}
+
 /// <summary>Who the fake auth handler signs the request in as. A null <see cref="Group"/> is a signed-in user with no tblUser record.</summary>
 public sealed record TestUser(string? Group, int AreaId = 0, int UserId = 1)
 {
@@ -62,8 +69,34 @@ public sealed class HistoWebFactory : WebApplicationFactory<Program>
             services.RemoveAll<IBatchService>();
             services.AddSingleton(Batches.Object);
 
+            StubRemainingModuleServices(services);
+
             services.AddSingleton<IStartupFilter, HeaderIdentityStartupFilter>();
         });
+    }
+
+    private static readonly Type[] RealServices =
+        [typeof(IDbConnectionFactory), typeof(IBatchService), typeof(Histo.Web.Services.ISessionService), typeof(IAppLogger)];
+
+    // Every other module interface becomes an empty loose mock, so allowed requests run the full
+    // page and view pipeline without a database.
+    private static void StubRemainingModuleServices(IServiceCollection services)
+    {
+        var types = services
+            .Select(d => d.ServiceType)
+            .Where(t => t is { IsInterface: true, IsGenericTypeDefinition: false }
+                        && t.Assembly.GetName().Name!.StartsWith("Histo.", StringComparison.Ordinal)
+                        && !RealServices.Contains(t))
+            .Distinct()
+            .ToList();
+
+        foreach (var type in types)
+        {
+            var mock = (Mock)Activator.CreateInstance(typeof(Mock<>).MakeGenericType(type), MockBehavior.Loose)!;
+            mock.DefaultValue = DefaultValue.Mock;
+            services.RemoveAll(type);
+            services.AddSingleton(type, mock.Object);
+        }
     }
 
     public HttpClient CreateClientAs(TestUser? user)
