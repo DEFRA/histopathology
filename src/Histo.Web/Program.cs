@@ -139,7 +139,8 @@ try
 
     // Deny by default: any endpoint without an explicit [AllowAnonymous] requires a signed-in user.
     builder.Services.AddAuthorizationBuilder()
-        .SetFallbackPolicy(AuthorizationPolicies.FallbackRequireSignedIn());
+        .SetFallbackPolicy(AuthorizationPolicies.FallbackRequireSignedIn())
+        .AddHistoPolicies();
 
     builder.Services.PostConfigure<CookieAuthenticationOptions>("saml2",
         options => StartupExtensions.ConfigureSamlCookie(options, idleTimeout));

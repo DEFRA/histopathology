@@ -23,8 +23,7 @@ public sealed class HistoOrMaintenancePageFilter : IAsyncPageFilter
             return;
         }
 
-        var group = user.FindFirst(AppClaimTypes.GroupName)?.Value;
-        if (group is not (HistoGroup or MaintenanceGroup))
+        if (!AuthorizationPolicies.IsHistoOrMaintenance(user))
         {
             AuthorizationAudit.LogDenied(context.HttpContext, "group not permitted (Histopathology User or Maintenance required)");
             context.Result = new RedirectToPageResult("/Index");
