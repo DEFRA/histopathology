@@ -29,7 +29,7 @@ using System.ServiceModel.Security;
 namespace Histo.Tests.Unit;
 
 /// <summary>Sign-in redirect, ACS success/failure branches and SLO success for the SAML controller.</summary>
-public sealed class AuthControllerFlowTests : IDisposable
+public sealed partial class AuthControllerFlowTests : IDisposable
 {
     private const string SpIssuer = "https://sp.test/";
     private const string IdpIssuer = "https://idp.test/";
@@ -117,8 +117,11 @@ public sealed class AuthControllerFlowTests : IDisposable
 
         var binding = new Saml2PostBinding { RelayState = relayState };
         binding.Bind(response);
-        return Regex.Match(binding.PostContent, "name=\"SAMLResponse\" value=\"([^\"]+)\"").Groups[1].Value;
+        return SamlResponseField().Match(binding.PostContent).Groups[1].Value;
     }
+
+    [GeneratedRegex("name=\"SAMLResponse\" value=\"([^\"]+)\"")]
+    private static partial Regex SamlResponseField();
 
     private static DefaultHttpContext WithForm(DefaultHttpContext http, string samlResponse, string? relayState)
     {

@@ -12,6 +12,9 @@ public class QCNoteDataSetBuilderBuildAsyncTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    private static readonly string[] BlankColumns =
+        ["QCNoteRef", "SubmissionNumber", "Project", "Species", "StainRef", "QCText", "CreatedBy", "DateCreated"];
+
     private static DataTable Table(params (string Column, Type Type)[] columns)
     {
         var table = new DataTable();
@@ -114,11 +117,10 @@ public class QCNoteDataSetBuilderBuildAsyncTests
 
         var row = Row(await Builder(db).BuildAsync(7, Ct));
 
-        Assert.All(new[] { "QCNoteRef", "SubmissionNumber", "Project", "Species", "StainRef", "QCText", "CreatedBy", "DateCreated" },
-            col => Assert.Equal(string.Empty, row[col]));
+        Assert.All(BlankColumns, col => Assert.Equal(string.Empty, row[col]));
         var summary = ((string)row["TestSummary"]).Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-        Assert.Single(summary);
-        Assert.Contains("Block Ref", summary[0]);
+        var heading = Assert.Single(summary);
+        Assert.Contains("Block Ref", heading);
         Assert.Equal(0, Assert.Single(db.Commands, c => c.Text == "GetQCNoteAntibodiesInformation").Parameters["SubmissionType"]);
     }
 
