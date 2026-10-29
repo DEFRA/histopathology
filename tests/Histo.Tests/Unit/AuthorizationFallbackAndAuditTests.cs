@@ -19,10 +19,14 @@ public class AuthorizationFallbackAndAuditTests
     private sealed class CapturingLogger : ILogger
     {
         public List<(LogLevel Level, string Message)> Entries { get; } = [];
+        public List<object?> States { get; } = [];
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel logLevel) => true;
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-            => Entries.Add((logLevel, formatter(state, exception)));
+        {
+            States.Add(state);
+            Entries.Add((logLevel, formatter(state, exception)));
+        }
     }
 
     private static (DefaultHttpContext Context, CapturingLogger Logger) ContextWithLogger(ClaimsPrincipal user)
@@ -94,6 +98,21 @@ public class AuthorizationFallbackAndAuditTests
         Assert.Contains("resourceId=3049", entry.Message);
         Assert.Contains("path=/Admin/Users", entry.Message);
         Assert.DoesNotContain("someone@example.test", entry.Message);
+    }
+
+    [Fact]
+    public void LogDenied_EmitsAnApplicationInsightsCustomEventWithoutClaimValues()
+    {
+        var (context, logger) = ContextWithLogger(SignedIn("Customer", "42"));
+
+        AuthorizationAudit.LogDenied(context, "batch outside user area", 3049);
+
+        var state = Assert.IsAssignableFrom<IReadOnlyList<KeyValuePair<string, object?>>>(Assert.Single(logger.States));
+        var values = state.ToDictionary(p => p.Key, p => p.Value);
+        Assert.Equal(AuthorizationAudit.EventName, values["microsoft.custom_event.name"]);
+        Assert.Equal("42", values["UserId"]);
+        Assert.Equal(3049, values["ResourceId"]);
+        Assert.DoesNotContain(values.Values, v => v?.ToString()?.Contains("someone@example.test") == true);
     }
 
     [Fact]
