@@ -1,14 +1,13 @@
 using Histo.Administration.Interfaces;
 using Histo.Administration.Models;
 using Histo.AuditLog.Interfaces;
-using Histo.AuditLog.Models;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Histo.Web.Pages.AuditLog;
 
 /// <summary>Replaces <c>AuditLogByUser.aspx</c>.</summary>
-public class AuditLogByUserModel : GridPageModel
+public class AuditLogByUserModel : AuditLogPageModelBase
 {
     private readonly IAuditLogService _auditLog;
     private readonly IUserService _users;
@@ -25,47 +24,21 @@ public class AuditLogByUserModel : GridPageModel
     [BindProperty] public DateTime? EndDate   { get; set; }
 
     public IReadOnlyList<User> Users { get; private set; } = [];
-    public IReadOnlyList<AuditLogEntry> Results { get; private set; } = [];
-    public List<string> Errors { get; } = [];
-    public bool Searched { get; private set; }
-
-    public int TotalCount => Results.Count;
-
-    public IReadOnlyList<AuditLogEntry> PagedEntries =>
-        (SortColumn switch
-        {
-            "FieldName"   => SortDesc ? Results.OrderByDescending(e => e.FieldName)   : Results.OrderBy(e => e.FieldName),
-            "UserName"    => SortDesc ? Results.OrderByDescending(e => e.UserName)    : Results.OrderBy(e => e.UserName),
-            "TableName"   => SortDesc ? Results.OrderByDescending(e => e.TableName)   : Results.OrderBy(e => e.TableName),
-            "BeforeValue" => SortDesc ? Results.OrderByDescending(e => e.BeforeValue) : Results.OrderBy(e => e.BeforeValue),
-            "AfterValue"  => SortDesc ? Results.OrderByDescending(e => e.AfterValue)  : Results.OrderBy(e => e.AfterValue),
-            "Reason"      => SortDesc ? Results.OrderByDescending(e => e.Reason)      : Results.OrderBy(e => e.Reason),
-            "KeyID"       => SortDesc ? Results.OrderByDescending(e => e.KeyID)       : Results.OrderBy(e => e.KeyID),
-            _             => SortDesc ? Results.OrderByDescending(e => e.ChangedAt)  : Results.OrderBy(e => e.ChangedAt),
-        })
-        .Skip((PageNumber - 1) * PageSize)
-        .Take(PageSize)
-        .ToList();
 
     public async Task OnGetAsync()
     {
-        ViewData["Title"] = "Audit log by user";
-        ViewData["PageTitle"] = "Audit log — by user";
+        SetTitles("Audit log by user", "Audit log — by user");
         Users = await _users.GetAllUsersAsync();
         PopulateGridViewData(TotalCount);
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Audit log by user";
-        ViewData["PageTitle"] = "Audit log — by user";
+        SetTitles("Audit log by user", "Audit log — by user");
         Users = await _users.GetAllUsersAsync();
 
-        if (UserID <= 0)          Errors.Add("Select a user.");
-        if (!StartDate.HasValue)  Errors.Add("Enter a start date.");
-        if (!EndDate.HasValue)    Errors.Add("Enter an end date.");
-        if (StartDate.HasValue && EndDate.HasValue && StartDate.Value.Date > EndDate.Value.Date)
-            Errors.Add("The end date must be the same as or after the start date.");
+        if (UserID <= 0) Errors.Add("Select a user.");
+        AddDateRangeErrors(StartDate, EndDate);
         if (Errors.Count > 0)
         {
             PopulateGridViewData(TotalCount);
@@ -78,17 +51,9 @@ public class AuditLogByUserModel : GridPageModel
         return Page();
     }
 
-    /// <summary>Replaces the legacy ExcelExport.aspx link — exports the current results as .xlsx.</summary>
     public async Task<IActionResult> OnPostExportExcelAsync()
     {
         var results = await _auditLog.GetByUserAsync(UserID, StartDate, EndDate);
-        return ExcelExportHelper.BuildXlsx(
-            "UserAuditlogResult.xlsx",
-            ["ID", "Table Name", "Field Name", "Date/Time", "User Name", "Before", "After", "Reason", "Key"],
-            results.Select(e => (IReadOnlyList<object?>)new object?[]
-            {
-                e.ID, e.TableName, e.FieldName, e.ChangedAt, e.UserName,
-                e.BeforeValue, e.AfterValue, e.Reason, e.KeyID
-            }));
+        return BuildExport("UserAuditlogResult.xlsx", results);
     }
 }

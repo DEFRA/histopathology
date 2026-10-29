@@ -50,9 +50,13 @@
 </table>
 
 <form method="post" asp-page="/Bookings/BookHistologyRef">
-    <div class="govuk-form-group">
+    <div class="govuk-form-group @(string.IsNullOrEmpty(Model.Error) ? "" : "govuk-form-group--error")">
         <label class="govuk-label" for="HistologyType">Histology Ref Range Type</label>
-        <select name="HistologyType" id="HistologyType" class="govuk-select" required>
+        @if (!string.IsNullOrEmpty(Model.Error))
+        {
+            <p id="HistologyType-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @Model.Error</p>
+        }
+        <select name="HistologyType" id="HistologyType" class="govuk-select @(string.IsNullOrEmpty(Model.Error) ? "" : "govuk-select--error")" aria-describedby="@(string.IsNullOrEmpty(Model.Error) ? null : "HistologyType-error")" required>
             <option value="">-- Select --</option>
             @foreach (var c in Model.Counters)
             {
@@ -64,7 +68,9 @@
         <label class="govuk-label" for="NumberToBook">Number required</label>
         <input class="govuk-input govuk-input--width-4" id="NumberToBook" name="NumberToBook" type="number" min="1" step="1" value="@Model.NumberToBook" required />
     </div>
-    <button type="submit" class="govuk-button" data-module="govuk-button">Book</button>
+    @* DEFECT-FIX: legacy PromptBeforeSaveScript asked for confirmation before booking. *@
+    <button type="submit" class="govuk-button" data-module="govuk-button"
+            data-confirm="Are you sure you want to book the specified histology numbers. Continue?">Book</button>
 </form>
 
 <p class="govuk-body">

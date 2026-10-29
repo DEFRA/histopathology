@@ -11,6 +11,18 @@ namespace Histo.Submissions.Repositories;
 /// </summary>
 public sealed class BatchRepository : IBatchRepository
 {
+    private const string GetCommonBatchTablesProc = "GetCommonBatchTablesByID";
+    private const string GetBatchesWithStatusProc = "GetBatchesWithStatus";
+    private const string BatchStatusColumn = "BatchStatus";
+    private const string CommentsColumn = "Comments";
+    private const string BatchDateColumn = "BatchDate";
+    private const string SubmittedByColumn = "SubmittedBy";
+    private const string BatchTypeColumn = "BatchType";
+    private const string SpeciesColumn = "Species";
+    private const string CustomerReceivedDateColumn = "CustomerReceivedDate";
+    private const string OtherSubmittedByColumn = "OtherSubmittedBy";
+    private const string SafeToHandleColumn = "SafeToHandle";
+
     private const string ReturnValueParam = "RETURN_VALUE";
     private const string DateReceivedColumn = "DateReceived";
     private const string ReceivedByColumn = "ReceivedBy";
@@ -24,18 +36,20 @@ public sealed class BatchRepository : IBatchRepository
     {
         using var conn = _db.CreateConnection();
         using var multi = await conn.QueryMultipleAsync(
-            "GetCommonBatchTablesByID",
+            GetCommonBatchTablesProc,
             new { ID = batchId },
             commandType: System.Data.CommandType.StoredProcedure);
 
         // Result set 0 = BATCH_TABLE (GetBatchDetails); set 5 = BATCH_SUBMITTEDAS. Consume the rest to avoid connection errors.
         var batchRows = await multi.ReadAsync<dynamic>();
         string? submittedAsCode = null;
-        for (var set = 1; !multi.IsConsumed; set++)
+        var set = 1;
+        while (!multi.IsConsumed)
         {
             var rows = await multi.ReadAsync<dynamic>();
             if (set == 5 && rows.FirstOrDefault() is IDictionary<string, object> sa && sa.TryGetValue("Code", out var c))
                 submittedAsCode = Convert.ToString(c)?.Trim();
+            set++;
         }
 
         var row = batchRows.FirstOrDefault();
@@ -68,47 +82,36 @@ public sealed class BatchRepository : IBatchRepository
         static bool? NullBool(Dictionary<string, object> d, string k)
             => d.TryGetValue(k, out var v) && v is not DBNull && v != null ? (bool?)Convert.ToBoolean(v) : null;
 
-        static DateTime? ParseDate(Dictionary<string, object> d, string k)
-        {
-            if (!d.TryGetValue(k, out var v) || v is null) return null;
-            if (v is DateTime dt) return dt;
-            var s = Convert.ToString(v);
-            if (string.IsNullOrEmpty(s)) return null;
-            return DateTime.TryParseExact(s, ["dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss"],
-                System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.None, out var parsed) ? parsed : null;
-        }
-
         // BatchStatus is int (1-6) in DB; convert to string constant used by the app.
-        var batchStatusInt = Int(dict, "BatchStatus");
+        var batchStatusInt = Int(dict, BatchStatusColumn);
         var submittedAreaStr = Str(dict, "SubmittedArea");
 
         return new Batch
         {
             ID                = Int(dict, "ID"),
             Status            = batchStatusInt > 0 ? batchStatusInt.ToString() : BatchStatus.Submitted,
-            Comments          = Str(dict, "Comments"),
+            Comments          = Str(dict, CommentsColumn),
             StatusComments    = Str(dict, "StatusComments"),
-            BatchDate         = ParseDate(dict, "BatchDate"),
+            BatchDate         = ParseDate(dict, BatchDateColumn),
             ReceivedDate      = ParseDate(dict, DateReceivedColumn),   // SP column: DateReceived
             CompletedDate     = ParseDate(dict, "DateCompleted"),  // SP column: DateCompleted
-            SubmittedByUserID = Int(dict, "SubmittedBy"),          // populate old field for backward compat
+            SubmittedByUserID = Int(dict, SubmittedByColumn),          // populate old field for backward compat
             UserAreaCode      = int.TryParse(submittedAreaStr, out var ua) ? ua : 0,
             IsCassetted       = Bool(dict, "Cassetted"),           // SP column: Cassetted
             IsPreCassetted    = Histo.Core.Domain.ValidationHelpers.IsBatchPreCassetted(submittedAsCode),
             ByPassSort        = Bool(dict, "ByPassSort"),
             RowStamp          = d.TryGetValue("RowStamp", out var rs) ? rs as byte[] : null,
-            BatchType         = Int(dict, "BatchType"),
+            BatchType         = Int(dict, BatchTypeColumn),
             ProjectContractCode = Str(dict, "ProjectContractCode"),
             ContactName       = Str(dict, "ContactName"),
-            Species           = Str(dict, "Species"),
+            Species           = Str(dict, SpeciesColumn),
             Fixation          = Str(dict, "Fixation"),
-            CustomerReceivedDate = dict.TryGetValue("CustomerReceivedDate", out var crd) && crd is DateTime crdDt ? crdDt : ParseDate(dict, "CustomerReceivedDate"),
-            SubmittedBy       = NullInt(dict, "SubmittedBy"),
+            CustomerReceivedDate = dict.TryGetValue(CustomerReceivedDateColumn, out var crd) && crd is DateTime crdDt ? crdDt : ParseDate(dict, CustomerReceivedDateColumn),
+            SubmittedBy       = NullInt(dict, SubmittedByColumn),
             SubmittedArea     = submittedAreaStr,
-            OtherSubmittedBy  = NullInt(dict, "OtherSubmittedBy"),
+            OtherSubmittedBy  = NullInt(dict, OtherSubmittedByColumn),
             OtherSubmittedArea = Str(dict, "OtherSubmittedArea"),
-            SafeToHandle      = NullBool(dict, "SafeToHandle"),
+            SafeToHandle      = NullBool(dict, SafeToHandleColumn),
             IsBlocked         = Bool(dict, "IsBlocked"),
             SampleSameProjects = Bool(dict, "SampleSameProjects"),
             AllTissuesAssigned = Bool(dict, "AllTissuesAssigned"),
@@ -140,7 +143,7 @@ public sealed class BatchRepository : IBatchRepository
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<BatchListResult>(
-            "GetBatchesWithStatus",
+            GetBatchesWithStatusProc,
             new { BatchStatus = 6 },
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
@@ -151,7 +154,7 @@ public sealed class BatchRepository : IBatchRepository
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<BatchListResult>(
-            "GetBatchesWithStatus",
+            GetBatchesWithStatusProc,
             new { BatchStatus = 1 },
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
@@ -162,7 +165,7 @@ public sealed class BatchRepository : IBatchRepository
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<BatchListResult>(
-            "GetBatchesWithStatus",
+            GetBatchesWithStatusProc,
             new { BatchStatus = 0 },
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
@@ -173,7 +176,7 @@ public sealed class BatchRepository : IBatchRepository
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<BatchListResult>(
-            "GetBatchesWithStatus",
+            GetBatchesWithStatusProc,
             new { BatchStatus = 5 },
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
@@ -184,7 +187,7 @@ public sealed class BatchRepository : IBatchRepository
     {
         using var conn = _db.CreateConnection();
         var rows = await conn.QueryAsync<BatchListResult>(
-            "GetBatchesWithStatus",
+            GetBatchesWithStatusProc,
             new { BatchStatus = 4 },
             commandType: System.Data.CommandType.StoredProcedure);
         return rows.ToList();
@@ -238,19 +241,19 @@ public sealed class BatchRepository : IBatchRepository
         var p = new DynamicParameters();
         p.Add("ProjectContractCode", ToIntParam(batch.ProjectContractCode));
         p.Add("ContactName",         ToIntParam(batch.ContactName));
-        p.Add("Species",             (object?)(batch.Species ?? ""));
-        p.Add("BatchDate",           batch.BatchDate ?? (object)DateTime.Today);
-        p.Add("BatchType",           batch.BatchType);
-        p.Add("SubmittedBy",         batch.SubmittedByUserID > 0 ? batch.SubmittedByUserID : userId);
-        p.Add("SafeToHandle",        batch.SafeToHandle ?? false);
-        p.Add("BatchStatus",         1);
-        p.Add("OtherSubmittedBy",    batch.OtherSubmittedBy ?? 0);
+        p.Add(SpeciesColumn,             (object?)(batch.Species ?? ""));
+        p.Add(BatchDateColumn,           batch.BatchDate ?? (object)DateTime.Today);
+        p.Add(BatchTypeColumn,           batch.BatchType);
+        p.Add(SubmittedByColumn,         batch.SubmittedByUserID > 0 ? batch.SubmittedByUserID : userId);
+        p.Add(SafeToHandleColumn,        batch.SafeToHandle ?? false);
+        p.Add(BatchStatusColumn,         1);
+        p.Add(OtherSubmittedByColumn,    batch.OtherSubmittedBy ?? 0);
         p.Add("OtherSubmittedArea",  batch.OtherSubmittedArea ?? "");
         p.Add("Fixation",            batch.Fixation);
-        p.Add("Comments",            batch.Comments);
+        p.Add(CommentsColumn,            batch.Comments);
         p.Add("Cassetted",           batch.IsCassetted);
         p.Add("IsBlocked",           batch.IsBlocked);
-        p.Add("CustomerReceivedDate",batch.CustomerReceivedDate);
+        p.Add(CustomerReceivedDateColumn,batch.CustomerReceivedDate);
         p.Add("SubmittedArea",       batch.UserAreaCode > 0 ? batch.UserAreaCode.ToString() : null);
         p.Add("SampleSameProjects",  batch.SampleSameProjects);
         p.Add("ByPassSort",          batch.ByPassSort);
@@ -271,24 +274,24 @@ public sealed class BatchRepository : IBatchRepository
         p.Add("ID",                  batch.ID);
         p.Add("ProjectContractCode", ToIntParam(batch.ProjectContractCode));
         p.Add("ContactName",         ToIntParam(batch.ContactName));
-        p.Add("Species",             (object?)(batch.Species ?? ""));
-        p.Add("BatchDate",           batch.BatchDate);
-        p.Add("BatchType",           batch.BatchType);
-        p.Add("SubmittedBy",         batch.SubmittedByUserID > 0 ? batch.SubmittedByUserID : (batch.SubmittedBy ?? 0));
-        p.Add("SafeToHandle",        batch.SafeToHandle ?? false);
-        p.Add("BatchStatus",         batchStatusInt);
+        p.Add(SpeciesColumn,             (object?)(batch.Species ?? ""));
+        p.Add(BatchDateColumn,           batch.BatchDate);
+        p.Add(BatchTypeColumn,           batch.BatchType);
+        p.Add(SubmittedByColumn,         batch.SubmittedByUserID > 0 ? batch.SubmittedByUserID : (batch.SubmittedBy ?? 0));
+        p.Add(SafeToHandleColumn,        batch.SafeToHandle ?? false);
+        p.Add(BatchStatusColumn,         batchStatusInt);
         p.Add(DateReceivedColumn,    batch.ReceivedDate);
         p.Add("TimeReceived",        batch.TimeReceived);
         p.Add(ReceivedByColumn,      batch.ReceivedBy);
-        p.Add("OtherSubmittedBy",    batch.OtherSubmittedBy ?? 0);
+        p.Add(OtherSubmittedByColumn,    batch.OtherSubmittedBy ?? 0);
         p.Add("OtherSubmittedArea",  batch.OtherSubmittedArea ?? "");
         p.Add("Cassetted",           batch.IsCassetted);
         p.Add("Fixation",            batch.Fixation);
-        p.Add("Comments",            batch.Comments);
+        p.Add(CommentsColumn,            batch.Comments);
         p.Add("StatusComments",      batch.StatusComments);
         p.Add("PostFixationOther",   batch.PostFixationOther);
         p.Add("IsBlocked",           batch.IsBlocked);
-        p.Add("CustomerReceivedDate",batch.CustomerReceivedDate);
+        p.Add(CustomerReceivedDateColumn,batch.CustomerReceivedDate);
         p.Add("DateCompleted",       batch.CompletedDate);
         p.Add("SubmittedArea",       submittedArea);
         p.Add("SampleSameProjects",  batch.SampleSameProjects);
@@ -306,24 +309,7 @@ public sealed class BatchRepository : IBatchRepository
         var existing = await GetByIdAsync(batchId, ct);
         if (existing is null) return;
         // Construct new Batch with only CustomerReceivedDate changed; preserve everything else.
-        var updated = new Batch
-        {
-            ID = existing.ID, Status = existing.Status, Comments = existing.Comments,
-            StatusComments = existing.StatusComments, BatchDate = existing.BatchDate,
-            ReceivedDate = existing.ReceivedDate, CompletedDate = existing.CompletedDate,
-            SubmittedByUserID = existing.SubmittedByUserID, UserAreaCode = existing.UserAreaCode,
-            IsCassetted = existing.IsCassetted, ByPassSort = existing.ByPassSort,
-            RowStamp = rowStamp, BatchType = existing.BatchType,
-            ProjectContractCode = existing.ProjectContractCode, ContactName = existing.ContactName,
-            Species = existing.Species, Fixation = existing.Fixation,
-            CustomerReceivedDate = date,
-            SubmittedBy = existing.SubmittedBy, SubmittedArea = existing.SubmittedArea,
-            OtherSubmittedBy = existing.OtherSubmittedBy, OtherSubmittedArea = existing.OtherSubmittedArea,
-            SafeToHandle = existing.SafeToHandle, IsBlocked = existing.IsBlocked,
-            SampleSameProjects = existing.SampleSameProjects, AllTissuesAssigned = existing.AllTissuesAssigned,
-            TimeReceived = existing.TimeReceived, ReceivedBy = existing.ReceivedBy,
-            PostFixationOther = existing.PostFixationOther,
-        };
+        var updated = CloneBatch(existing, BatchOverrides.Of(existing) with { RowStamp = rowStamp, CustomerReceivedDate = date });
         await UpdateAsync(updated, userId, ct);
     }
 
@@ -332,24 +318,7 @@ public sealed class BatchRepository : IBatchRepository
     {
         var existing = await GetByIdAsync(batchId, ct);
         if (existing is null) return;
-        var updated = new Batch
-        {
-            ID = existing.ID, Status = existing.Status, Comments = existing.Comments,
-            StatusComments = existing.StatusComments, BatchDate = existing.BatchDate,
-            ReceivedDate = existing.ReceivedDate, CompletedDate = existing.CompletedDate,
-            SubmittedByUserID = existing.SubmittedByUserID, UserAreaCode = existing.UserAreaCode,
-            IsCassetted = existing.IsCassetted, ByPassSort = byPassSort,
-            RowStamp = existing.RowStamp, BatchType = existing.BatchType,
-            ProjectContractCode = existing.ProjectContractCode, ContactName = existing.ContactName,
-            Species = existing.Species, Fixation = existing.Fixation,
-            CustomerReceivedDate = existing.CustomerReceivedDate,
-            SubmittedBy = existing.SubmittedBy, SubmittedArea = existing.SubmittedArea,
-            OtherSubmittedBy = existing.OtherSubmittedBy, OtherSubmittedArea = existing.OtherSubmittedArea,
-            SafeToHandle = existing.SafeToHandle, IsBlocked = existing.IsBlocked,
-            SampleSameProjects = existing.SampleSameProjects, AllTissuesAssigned = existing.AllTissuesAssigned,
-            TimeReceived = existing.TimeReceived, ReceivedBy = existing.ReceivedBy,
-            PostFixationOther = existing.PostFixationOther,
-        };
+        var updated = CloneBatch(existing, BatchOverrides.Of(existing) with { ByPassSort = byPassSort });
         await UpdateAsync(updated, userId, ct);
     }
 
@@ -440,66 +409,47 @@ public sealed class BatchRepository : IBatchRepository
         var allTissuesAssigned = animals.Count > 0 && unassignedAnimals.Count == 0;
         if (allTissuesAssigned == existing.AllTissuesAssigned) return;
 
-        var updated = new Batch
-        {
-            ID = existing.ID,
-            Status = existing.Status,
-            Comments = existing.Comments,
-            StatusComments = existing.StatusComments,
-            BatchDate = existing.BatchDate,
-            ReceivedDate = existing.ReceivedDate,
-            CompletedDate = existing.CompletedDate,
-            SubmittedByUserID = existing.SubmittedByUserID,
-            UserAreaCode = existing.UserAreaCode,
-            IsCassetted = existing.IsCassetted,
-            ByPassSort = existing.ByPassSort,
-            RowStamp = existing.RowStamp,
-            BatchType = existing.BatchType,
-            ProjectContractCode = existing.ProjectContractCode,
-            ContactName = existing.ContactName,
-            Species = existing.Species,
-            Fixation = existing.Fixation,
-            CustomerReceivedDate = existing.CustomerReceivedDate,
-            SubmittedBy = existing.SubmittedBy,
-            SubmittedArea = existing.SubmittedArea,
-            OtherSubmittedBy = existing.OtherSubmittedBy,
-            OtherSubmittedArea = existing.OtherSubmittedArea,
-            SafeToHandle = existing.SafeToHandle,
-            IsBlocked = existing.IsBlocked,
-            SampleSameProjects = existing.SampleSameProjects,
-            AllTissuesAssigned = allTissuesAssigned,
-            TimeReceived = existing.TimeReceived,
-            ReceivedBy = existing.ReceivedBy,
-            PostFixationOther = existing.PostFixationOther,
-        };
+        var updated = CloneBatch(existing, BatchOverrides.Of(existing) with { AllTissuesAssigned = allTissuesAssigned });
 
         await UpdateAsync(updated, userId, ct);
     }
 
     /// <summary>
-    /// Builds a full <see cref="Batch"/> row-clone of <paramref name="existing"/> with only
-    /// <see cref="Batch.Status"/>/<see cref="Batch.CompletedDate"/> overridden — shared by
-    /// <see cref="SetCompletedAsync"/>/<see cref="SetInProgressAsync"/> to avoid duplicating the
-    /// full EditBatch parameter carry-forward for what is otherwise an identical operation.
+    /// Full <see cref="Batch"/> row-clone of <paramref name="existing"/> for EditBatch's parameter
+    /// carry-forward; only the explicitly passed fields differ from <paramref name="existing"/>.
     /// </summary>
-    private static Batch CloneWithStatus(Batch existing, string status, DateTime? completedDate) => new()
+    private sealed record BatchOverrides(string Status, DateTime? CompletedDate, bool ByPassSort,
+        byte[]? RowStamp, DateTime? CustomerReceivedDate, bool IsBlocked, bool AllTissuesAssigned)
     {
-        ID = existing.ID, Status = status, Comments = existing.Comments,
+        public static BatchOverrides Of(Batch b) => new(b.Status, b.CompletedDate, b.ByPassSort,
+            b.RowStamp, b.CustomerReceivedDate, b.IsBlocked, b.AllTissuesAssigned);
+    }
+
+    private static Batch CloneBatch(Batch existing, BatchOverrides o) => new()
+    {
+        ID = existing.ID, Status = o.Status, Comments = existing.Comments,
         StatusComments = existing.StatusComments, BatchDate = existing.BatchDate,
-        ReceivedDate = existing.ReceivedDate, CompletedDate = completedDate ?? existing.CompletedDate,
+        ReceivedDate = existing.ReceivedDate, CompletedDate = o.CompletedDate,
         SubmittedByUserID = existing.SubmittedByUserID, UserAreaCode = existing.UserAreaCode,
-        IsCassetted = existing.IsCassetted, ByPassSort = existing.ByPassSort,
-        RowStamp = existing.RowStamp, BatchType = existing.BatchType,
+        IsCassetted = existing.IsCassetted, ByPassSort = o.ByPassSort,
+        RowStamp = o.RowStamp, BatchType = existing.BatchType,
         ProjectContractCode = existing.ProjectContractCode, ContactName = existing.ContactName,
         Species = existing.Species, Fixation = existing.Fixation,
-        CustomerReceivedDate = existing.CustomerReceivedDate,
+        CustomerReceivedDate = o.CustomerReceivedDate,
         SubmittedBy = existing.SubmittedBy, SubmittedArea = existing.SubmittedArea,
         OtherSubmittedBy = existing.OtherSubmittedBy, OtherSubmittedArea = existing.OtherSubmittedArea,
-        SafeToHandle = existing.SafeToHandle, IsBlocked = existing.IsBlocked,
-        SampleSameProjects = existing.SampleSameProjects, AllTissuesAssigned = existing.AllTissuesAssigned,
+        SafeToHandle = existing.SafeToHandle, IsBlocked = o.IsBlocked,
+        SampleSameProjects = existing.SampleSameProjects, AllTissuesAssigned = o.AllTissuesAssigned,
         TimeReceived = existing.TimeReceived, ReceivedBy = existing.ReceivedBy,
         PostFixationOther = existing.PostFixationOther,
     };
+
+    /// <summary>
+    /// Row-clone of <paramref name="existing"/> with only <see cref="Batch.Status"/>/<see cref="Batch.CompletedDate"/>
+    /// overridden — shared by <see cref="SetCompletedAsync"/>/<see cref="SetInProgressAsync"/>.
+    /// </summary>
+    private static Batch CloneWithStatus(Batch existing, string status, DateTime? completedDate) =>
+        CloneBatch(existing, BatchOverrides.Of(existing) with { Status = status, CompletedDate = completedDate ?? existing.CompletedDate });
 
     /// <inheritdoc/>
     public async Task SetCompletedAsync(int batchId, DateTime completedDate, int userId, CancellationToken ct = default)
@@ -581,37 +531,26 @@ public sealed class BatchRepository : IBatchRepository
         static int Int(Dictionary<string, object> d, string k)
             => d.TryGetValue(k, out var v) && v is not DBNull && v is not null ? Convert.ToInt32(v) : 0;
 
-        static DateTime? ParseDate(Dictionary<string, object> d, string k)
-        {
-            if (!d.TryGetValue(k, out var v) || v is DBNull || v is null) return null;
-            if (v is DateTime dt) return dt;
-            var s = Convert.ToString(v);
-            if (string.IsNullOrEmpty(s)) return null;
-            return DateTime.TryParseExact(s, ["dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss"],
-                System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.None, out var parsed) ? parsed : null;
-        }
-
-        var batchStatusInt = Int(dict, "BatchStatus");
+        var batchStatusInt = Int(dict, BatchStatusColumn);
 
         return new BatchSearchResult
         {
             ID                    = Int(dict, "ID"),
             ProjectDescription    = Str(dict, "ProjectDescription"),
             ContactDescription    = Str(dict, "ContactDescription"),
-            Species               = Str(dict, "Species"),
-            BatchDate             = ParseDate(dict, "BatchDate"),
+            Species               = Str(dict, SpeciesColumn),
+            BatchDate             = ParseDate(dict, BatchDateColumn),
             DateReceived          = ParseDate(dict, DateReceivedColumn),
             DateCompleted         = ParseDate(dict, "DateCompleted"),
-            CustomerReceivedDate  = ParseDate(dict, "CustomerReceivedDate"),
+            CustomerReceivedDate  = ParseDate(dict, CustomerReceivedDateColumn),
             Status                = batchStatusInt > 0 ? batchStatusInt.ToString() : Str(dict, "Status"),
-            SubmittedBy           = Str(dict, "SubmittedBy"),
-            BatchType             = Str(dict, "BatchType"),
-            SafeToHandle          = Str(dict, "SafeToHandle"),
+            SubmittedBy           = Str(dict, SubmittedByColumn),
+            BatchType             = Str(dict, BatchTypeColumn),
+            SafeToHandle          = Str(dict, SafeToHandleColumn),
             ReceivedTime          = Str(dict, "ReceivedTime"),
             ReceivedBy            = Str(dict, ReceivedByColumn),
-            OtherSubmittedBy      = Str(dict, "OtherSubmittedBy"),
-            Comments              = Str(dict, "Comments"),
+            OtherSubmittedBy      = Str(dict, OtherSubmittedByColumn),
+            Comments              = Str(dict, CommentsColumn),
         };
     }
 
@@ -693,7 +632,7 @@ public sealed class BatchRepository : IBatchRepository
     {
         using var conn = _db.CreateConnection();
         using var multi = await conn.QueryMultipleAsync(
-            "GetCommonBatchTablesByID",
+            GetCommonBatchTablesProc,
             new { ID = batchId },
             commandType: System.Data.CommandType.StoredProcedure);
 
@@ -719,7 +658,7 @@ public sealed class BatchRepository : IBatchRepository
         {
             using var conn = _db.CreateConnection();
             using var multi = await conn.QueryMultipleAsync(
-                "GetCommonBatchTablesByID",
+                GetCommonBatchTablesProc,
                 new { ID = batchId },
                 commandType: System.Data.CommandType.StoredProcedure);
 
@@ -787,25 +726,19 @@ public sealed class BatchRepository : IBatchRepository
         var currentSet = current.ToDictionary(r => r.Code, r => r.ID, StringComparer.OrdinalIgnoreCase);
         var newSet = newCodes.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var row in current)
+        foreach (var row in current.Where(r => !newSet.Contains(r.Code)))
         {
-            if (!newSet.Contains(row.Code))
-            {
-                await conn.ExecuteAsync(deleteSp,
-                    new { ID = row.ID },
-                    commandType: System.Data.CommandType.StoredProcedure);
-            }
+            await conn.ExecuteAsync(deleteSp,
+                new { ID = row.ID },
+                commandType: System.Data.CommandType.StoredProcedure);
         }
 
         //foreach (var code in newCodes)
-        foreach (var code in newCodes.Distinct(StringComparer.OrdinalIgnoreCase))
+        foreach (var code in newCodes.Distinct(StringComparer.OrdinalIgnoreCase).Where(c => !currentSet.ContainsKey(c)))
         {
-            if (!currentSet.ContainsKey(code))
-            {
-                await conn.ExecuteAsync(addSp,
-                    new { BatchID = batchId, Code = code, UserID = userId },
-                    commandType: System.Data.CommandType.StoredProcedure);
-            }
+            await conn.ExecuteAsync(addSp,
+                new { BatchID = batchId, Code = code, UserID = userId },
+                commandType: System.Data.CommandType.StoredProcedure);
         }
     }
 
@@ -816,25 +749,25 @@ public sealed class BatchRepository : IBatchRepository
     /// <inheritdoc/>
     public async Task<IReadOnlyList<string>> GetPostFixationCodesAsync(int batchId, CancellationToken ct = default)
     {
-        var rows = await GetPostFixationRowsAsync(batchId, ct);
+        var rows = await GetPostFixationRowsAsync(batchId);
         return rows.Select(r => r.Code).ToList();
     }
 
     /// <inheritdoc/>
     public async Task SavePostFixationCodesAsync(int batchId, IReadOnlyList<string> codes, int userId, CancellationToken ct = default)
     {
-        var current = await GetPostFixationRowsAsync(batchId, ct);
+        var current = await GetPostFixationRowsAsync(batchId);
 
         using var conn = _db.CreateConnection();
         await ApplyTestSelectionDeltaAsync(conn, batchId, userId,
             current, codes, "AddPostFixation", "DeletePostFixation");
     }
 
-    private async Task<List<BatchTestSelectionRow>> GetPostFixationRowsAsync(int batchId, CancellationToken ct = default)
+    private async Task<List<BatchTestSelectionRow>> GetPostFixationRowsAsync(int batchId)
     {
         using var conn = _db.CreateConnection();
         using var multi = await conn.QueryMultipleAsync(
-            "GetCommonBatchTablesByID",
+            GetCommonBatchTablesProc,
             new { ID = batchId },
             commandType: System.Data.CommandType.StoredProcedure);
 
@@ -857,38 +790,10 @@ public sealed class BatchRepository : IBatchRepository
         // both persist a blocked/in-progress state together with the all-tissues-assigned flag.
         // This is the real transition, not the generic EditBatchStatus path, which never updates
         // those fields and therefore cannot advance the batch to the correct workflow state.
-        var updated = new Batch
+        var updated = CloneBatch(existing, BatchOverrides.Of(existing) with
         {
-            ID = existing.ID,
-            Status = BatchStatus.InProgress,
-            Comments = existing.Comments,
-            StatusComments = existing.StatusComments,
-            BatchDate = existing.BatchDate,
-            ReceivedDate = existing.ReceivedDate,
-            CompletedDate = existing.CompletedDate,
-            SubmittedByUserID = existing.SubmittedByUserID,
-            UserAreaCode = existing.UserAreaCode,
-            IsCassetted = existing.IsCassetted,
-            ByPassSort = existing.ByPassSort,
-            RowStamp = existing.RowStamp,
-            BatchType = existing.BatchType,
-            ProjectContractCode = existing.ProjectContractCode,
-            ContactName = existing.ContactName,
-            Species = existing.Species,
-            Fixation = existing.Fixation,
-            CustomerReceivedDate = existing.CustomerReceivedDate,
-            SubmittedBy = existing.SubmittedBy,
-            SubmittedArea = existing.SubmittedArea,
-            OtherSubmittedBy = existing.OtherSubmittedBy,
-            OtherSubmittedArea = existing.OtherSubmittedArea,
-            SafeToHandle = existing.SafeToHandle,
-            IsBlocked = true,
-            SampleSameProjects = existing.SampleSameProjects,
-            AllTissuesAssigned = allTissuesAssigned,
-            TimeReceived = existing.TimeReceived,
-            ReceivedBy = existing.ReceivedBy,
-            PostFixationOther = existing.PostFixationOther,
-        };
+            Status = BatchStatus.InProgress, IsBlocked = true, AllTissuesAssigned = allTissuesAssigned,
+        });
 
         await UpdateAsync(updated, userId, ct);
     }
@@ -964,6 +869,26 @@ public sealed class BatchRepository : IBatchRepository
     /// </summary>
     private static string JoinTestCodes(IReadOnlyList<string> codes) => string.Join("','", codes);
 
+    private static DateTime? ParseDate(Dictionary<string, object> d, string k)
+    {
+        if (!d.TryGetValue(k, out var v) || v is DBNull || v is null) return null;
+        if (v is DateTime dt) return dt;
+        var s = Convert.ToString(v);
+        if (string.IsNullOrEmpty(s)) return null;
+        return DateTime.TryParseExact(s, ["dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss"],
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var parsed) ? parsed : null;
+    }
+
+    private static object PremiumChargeParams(PremiumChargeFilter filter, string tests, string testCode) => new
+    {
+        ProjectContractCode = filter.ProjectDescription ?? "",
+        SubmittedDateFrom = filter.StartDate,
+        SubmittedDateTo = filter.EndDate,
+        BatchType = filter.BatchType != 0,
+        Tests = tests,
+        TestCode = testCode,
+    };
     /// <summary>Groups the shared filter parameters for <see cref="AddCountsAsync"/>/<see cref="AddBatchesAsync"/> so both stay under the 7-parameter limit.</summary>
     private sealed record PremiumChargeFilter(string? ProjectDescription, int BatchType, DateTime? StartDate, DateTime? EndDate);
 
@@ -977,15 +902,7 @@ public sealed class BatchRepository : IBatchRepository
 
         foreach (var testCode in premiumCharges)
         {
-            var rows = await conn.QueryAsync<dynamic>(procName, new
-            {
-                ProjectContractCode = filter.ProjectDescription ?? "",
-                SubmittedDateFrom = filter.StartDate,
-                SubmittedDateTo = filter.EndDate,
-                BatchType = filter.BatchType != 0,
-                Tests = tests,
-                TestCode = testCode,
-            }, commandType: System.Data.CommandType.StoredProcedure);
+            var rows = await conn.QueryAsync<dynamic>(procName, PremiumChargeParams(filter, tests, testCode), commandType: System.Data.CommandType.StoredProcedure);
 
             foreach (var row in rows)
             {
@@ -1014,15 +931,7 @@ public sealed class BatchRepository : IBatchRepository
 
         foreach (var testCode in premiumCharges)
         {
-            var batchIds = await conn.QueryAsync<int>(procName, new
-            {
-                ProjectContractCode = filter.ProjectDescription ?? "",
-                SubmittedDateFrom = filter.StartDate,
-                SubmittedDateTo = filter.EndDate,
-                BatchType = filter.BatchType != 0,
-                Tests = tests,
-                TestCode = testCode,
-            }, commandType: System.Data.CommandType.StoredProcedure);
+            var batchIds = await conn.QueryAsync<int>(procName, PremiumChargeParams(filter, tests, testCode), commandType: System.Data.CommandType.StoredProcedure);
 
             foreach (var id in batchIds)
                 results.Add(new Models.TestPremiumChargeBatchRef { PremiumCode = testCode, BatchID = id });

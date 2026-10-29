@@ -36,7 +36,7 @@ public sealed class QCNoteRepository : IQCNoteRepository
 
         if (headerRow is null) return null;
         var header = (IDictionary<string, object>)headerRow;
-        var batchType = header.TryGetValue("BatchType", out var bt) ? Convert.ToInt32(bt) : 0;
+        var batchType = GetInt(header, "BatchType") ?? 0;
 
         // Second + third calls: histology/stain test rows, then antibodies test rows —
         // legacy imports both result sets into the same DataTable before reading QCText.
@@ -55,23 +55,29 @@ public sealed class QCNoteRepository : IQCNoteRepository
             .ToList();
 
         var first = detail.FirstOrDefault();
-        var qcText = first is not null && first.TryGetValue("QCText", out var qt) ? Convert.ToString(qt) ?? "" : "";
+        var qcText = GetString(first, "QCText") ?? "";
 
         return new QCNote
         {
-            ID                 = header.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0,
-            QCNoteRef          = header.TryGetValue("QCNoteRef", out var qcRef) && qcRef is not null ? Convert.ToInt32(qcRef) : null,
-            StainRef           = header.TryGetValue("StainRef", out var stainRef) ? Convert.ToString(stainRef) : null,
-            ProjectDescription = header.TryGetValue("ProjectDescription", out var project) ? Convert.ToString(project) : null,
-            Species            = header.TryGetValue("Species", out var species) ? Convert.ToString(species) : null,
+            ID                 = GetInt(header, "ID") ?? 0,
+            QCNoteRef          = GetInt(header, "QCNoteRef"),
+            StainRef           = GetString(header, "StainRef"),
+            ProjectDescription = GetString(header, "ProjectDescription"),
+            Species            = GetString(header, "Species"),
             // Blank QCText means the note has never been edited — legacy builds a default
             // Sender Ref / Histo Ref / Block Ref / Test table instead of showing nothing.
             Text               = !string.IsNullOrEmpty(qcText) ? qcText : BuildDefaultNoteText(detail),
-            CreatedBy          = first is not null && first.TryGetValue("Name", out var name) ? Convert.ToString(name) : null,
+            CreatedBy          = GetString(first, "Name"),
             DateCreated        = first is not null && first.TryGetValue("DateCreated", out var created) ? ParseDate(created) : null,
             RowStamp           = first is not null && first.TryGetValue("RowStamp", out var rowStamp) ? rowStamp as byte[] : null,
         };
     }
+
+    private static string? GetString(IDictionary<string, object>? row, string key) =>
+        row is not null && row.TryGetValue(key, out var value) ? Convert.ToString(value) : null;
+
+    private static int? GetInt(IDictionary<string, object> row, string key) =>
+        row.TryGetValue(key, out var value) && value is not null ? Convert.ToInt32(value) : null;
 
     private static readonly string[] DateFormats = ["dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss"];
 
@@ -89,15 +95,16 @@ public sealed class QCNoteRepository : IQCNoteRepository
         var s = value.ToString();
         if (string.IsNullOrWhiteSpace(s)) return null;
 
-        return DateTime.TryParseExact(
-            s, DateFormats,
-            System.Globalization.CultureInfo.InvariantCulture,
-            System.Globalization.DateTimeStyles.None,
-            out var parsed)
-            ? parsed
-            : DateTime.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var fallback)
-                ? fallback
-                : null;
+        if (DateTime.TryParseExact(
+                s, DateFormats,
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None,
+                out var parsed))
+            return parsed;
+
+        return DateTime.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var fallback)
+            ? fallback
+            : null;
     }
 
     /// <summary>

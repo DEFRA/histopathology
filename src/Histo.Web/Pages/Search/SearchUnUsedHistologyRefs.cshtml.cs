@@ -21,7 +21,7 @@ public class SearchUnUsedHistologyRefsModel : GridPageModel
     public string BackLinkPage =>
         !string.IsNullOrWhiteSpace(ReturnPage) && Url.IsLocalUrl(ReturnPage) ? ReturnPage : "/Search/SearchMenu";
 
-    public IReadOnlyList<HistologyRef> PagedResults =>
+    public IReadOnlyList<HistologyRef> GetPagedResults() =>
         (SortColumn switch
         {
             //"SenderRef" => SortDesc ? Results.OrderByDescending(r => r.SenderRef) : Results.OrderBy(r => r.SenderRef),

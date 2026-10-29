@@ -28,6 +28,12 @@ public sealed class SubmissionRepository : ISubmissionRepository
     private const string ArchiveLocationParam = "ArchiveLocation";
     private const string ArchiveCommentParam = "ArchiveComment";
     private const string BlockIdParam = "BlockID";
+    private const string NewIdParam = "NewID";
+    private const string BatchSubmissionIdParam = "BatchSubmissionID";
+    private const string NoPiecesParam = "NoPieces";
+    private const string CommentParam = "Comment";
+    private const string RowStampParam = "RowStamp";
+    private const string SenderRefParam = "SenderRef";
     private readonly IDbConnectionFactory _db;
 
     public SubmissionRepository(IDbConnectionFactory db) => _db = db;
@@ -70,11 +76,11 @@ public sealed class SubmissionRepository : ISubmissionRepository
         parameters.Add("AnimalID",  submission.AnimalID,    dbType: System.Data.DbType.Int32);
         parameters.Add("Order",     submission.Order,       dbType: System.Data.DbType.Int32);
         parameters.Add("OldID",     dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
-        parameters.Add("NewID",     dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+        parameters.Add(NewIdParam,     dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync("AddBatchSubmission", parameters,
             commandType: System.Data.CommandType.StoredProcedure);
-        return parameters.Get<int>("NewID");
+        return parameters.Get<int>(NewIdParam);
     }
 
     /// <inheritdoc/>
@@ -133,7 +139,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         await conn.OpenAsync(ct);
         using var tx = await conn.BeginTransactionAsync(ct);
 
-        var step = "create the submission header";
+        var step = new CopyStep("create the submission header");
 
         try
         {
@@ -141,16 +147,16 @@ public sealed class SubmissionRepository : ISubmissionRepository
             if (newBatchId <= 0)
                 throw new InvalidOperationException("Failed to create the new submission header.");
 
-            step = await SaveSelectionCodesAsync(conn, tx, newBatchId, testCodes.HistologyCodes, "AddHistology", userId);
-            step = await SaveSelectionCodesAsync(conn, tx, newBatchId, testCodes.AntibodyCodes, "AddAntibodies", userId);
-            step = await SaveSelectionCodesAsync(conn, tx, newBatchId, testCodes.StainCodes, "AddSpecialStain", userId);
+            await SaveSelectionCodesAsync(conn, tx, newBatchId, testCodes.HistologyCodes, "AddHistology", userId, step);
+            await SaveSelectionCodesAsync(conn, tx, newBatchId, testCodes.AntibodyCodes, "AddAntibodies", userId, step);
+            await SaveSelectionCodesAsync(conn, tx, newBatchId, testCodes.StainCodes, "AddSpecialStain", userId, step);
 
-            step = "save the submission type";
+            step.Description = "save the submission type";
             if (!string.IsNullOrWhiteSpace(submittedAsCode))
                 await conn.ExecuteAsync("AddSubmittedAs", new { BatchID = newBatchId, Code = submittedAsCode, UserID = userId }, tx, commandType: System.Data.CommandType.StoredProcedure);
 
             foreach (var sample in plan)
-                step = await CopySamplePlanAsync(conn, tx, newBatchId, sample, userId);
+                await CopySamplePlanAsync(conn, tx, newBatchId, sample, userId, step);
 
             await tx.CommitAsync(ct);
             return newBatchId;
@@ -158,7 +164,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         catch (Microsoft.Data.SqlClient.SqlException ex)
         {
             await tx.RollbackAsync(ct);
-            throw new InvalidOperationException($"Could not {step} (database error {ex.Number}). Nothing was saved.", ex);
+            throw new InvalidOperationException($"Could not {step.Description} (database error {ex.Number}). Nothing was saved.", ex);
         }
         catch
         {
@@ -169,17 +175,21 @@ public sealed class SubmissionRepository : ISubmissionRepository
         }
     }
 
-    private static async Task<string> SaveSelectionCodesAsync(IDbConnection conn, IDbTransaction tx, int batchId, IReadOnlyList<string> codes, string storedProcedure, int userId)
+    private sealed class CopyStep(string description)
     {
-        var step = $"save the {storedProcedure.ToLowerInvariant()} selections";
-        foreach (var code in codes.Distinct(StringComparer.OrdinalIgnoreCase))
-            await conn.ExecuteAsync(storedProcedure, new { BatchID = batchId, Code = code, UserID = userId }, tx, commandType: System.Data.CommandType.StoredProcedure);
-        return step;
+        public string Description { get; set; } = description;
     }
 
-    private static async Task<string> CopySamplePlanAsync(IDbConnection conn, IDbTransaction tx, int newBatchId, CopiedSamplePlan sample, int userId)
+    private static async Task SaveSelectionCodesAsync(IDbConnection conn, IDbTransaction tx, int batchId, IReadOnlyList<string> codes, string storedProcedure, int userId, CopyStep step)
     {
-        var step = $"draw a histology ref for sample {sample.NewSenderRef}";
+        step.Description = $"save the {storedProcedure.ToLowerInvariant()} selections";
+        foreach (var code in codes.Distinct(StringComparer.OrdinalIgnoreCase))
+            await conn.ExecuteAsync(storedProcedure, new { BatchID = batchId, Code = code, UserID = userId }, tx, commandType: System.Data.CommandType.StoredProcedure);
+    }
+
+    private static async Task CopySamplePlanAsync(IDbConnection conn, IDbTransaction tx, int newBatchId, CopiedSamplePlan sample, int userId, CopyStep step)
+    {
+        step.Description = $"draw a histology ref for sample {sample.NewSenderRef}";
         var newHistologyRef = await DrawHistologyRefAsync(conn, tx, sample.HistologyRefType);
 
         var animal = new Animal
@@ -196,7 +206,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
             IsPGNumber = sample.SourceAnimal.IsPGNumber,
         };
 
-        step = $"create sample {sample.NewSenderRef}";
+        step.Description = $"create sample {sample.NewSenderRef}";
         var (newAnimalId, addResult) = await AddAnimalAsync(conn, tx, animal);
 
         if (addResult == 2)
@@ -215,17 +225,17 @@ public sealed class SubmissionRepository : ISubmissionRepository
             Order = sample.SourceSubmission.Order,
         };
 
-        step = $"link sample {sample.NewSenderRef} to the submission";
+        step.Description = $"link sample {sample.NewSenderRef} to the submission";
         var newSubmissionId = await AddSubmissionAsync(conn, tx, submission);
         if (newSubmissionId <= 0)
             throw new InvalidOperationException($"Failed to create the submission record for {sample.NewSenderRef}.");
 
-        step = $"copy the tissues for sample {sample.NewSenderRef}";
+        step.Description = $"copy the tissues for sample {sample.NewSenderRef}";
         await CopySourceTissuesAsync(conn, tx, sample.Tissues, newSubmissionId);
 
         foreach (var block in sample.Blocks)
         {
-            step = $"copy block {block.BlockRef} for sample {sample.NewSenderRef}";
+            step.Description = $"copy block {block.BlockRef} for sample {sample.NewSenderRef}";
             var newBlockId = await AddBlockAsync(conn, tx, newBatchId, newAnimalId, block);
             if (newBlockId <= 0)
                 throw new InvalidOperationException(
@@ -233,11 +243,9 @@ public sealed class SubmissionRepository : ISubmissionRepository
 
             await CopySourceTissuesAsync(conn, tx, block.Tissues, newBlockId);
 
-            step = $"copy the test selections for block {block.BlockRef}";
+            step.Description = $"copy the test selections for block {block.BlockRef}";
             await AddBlockTestsAsync(conn, tx, newBatchId, newBlockId, userId, block);
         }
-
-        return step;
     }
 
     /// <summary>
@@ -354,7 +362,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
 
         return rows
             .Select(r => (IDictionary<string, object>)r)
-            .Where(d => d.TryGetValue("BatchSubmissionID", out var bsid) && Convert.ToInt32(bsid) == submissionId)
+            .Where(d => d.TryGetValue(BatchSubmissionIdParam, out var bsid) && Convert.ToInt32(bsid) == submissionId)
             .Select(d => MapTissueRow(d, submissionId, TissueOwner.Submission))
             .ToList();
     }
@@ -373,12 +381,12 @@ public sealed class SubmissionRepository : ISubmissionRepository
             OwnerID = ownerId,
             Owner = owner,
             TissueCode = tissueCode,
-            NoPieces = d.TryGetValue("NoPieces", out var np) ? Convert.ToInt16(np) : (short)0,
-            Comment = d.TryGetValue("Comment", out var cm) && cm is not DBNull ? Convert.ToString(cm) : null,
+            NoPieces = d.TryGetValue(NoPiecesParam, out var np) ? Convert.ToInt16(np) : (short)0,
+            Comment = d.TryGetValue(CommentParam, out var cm) && cm is not DBNull ? Convert.ToString(cm) : null,
             ArchiveLocation = d.TryGetValue(ArchiveLocationParam, out var al) && al is not DBNull ? Convert.ToString(al) : null,
             ArchivedDate = archivedDate,
             ArchiveComment = d.TryGetValue(ArchiveCommentParam, out var ac) && ac is not DBNull ? Convert.ToString(ac) : null,
-            RowStamp = d.TryGetValue("RowStamp", out var rs) ? rs as byte[] : null,
+            RowStamp = d.TryGetValue(RowStampParam, out var rs) ? rs as byte[] : null,
         };
     }
 
@@ -390,10 +398,10 @@ public sealed class SubmissionRepository : ISubmissionRepository
         parameters.Add("AnimalID", submission.AnimalID, dbType: System.Data.DbType.Int32);
         parameters.Add("Order", submission.Order, dbType: System.Data.DbType.Int32);
         parameters.Add("OldID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
-        parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+        parameters.Add(NewIdParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync("AddBatchSubmission", parameters, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
-        return parameters.Get<int>("NewID");
+        return parameters.Get<int>(NewIdParam);
     }
 
     /// <summary>
@@ -407,17 +415,17 @@ public sealed class SubmissionRepository : ISubmissionRepository
     {
         var parameters = new DynamicParameters();
         parameters.Add(ReturnValueParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
-        parameters.Add("SenderRef", animal.SenderRef);
+        parameters.Add(SenderRefParam, animal.SenderRef);
         parameters.Add("HistologyRef", animal.HistologyRef, dbType: System.Data.DbType.String);
         parameters.Add("NextBlockRef", animal.NextBlockRef);
         // Unlike EditAnimal's, this SP's @PMDate takes the legacy dd/MM/yyyy string as-is —
         // parsing it to a DateTime here breaks every insert.
         parameters.Add("PMDate", (object?)animal.PMDate ?? DBNull.Value, dbType: System.Data.DbType.String);
         parameters.Add("OnHold", animal.OnHold);
-        parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+        parameters.Add(NewIdParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync("AddAnimal", parameters, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
-        return (parameters.Get<int?>("NewID") ?? 0, parameters.Get<int?>(ReturnValueParam) ?? 0);
+        return (parameters.Get<int?>(NewIdParam) ?? 0, parameters.Get<int?>(ReturnValueParam) ?? 0);
     }
 
     /// <summary>
@@ -433,16 +441,16 @@ public sealed class SubmissionRepository : ISubmissionRepository
         parameters.Add("BlockRef", block.BlockRef);
         parameters.Add("CustomerRef", block.CustomerRef);
         parameters.Add("RepeatBlock", block.RepeatBlock);
-        parameters.Add("Comment", block.Comment);
+        parameters.Add(CommentParam, block.Comment);
         // Legacy clsBlock.NewBlock always stamps a copied block STATUS_USED (1) rather than
         // carrying the source block's own status across.
         parameters.Add("Status", 1);
         parameters.Add("Order", block.Order);
         parameters.Add("OldID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
-        parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+        parameters.Add(NewIdParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync("AddBlock", parameters, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
-        return parameters.Get<int?>("NewID") ?? 0;
+        return parameters.Get<int?>(NewIdParam) ?? 0;
     }
 
     /// <summary>
@@ -484,7 +492,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         var p = new DynamicParameters();
         p.Add("Type", histologyType.Value, dbType: System.Data.DbType.Int32);
         p.Add("NextHistologyRef", dbType: System.Data.DbType.String, size: 5, direction: System.Data.ParameterDirection.Output);
-        p.Add("RowStamp", dbType: System.Data.DbType.Binary, size: 8, direction: System.Data.ParameterDirection.Output);
+        p.Add(RowStampParam, dbType: System.Data.DbType.Binary, size: 8, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync("GetNextHistologyRef", p, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
 
@@ -493,7 +501,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         // unconstrained varchar(5), so refuse anything that isn't a number inside this type's range
         // rather than stamping a wrong-type or non-numeric ref onto the copied sample.
         return int.TryParse(next, out var number) && number >= lower && number < upper
-            ? Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(next!)
+            ? Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(next)
             : null;
     }
 
@@ -539,7 +547,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
     private static async Task<int> AddTissueAsync(IDbConnection conn, IDbTransaction tx, Tissue tissue)
     {
         var procName = tissue.Owner == TissueOwner.Submission ? "AddTissue" : "AddBlockTissue";
-        var keyParam = tissue.Owner == TissueOwner.Submission ? "BatchSubmissionID" : BlockIdParam;
+        var keyParam = tissue.Owner == TissueOwner.Submission ? BatchSubmissionIdParam : BlockIdParam;
 
         // Legacy source: clsTissue.vb::UpdateTissueDetails — AddInsertParam list is
         // {keyField, TissueCode, NoPieces, Comment} only. No @UserID and no Archive* parameters on
@@ -548,8 +556,8 @@ public sealed class SubmissionRepository : ISubmissionRepository
         parameters.Add(ReturnValueParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
         parameters.Add(keyParam, tissue.OwnerID);
         parameters.Add(TissueCodeParam, tissue.TissueCode);
-        parameters.Add("NoPieces", tissue.NoPieces);
-        parameters.Add("Comment", (object?)tissue.Comment ?? DBNull.Value, dbType: System.Data.DbType.String);
+        parameters.Add(NoPiecesParam, tissue.NoPieces);
+        parameters.Add(CommentParam, (object?)tissue.Comment ?? DBNull.Value, dbType: System.Data.DbType.String);
 
         await conn.ExecuteAsync(procName, parameters, transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
         return parameters.Get<int>(ReturnValueParam);
@@ -648,16 +656,16 @@ public sealed class SubmissionRepository : ISubmissionRepository
         // Legacy SP signature (clsAnimal.vb::AddAnimal / UpdateAnimalRow's Added-row branch):
         // SenderRef, HistologyRef, NextBlockRef, PMDate, OnHold, @NewID (output) — no
         // BatchSubmissionID/PMDateSet/IsPGNumber/UserID parameters exist on this SP for inserts.
-        parameters.Add("SenderRef", animal.SenderRef);
+        parameters.Add(SenderRefParam, animal.SenderRef);
         parameters.Add("HistologyRef", animal.HistologyRef, dbType: System.Data.DbType.String);
         parameters.Add("NextBlockRef", animal.NextBlockRef);
         parameters.Add("PMDate", (object?)animal.PMDate ?? DBNull.Value, dbType: System.Data.DbType.String);
         parameters.Add("OnHold", animal.OnHold);
-        parameters.Add("NewID", dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
+        parameters.Add(NewIdParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.Output);
 
         await conn.ExecuteAsync("AddAnimal", parameters,
             commandType: System.Data.CommandType.StoredProcedure);
-        return parameters.Get<int?>("NewID") ?? 0;
+        return parameters.Get<int?>(NewIdParam) ?? 0;
     }
 
     /// <inheritdoc/>
@@ -677,20 +685,31 @@ public sealed class SubmissionRepository : ISubmissionRepository
             ? parsedPmDate
             : DBNull.Value;
 
-        await conn.ExecuteAsync(
-            "EditAnimal",
-            new
-            {
-                animal.ID,
-                animal.SenderRef,
-                animal.NextBlockRef,
-                HistologyRef = (object?)animal.HistologyRef ?? DBNull.Value,
-                animal.OnHold,
-                PMDate = pmDateParam,
-                animal.RowStamp,
-                UserID = userId,
-            },
-            commandType: System.Data.CommandType.StoredProcedure);
+        // DEFECT-FIX: EditAnimal reports a duplicate Histology Ref (2) or a stale RowStamp (1) through its
+        // return code, not an exception; ignoring it made a rejected save look successful.
+        var parameters = new DynamicParameters();
+        parameters.Add(ReturnValueParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
+        parameters.AddDynamicParams(new
+        {
+            animal.ID,
+            animal.SenderRef,
+            animal.NextBlockRef,
+            HistologyRef = (object?)animal.HistologyRef ?? DBNull.Value,
+            animal.OnHold,
+            PMDate = pmDateParam,
+            animal.RowStamp,
+            UserID = userId,
+        });
+
+        await conn.ExecuteAsync("EditAnimal", parameters, commandType: System.Data.CommandType.StoredProcedure);
+
+        switch (parameters.Get<int>(ReturnValueParam))
+        {
+            case 1:
+                throw new AnimalConcurrencyException();
+            case 2:
+                throw new AnimalRefUpdateException($"Edit Animal: Another Animal is already assigned the Histology Ref: {animal.HistologyRef}.");
+        }
     }
 
     /// <inheritdoc/>
@@ -773,7 +792,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         using var conn = _db.CreateConnection();
         var parameters = new DynamicParameters();
         parameters.Add(ReturnValueParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
-        parameters.Add("SenderRef", senderRef);
+        parameters.Add(SenderRefParam, senderRef);
         parameters.Add("NewSenderRef", newSenderRef);
         parameters.Add("UserID", userId);
 
@@ -796,7 +815,7 @@ public sealed class SubmissionRepository : ISubmissionRepository
         using var conn = _db.CreateConnection();
         var parameters = new DynamicParameters();
         parameters.Add(ReturnValueParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
-        parameters.Add("SenderRef", senderRef);
+        parameters.Add(SenderRefParam, senderRef);
         parameters.Add("NewHistologyRef", (object?)newHistologyRef ?? DBNull.Value, dbType: System.Data.DbType.String);
         parameters.Add("UserID", userId);
 
@@ -813,6 +832,17 @@ public sealed class SubmissionRepository : ISubmissionRepository
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<bool> IsHistologyRefInUseAsync(string histologyRef, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var count = await conn.ExecuteScalarAsync<int>(
+            "CountAnimalsByHistologyRef",
+            new { HistologyRef = histologyRef },
+            commandType: System.Data.CommandType.StoredProcedure);
+        return count > 0;
+    }
+
     // -----------------------------------------------------------------------
     // Tissues
     // -----------------------------------------------------------------------
@@ -827,24 +857,39 @@ public sealed class SubmissionRepository : ISubmissionRepository
             commandType: System.Data.CommandType.StoredProcedure);
         return rows
             .Select(r => (IDictionary<string, object>)r)
-            .Where(d => d.TryGetValue("BatchSubmissionID", out var bsid) && Convert.ToInt32(bsid) == submissionId)
-            .Select(d => new Tissue
-            {
-                ID = d.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0,
-                OwnerID = submissionId,
-                Owner = TissueOwner.Submission,
-                // Trimmed: TissueCode is fixed-width in the database, so untrimmed values fail
-                // exact-match comparisons against the tissue lookup's Code.
-                TissueCode = d.TryGetValue(TissueCodeParam, out var tc) ? Convert.ToString(tc)?.Trim() ?? "" : "",
-                NoPieces = d.TryGetValue("NoPieces", out var np) ? Convert.ToInt16(np) : (short)0,
-                Comment = d.TryGetValue("Comment", out var cm) && cm is not DBNull ? Convert.ToString(cm) : null,
-                ArchiveLocation = d.TryGetValue(ArchiveLocationParam, out var al) && al is not DBNull ? Convert.ToString(al) : null,
-                ArchivedDate = d.TryGetValue(ArchivedDateParam, out var ad) && ad is not DBNull && DateTime.TryParse(Convert.ToString(ad), out var adv) ? adv : null,
-                ArchiveComment = d.TryGetValue(ArchiveCommentParam, out var ac) && ac is not DBNull ? Convert.ToString(ac) : null,
-                RowStamp = d.TryGetValue("RowStamp", out var rs) ? rs as byte[] : null,
-            })
+            .Where(d => d.TryGetValue(BatchSubmissionIdParam, out var bsid) && Convert.ToInt32(bsid) == submissionId)
+            .Select(d => MapSubmissionTissue(d, submissionId))
             .ToList();
     }
+
+    private static Tissue MapSubmissionTissue(IDictionary<string, object> d, int submissionId) => new()
+    {
+        ID = IntOrZero(d, "ID"),
+        OwnerID = submissionId,
+        Owner = TissueOwner.Submission,
+        TissueCode = TrimmedTissueCode(d),
+        NoPieces = d.TryGetValue(NoPiecesParam, out var np) ? Convert.ToInt16(np) : (short)0,
+        Comment = OptionalString(d, CommentParam),
+        ArchiveLocation = OptionalString(d, ArchiveLocationParam),
+        ArchivedDate = ParseArchivedDate(d),
+        ArchiveComment = OptionalString(d, ArchiveCommentParam),
+        RowStamp = d.TryGetValue(RowStampParam, out var rs) ? rs as byte[] : null,
+    };
+
+    private static int IntOrZero(IDictionary<string, object> d, string key) =>
+        d.TryGetValue(key, out var value) ? Convert.ToInt32(value) : 0;
+
+    // Trimmed: TissueCode is fixed-width in the database, so untrimmed values fail
+    // exact-match comparisons against the tissue lookup's Code.
+    private static string TrimmedTissueCode(IDictionary<string, object> d) =>
+        d.TryGetValue(TissueCodeParam, out var tc) ? Convert.ToString(tc)?.Trim() ?? "" : "";
+
+    private static string? OptionalString(IDictionary<string, object> d, string key) =>
+        d.TryGetValue(key, out var value) && value is not DBNull ? Convert.ToString(value) : null;
+
+    private static DateTime? ParseArchivedDate(IDictionary<string, object> d) =>
+        d.TryGetValue(ArchivedDateParam, out var ad) && ad is not DBNull
+            && DateTime.TryParse(Convert.ToString(ad), CultureInfo.CurrentCulture, DateTimeStyles.None, out var adv) ? adv : null;
 
     /// <inheritdoc/>
     public async Task<IReadOnlyList<Tissue>> GetBatchSubmissionTissuesAsync(int batchId, CancellationToken ct = default)
@@ -862,33 +907,33 @@ public sealed class SubmissionRepository : ISubmissionRepository
         for (var i = 0; i < tissueTableIndex; i++)
             await multi.ReadAsync<dynamic>();
         var rows = await multi.ReadAsync<dynamic>();
-        return rows.Select(r =>
+        return rows.Select(r => MapBatchSubmissionTissue((IDictionary<string, object>)r)).ToList();
+    }
+
+    private static Tissue MapBatchSubmissionTissue(IDictionary<string, object> d)
+    {
+        // Try both common FK column names — SP may use either alias.
+        var submId = d.ContainsKey(BatchSubmissionIdParam) ? IntOrZero(d, BatchSubmissionIdParam) : IntOrZero(d, "SubmissionID");
+        return new Tissue
         {
-            var d = (IDictionary<string, object>)r;
-            // Try both common FK column names — SP may use either alias.
-            var submId = d.TryGetValue("BatchSubmissionID", out var bsid) ? Convert.ToInt32(bsid) :
-                         d.TryGetValue("SubmissionID", out var sid) ? Convert.ToInt32(sid) : 0;
-            return new Tissue
-            {
-                ID = d.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0,
-                OwnerID = submId,
-                Owner = TissueOwner.Submission,
-                TissueCode = d.TryGetValue(TissueCodeParam, out var tc) ? Convert.ToString(tc)?.Trim() ?? "" : "",
-                NoPieces = d.TryGetValue("NoPieces", out var np) ? Convert.ToInt16(np) : (short)0,
-                Comment = d.TryGetValue("Comment", out var c) && c is not DBNull ? Convert.ToString(c) : null,
-                ArchiveLocation = d.TryGetValue(ArchiveLocationParam, out var al) && al is not DBNull ? Convert.ToString(al) : null,
-                ArchivedDate = d.TryGetValue(ArchivedDateParam, out var ad) && ad is not DBNull ? Convert.ToDateTime(ad) : null,
-                ArchiveComment = d.TryGetValue(ArchiveCommentParam, out var ac) && ac is not DBNull ? Convert.ToString(ac) : null,
-                RowStamp = d.TryGetValue("RowStamp", out var rs) && rs is not DBNull ? (byte[])rs : null,
-            };
-        }).ToList();
+            ID = IntOrZero(d, "ID"),
+            OwnerID = submId,
+            Owner = TissueOwner.Submission,
+            TissueCode = TrimmedTissueCode(d),
+            NoPieces = d.TryGetValue(NoPiecesParam, out var np) ? Convert.ToInt16(np) : (short)0,
+            Comment = OptionalString(d, CommentParam),
+            ArchiveLocation = OptionalString(d, ArchiveLocationParam),
+            ArchivedDate = d.TryGetValue(ArchivedDateParam, out var ad) && ad is not DBNull ? Convert.ToDateTime(ad) : null,
+            ArchiveComment = OptionalString(d, ArchiveCommentParam),
+            RowStamp = d.TryGetValue(RowStampParam, out var rs) && rs is not DBNull ? (byte[])rs : null,
+        };
     }
 
     /// <inheritdoc/>
     public async Task<int> AddTissueAsync(Tissue tissue, int userId, CancellationToken ct = default)
     {
         var procName = tissue.Owner == TissueOwner.Submission ? "AddTissue" : "AddBlockTissue";
-        var keyParam = tissue.Owner == TissueOwner.Submission ? "BatchSubmissionID" : BlockIdParam;
+        var keyParam = tissue.Owner == TissueOwner.Submission ? BatchSubmissionIdParam : BlockIdParam;
 
         using var conn = _db.CreateConnection();
         // Legacy source: clsTissue.vb::UpdateTissueDetails — AddInsertParam list is
@@ -898,8 +943,8 @@ public sealed class SubmissionRepository : ISubmissionRepository
         parameters.Add(ReturnValueParam, dbType: System.Data.DbType.Int32, direction: System.Data.ParameterDirection.ReturnValue);
         parameters.Add(keyParam, tissue.OwnerID);
         parameters.Add(TissueCodeParam, tissue.TissueCode);
-        parameters.Add("NoPieces", tissue.NoPieces);
-        parameters.Add("Comment", (object?)tissue.Comment ?? DBNull.Value, dbType: System.Data.DbType.String);
+        parameters.Add(NoPiecesParam, tissue.NoPieces);
+        parameters.Add(CommentParam, (object?)tissue.Comment ?? DBNull.Value, dbType: System.Data.DbType.String);
 
         await conn.ExecuteAsync(procName, parameters,
             commandType: System.Data.CommandType.StoredProcedure);
@@ -910,17 +955,17 @@ public sealed class SubmissionRepository : ISubmissionRepository
     public async Task UpdateTissueAsync(Tissue tissue, int userId, CancellationToken ct = default)
     {
         var procName = tissue.Owner == TissueOwner.Submission ? "EditTissue" : "EditBlockTissue";
-        var keyParam = tissue.Owner == TissueOwner.Submission ? "BatchSubmissionID" : BlockIdParam;
+        var keyParam = tissue.Owner == TissueOwner.Submission ? BatchSubmissionIdParam : BlockIdParam;
 
         using var conn = _db.CreateConnection();
         var parameters = new DynamicParameters();
         parameters.Add("ID", tissue.ID);
         parameters.Add(keyParam, tissue.OwnerID);
         parameters.Add(TissueCodeParam, tissue.TissueCode);
-        parameters.Add("NoPieces", tissue.NoPieces);
-        parameters.Add("Comment", (object?)tissue.Comment ?? DBNull.Value, dbType: System.Data.DbType.String);
+        parameters.Add(NoPiecesParam, tissue.NoPieces);
+        parameters.Add(CommentParam, (object?)tissue.Comment ?? DBNull.Value, dbType: System.Data.DbType.String);
         parameters.Add("UserID", userId);
-        parameters.Add("RowStamp", tissue.RowStamp);
+        parameters.Add(RowStampParam, tissue.RowStamp);
         // Legacy source: clsTissue.vb::UpdateTissueDetails — Archive* AddUpdateParams are only
         // registered when sKeyField = "BatchSubmissionID" (EditBlockTissue has no Archive params).
         if (tissue.Owner == TissueOwner.Submission)
@@ -949,9 +994,9 @@ public sealed class SubmissionRepository : ISubmissionRepository
                 OwnerID = d.TryGetValue(BlockIdParam, out var bid) ? Convert.ToInt32(bid) : 0,
                 Owner = TissueOwner.Block,
                 TissueCode = d.TryGetValue(TissueCodeParam, out var tc) ? Convert.ToString(tc)?.Trim() ?? "" : "",
-                NoPieces = d.TryGetValue("NoPieces", out var np) ? Convert.ToInt16(np) : (short)0,
-                Comment = d.TryGetValue("Comment", out var cm) && cm is not DBNull ? Convert.ToString(cm) : null,
-                RowStamp = d.TryGetValue("RowStamp", out var rs) ? rs as byte[] : null,
+                NoPieces = d.TryGetValue(NoPiecesParam, out var np) ? Convert.ToInt16(np) : (short)0,
+                Comment = d.TryGetValue(CommentParam, out var cm) && cm is not DBNull ? Convert.ToString(cm) : null,
+                RowStamp = d.TryGetValue(RowStampParam, out var rs) ? rs as byte[] : null,
             })
             .ToList();
     }
@@ -1006,12 +1051,14 @@ public sealed class SubmissionRepository : ISubmissionRepository
             var d = new Dictionary<string, object?>(
                 ((IDictionary<string, object>)r).ToDictionary(p => p.Key, p => (object?)p.Value),
                 StringComparer.OrdinalIgnoreCase);
+            string? histologyRef = null;
+            if (d.TryGetValue("HistologyRef", out var hr)) histologyRef = Convert.ToString(hr);
+            else if (d.TryGetValue("HistoRef", out var hr2)) histologyRef = Convert.ToString(hr2);
             return new SenderSearchResult
             {
                 ID = d.TryGetValue("ID", out var id) ? Convert.ToInt32(id) : 0,
-                SenderRef = d.TryGetValue("SenderRef", out var sr) ? Convert.ToString(sr) : null,
-                HistologyRef = d.TryGetValue("HistologyRef", out var hr) ? Convert.ToString(hr) :
-                               d.TryGetValue("HistoRef", out var hr2) ? Convert.ToString(hr2) : null,
+                SenderRef = d.TryGetValue(SenderRefParam, out var sr) ? Convert.ToString(sr) : null,
+                HistologyRef = histologyRef,
             };
         }).ToList();
     }

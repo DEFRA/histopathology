@@ -1,5 +1,6 @@
 @page
 @model Histo.Web.Pages.Submissions.SubmissionDetailsBlockModel
+@using Histo.Web.Pages.Shared
 @{
     ViewData["Title"] = "Sample blocks";
     ViewData["PageTitle"] = "Sample blocks";
@@ -175,7 +176,7 @@ else
     <form method="post" asp-page="/Submissions/SubmissionDetailsBlock" id="blocks-grid-form">
         <input type="hidden" asp-for="BatchId" />
         <input type="hidden" asp-for="AnimalId" />
-        <table class="govuk-table">
+        <table class="govuk-table app-table--scroll">
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
                     <th scope="col" class="govuk-table__header">Block ref</th>
@@ -196,17 +197,22 @@ else
                         }
                         <th scope="col" class="govuk-table__header">Special stain</th>
                     }
-                    <th scope="col" class="govuk-table__header">
+                    <th scope="col" class="govuk-table__header" data-label="Select">
                         Select
                         @if (!Model.IsViewMode && Model.Blocks.Any())
                         {
-                            <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-top-1">
+                            <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-top-1 app-js-only">
                                 <div class="govuk-checkboxes__item">
                                     <input class="govuk-checkboxes__input" type="checkbox" id="select-all-blocks" />
                                     <label class="govuk-label govuk-checkboxes__label" for="select-all-blocks">
                                         <span class="govuk-visually-hidden">Select all blocks (for Delete block)</span>
                                     </label>
                                 </div>
+                            </div>
+                            <div class="app-no-js govuk-!-margin-top-1">
+                                <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-SelectAll="true" class="govuk-link govuk-body-s">Select all<span class="govuk-visually-hidden"> blocks</span></a>
+                                <br />
+                                <a asp-page="/Submissions/SubmissionDetailsBlock" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" class="govuk-link govuk-body-s">Clear<span class="govuk-visually-hidden"> block selection</span></a>
                             </div>
                         }
                     </th>
@@ -219,98 +225,16 @@ else
                     var histCodes = Model.HistologyCodesByBlockId.GetValueOrDefault(b.ID, []);
                     <tr class="govuk-table__row">
                         <td class="govuk-table__cell">@b.BlockRef</td>
-                        <td class="govuk-table__cell">
-                            @if (blockTissues.Any())
-                            {
-                                <details class="govuk-details govuk-!-margin-bottom-0">
-                                    <summary class="govuk-details__summary">
-                                        <span class="govuk-details__summary-text">@blockTissues.Count tissue(s)</span>
-                                    </summary>
-                                    <div class="govuk-details__text">
-                                        <ul class="govuk-list">
-                                            @foreach (var t in blockTissues)
-                                            {
-                                                <li>@t.NoPieces x @Model.TissueName(t.TissueCode)</li>
-                                            }
-                                        </ul>
-                                    </div>
-                                </details>
-                            }
-                            else
-                            {
-                                <span>None</span>
-                            }
-                        </td>
+                        <partial name="_BlockTissuesCell" model="new BlockTissuesCell(blockTissues, Model.TissueName)" />
                         @if (Model.ShowTestDetails)
                         {
-                            <td class="govuk-table__cell">
-                                <div class="govuk-checkboxes govuk-checkboxes--small">
-                                    <div class="govuk-checkboxes__item">
-                                        <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.Archive)" />
-                                        <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">Archived</span></label>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="govuk-table__cell">
-                                <div class="govuk-checkboxes govuk-checkboxes--small">
-                                    <div class="govuk-checkboxes__item">
-                                        <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.EO)" />
-                                        <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">EO</span></label>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="govuk-table__cell">
-                                <div class="govuk-checkboxes govuk-checkboxes--small">
-                                    <div class="govuk-checkboxes__item">
-                                        <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.HAndE)" />
-                                        <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">H&amp;E</span></label>
-                                    </div>
-                                </div>
-                            </td>
-                            @if (Model.IsTse)
-                            {
-                                <td class="govuk-table__cell">
-                                    <div class="govuk-checkboxes govuk-checkboxes--small">
-                                        <div class="govuk-checkboxes__item">
-                                            <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.HeBse)" />
-                                            <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">H&amp;E (BSE)</span></label>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="govuk-table__cell">
-                                    <div class="govuk-checkboxes govuk-checkboxes--small">
-                                        <div class="govuk-checkboxes__item">
-                                            <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcPrp)" />
-                                            <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">IHC Prp</span></label>
-                                        </div>
-                                    </div>
-                                </td>
-                            }
-                            else
-                            {
-                                <td class="govuk-table__cell">
-                                    <div class="govuk-checkboxes govuk-checkboxes--small">
-                                        <div class="govuk-checkboxes__item">
-                                            <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcOther)" />
-                                            <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">IHC Other</span></label>
-                                        </div>
-                                    </div>
-                                </td>
-                            }
-                            <td class="govuk-table__cell">
-                                <div class="govuk-checkboxes govuk-checkboxes--small">
-                                    <div class="govuk-checkboxes__item">
-                                        <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@histCodes.Contains(Histo.Submissions.Models.HistologyCode.SpecialStain)" />
-                                        <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">Special stain</span></label>
-                                    </div>
-                                </div>
-                            </td>
+                            <partial name="_BlockHistologyCells" model="new BlockHistologyCells(b.ID, histCodes, Model.IsTse)" />
                         }
                         <td class="govuk-table__cell">
                             <div class="govuk-checkboxes govuk-checkboxes--small">
                                 <div class="govuk-checkboxes__item">
-                                    <input class="govuk-checkboxes__input" type="checkbox" name="blockIds" value="@b.ID" form="blocks-grid-form" />
-                                    <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">Select block @b.BlockRef</span></label>
+                                    <input class="govuk-checkboxes__input" type="checkbox" name="blockIds" value="@b.ID" form="blocks-grid-form" checked="@Model.SelectAll" disabled="@(Model.IsViewMode ? "disabled" : null)" id="select-block-@b.ID" />
+                                    <label class="govuk-label govuk-checkboxes__label" for="select-block-@b.ID"><span class="govuk-visually-hidden">Select block @b.BlockRef</span></label>
                                 </div>
                             </div>
                         </td>
@@ -350,6 +274,7 @@ else
             var selectAll = document.getElementById('select-all-blocks');
             var checkboxes = document.querySelectorAll('input[name="blockIds"]');
             if (!selectAll || !checkboxes.length) return;
+            selectAll.checked = Array.prototype.every.call(checkboxes, function (cb) { return cb.checked; });
             selectAll.addEventListener('change', function () {
                 checkboxes.forEach(function (cb) { cb.checked = selectAll.checked; });
             });

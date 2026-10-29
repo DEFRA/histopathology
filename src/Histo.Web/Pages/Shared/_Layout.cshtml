@@ -1,11 +1,23 @@
 @inject Histo.Web.Services.ISessionService SessionSvc
+@{
+    // Rendered up front so <title> can reflect a visible error summary in the body (WCAG 2.4.2).
+    var bodyContent = RenderBody();
+    string bodyHtml;
+    using (var bodyWriter = new System.IO.StringWriter())
+    {
+        bodyContent.WriteTo(bodyWriter, System.Text.Encodings.Web.HtmlEncoder.Default);
+        bodyHtml = bodyWriter.ToString();
+    }
+    var hasVisibleErrorSummary = System.Text.RegularExpressions.Regex.IsMatch(
+        bodyHtml, "<div class=\"govuk-error-summary\"(?![^>]*\\bhidden)", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
+}
 <!DOCTYPE html>
 <html lang="en" class="govuk-template">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#1d70b8" />
-    <title>@(ViewData["HasErrors"] is true ? "Error: " : "")@ViewData["Title"] — Histopathology System</title>
+    <title>@(ViewData["HasErrors"] is true || hasVisibleErrorSummary ? "Error: " : "")@ViewData["Title"] — Histopathology System</title>
     <link rel="icon" sizes="48x48" href="~/assets/images/favicon.ico">
     <link rel="icon" sizes="any" href="~/assets/images/favicon.svg" type="image/svg+xml">
     <link rel="mask-icon" href="~/assets/images/govuk-icon-mask.svg" color="#1d70b8">
@@ -57,9 +69,9 @@
                     @if (hasAppSession)
                     {
                         <div class="app-header-right">
-                            <p class="govuk-body-s app-header-user govuk-!-margin-bottom-0">
+                            <div class="govuk-body-s app-header-user govuk-!-margin-bottom-0">
                                 @await Html.PartialAsync("_UserContextPartial")
-                            </p>
+                            </div>
                             <button type="button" class="govuk-service-navigation__toggle app-nav-toggle"
                                     aria-controls="navigation" aria-expanded="false">Menu</button>
                         </div>
@@ -70,9 +82,7 @@
             {
                 <nav aria-label="Menu" class="govuk-service-navigation__wrapper app-nav-wrapper">
                     <div class="govuk-width-container">
-                        <ul class="govuk-service-navigation__list" id="navigation">
-                            @await Html.PartialAsync("_NavPartial")
-                        </ul>
+                        @await Html.PartialAsync("_NavPartial")
                     </div>
                 </nav>
             }
@@ -81,7 +91,7 @@
 
     <div class="govuk-width-container @(ViewData["PageClass"])">
         <main class="govuk-main-wrapper" id="main-content" role="main">
-            @RenderSection("BeforeHeading", required: false)
+            @await RenderSectionAsync("BeforeHeading", required: false)
             @if (ViewData["PageTitle"] is string pt)
             {
                 @if (ViewData["Caption"] is string caption)
@@ -90,7 +100,7 @@
                 }
                 <h1 class="govuk-heading-xl">@pt</h1>
             }
-            @RenderBody()
+            @Html.Raw(bodyHtml)
         </main>
     </div>
 
@@ -98,17 +108,17 @@
         <div class="govuk-footer">
             <div class="govuk-width-container">
                 <div class="govuk-footer__logo">
-                    <img src="~/assets/images/apha_icon.png" alt="Animal and Plant Health Agency"
+                    <img src="~/assets/images/apha_icon.png" alt="" aria-hidden="true"
                          height="120" width="136" />
                 </div>
                 <div class="govuk-footer__meta">
                     <div class="govuk-footer__meta-item govuk-footer__meta-item--grow">
-                        <h2 class="govuk-visually-hidden">Support links</h2>
-                        <ul class="govuk-footer__inline-list">
-                            <li class="govuk-footer__inline-list-item">
-                                <span>Animal & Plant Health Agency – Department: Defra IT Service Desk</span>
-                            </li>
-                        </ul>
+                        <p class="govuk-body-s govuk-!-margin-bottom-1">
+                            Animal &amp; Plant Health Agency. For support, contact the Defra IT Service Desk.
+                        </p>
+                        <p class="govuk-body-s govuk-!-margin-bottom-4">
+                            <a class="govuk-footer__link" asp-page="/AccessibilityStatement">Accessibility statement</a>
+                        </p>
                         <svg aria-hidden="true" focusable="false" class="govuk-footer__licence-logo"
                              xmlns="http://www.w3.org/2000/svg" viewBox="0 0 483.2 195.7" height="17" width="41">
                             <path fill="currentColor" d="M421.5 142.8V.1l-50.7 32.3v161.1h112.4v-50.7zm-122.3-9.6A47.12 47.12 0 0 1 221 97.8c0-26 21.1-47.1 47.1-47.1 16.7 0 31.4 8.7 39.7 21.8l42.7-27.2A97.63 97.63 0 0 0 268.1 0c-36.5 0-68.3 20.1-85.1 49.7A98 98 0 0 0 97.8 0C43.9 0 0 43.9 0 97.8s43.9 97.8 97.8 97.8c36.5 0 68.3-20.1 85.1-49.7a97.76 97.76 0 0 0 149.6 25.4l19.4 22.2h3v-87.8h-80l24.3 27.5zM97.8 145c-26 0-47.1-21.1-47.1-47.1s21.1-47.1 47.1-47.1 47.2 21 47.2 47S123.8 145 97.8 145" />
@@ -136,6 +146,9 @@
         initAll()
     </script>
     <script src="~/js/nav-toggle.js" asp-append-version="true"></script>
+    <script src="~/js/help-link.js" asp-append-version="true"></script>
+    <script src="~/js/responsive-tables.js" asp-append-version="true"></script>
+<script src="~/js/page-behaviours.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

@@ -92,7 +92,8 @@
                    id="NewHistologyRef" name="NewHistologyRef" type="text" value="@Model.NewHistologyRef"
                    aria-describedby="@(Model.ErrorField == "NewHistologyRef" ? "NewHistologyRef-error" : null)" />
             <button type="submit" asp-page-handler="SaveHistologyRef" class="govuk-button govuk-!-margin-bottom-0 app-button-uniform" data-module="govuk-button" data-prevent-double-click="true"
-                    onclick="return document.getElementById('NewHistologyRef').value !== '' || confirm('You have not entered a Histology ref. This will delete any existing Histology Ref. Do you wish to continue?');">
+                    data-confirm-unless-filled="NewHistologyRef"
+                    data-confirm="You have not entered a Histology ref. This will delete any existing Histology Ref. Do you wish to continue?">
                 Save histology ref
             </button>
         </div>

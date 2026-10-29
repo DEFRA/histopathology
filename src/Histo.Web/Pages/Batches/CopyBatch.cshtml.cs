@@ -21,6 +21,8 @@ namespace Histo.Web.Pages.Batches;
 /// </summary>
 public class CopyBatchModel : HistoPageModel
 {
+    private const string CopySubmissionTitle = "Copy Submission";
+
     private readonly IBatchService _batches;
     private readonly ISubmissionService _submissions;
     private readonly ILookupService _lookups;
@@ -51,22 +53,15 @@ public class CopyBatchModel : HistoPageModel
 
     public async Task<IActionResult> OnGetAsync(int sourceBatchId)
     {
-        ViewData["Title"] = "Copy Submission";
-        ViewData["PageTitle"] = "Copy Submission";
+        ViewData["Title"] = CopySubmissionTitle;
+        ViewData["PageTitle"] = CopySubmissionTitle;
 
         SourceBatchId = sourceBatchId;
 
         // ── Picker return: Animals were serialised to TempData before navigating to SearchSender. ──
         if (TempData["CopyBatch_Animals"] is string savedJson)
         {
-            Animals     = JsonSerializer.Deserialize<List<AnimalRow>>(savedJson) ?? [];
-            IsCassetted = bool.TryParse(TempData["CopyBatch_IsCassetted"] as string, out var ic) && ic;
-            if (TempData["SenderRefPicker_Selected"] is string chosen &&
-                int.TryParse(TempData["CopyBatch_RowIndex"] as string, out var ri) &&
-                ri >= 0 && ri < Animals.Count)
-            {
-                Animals[ri].NewSenderRef = chosen;
-            }
+            RestoreFromPicker(savedJson);
             SourceBatch = await _batches.GetByIdAsync(sourceBatchId);
             return Page();
         }
@@ -81,6 +76,35 @@ public class CopyBatchModel : HistoPageModel
         var blockAnimals = await _submissions.GetBlockAnimalsByBatchAsync(sourceBatchId);
         IsCassetted = blockAnimals.Count > 0;
 
+        var rowFactory = await CreateRowFactoryAsync(sourceBatchId, submissions);
+
+        if (IsCassetted)
+        {
+            Animals = blockAnimals.OrderBy(a => a.SenderRef).Select(rowFactory).ToList();
+        }
+        else
+        {
+            var animals = await _submissions.GetAnimalsByBatchAsync(sourceBatchId);
+            Animals = animals.OrderBy(a => a.SenderRef).Select(rowFactory).ToList();
+        }
+
+        return Page();
+    }
+
+    private void RestoreFromPicker(string savedJson)
+    {
+        Animals     = JsonSerializer.Deserialize<List<AnimalRow>>(savedJson) ?? [];
+        IsCassetted = bool.TryParse(TempData["CopyBatch_IsCassetted"] as string, out var ic) && ic;
+        if (TempData["SenderRefPicker_Selected"] is string chosen &&
+            int.TryParse(TempData["CopyBatch_RowIndex"] as string, out var ri) &&
+            ri >= 0 && ri < Animals.Count)
+        {
+            Animals[ri].NewSenderRef = chosen;
+        }
+    }
+
+    private async Task<Func<Animal, AnimalRow>> CreateRowFactoryAsync(int sourceBatchId, IReadOnlyList<BatchSubmission> submissions)
+    {
         // Load submission-level tissues for ALL scenarios — the column is always shown.
         var tissueTypes = await _lookups.GetLookupDataAsync(9); // 9 = LOOKUP_TISSUE_CODE
         var tissueNames = tissueTypes
@@ -104,47 +128,28 @@ public class CopyBatchModel : HistoPageModel
             .GroupBy(s => s.AnimalID)
             .ToDictionary(g => g.Key, g => g.First().ID);
 
-        int OwnSubmissionId(Animal a)
+        return a => new AnimalRow
         {
-            if (submissionByAnimalId.TryGetValue(a.ID, out var own)) return own;
-            if (a.BatchSubmissionID > 0 && submissionIds.Contains(a.BatchSubmissionID)) return a.BatchSubmissionID;
-            return firstSubmId;
-        }
+            AnimalId = a.ID,
+            SubmissionId = OwnSubmissionId(a, submissionByAnimalId, submissionIds, firstSubmId),
+            SenderRef = a.SenderRef,
+            NewSenderRef = string.Empty,
+            TissueDetails = submissionByAnimalId.TryGetValue(a.ID, out var own) && tissuesBySubmId.TryGetValue(own, out var td) ? td : [],
+        };
+    }
 
-        List<string> ResolveTissues(Animal a) =>
-            submissionByAnimalId.TryGetValue(a.ID, out var own) && tissuesBySubmId.TryGetValue(own, out var td) ? td : [];
-
-        if (IsCassetted)
-        {
-            Animals = blockAnimals.OrderBy(a => a.SenderRef).Select(a => new AnimalRow
-            {
-                AnimalId = a.ID,
-                SubmissionId = OwnSubmissionId(a),
-                SenderRef = a.SenderRef,
-                NewSenderRef = string.Empty,
-                TissueDetails = ResolveTissues(a),
-            }).ToList();
-        }
-        else
-        {
-            var animals = await _submissions.GetAnimalsByBatchAsync(sourceBatchId);
-            Animals = animals.OrderBy(a => a.SenderRef).Select(a => new AnimalRow
-            {
-                AnimalId = a.ID,
-                SubmissionId = OwnSubmissionId(a),
-                SenderRef = a.SenderRef,
-                NewSenderRef = string.Empty,
-                TissueDetails = ResolveTissues(a),
-            }).ToList();
-        }
-
-        return Page();
+    private static int OwnSubmissionId(
+        Animal a, Dictionary<int, int> submissionByAnimalId, HashSet<int> submissionIds, int firstSubmId)
+    {
+        if (submissionByAnimalId.TryGetValue(a.ID, out var own)) return own;
+        if (a.BatchSubmissionID > 0 && submissionIds.Contains(a.BatchSubmissionID)) return a.BatchSubmissionID;
+        return firstSubmId;
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Copy Submission";
-        ViewData["PageTitle"] = "Copy Submission";
+        ViewData["Title"] = CopySubmissionTitle;
+        ViewData["PageTitle"] = CopySubmissionTitle;
 
         SourceBatch = await _batches.GetByIdAsync(SourceBatchId);
         if (SourceBatch is null)

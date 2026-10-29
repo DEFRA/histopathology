@@ -19,16 +19,13 @@ namespace Histo.Web.Pages.Reports;
 public class SubmissionNotesModel : HistoPageModel
 {
     private readonly SubmissionNotesDataSetBuilder _dataSetBuilder;
-    private readonly SubmissionNotesRenderer _renderer;
 
     public SubmissionNotesModel(
         ISessionService session,
-        SubmissionNotesDataSetBuilder dataSetBuilder,
-        SubmissionNotesRenderer renderer)
+        SubmissionNotesDataSetBuilder dataSetBuilder)
         : base(session)
     {
         _dataSetBuilder = dataSetBuilder;
-        _renderer       = renderer;
     }
 
     // In the URL so a refreshed report tab keeps showing the batch it was opened for.
@@ -43,7 +40,7 @@ public class SubmissionNotesModel : HistoPageModel
             return RedirectToPage("/Index");
 
         var ds  = await _dataSetBuilder.BuildAsync(batchId.Value, ct);
-        var pdf = await _renderer.RenderAsync(ds);
+        var pdf = await SubmissionNotesRenderer.RenderAsync(ds);
 
         // "inline" makes the browser display the PDF; the filename is used if the user saves it.
         Response.Headers[HeaderNames.ContentDisposition] =

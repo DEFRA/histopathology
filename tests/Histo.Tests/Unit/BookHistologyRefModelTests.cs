@@ -94,4 +94,17 @@ public class BookHistologyRefModelTests
         Assert.Null(sut.Error);
         Assert.Equal("You have successfully booked Histology numbers in the range 20000 - 20004, inclusive.", sut.SuccessMessage);
     }
+
+    [Fact]
+    public void BookButton_PromptsForConfirmationBeforeSubmit()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "src", "Histo.Web", "Pages", "Bookings", "BookHistologyRef.cshtml")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+
+        var markup = File.ReadAllText(Path.Combine(dir!.FullName, "src", "Histo.Web", "Pages", "Bookings", "BookHistologyRef.cshtml"));
+
+        Assert.Contains("data-confirm=\"Are you sure you want to book", markup);
+    }
 }

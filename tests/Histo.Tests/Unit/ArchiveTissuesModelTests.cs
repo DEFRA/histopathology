@@ -210,7 +210,7 @@ public class ArchiveTissuesModelTests
         sut.SortColumn = column;
         sut.SortDesc = desc;
 
-        Assert.Equal(expectedIds, sut.PagedEntries.Select(r => r.ID));
+        Assert.Equal(expectedIds, sut.GetPagedEntries().Select(r => r.ID));
     }
 
     [Fact]
@@ -222,10 +222,119 @@ public class ArchiveTissuesModelTests
         await sut.OnGetAsync();
         sut.SelectAllAcrossPages = true;
         sut.ArchiveLocationCode = "L1";
+        sut.ArchivedDate = DateTime.Today;
 
         await sut.OnPostUpdateAsync();
 
         _submissions.Verify(s => s.UpdateTissueAsync(It.IsAny<Tissue>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Exactly(3));
         Assert.Equal("Archive information updated for 3 tissue(s).", sut.SuccessMessage);
+    }
+
+    [Theory]
+    [InlineData(null, true, false)]
+    [InlineData("L1", false, false)]
+    [InlineData(null, false, false)]
+    [InlineData(null, true, true)]
+    [InlineData("L1", false, true)]
+    public async Task OnPostUpdateAsync_MissingLocationOrDate_IsRejectedAndNothingIsSaved(string? location, bool withDate, bool allRows)
+    {
+        SetupArchivedFixture();
+        var sut = CreateSut();
+        sut.BatchId = 42;
+        await sut.OnGetAsync();
+        if (allRows) sut.SelectAllAcrossPages = true; else sut.SelectedIds = [1];
+        sut.ArchiveLocationCode = location;
+        sut.ArchivedDate = withDate ? DateTime.Today : null;
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.Equal("Select an archive location and enter an archived date.", sut.Error);
+        Assert.Null(sut.SuccessMessage);
+        _submissions.Verify(s => s.UpdateTissueAsync(It.IsAny<Tissue>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostUpdateAsync_ArchivedDateBeforeReceivedDate_IsRejectedAndNothingIsSaved()
+    {
+        SetupArchivedFixture();
+        _batches.Setup(b => b.GetByIdAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Batch { ID = 42, ReceivedDate = new DateTime(2024, 6, 10) });
+        var sut = CreateSut();
+        sut.BatchId = 42;
+        await sut.OnGetAsync();
+        sut.SelectedIds = [1];
+        sut.ArchiveLocationCode = "L1";
+        sut.ArchivedDate = new DateTime(2024, 6, 1);
+
+        await sut.OnPostUpdateAsync();
+
+        Assert.StartsWith("Archive date must be the same or later than the Submission received date of", sut.Error);
+        _submissions.Verify(s => s.UpdateTissueAsync(It.IsAny<Tissue>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private static string ReadArchiveView(string view)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "src", "Histo.Web", "Pages", "Archive", view)))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+        var archiveDir = Path.Combine(dir!.FullName, "src", "Histo.Web", "Pages", "Archive");
+        // The page markup is shared via the _Archive*.cshtml partials, so the page and its partials are read together.
+        var partials = Directory.GetFiles(archiveDir, "_*.cshtml").OrderBy(p => p, StringComparer.Ordinal).Select(File.ReadAllText);
+        return File.ReadAllText(Path.Combine(archiveDir, view)) + string.Concat(partials);
+    }
+
+    [Theory]
+    [InlineData("ArchiveTissues.cshtml")]
+    [InlineData("ArchiveBlocks.cshtml")]
+    public void Markup_ErrorSummaryRendersAtTopOfPage_BeforeTheSubmissionDetails(string view)
+    {
+        var markup = ReadArchiveView(view);
+
+        var errorAt = markup.IndexOf("govuk-error-summary", StringComparison.Ordinal);
+        var detailsAt = markup.IndexOf("<dl", StringComparison.Ordinal);
+
+        Assert.True(errorAt >= 0, "Error summary not found.");
+        Assert.True(errorAt < detailsAt, "Error summary must come before the submission details list.");
+    }
+
+    [Theory]
+    [InlineData("ArchiveTissues.cshtml")]
+    [InlineData("ArchiveBlocks.cshtml")]
+    public void Markup_ScriptDoesNotOverwriteSubmittedValuesAfterAPostback(string view)
+    {
+        var markup = ReadArchiveView(view);
+
+        Assert.Matches(@"if\s*\(\s*!posted\s*\)\s*applySelection\(\);", markup);
+    }
+
+    [Theory]
+    [InlineData("ArchiveTissues.cshtml")]
+    [InlineData("ArchiveBlocks.cshtml")]
+    public void Markup_ScriptTicksTheRowCheckboxesWhenAllCameBackChecked(string view)
+    {
+        var markup = ReadArchiveView(view);
+
+        Assert.Matches(@"if\s*\(\s*selectAll\.checked\s*\)\s*checkboxes\.forEach\(function\s*\(cb\)\s*\{\s*cb\.checked\s*=\s*true;", markup);
+    }
+
+    [Theory]
+    [InlineData("ArchiveTissues.cshtml")]
+    [InlineData("ArchiveBlocks.cshtml")]
+    public void Markup_RowCheckboxesStayEnabledWhenAllIsTicked_AsInLegacy(string view)
+    {
+        var markup = ReadArchiveView(view);
+
+        Assert.DoesNotContain("cb.disabled", markup);
+    }
+
+    [Theory]
+    [InlineData("ArchiveTissues.cshtml")]
+    [InlineData("ArchiveBlocks.cshtml")]
+    public void Markup_UntickingARowUnticksAll_SoTheServerUsesTheRowsStillTicked(string view)
+    {
+        var markup = ReadArchiveView(view);
+
+        Assert.Matches(@"selectAll\.checked\s*=\s*false", markup);
     }
 }

@@ -301,7 +301,7 @@
             </div>
         </div>
         <div class="govuk-grid-column-one-third">
-            <div class="govuk-form-group" id="edit-antibodies-section" style="@(Model.ShowAntibodies ? "" : "display:none")">
+            <div class="govuk-form-group" id="edit-antibodies-section" hidden="@(Model.ShowAntibodies ? null : "hidden")">
                 <fieldset class="govuk-fieldset">
                     <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Antibodies</legend>
                     <div class="govuk-hint">Required when IHC is selected above.</div>
@@ -327,7 +327,7 @@
             </div>
         </div>
         <div class="govuk-grid-column-one-third">
-            <div class="govuk-form-group" id="edit-stains-section" style="@(Model.ShowStains ? "" : "display:none")">
+            <div class="govuk-form-group" id="edit-stains-section" hidden="@(Model.ShowStains ? null : "hidden")">
                 <fieldset class="govuk-fieldset">
                     <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">Special stains</legend>
                     <div class="govuk-hint">Required when Special Stain is selected above.</div>
@@ -362,7 +362,7 @@
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
         <a href="@Model.ReturnUrl" class="govuk-button govuk-button--secondary" data-module="govuk-button"
-           onclick="return confirm('Are you sure you want to cancel? Any changes you have made will be lost.');">Cancel</a>
+           data-confirm="Are you sure you want to cancel? Any changes you have made will be lost.">Cancel</a>
         @* Saves first, then opens SampleSummary (Add/Edit/Copy/Delete sample live there). *@
         <button type="submit" name="ProceedToSamples" value="true" class="govuk-button govuk-button--secondary" data-module="govuk-button">Save and proceed to samples</button>
     </div>
@@ -393,12 +393,12 @@
         var showAntibodies = codes.some(function (c) { return ihcCodes.indexOf(c) >= 0; });
         var showStains = codes.indexOf(stainCode) >= 0;
 
-        document.getElementById('edit-antibodies-section').style.display = showAntibodies ? '' : 'none';
+        document.getElementById('edit-antibodies-section').hidden = !showAntibodies;
         // Hidden checkboxes are still real form fields — clear them so a deselected IHC type
         // doesn't leave stale antibody codes checked (submitted on Save, and still shown above).
         if (!showAntibodies) antibodyCheckboxes.forEach(function (cb) { cb.checked = false; });
 
-        document.getElementById('edit-stains-section').style.display = showStains ? '' : 'none';
+        document.getElementById('edit-stains-section').hidden = !showStains;
         if (!showStains) stainCheckboxes.forEach(function (cb) { cb.checked = false; });
     }
 

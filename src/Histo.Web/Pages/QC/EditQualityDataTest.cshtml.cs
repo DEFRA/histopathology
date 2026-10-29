@@ -118,35 +118,7 @@ public class EditQualityDataTestModel : HistoPageModel
         Test = await _tests.GetByIdAsync(Session.BatchID.Value, TestId);
         if (Test?.RowStamp is null) return RedirectToPage("/QC/QualityData");
 
-        if (Result == Histo.Histology.Models.BlockTestResult.Failed && string.IsNullOrWhiteSpace(QCCode))
-        {
-            Errors["QCCode"] = "Enter a QC code when the test result is Failed.";
-        }
-
-        if (Dispatched)
-        {
-            if (DispatchedDate is null)
-                Errors["DispatchedDate"] = "Enter a dispatched date.";
-            if (string.IsNullOrWhiteSpace(DispatchedBy))
-                Errors["DispatchedBy"] = "Select who dispatched the test.";
-            if (string.IsNullOrWhiteSpace(DispatchedTo))
-                Errors["DispatchedTo"] = "Enter who the test was dispatched to.";
-        }
-
-        if (string.IsNullOrWhiteSpace(RemedialAction))
-        {
-            Errors["RemedialAction"] = "Select a remedial action.";
-        }
-
-        if (!string.IsNullOrWhiteSpace(ArchiveLocation) && ArchivedDate is null)
-        {
-            Errors["ArchivedDate"] = "Enter an archive date when an archive location is selected.";
-        }
-
-        if (ArchivedDate is not null && string.IsNullOrWhiteSpace(ArchiveLocation))
-        {
-            Errors["ArchiveLocation"] = "Select an archive location when an archive date is entered.";
-        }
+        ValidateInputs();
 
         if (Errors.Count > 0)
         {
@@ -154,51 +126,8 @@ public class EditQualityDataTestModel : HistoPageModel
             return Page();
         }
 
-        // Checkbox is never locked: unticking unlinks any existing ref; ticking keeps a test's own
-        // ref unchanged, or creates a brand-new, independent note (not shared/reused across saves).
-        var qcNoteRef = Test.QCNoteRef;
-        var rowStamp = Test.RowStamp;
-        string? noteWarning = null;
-        if (!QCNote)
-        {
-            qcNoteRef = null;
-        }
-        else if (qcNoteRef is null or 0)
-        {
-            var newId = await _qc.AddAsync(Session.BatchID.Value, Session.UserID);
-            qcNoteRef = newId > 0 ? newId : null;
-            if (newId <= 0) noteWarning = QCNoteText.CreateFailedWarning;
-        }
-
-        var updated = new BlockTest
-        {
-            ID = Test.ID,
-            BlockID = Test.BlockID,
-            BlockRef = Test.BlockRef,
-            HistologyRef = Test.HistologyRef,
-            TestType = Test.TestType,
-            Code = Test.Code,
-            TestDetails = Test.TestDetails,
-            Result = Result,
-            QCCode = QCCode,
-            QCNote = QCNote,
-            QCNoteRef = qcNoteRef,
-            StainRef = StainRef,
-            Dispatched = Dispatched,
-            DispatchedDate = DispatchedDate,
-            DispatchedBy = DispatchedBy,
-            PremiumCharge = Test.PremiumCharge, // pass-through, not edited on this screen
-            DispatchedTo = DispatchedTo,
-            Comment = Comment,
-            RemedialAction = RemedialAction,
-            ArchiveLocation = ArchiveLocation,
-            ArchivedDate = ArchivedDate,
-            ArchiveComment = ArchiveComment,
-            NumberOfSlides = NumberOfSlides,
-            OnHold = Test.OnHold,
-            Archived = !string.IsNullOrWhiteSpace(ArchiveLocation) && ArchivedDate is not null,
-            RowStamp = rowStamp,
-        };
+        var (qcNoteRef, noteWarning) = await ResolveQcNoteRefAsync(Test, Session.BatchID.Value);
+        var updated = BuildUpdatedTest(Test, qcNoteRef);
 
         try
         {
@@ -217,6 +146,76 @@ public class EditQualityDataTestModel : HistoPageModel
             return Page();
         }
     }
+
+    private void ValidateInputs()
+    {
+        if (Result == Histo.Histology.Models.BlockTestResult.Failed && string.IsNullOrWhiteSpace(QCCode))
+            Errors["QCCode"] = "Enter a QC code when the test result is Failed.";
+
+        ValidateDispatch();
+
+        if (string.IsNullOrWhiteSpace(RemedialAction))
+            Errors["RemedialAction"] = "Select a remedial action.";
+
+        if (!string.IsNullOrWhiteSpace(ArchiveLocation) && ArchivedDate is null)
+            Errors["ArchivedDate"] = "Enter an archive date when an archive location is selected.";
+
+        if (ArchivedDate is not null && string.IsNullOrWhiteSpace(ArchiveLocation))
+            Errors["ArchiveLocation"] = "Select an archive location when an archive date is entered.";
+    }
+
+    private void ValidateDispatch()
+    {
+        if (!Dispatched) return;
+
+        if (DispatchedDate is null)
+            Errors["DispatchedDate"] = "Enter a dispatched date.";
+        if (string.IsNullOrWhiteSpace(DispatchedBy))
+            Errors["DispatchedBy"] = "Select who dispatched the test.";
+        if (string.IsNullOrWhiteSpace(DispatchedTo))
+            Errors["DispatchedTo"] = "Enter who the test was dispatched to.";
+    }
+
+    // Checkbox is never locked: unticking unlinks any existing ref; ticking keeps a test's own
+    // ref unchanged, or creates a brand-new, independent note (not shared/reused across saves).
+    private async Task<(int? QcNoteRef, string? Warning)> ResolveQcNoteRefAsync(BlockTest test, int batchId)
+    {
+        if (!QCNote) return (null, null);
+        if (test.QCNoteRef is not (null or 0)) return (test.QCNoteRef, null);
+
+        var newId = await _qc.AddAsync(batchId, Session.UserID);
+        return newId > 0 ? (newId, null) : (null, QCNoteText.CreateFailedWarning);
+    }
+
+    private BlockTest BuildUpdatedTest(BlockTest test, int? qcNoteRef) => new()
+    {
+        ID = test.ID,
+        BlockID = test.BlockID,
+        BlockRef = test.BlockRef,
+        HistologyRef = test.HistologyRef,
+        TestType = test.TestType,
+        Code = test.Code,
+        TestDetails = test.TestDetails,
+        Result = Result,
+        QCCode = QCCode,
+        QCNote = QCNote,
+        QCNoteRef = qcNoteRef,
+        StainRef = StainRef,
+        Dispatched = Dispatched,
+        DispatchedDate = DispatchedDate,
+        DispatchedBy = DispatchedBy,
+        PremiumCharge = test.PremiumCharge, // pass-through, not edited on this screen
+        DispatchedTo = DispatchedTo,
+        Comment = Comment,
+        RemedialAction = RemedialAction,
+        ArchiveLocation = ArchiveLocation,
+        ArchivedDate = ArchivedDate,
+        ArchiveComment = ArchiveComment,
+        NumberOfSlides = NumberOfSlides,
+        OnHold = test.OnHold,
+        Archived = !string.IsNullOrWhiteSpace(ArchiveLocation) && ArchivedDate is not null,
+        RowStamp = test.RowStamp,
+    };
 
     /// <summary>
     /// Reproduces legacy <c>QualityData.aspx.vb::UpdateSessionWithQualityData</c>: once every test

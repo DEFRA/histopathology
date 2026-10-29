@@ -1,6 +1,13 @@
 @page
 @model AuditLogByDateModel
 @{
+    static string? ErrorAnchor(string error)
+    {
+        if (error.Contains("start", StringComparison.OrdinalIgnoreCase)) return "StartDate";
+        if (error.Contains("end", StringComparison.OrdinalIgnoreCase)) return "EndDate";
+        return null;
+    }
+
     ViewData["Title"] = "Audit log by date";
     ViewData["PageTitle"] = "Audit log — search by date";
 }
@@ -9,34 +16,7 @@
     <a asp-page="/AuditLog/AuditLogMenu" class="govuk-back-link">Back</a>
 }
 
-@if (Model.Errors.Any())
-{
-    <div class="govuk-error-summary" data-module="govuk-error-summary">
-        <div role="alert">
-            <h2 class="govuk-error-summary__title">There is a problem</h2>
-            <div class="govuk-error-summary__body">
-                <ul class="govuk-list govuk-error-summary__list">
-                    @foreach (var e in Model.Errors)
-                    {
-                        var anchor = e.Contains("start", StringComparison.OrdinalIgnoreCase) ? "StartDate"
-                                   : e.Contains("end", StringComparison.OrdinalIgnoreCase) ? "EndDate"
-                                   : null;
-                        <li>
-                            @if (anchor is not null)
-                            {
-                                <a class="govuk-link" href="#@anchor">@e</a>
-                            }
-                            else
-                            {
-                                @e
-                            }
-                        </li>
-                    }
-                </ul>
-            </div>
-        </div>
-    </div>
-}
+<partial name="_AuditLogErrors" model='(Model.Errors, (Func<string, string?>)ErrorAnchor)' />
 
 <form method="post" id="audit-log-form">
     <div class="govuk-grid-row">
@@ -66,44 +46,7 @@
 
 @if (Model.Results.Any())
 {
-    <table class="govuk-table">
-        <thead class="govuk-table__head">
-            <tr class="govuk-table__row">
-                @{ ViewData["Label"] = "Table"; ViewData["Column"] = "TableName"; ViewData["FormId"] = "audit-log-form"; ViewData["Handler"] = ""; }
-                <partial name="_SortableHeaderPost" />
-                @{ ViewData["Label"] = "Field"; ViewData["Column"] = "FieldName"; }
-                <partial name="_SortableHeaderPost" />
-                @{ ViewData["Label"] = "Date/Time"; ViewData["Column"] = "ChangedAt"; }
-                <partial name="_SortableHeaderPost" />
-                @{ ViewData["Label"] = "User"; ViewData["Column"] = "UserName"; }
-                <partial name="_SortableHeaderPost" />
-                @{ ViewData["Label"] = "Before"; ViewData["Column"] = "BeforeValue"; }
-                <partial name="_SortableHeaderPost" />
-                @{ ViewData["Label"] = "After"; ViewData["Column"] = "AfterValue"; }
-                <partial name="_SortableHeaderPost" />
-                @{ ViewData["Label"] = "Reason"; ViewData["Column"] = "Reason"; }
-                <partial name="_SortableHeaderPost" />
-                @{ ViewData["Label"] = "Key"; ViewData["Column"] = "KeyID"; }
-                <partial name="_SortableHeaderPost" />
-            </tr>
-        </thead>
-        <tbody class="govuk-table__body">
-            @foreach (var e in Model.PagedEntries)
-            {
-                <tr class="govuk-table__row">
-                    <td class="govuk-table__cell">@e.TableName</td>
-                    <td class="govuk-table__cell">@e.FieldName</td>
-                    <td class="govuk-table__cell">@e.ChangedAt.ToString("dd/MM/yyyy HH:mm:ss")</td>
-                    <td class="govuk-table__cell">@e.UserName</td>
-                    <td class="govuk-table__cell">@e.BeforeValue</td>
-                    <td class="govuk-table__cell">@e.AfterValue</td>
-                    <td class="govuk-table__cell">@e.Reason</td>
-                    <td class="govuk-table__cell">@e.KeyID</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-    <partial name="_PaginationPost" />
+    <partial name="_AuditLogResults" model="Model.GetPagedEntries()" />
 }
 else if (Model.Searched)
 {

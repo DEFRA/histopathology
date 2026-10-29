@@ -15,6 +15,8 @@ namespace Histo.Web.Pages.Batches;
 /// </summary>
 public class CassettedModel : HistoPageModel
 {
+    private const string SubmissionTypeTitle = "Submission type";
+
     private const int LookupSubmittedAs = 11; // Common.vb LOOKUP_SUBMITTEDAS
 
     private readonly ILookupService _lookups;
@@ -36,8 +38,8 @@ public class CassettedModel : HistoPageModel
 
     public async Task OnGetAsync(bool restore = false)
     {
-        ViewData["Title"]     = "Submission type";
-        ViewData["PageTitle"] = "Submission type";
+        ViewData["Title"]     = SubmissionTypeTitle;
+        ViewData["PageTitle"] = SubmissionTypeTitle;
         await LoadLookupsAsync();
 
         // Every fresh visit starts with TSE selected (the property's own default) — Session.BatchType
@@ -63,8 +65,8 @@ public class CassettedModel : HistoPageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"]     = "Submission type";
-        ViewData["PageTitle"] = "Submission type";
+        ViewData["Title"]     = SubmissionTypeTitle;
+        ViewData["PageTitle"] = SubmissionTypeTitle;
         await LoadLookupsAsync();
 
         var errors = new Dictionary<string, string>();

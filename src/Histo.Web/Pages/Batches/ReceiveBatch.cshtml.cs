@@ -27,6 +27,8 @@ namespace Histo.Web.Pages.Batches;
 /// </summary>
 public class ReceiveBatchModel : HistoPageModel
 {
+    private const string BatchesNotReceivedPage = "/Batches/BatchesNotReceived";
+
     private const int LookupTimeReceived = 3;  // Legacy source: HistopathologySystem/Common.vb — LOOKUP_TIME_RECEIVED
     private const int LookupPostFixation = 12; // Legacy source: HistopathologySystem/Common.vb — LOOKUP_POSTFIXATION
 
@@ -71,7 +73,7 @@ public class ReceiveBatchModel : HistoPageModel
 
     /// <summary>Page path for the back link / cancel target — set by the list page before navigating here.</summary>
     public string BackLinkPage => string.IsNullOrWhiteSpace(Session.ReturnPage)
-        ? "/Batches/BatchesNotReceived"
+        ? BatchesNotReceivedPage
         : Session.ReturnPage;
 
     // ── Bind properties (the receive/reject form) ──────────────────────────
@@ -87,10 +89,10 @@ public class ReceiveBatchModel : HistoPageModel
     public async Task<IActionResult> OnGetAsync()
     {
         SetTitle();
-        if (Session.BatchID is null or <= 0) return RedirectToPage("/Batches/BatchesNotReceived");
+        if (Session.BatchID is null or <= 0) return RedirectToPage(BatchesNotReceivedPage);
 
         Batch = await _batches.GetByIdAsync(Session.BatchID.Value);
-        if (Batch is null) return RedirectToPage("/Batches/BatchesNotReceived");
+        if (Batch is null) return RedirectToPage(BatchesNotReceivedPage);
 
         // Clears the one-shot pointer OnPostEditSubmission left behind, otherwise this page's
         // own BackLinkPage/Cancel would target itself on every visit after an Edit Submission trip.
@@ -149,39 +151,15 @@ public class ReceiveBatchModel : HistoPageModel
 
         // Full field carry-forward (mirrors legacy ReceiveBatch.aspx → UpdateBatchDetails → EditBatch SP)
         // so EditBatch's exhaustive parameter set doesn't null out fields this page doesn't edit.
-        var updated = new Batch
-        {
-            ID                  = Batch.ID,
-            Status              = Status,
-            CustomerRef         = Batch.CustomerRef,
-            Comments            = Batch.Comments,
-            StatusComments      = Reason,
-            BatchDate           = Batch.BatchDate,
-            ReceivedDate        = DateReceived,
-            TimeReceived        = TimeReceived,
-            ReceivedBy          = ReceivedByUserId,
-            PostFixationOther   = otherText,
-            CompletedDate       = Batch.CompletedDate,
-            SubmittedByUserID   = Batch.SubmittedByUserID,
-            UserAreaCode        = Batch.UserAreaCode,
-            IsCassetted      = Batch.IsCassetted,
-            ByPassSort          = Batch.ByPassSort,
-            RowStamp            = Batch.RowStamp,
-            BatchType           = Batch.BatchType,
-            ProjectContractCode = Batch.ProjectContractCode,
-            ContactName         = Batch.ContactName,
-            Species             = Batch.Species,
-            Fixation            = Batch.Fixation,
-            CustomerReceivedDate = Batch.CustomerReceivedDate,
-            SubmittedBy         = Batch.SubmittedBy,
-            SubmittedArea       = Batch.SubmittedArea,
-            OtherSubmittedBy    = Batch.OtherSubmittedBy,
-            OtherSubmittedArea  = Batch.OtherSubmittedArea ?? "",
-            SafeToHandle        = Batch.SafeToHandle,
-            IsBlocked           = Batch.IsBlocked,
-            SampleSameProjects  = Batch.SampleSameProjects,
-            AllTissuesAssigned  = Batch.AllTissuesAssigned,
-        };
+        var updated = BatchCarryForward.Create(Batch, new BatchCarryForward.Edits(
+            Status:            Status,
+            CustomerRef:       Batch.CustomerRef,
+            StatusComments:    Reason,
+            ReceivedDate:      DateReceived,
+            CompletedDate:     Batch.CompletedDate,
+            TimeReceived:      TimeReceived,
+            ReceivedBy:        ReceivedByUserId,
+            PostFixationOther: otherText));
 
         // UpdateAsync rethrows on failure (see BatchService.UpdateAsync) rather than returning
         // false — matches the try/catch pattern already used by EditBatch.cshtml.cs.
@@ -201,7 +179,7 @@ public class ReceiveBatchModel : HistoPageModel
             return Page();
         }
 
-        Session.ReturnPage = "/Batches/BatchesNotReceived";
+        Session.ReturnPage = BatchesNotReceivedPage;
         return RedirectToPage("/Batches/PrintSubmission");
     }
 
@@ -239,44 +217,38 @@ public class ReceiveBatchModel : HistoPageModel
 
         if (Status is BatchStatus.Received or BatchStatus.Rejected)
         {
-            if (ReceivedByUserId is null or <= 0)
+            var error = ReceivedOrRejectedError();
+            if (error is not null)
             {
-                Error = "Select who received or rejected the submission.";
-                return false;
-            }
-
-            if (string.IsNullOrWhiteSpace(TimeReceived))
-            {
-                Error = "Select the time the submission was received or rejected.";
-                return false;
-            }
-
-            if (DateReceived is null)
-            {
-                Error = "Enter the date the submission was received or rejected.";
-                return false;
-            }
-
-            if (Batch?.BatchDate is { } submitted && DateReceived < submitted.Date)
-            {
-                Error = $"The date received must be the same as or later than the submission date of {submitted:d}.";
-                return false;
-            }
-
-            if (DateReceived > DateTime.Today)
-            {
-                Error = "The date received must be today or earlier.";
-                return false;
-            }
-
-            if (Status == BatchStatus.Rejected && string.IsNullOrWhiteSpace(Reason))
-            {
-                Error = "Enter a reason for rejecting the submission.";
+                Error = error;
                 return false;
             }
         }
 
         return true;
+    }
+
+    private string? ReceivedOrRejectedError()
+    {
+        if (ReceivedByUserId is null or <= 0)
+            return "Select who received or rejected the submission.";
+
+        if (string.IsNullOrWhiteSpace(TimeReceived))
+            return "Select the time the submission was received or rejected.";
+
+        if (DateReceived is null)
+            return "Enter the date the submission was received or rejected.";
+
+        if (Batch?.BatchDate is { } submitted && DateReceived < submitted.Date)
+            return $"The date received must be the same as or later than the submission date of {submitted:d}.";
+
+        if (DateReceived > DateTime.Today)
+            return "The date received must be today or earlier.";
+
+        if (Status == BatchStatus.Rejected && string.IsNullOrWhiteSpace(Reason))
+            return "Enter a reason for rejecting the submission.";
+
+        return null;
     }
 
     private async Task LoadLookupsAsync()

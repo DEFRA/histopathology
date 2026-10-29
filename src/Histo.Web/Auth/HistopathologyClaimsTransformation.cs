@@ -57,7 +57,7 @@ public sealed class HistopathologyClaimsTransformation : IClaimsTransformation
             return principal; // no GroupName added → HistoPageModel redirects to AccessDenied
         }
 
-        var identity = (ClaimsIdentity)principal.Identity!;
+        var identity = (ClaimsIdentity)principal.Identity;
 
         // Drop any app claims carried in the auth cookie from a previous request before
         // re-adding them. AddClaim appends rather than replaces, and FindFirst returns the
@@ -70,6 +70,7 @@ public sealed class HistopathologyClaimsTransformation : IClaimsTransformation
         identity.AddClaim(new Claim(AppClaimTypes.GroupId,    user.GroupCode.ToString()));
         identity.AddClaim(new Claim(AppClaimTypes.UserArea,   user.AreaName));
         identity.AddClaim(new Claim(AppClaimTypes.UserAreaId, user.AreaCode.ToString()));
+        identity.AddClaim(new Claim(AppClaimTypes.UserName,   user.Name));
 
         return principal;
     }

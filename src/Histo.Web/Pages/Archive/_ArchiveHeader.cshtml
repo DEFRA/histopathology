@@ -1,0 +1,38 @@
+@*
+    Error summary, success panel and batch summary list shared by the Archive blocks/tissues pages.
+*@
+@model Histo.Web.Pages.Archive.IArchivePage
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list"><li><a href="#ArchiveLocationCode">@Model.Error</a></li></ul>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="govuk-panel govuk-panel--confirmation govuk-!-margin-bottom-6">
+        <p class="govuk-panel__body">@Model.SuccessMessage</p>
+    </div>
+}
+
+@if (Model.Batch is not null)
+{
+    <dl class="govuk-summary-list govuk-!-margin-bottom-6">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Submission number</dt>
+            <dd class="govuk-summary-list__value">@Model.Batch.ID</dd>
+        </div>
+        <partial name="_BatchSummaryCoreRows" model="(Model.SpeciesName, Model.ProjectName, Model.PathologistName, Model.Batch.BatchDate?.ToShortDateString())" />
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Received date</dt>
+            <dd class="govuk-summary-list__value">@(Model.Batch.ReceivedDate?.ToShortDateString() ?? "Not recorded")</dd>
+        </div>
+        <partial name="_BatchSummaryOwnerRows" model="(Model.EnteredByName, Model.EnteredAreaName, Model.SubmittedByName, Model.SubmittedAreaName)" />
+    </dl>
+}

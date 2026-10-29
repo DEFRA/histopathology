@@ -3,8 +3,8 @@
 // tablet breakpoint). Click or Enter/Space (native <button> semantics) toggles the nav list;
 // Escape closes it while focus is inside.
 (function () {
-    var toggle = document.querySelector('.app-nav-toggle');
-    var menu = document.getElementById('navigation');
+    const toggle = document.querySelector('.app-nav-toggle');
+    const menu = document.getElementById('navigation');
     if (!toggle || !menu) {
         return;
     }
