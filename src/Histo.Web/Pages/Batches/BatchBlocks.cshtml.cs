@@ -6,6 +6,7 @@ using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
+using Histo.Web.Pages.Shared;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Histo.Web.Pages.Batches;
@@ -270,24 +271,14 @@ public class BatchBlocksModel : HistoPageModel
         TissueOptions = await _lookups.GetLookupDataAsync(LookupTissueCode);
 
         var allTissues = await _submissions.GetTissuesByBatchAsync(BatchId ?? 0);
-        var tissuesByBlockId = new Dictionary<int, IReadOnlyList<Tissue>>();
-        foreach (var block in Blocks)
-            tissuesByBlockId[block.ID] = allTissues.Where(t => t.OwnerID == block.ID).ToList();
-        TissuesByBlockId = tissuesByBlockId;
+        TissuesByBlockId = BlockGridLoader.GroupTissuesByBlock(Blocks, allTissues);
 
         // Wrapped because this reads a 10-result-set SP and a shape mismatch must not take the
         // whole page down — see SubmissionDetailsBlockModel's identical precedent.
         try
         {
             HistologyOptions = await _lookups.GetHistologyTypesAsync();
-
-            // GetByBatchAsync excludes Special Stain/IHC-PrP/IHC-Other (worklist-only exclusion) —
-            // these grid checkboxes need every code, so they must use GetAllSelectionsByBatchAsync.
-            var allTests = await _blockTests.GetAllSelectionsByBatchAsync(BatchId ?? 0);
-            var histologyByBlock = new Dictionary<int, IReadOnlyList<string>>();
-            foreach (var block in Blocks)
-                histologyByBlock[block.ID] = allTests.Where(t => t.BlockID == block.ID && t.TestType == BlockTestType.Histology).Select(t => t.Code).ToList();
-            HistologyCodesByBlockId = histologyByBlock;
+            HistologyCodesByBlockId = await BlockGridLoader.LoadHistologyCodesByBlockAsync(_blockTests, BatchId ?? 0, Blocks);
         }
         catch (Exception ex)
         {

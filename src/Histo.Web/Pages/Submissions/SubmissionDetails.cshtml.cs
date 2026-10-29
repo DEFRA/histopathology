@@ -14,6 +14,8 @@ namespace Histo.Web.Pages.Submissions;
 /// </summary>
 public class SubmissionDetailsModel : HistoPageModel
 {
+    private const string SampleDetailsTitle = "Sample Details";
+
     private const int LookupTissueCode = 9;
 
     private readonly ISubmissionService _submissions;
@@ -73,8 +75,8 @@ public class SubmissionDetailsModel : HistoPageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
-        ViewData["Title"] = "Sample Details";
-        ViewData["PageTitle"] = "Sample Details";
+        ViewData["Title"] = SampleDetailsTitle;
+        ViewData["PageTitle"] = SampleDetailsTitle;
 
         BatchId ??= Session.BatchID;
         var redirect = await LoadAnimalAsync();
@@ -105,8 +107,8 @@ public class SubmissionDetailsModel : HistoPageModel
 
     public async Task<IActionResult> OnPostSaveDetailsAsync()
     {
-        ViewData["Title"] = "Sample Details";
-        ViewData["PageTitle"] = "Sample Details";
+        ViewData["Title"] = SampleDetailsTitle;
+        ViewData["PageTitle"] = SampleDetailsTitle;
 
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
@@ -114,7 +116,7 @@ public class SubmissionDetailsModel : HistoPageModel
 
         var updated = new Animal
         {
-            ID = Animal!.ID,
+            ID = Animal.ID,
             BatchSubmissionID = Animal.BatchSubmissionID,
             SenderRef = Animal.SenderRef,
             NextBlockRef = Animal.NextBlockRef,
@@ -147,7 +149,7 @@ public class SubmissionDetailsModel : HistoPageModel
         {
             var tissue = new Tissue
             {
-                OwnerID = Animal!.BatchSubmissionID,
+                OwnerID = Animal.BatchSubmissionID,
                 Owner = TissueOwner.Submission,
                 TissueCode = TissueCode,
                 NoPieces = NoPieces,

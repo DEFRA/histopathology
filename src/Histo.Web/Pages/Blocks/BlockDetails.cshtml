@@ -1,7 +1,7 @@
 @page
 @model Histo.Web.Pages.Blocks.BlockDetailsModel
 @{
-    ViewData["Title"] = Model.IsAddFlow ? "Add block" : (Model.IsEditMode ? "Edit block" : "Add block");
+    ViewData["Title"] = !Model.IsAddFlow && Model.IsEditMode ? "Edit block" : "Add block";
     ViewData["PageTitle"] = ViewData["Title"];
 }
 
@@ -94,7 +94,7 @@ else
         <div class="govuk-grid-row">
             <div class="govuk-grid-column-one-half">
                 <div class="govuk-form-group">
-                    <label class="govuk-label">Sender ref</label>
+                    <span class="govuk-label">Sender ref</span>
                     <p class="govuk-body govuk-!-font-weight-bold">@Model.Animal.SenderRef</p>
                 </div>
                 <div class="govuk-form-group">
@@ -131,13 +131,14 @@ else
                             @if (Model.CanUseAdditionalRequest)
                             {
                                 <input class="govuk-checkboxes__input" asp-for="NewRepeatBlock" type="checkbox" />
+                                <label class="govuk-label govuk-checkboxes__label" for="NewRepeatBlock">Additional request (repeat block)</label>
                             }
                             else
                             {
-                                <input class="govuk-checkboxes__input" type="checkbox" disabled />
+                                <input class="govuk-checkboxes__input" id="NewRepeatBlockUnavailable" type="checkbox" disabled />
                                 <input type="hidden" asp-for="NewRepeatBlock" value="false" />
+                                <label class="govuk-label govuk-checkboxes__label" for="NewRepeatBlockUnavailable">Additional request (repeat block)</label>
                             }
-                            <label class="govuk-label govuk-checkboxes__label" for="NewRepeatBlock">Additional request (repeat block)</label>
                         </div>
                     </div>
                     @if (!Model.CanUseAdditionalRequest)
@@ -225,25 +226,7 @@ else
                                         <input type="hidden" name="IsAddFlow" value="@(Model.IsAddFlow ? "true" : "false")" />
                                         <input type="hidden" name="IsFromNextBlock" value="@(Model.IsFromNextBlock ? "true" : "false")" />
                                         <input type="hidden" name="UseWholeTissueList" value="@(Model.UseWholeTissueList ? "true" : "false")" />
-                                        <input type="hidden" name="BlockFieldsPosted" value="true" />
-                                        <input type="hidden" name="NewBlockRef" value="@Model.NewBlockRef" />
-                                        <input type="hidden" name="NewNumberOfBlocks" value="@Model.NewNumberOfBlocks" />
-                                        <input type="hidden" name="NewCustomerRef" value="@Model.NewCustomerRef" />
-                                        <input type="hidden" name="NewRepeatBlock" value="@(Model.NewRepeatBlock ? "true" : "false")" />
-                                        <input type="hidden" name="NewComment" value="@Model.NewComment" />
-                                        @foreach (var code in Model.SelectedHistologyCodes)
-                                        {
-                                            <input type="hidden" name="SelectedHistologyCodes" value="@code" />
-                                        }
-                                        @foreach (var code in Model.SelectedAntibodyCodes)
-                                        {
-                                            <input type="hidden" name="SelectedAntibodyCodes" value="@code" />
-                                        }
-                                        @foreach (var code in Model.SelectedStainCodes)
-                                        {
-                                            <input type="hidden" name="SelectedStainCodes" value="@code" />
-                                        }
-                                        <input type="hidden" name="CarryTestsToNextBlock" value="@(Model.CarryTestsToNextBlock ? "true" : "false")" />
+                                        <partial name="_BlockCarryFields" model="Model" />
                                         <input type="hidden" name="tissueId" value="@t.ID" />
                                         <button type="submit" class="govuk-button govuk-button--warning govuk-!-margin-bottom-0" data-module="govuk-button">Delete</button>
                                     </form>
@@ -266,25 +249,7 @@ else
             <input type="hidden" asp-for="IsAddFlow" />
             <input type="hidden" asp-for="IsFromNextBlock" />
             <input type="hidden" asp-for="UseWholeTissueList" />
-            <input type="hidden" name="BlockFieldsPosted" value="true" />
-            <input type="hidden" name="NewBlockRef" value="@Model.NewBlockRef" />
-            <input type="hidden" name="NewNumberOfBlocks" value="@Model.NewNumberOfBlocks" />
-            <input type="hidden" name="NewCustomerRef" value="@Model.NewCustomerRef" />
-            <input type="hidden" name="NewRepeatBlock" value="@(Model.NewRepeatBlock ? "true" : "false")" />
-            <input type="hidden" name="NewComment" value="@Model.NewComment" />
-            @foreach (var code in Model.SelectedHistologyCodes)
-            {
-                <input type="hidden" name="SelectedHistologyCodes" value="@code" />
-            }
-            @foreach (var code in Model.SelectedAntibodyCodes)
-            {
-                <input type="hidden" name="SelectedAntibodyCodes" value="@code" />
-            }
-            @foreach (var code in Model.SelectedStainCodes)
-            {
-                <input type="hidden" name="SelectedStainCodes" value="@code" />
-            }
-            <input type="hidden" name="CarryTestsToNextBlock" value="@(Model.CarryTestsToNextBlock ? "true" : "false")" />
+            <partial name="_BlockCarryFields" model="Model" />
             <div class="govuk-form-group">
                 <label class="govuk-label" for="NewTissueCode">Tissue type</label>
                 @if (Model.UseWholeTissueList)
@@ -361,7 +326,7 @@ else
         <div class="govuk-form-group">
             <fieldset class="govuk-fieldset">
                 <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Antibodies</legend>
-                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes" id="block-antibodies-section" style="@(Model.ShowAntibodies ? "" : "display:none")">
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes" id="block-antibodies-section" hidden="@(Model.ShowAntibodies ? null : "hidden")">
                     @foreach (var opt in antibodyOptions)
                     {
                         <div class="govuk-checkboxes__item">
@@ -379,7 +344,7 @@ else
         <div class="govuk-form-group">
             <fieldset class="govuk-fieldset">
                 <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Special stain</legend>
-                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes" id="block-stains-section" style="@(Model.ShowStains ? "" : "display:none")">
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes" id="block-stains-section" hidden="@(Model.ShowStains ? null : "hidden")">
                     @foreach (var opt in stainOptions)
                     {
                         <div class="govuk-checkboxes__item">

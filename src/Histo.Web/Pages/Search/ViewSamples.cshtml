@@ -66,9 +66,9 @@
                 <label class="govuk-label" for="ProjectDesc">Project</label>
                 <select class="govuk-select govuk-input--width-20" asp-for="ProjectDesc">
                     <option value="">-- Select --</option>
-                    @foreach (var p in Model.Projects)
+                    @foreach (var name in Model.Projects.Select(p => p.Name))
                     {
-                        <option value="@p.Name">@p.Name</option>
+                        <option value="@name">@name</option>
                     }
                 </select>
             </div>
@@ -139,10 +139,8 @@
                     <partial name="_SortableHeader" />
                     @if (Model.Mode == "Block")
                     {
-                        {
-                            ViewData["Label"] = "Block ref"; ViewData["Column"] = "BlockRef";
-                        }
-                    <partial name="_SortableHeader" />
+                        ViewData["Label"] = "Block ref"; ViewData["Column"] = "BlockRef";
+                        <partial name="_SortableHeader" />
                     }
                     @{ ViewData["Label"] = "Tissue"; ViewData["Column"] = "TissueDescription"; }
                     <partial name="_SortableHeader" />

@@ -247,127 +247,146 @@ public class BlockDetailsModel : HistoPageModel
         EditPMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
         await LoadSupportingDataAsync();
 
-        if (IsEditMode)
+        if (!IsEditMode) return await ProvisionNewBlockAsync(Animal);
+
+        if (!await LoadEditModeDataAsync()) return Page();
+        RestoreDraft();
+        return Page();
+    }
+
+    private const string CouldNotCreateBlockMessage = "Could not create the block. Please try again or contact support if the problem continues.";
+
+    private async Task<IActionResult> ProvisionNewBlockAsync(Animal animal)
+    {
+        // Legacy: SubmissionDetailsBlock.aspx.vb::ValidateMandatoryFields blocks btnAddBlock_Click
+        // when Histology Ref is mandatory (Histopath-area user or Pre-Cassetted) and blank.
+        // Enforced here too (not just a disabled button there) since this is a GET the user could
+        // reach directly — redirect back with the same GDS error-summary convention that page
+        // already uses for delete errors.
+        if (HistologyRefRequired && !animal.HistoRefSet)
         {
-            if (!await LoadEditModeDataAsync()) return Page();
-            RestoreDraft();
+            TempData["SubmissionDetailsBlock_Error"] = "Enter a Histology Reference for this sample before adding a block.";
+            TempData["SubmissionDetailsBlock_ErrorFieldId"] = "EditHistologyRef";
+            return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId = BatchId, animalId = AnimalId });
+        }
+
+        // Legacy: BlockDetails.aspx.vb Page_Load -> CreateNewRecord() provisionally creates the
+        // block immediately (in an in-memory dataset there; directly in the DB here) so tissues
+        // and tests can be assigned from the very first page load, without an explicit Save
+        // first. isAddFlow=true carries the "still adding" state across the redirects the
+        // tissue/test actions below use to return to this page. Set up-front so the Add-mode
+        // labelling (title/button/Number of blocks) is still correct even on the fallback
+        // render paths below (e.g. no pre-booked refs left for a pre-cassetted submission).
+        IsAddFlow = true;
+        var allBatchBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
+        var animalBlocks = allBatchBlocks.Where(b => b.AnimalID == animal.ID).ToList();
+        var batchTissues = await _submissions.GetTissuesByBatchAsync(BatchId ?? 0);
+        NewBlockRef = await ComputeNewBlockRefAsync(animal, animalBlocks, batchTissues);
+
+        if (string.IsNullOrWhiteSpace(NewBlockRef))
+        {
+            SetMissingBlockRefError();
+            return Page();
+        }
+
+        // Resume an existing, never-finished (zero-tissue) block with this exact ref instead
+        // of creating a duplicate row for it — e.g. one the user backed out of earlier.
+        var abandoned = animalBlocks.FirstOrDefault(b =>
+            string.Equals(b.BlockRef, NewBlockRef, StringComparison.OrdinalIgnoreCase) && !batchTissues.Any(t => t.OwnerID == b.ID));
+
+        int newId;
+        if (abandoned is not null)
+        {
+            newId = abandoned.ID;
         }
         else
         {
-            // Legacy: SubmissionDetailsBlock.aspx.vb::ValidateMandatoryFields blocks btnAddBlock_Click
-            // when Histology Ref is mandatory (Histopath-area user or Pre-Cassetted) and blank.
-            // Enforced here too (not just a disabled button there) since this is a GET the user could
-            // reach directly — redirect back with the same GDS error-summary convention that page
-            // already uses for delete errors.
-            if (HistologyRefRequired && !Animal.HistoRefSet)
-            {
-                TempData["SubmissionDetailsBlock_Error"] = "Enter a Histology Reference for this sample before adding a block.";
-                TempData["SubmissionDetailsBlock_ErrorFieldId"] = "EditHistologyRef";
-                return RedirectToPage("/Submissions/SubmissionDetailsBlock", new { batchId = BatchId, animalId = AnimalId });
-            }
-
-            // Legacy: BlockDetails.aspx.vb Page_Load -> CreateNewRecord() provisionally creates the
-            // block immediately (in an in-memory dataset there; directly in the DB here) so tissues
-            // and tests can be assigned from the very first page load, without an explicit Save
-            // first. isAddFlow=true carries the "still adding" state across the redirects the
-            // tissue/test actions below use to return to this page. Set up-front so the Add-mode
-            // labelling (title/button/Number of blocks) is still correct even on the fallback
-            // render paths below (e.g. no pre-booked refs left for a pre-cassetted submission).
-            IsAddFlow = true;
-            var allBatchBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
-            var animalBlocks = allBatchBlocks.Where(b => b.AnimalID == Animal.ID).ToList();
-            var batchTissues = await _submissions.GetTissuesByBatchAsync(BatchId ?? 0);
-            // A block with no tissues was never actually used — exclude it from the "existing
-            // refs" the next ref is computed from, so an abandoned/never-finished block's ref
-            // becomes available again instead of being permanently skipped over.
-            var usedRefs = animalBlocks.Where(b => batchTissues.Any(t => t.OwnerID == b.ID)).Select(b => b.BlockRef)
-                .Concat(await GetOtherBatchRefsAsync(Animal.ID));
-            if (!IsPreCassetted)
-                usedRefs = usedRefs.Concat((await _blocks.GetPreBookedByAnimalAsync(Animal.ID) ?? []).Select(b => b.BlockRef));
-            // Always the lowest ref not used or booked (e.g. after a block was deleted or skipped), so the
-            // animal's NextBlockRef high-water mark is deliberately not applied; the user can still override it.
-            NewBlockRef = IsPreCassetted
-                ? FirstPreBookedRef()
-                : BlockHelpers.ComputeNextBlockRef(usedRefs);
-
-            if (string.IsNullOrWhiteSpace(NewBlockRef))
-            {
-                // Pre-cassetted submissions can only create a block from a pre-booked reference
-                // (legacy: clsBlock.NewBlock -> GetPreBookedBlock). If none remain for this animal,
-                // there is nothing to auto-provision — tell the user why instead of silently
-                // rendering a form with no Tissues/Add tissue section and no visible explanation.
-                if (IsPreCassetted)
-                {
-                    ErrorMessage = "No pre-booked block references are available for this animal. Book a block reference for this sender before adding a block.";
-                    NoPreBookedRefsAvailable = true;
-                }
-                else
-                {
-                    ErrorMessage = "Could not determine the next block reference. Please try again or contact support if the problem continues.";
-                }
-                return Page();
-            }
-
-            // Resume an existing, never-finished (zero-tissue) block with this exact ref instead
-            // of creating a duplicate row for it — e.g. one the user backed out of earlier.
-            var abandoned = animalBlocks.FirstOrDefault(b =>
-                string.Equals(b.BlockRef, NewBlockRef, StringComparison.OrdinalIgnoreCase) && !batchTissues.Any(t => t.OwnerID == b.ID));
-
-            int newId;
-            if (abandoned is not null)
-            {
-                newId = abandoned.ID;
-            }
-            else if (IsPreCassetted)
-            {
-                // Claim the matching pre-booked placeholder in place instead of inserting a new
-                // row, so it's retired (Status PreBooked -> PreBookedUsed) and never reappears as
-                // a "next" ref for this animal's future submissions.
-                var existingOrders = allBatchBlocks.Select(b => b.Order).ToList();
-                var preBookedToClaim = PreBookedBlockRefs.First(b => string.Equals(b.BlockRef, NewBlockRef, StringComparison.OrdinalIgnoreCase));
-                var claimed = await _blocks.ClaimPreBookedBlockAsync(preBookedToClaim, BatchId ?? 0, existingOrders, Session.UserID);
-                newId = claimed ? preBookedToClaim.ID : 0;
-                if (newId <= 0)
-                {
-                    ErrorMessage = "Could not create the block. Please try again or contact support if the problem continues.";
-                    return Page();
-                }
-            }
-            else
-            {
-                var existingOrders = allBatchBlocks.Select(b => b.Order).ToList();
-                newId = await _blocks.AddBlockAsync(BatchId ?? 0, Animal.ID, NewBlockRef, existingOrders, Session.UserID,
-                    customerRef: null, comment: null, repeatBlock: false);
-                if (newId <= 0)
-                {
-                    // AddBlockAsync swallows its own exceptions and logs them, returning 0 on failure —
-                    // without this, the page silently re-rendered the "Add block" form with no Tissues/
-                    // Add tissue section and no visible error, making a genuine DB failure look like a
-                    // missing feature. Surface it so the real cause shows up instead of a blank result.
-                    ErrorMessage = "Could not create the block. Please try again or contact support if the problem continues.";
-                    return Page();
-                }
-
-                try
-                {
-                    await SaveBatchDefaultsForNewBlockAsync(newId);
-                }
-                catch (Exception ex)
-                {
-                    // The block is already committed; without cleanup a retry would leave an unreachable orphan.
-                    _logger.LogError(ex, "BlockDetails: failed to save batch default tests for new block {BlockId}; removing it.", newId);
-                    try { await _blockTests.SaveTestSelectionsAsync(BatchId ?? 0, newId, [], [], [], Session.UserID); }
-                    catch (Exception clearEx) { _logger.LogError(clearEx, "BlockDetails: failed to clear partial test selections for block {BlockId}.", newId); }
-                    await _blocks.DeleteBlockAsync(newId, Session.UserID);
-                    ErrorMessage = "Could not create the block. Please try again or contact support if the problem continues.";
-                    return Page();
-                }
-            }
-
-            return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = newId, isAddFlow = true });
+            var existingOrders = allBatchBlocks.Select(b => b.Order).ToList();
+            newId = IsPreCassetted
+                ? await ClaimPreBookedBlockAsync(NewBlockRef, existingOrders)
+                : await AddBlockWithBatchDefaultsAsync(animal, NewBlockRef, existingOrders);
+            if (newId <= 0) return Page();
         }
 
-        return Page();
+        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = newId, isAddFlow = true });
+    }
+
+    private async Task<string?> ComputeNewBlockRefAsync(Animal animal, IReadOnlyList<Block> animalBlocks, IReadOnlyList<Tissue> batchTissues)
+    {
+        // A block with no tissues was never actually used — exclude it from the "existing
+        // refs" the next ref is computed from, so an abandoned/never-finished block's ref
+        // becomes available again instead of being permanently skipped over.
+        var usedRefs = animalBlocks.Where(b => batchTissues.Any(t => t.OwnerID == b.ID)).Select(b => b.BlockRef)
+            .Concat(await GetOtherBatchRefsAsync(animal.ID));
+        if (!IsPreCassetted)
+            usedRefs = usedRefs.Concat((await _blocks.GetPreBookedByAnimalAsync(animal.ID) ?? []).Select(b => b.BlockRef));
+        // Always the lowest ref not used or booked (e.g. after a block was deleted or skipped), so the
+        // animal's NextBlockRef high-water mark is deliberately not applied; the user can still override it.
+        return IsPreCassetted
+            ? FirstPreBookedRef()
+            : BlockHelpers.ComputeNextBlockRef(usedRefs);
+    }
+
+    // Pre-cassetted submissions can only create a block from a pre-booked reference
+    // (legacy: clsBlock.NewBlock -> GetPreBookedBlock). If none remain for this animal,
+    // there is nothing to auto-provision — tell the user why instead of silently
+    // rendering a form with no Tissues/Add tissue section and no visible explanation.
+    private void SetMissingBlockRefError()
+    {
+        if (IsPreCassetted)
+        {
+            ErrorMessage = "No pre-booked block references are available for this animal. Book a block reference for this sender before adding a block.";
+            NoPreBookedRefsAvailable = true;
+        }
+        else
+        {
+            ErrorMessage = "Could not determine the next block reference. Please try again or contact support if the problem continues.";
+        }
+    }
+
+    /// <summary>Returns the claimed block ID, or 0 (with <see cref="ErrorMessage"/> set) on failure.</summary>
+    private async Task<int> ClaimPreBookedBlockAsync(string blockRef, List<int> existingOrders)
+    {
+        // Claim the matching pre-booked placeholder in place instead of inserting a new
+        // row, so it's retired (Status PreBooked -> PreBookedUsed) and never reappears as
+        // a "next" ref for this animal's future submissions.
+        var preBookedToClaim = PreBookedBlockRefs.First(b => string.Equals(b.BlockRef, blockRef, StringComparison.OrdinalIgnoreCase));
+        var claimed = await _blocks.ClaimPreBookedBlockAsync(preBookedToClaim, BatchId ?? 0, existingOrders, Session.UserID);
+        if (claimed) return preBookedToClaim.ID;
+
+        ErrorMessage = CouldNotCreateBlockMessage;
+        return 0;
+    }
+
+    /// <summary>Returns the new block ID, or 0 (with <see cref="ErrorMessage"/> set) on failure.</summary>
+    private async Task<int> AddBlockWithBatchDefaultsAsync(Animal animal, string blockRef, List<int> existingOrders)
+    {
+        var newId = await _blocks.AddBlockAsync(BatchId ?? 0, animal.ID, blockRef, existingOrders, Session.UserID);
+        if (newId <= 0)
+        {
+            // AddBlockAsync swallows its own exceptions and logs them, returning 0 on failure —
+            // without this, the page silently re-rendered the "Add block" form with no Tissues/
+            // Add tissue section and no visible error, making a genuine DB failure look like a
+            // missing feature. Surface it so the real cause shows up instead of a blank result.
+            ErrorMessage = CouldNotCreateBlockMessage;
+            return 0;
+        }
+
+        try
+        {
+            await SaveBatchDefaultsForNewBlockAsync(newId);
+            return newId;
+        }
+        catch (Exception ex)
+        {
+            // The block is already committed; without cleanup a retry would leave an unreachable orphan.
+            _logger.LogError(ex, "BlockDetails: failed to save batch default tests for new block {BlockId}; removing it.", newId);
+            try { await _blockTests.SaveTestSelectionsAsync(BatchId ?? 0, newId, [], [], [], Session.UserID); }
+            catch (Exception clearEx) { _logger.LogError(clearEx, "BlockDetails: failed to clear partial test selections for block {BlockId}.", newId); }
+            await _blocks.DeleteBlockAsync(newId, Session.UserID);
+            ErrorMessage = CouldNotCreateBlockMessage;
+            return 0;
+        }
     }
 
     /// <summary>
@@ -856,8 +875,7 @@ public class BlockDetailsModel : HistoPageModel
             string.Equals(b.BlockRef, nextRef, StringComparison.OrdinalIgnoreCase) && !batchTissues.Any(t => t.OwnerID == b.ID));
         if (abandoned is not null) return abandoned.ID;
 
-        return await _blocks.AddBlockAsync(BatchId ?? 0, animal.ID, nextRef, existingOrders, Session.UserID,
-            customerRef: null, comment: null, repeatBlock: false);
+        return await _blocks.AddBlockAsync(BatchId ?? 0, animal.ID, nextRef, existingOrders, Session.UserID);
     }
 
     /// <summary>

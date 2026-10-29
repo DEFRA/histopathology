@@ -9,7 +9,7 @@
         bodyHtml = bodyWriter.ToString();
     }
     var hasVisibleErrorSummary = System.Text.RegularExpressions.Regex.IsMatch(
-        bodyHtml, "<div class=\"govuk-error-summary\"(?![^>]*\\bhidden)");
+        bodyHtml, "<div class=\"govuk-error-summary\"(?![^>]*\\bhidden)", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
 }
 <!DOCTYPE html>
 <html lang="en" class="govuk-template">
@@ -82,9 +82,7 @@
             {
                 <nav aria-label="Menu" class="govuk-service-navigation__wrapper app-nav-wrapper">
                     <div class="govuk-width-container">
-                        <ul class="govuk-service-navigation__list" id="navigation">
-                            @await Html.PartialAsync("_NavPartial")
-                        </ul>
+                        @await Html.PartialAsync("_NavPartial")
                     </div>
                 </nav>
             }
@@ -93,7 +91,7 @@
 
     <div class="govuk-width-container @(ViewData["PageClass"])">
         <main class="govuk-main-wrapper" id="main-content" role="main">
-            @RenderSection("BeforeHeading", required: false)
+            @await RenderSectionAsync("BeforeHeading", required: false)
             @if (ViewData["PageTitle"] is string pt)
             {
                 @if (ViewData["Caption"] is string caption)
@@ -150,6 +148,7 @@
     <script src="~/js/nav-toggle.js" asp-append-version="true"></script>
     <script src="~/js/help-link.js" asp-append-version="true"></script>
     <script src="~/js/responsive-tables.js" asp-append-version="true"></script>
+<script src="~/js/page-behaviours.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

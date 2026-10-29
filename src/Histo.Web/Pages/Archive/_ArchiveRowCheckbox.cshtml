@@ -1,0 +1,11 @@
+@model Histo.Web.Pages.Archive.ArchiveRowCheckbox
+<td class="govuk-table__cell">
+    <div class="govuk-checkboxes govuk-checkboxes--small">
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" type="checkbox" id="select-@Model.Id" name="SelectedIds" value="@Model.Id"
+                   data-archive-location="@Model.ArchiveLocation" data-archived-date="@Model.ArchivedDate?.ToString("yyyy-MM-dd")" data-comment="@Model.Comment"
+                   checked="@(Model.Page.SelectedIds.Contains(Model.Id))" @(Model.Page.IsViewMode ? "disabled" : "") />
+            <label class="govuk-label govuk-checkboxes__label" for="select-@Model.Id"><span class="govuk-visually-hidden">@Model.Label</span></label>
+        </div>
+    </div>
+</td>

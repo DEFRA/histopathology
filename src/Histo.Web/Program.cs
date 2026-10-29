@@ -8,6 +8,7 @@ using Histo.QualityControl;
 using Histo.Reporting.Reports;
 using Histo.Reporting.Services;
 using Histo.Submissions;
+using Histo.Web;
 using Histo.Web.Auth;
 using Histo.Web.Security;
 using Histo.Web.Services;
@@ -52,26 +53,16 @@ try
            .ReadFrom.Services(services)
            .Enrich.FromLogContext()
            .WriteTo.Console();
-    }, writeToProviders: IsAzureMonitorConfigured(builder.Configuration));
+    }, writeToProviders: StartupExtensions.IsAzureMonitorConfigured(builder.Configuration));
 
     // -- Strongly-typed options -----------------------------------------------
     builder.Services.Configure<AppOptions>(
         builder.Configuration.GetSection(AppOptions.SectionName));
 
     // One idle timeout drives both the auth cookie and the server-side session.
-    const string AuthCookieName = "Histo.Auth";
-    const string SessionCookieName = "Histo.Session";
-    const string SessionMarkerKey = "SessionStarted";
     var idleTimeout = TimeSpan.FromMinutes(Math.Max(1, builder.Configuration.GetValue("Session:IdleTimeoutMinutes", 20)));
 
-    // Optional shared key ring so auth/session cookies survive restarts and scale-out.
-    var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
-    if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
-    {
-        builder.Services.AddDataProtection()
-            .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath))
-            .SetApplicationName("Histo.Web");
-    }
+    builder.AddSharedDataProtection();
 
     // -- Forwarded headers (reverse proxy / edge in front of App Service) -----
     // dev-cde.azure.defra.cloud terminates TLS and forwards to the App Service's
@@ -113,8 +104,7 @@ try
 
     // -- Health checks --------------------------------------------------------
     builder.Services.AddHealthChecks();
-    // TODO Phase 1+: add SQL health check:
-    //   .AddSqlServer(connectionString, name: "histology-db", tags: ["db"]);
+    // A SQL Server health check (name "histology-db", tag "db") is planned for a later phase.
 
     // -- Razor Pages + MVC controllers (controllers needed for SAML2 endpoints) --
     builder.Services.AddRazorPages(options =>
@@ -135,39 +125,7 @@ try
     // See: docs/EntraID-Implementation-plan.md Phase B for migration steps.
     var saml2Section = builder.Configuration.GetSection("Saml2");
 
-    var saml2Config = new Saml2Configuration
-    {
-        Issuer             = saml2Section["SPEntityId"] ?? string.Empty,
-        SignatureAlgorithm = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
-        CertificateValidationMode = System.ServiceModel.Security.X509CertificateValidationMode.ChainTrust,
-        RevocationMode            = X509RevocationMode.NoCheck,
-    };
-
-    // Entra ID sets the assertion's <AudienceRestriction> to the SP Entity ID — without
-    // registering it here, audience validation always fails (IDX10214) regardless of
-    // what the IdP sends, since AllowedAudienceUris would otherwise be empty.
-    if (!string.IsNullOrEmpty(saml2Config.Issuer))
-        saml2Config.AllowedAudienceUris.Add(saml2Config.Issuer);
-
-    // SP signing certificate (optional in dev; required in all deployed environments).
-    var spCertThumbprint = saml2Section["SPCertificateThumbprint"];
-    if (!string.IsNullOrEmpty(spCertThumbprint))
-    {
-        using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
-        store.Open(OpenFlags.ReadOnly);
-        var cert = store.Certificates
-            .Find(X509FindType.FindByThumbprint, spCertThumbprint, false)
-            .OfType<X509Certificate2>()
-            .FirstOrDefault();
-        if (cert is not null)
-            saml2Config.SigningCertificate = cert;
-        else
-            Log.Warning("SP signing certificate with thumbprint {Thumbprint} was not found in the certificate store.", spCertThumbprint);
-    }
-    else
-    {
-        Log.Warning("Saml2:SPCertificateThumbprint is not configured — SP will not sign AuthnRequests. Required for all non-development environments.");
-    }
+    var saml2Config = StartupExtensions.CreateSaml2Configuration(saml2Section);
 
     builder.Services.AddSingleton(saml2Config); // saml2Config ref captured for post-build metadata load below
 
@@ -177,60 +135,8 @@ try
     // /SessionError page) instead of going straight to Entra ID.
     builder.Services.AddAuthentication(o => o.DefaultChallengeScheme = "saml2");
 
-    // The default cookie challenge/forbid handlers build an ABSOLUTE redirect URI from
-    // Request.Scheme/Request.Host. Behind a reverse proxy that doesn't forward a trusted
-    // X-Forwarded-Host (or forwards headers UseForwardedHeaders isn't picking up), that
-    // leaks the App Service origin hostname instead of the public custom domain. Forcing
-    // a relative redirect removes the dependency on Request.Host entirely — the browser
-    // resolves it against whatever host is currently in the address bar.
-    builder.Services.PostConfigure<CookieAuthenticationOptions>("saml2", options =>
-    {
-        options.Cookie.Name = AuthCookieName;
-        options.Cookie.HttpOnly = true;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        options.ExpireTimeSpan = idleTimeout;
-        options.SlidingExpiration = true;
-
-        var originalValidatePrincipal = options.Events.OnValidatePrincipal;
-        options.Events.OnValidatePrincipal = async context =>
-        {
-            await originalValidatePrincipal(context);
-            await SingleSessionPolicy.ValidateAsync(context);
-        };
-
-        var originalRedirectToLogin = options.Events.OnRedirectToLogin;
-        options.Events.OnRedirectToLogin = context =>
-        {
-            var request = context.Request;
-
-            // A leftover auth cookie means the user was signed in and timed out, not a first visit.
-            // /signin is exempt: it deletes the stale cookie but this request still carries it.
-            if (request.Headers.Accept.ToString().Contains("text/html", StringComparison.OrdinalIgnoreCase)
-                && request.Cookies.ContainsKey(AuthCookieName)
-                && !request.Path.StartsWithSegments("/signin"))
-            {
-                context.Response.Redirect("/SessionError");
-                return Task.CompletedTask;
-            }
-
-            if (Uri.TryCreate(context.RedirectUri, UriKind.Absolute, out var absoluteUri))
-                context.RedirectUri = absoluteUri.PathAndQuery;
-
-            // Only GET requests can be replayed after sign-in; anything else returns to the home page.
-            if (!HttpMethods.IsGet(request.Method))
-                context.RedirectUri = $"{options.LoginPath}?{options.ReturnUrlParameter}={Uri.EscapeDataString("/Index")}";
-
-            return originalRedirectToLogin(context);
-        };
-
-        var originalRedirectToAccessDenied = options.Events.OnRedirectToAccessDenied;
-        options.Events.OnRedirectToAccessDenied = context =>
-        {
-            if (Uri.TryCreate(context.RedirectUri, UriKind.Absolute, out var absoluteUri))
-                context.RedirectUri = absoluteUri.PathAndQuery;
-            return originalRedirectToAccessDenied(context);
-        };
-    });
+    builder.Services.PostConfigure<CookieAuthenticationOptions>("saml2",
+        options => StartupExtensions.ConfigureSamlCookie(options, idleTimeout));
 
     // Claims transformation — fallback DB lookup; normal path bakes claims in AuthController at ACS time.
     builder.Services.AddScoped<IClaimsTransformation, HistopathologyClaimsTransformation>();
@@ -240,7 +146,7 @@ try
     builder.Services.AddSession(o =>
     {
         o.IdleTimeout = idleTimeout;
-        o.Cookie.Name = SessionCookieName;
+        o.Cookie.Name = StartupExtensions.SessionCookieName;
         o.Cookie.HttpOnly = true;
         o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
         o.Cookie.IsEssential = true;
@@ -268,96 +174,19 @@ try
     builder.Services.AddTransient<HistologyReportDataSetBuilder>();
     builder.Services.AddTransient<QCNoteDataSetBuilder>();
     builder.Services.AddTransient<SubmissionNotesDataSetBuilder>();
-    builder.Services.AddTransient<SubmissionNotesRenderer>();
 
-    // -- Azure Monitor (OpenTelemetry) telemetry ------------------------------
-    // Matches the standard App Service setting name (APPLICATIONINSIGHTS_CONNECTION_STRING,
-    // top-level, the same key Azure's own extension uses). Skipped when unset (e.g. local dev).
-    // OpenTelemetry does not emit the Request-Context app-id response header.
-    if (IsAzureMonitorConfigured(builder.Configuration))
-    {
-        // Serilog forwards to the OpenTelemetry provider (writeToProviders), so the default
-        // providers are cleared here to avoid duplicate console output.
-        builder.Logging.ClearProviders();
-        builder.Services.AddOpenTelemetry().UseAzureMonitor(o =>
-            o.ConnectionString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]);
-    }
+    builder.AddAzureMonitorIfConfigured();
 
     var app = builder.Build();
 
     // -- Load IdP federation metadata (async — requires IHttpClientFactory from built container) --
     // saml2Config is the same singleton object already registered; updating it here is safe
     // because no requests are served until app.Run() is called.
-    // IdPMetadataUrl format: https://login.microsoftonline.com/{tenant-id}/federationmetadata/2007-06/federationmetadata.xml?appid={app-id}
-    var idpMetadataUrl = app.Configuration.GetSection("Saml2")["IdPMetadataUrl"];
-    if (!string.IsNullOrEmpty(idpMetadataUrl) && Uri.TryCreate(idpMetadataUrl, UriKind.Absolute, out var metadataUri))
-    {
-        try
-        {
-            var httpClientFactory = app.Services.GetRequiredService<IHttpClientFactory>();
-            var entityDescriptor  = new EntityDescriptor();
-            await entityDescriptor.ReadIdPSsoDescriptorFromUrlAsync(httpClientFactory, metadataUri);
-
-            if (entityDescriptor.IdPSsoDescriptor != null)
-            {
-                saml2Config.SingleSignOnDestination = entityDescriptor.IdPSsoDescriptor.SingleSignOnServices
-                    .FirstOrDefault(s => s.Binding.OriginalString.Contains("HTTP-Redirect"))?.Location
-                    ?? entityDescriptor.IdPSsoDescriptor.SingleSignOnServices.FirstOrDefault()?.Location;
-
-                saml2Config.SingleLogoutDestination = entityDescriptor.IdPSsoDescriptor.SingleLogoutServices
-                    .FirstOrDefault()?.Location;
-
-                saml2Config.SignatureValidationCertificates.AddRange(
-                    entityDescriptor.IdPSsoDescriptor.SigningCertificates);
-
-                Log.Information("Loaded SAML2 IdP metadata. SSO: {SsoUrl}. Signing certs: {CertCount}.",
-                    saml2Config.SingleSignOnDestination,
-                    saml2Config.SignatureValidationCertificates.Count);
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Could not load IdP metadata from {MetadataUrl}. " +
-                "Configure Saml2:IdPMetadataUrl with the Entra ID federation metadata URL.", idpMetadataUrl);
-        }
-    }
-    else
-    {
-        Log.Warning("Saml2:IdPMetadataUrl is not a valid URL. " +
-                    "Set it to: https://login.microsoftonline.com/{{tenant-id}}/federationmetadata/2007-06/federationmetadata.xml?appid={{app-id}}");
-    }
+    await StartupExtensions.LoadIdpMetadataAsync(app, saml2Config);
 
     // -- Middleware pipeline --------------------------------------------------
     app.UseSecurityHeaders(sendHsts: !app.Environment.IsDevelopment());
-
-    if (app.Environment.IsDevelopment())
-    {
-        app.UseDeveloperExceptionPage();
-    }
-    else
-    {
-        // GDS "There is a problem with the service" for all unhandled 5xx. Explicitly tracks
-        // the exception (with URL/user context) before redirecting, so a genuinely unhandled
-        // failure is fully visible in Application Insights rather than just an opaque TraceId.
-        app.UseExceptionHandler(errorApp =>
-        {
-            errorApp.Run(context =>
-            {
-                var error = context.Features.Get<IExceptionHandlerPathFeature>()?.Error;
-                if (error is not null)
-                {
-                    var telemetry = context.RequestServices.GetRequiredService<TelemetryHelper>();
-                    telemetry.TrackException(error, "GlobalExceptionHandler", new Dictionary<string, string>
-                    {
-                        ["url"] = context.Request.Path.Value ?? string.Empty,
-                    });
-                }
-                context.Response.Redirect("/Errors/ServiceProblem");
-                return Task.CompletedTask;
-            });
-        });
-        app.UseStatusCodePagesWithReExecute("/Errors/ServiceProblem");
-    }
+    app.UseServiceProblemHandling();
 
     app.UseSerilogRequestLogging();
 
@@ -382,30 +211,7 @@ try
     app.UseAuthentication();
     app.UseSaml2();         // ITfoxtec SAML2 middleware — must follow UseAuthentication
 
-    // The auth cookie can outlive the server-side session (restart, idle expiry). A request that
-    // arrives signed in with a session cookie but no marker means the session expired -> timeout page.
-    // Static files are served earlier by UseStaticFiles and non-HTML requests are ignored.
-    string[] sessionExpirySkippedPaths = ["/health", "/Saml2", "/Errors", "/AccessDenied", "/SessionError", "/signin"];
-    app.Use(async (context, next) =>
-    {
-        if (context.User.Identity?.IsAuthenticated == true
-            && context.Request.Headers.Accept.ToString().Contains("text/html", StringComparison.OrdinalIgnoreCase)
-            && !sessionExpirySkippedPaths.Any(p => context.Request.Path.StartsWithSegments(p)))
-        {
-            await context.Session.LoadAsync();
-            if (context.Session.GetString(SessionMarkerKey) is null)
-            {
-                context.Session.SetString(SessionMarkerKey, "1");
-                if (context.Request.Cookies.ContainsKey(SessionCookieName))
-                {
-                    context.Response.Redirect("/SessionError");
-                    return;
-                }
-            }
-        }
-
-        await next();
-    });
+    app.UseSessionExpiryRedirect();
 
     app.UseAuthorization();
 
@@ -413,37 +219,26 @@ try
     app.MapControllers(); // AuthController — SAML2 /Saml2/* endpoints
     app.MapRazorPages();
 
-    // Re-sign-in after a timeout: drop the stale cookies, then challenge the cookie scheme, which
-    // routes to /Saml2/login with a return to the home page (locally the dev bypass skips this).
-    app.MapGet("/signin", (HttpContext context) =>
-    {
-        context.Response.Cookies.Delete(AuthCookieName);
-        context.Response.Cookies.Delete(SessionCookieName);
-
-        if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("DevAuth:BypassEntraId"))
-            return Results.Redirect("/Index");
-
-        return Results.Challenge(new AuthenticationProperties { RedirectUri = "/Index" }, ["saml2"]);
-    }).AllowAnonymous();
+    app.MapSignIn();
 
     // Renamed to /Submissions/SampleSummary — "Block" is meaningless for Wet Tissue submissions.
     app.MapGet("/Submissions/BatchBlockSummary", (HttpRequest request) =>
         Results.Redirect($"/Submissions/SampleSummary{request.QueryString}", permanent: true));
 
-    app.Run();
+    await app.RunAsync();
 }
-catch (Exception ex) when (ex is not HostAbortedException)
+catch (Exception ex) when (ex is not HostAbortedException && LogFatal(ex))
 {
-    Log.Fatal(ex, "Histo.Web terminated unexpectedly");
+    // Unreachable: LogFatal always returns false so the exception propagates after being logged.
     throw;
 }
 finally
 {
-    Log.CloseAndFlush();
+    await Log.CloseAndFlushAsync();
 }
 
-static bool IsAzureMonitorConfigured(IConfiguration configuration)
+static bool LogFatal(Exception ex)
 {
-    var connectionString = configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
-    return !string.IsNullOrWhiteSpace(connectionString) && !connectionString.StartsWith("__", StringComparison.Ordinal);
+    Log.Fatal(ex, "Histo.Web terminated unexpectedly");
+    return false;
 }

@@ -1,0 +1,9 @@
+@*
+    Species / project / pathologist / submission date rows of a batch summary list.
+    Model = (species, project, pathologist, submission date text).
+*@
+@model (string? Species, string? Project, string? Pathologist, string? SubmissionDate)
+@SummaryList.Row("Species", Model.Species)
+@SummaryList.Row("Project/Contract Code", Model.Project)
+@SummaryList.Row("Pathologist", Model.Pathologist)
+@SummaryList.Row("Submission date", Model.SubmissionDate)

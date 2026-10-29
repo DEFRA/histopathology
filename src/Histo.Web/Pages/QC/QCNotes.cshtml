@@ -46,7 +46,7 @@
             </tr>
         </thead>
         <tbody class="govuk-table__body">
-            @foreach (var n in Model.PagedEntries)
+            @foreach (var n in Model.GetPagedEntries())
             {
                 <tr class="govuk-table__row">
                     <td class="govuk-table__cell">@n.QCNoteRef</td>

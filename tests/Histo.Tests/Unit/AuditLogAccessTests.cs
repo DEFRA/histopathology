@@ -3,15 +3,18 @@ using System.Text.RegularExpressions;
 namespace Histo.Tests.Unit;
 
 /// <summary>Audit logs are Maintenance-only, as in legacy <c>Home.aspx.vb</c>. Allow/deny is covered by <see cref="MaintenanceOnlyPageFilterTests"/>.</summary>
-public class AuditLogAccessTests
+public partial class AuditLogAccessTests
 {
+    [GeneratedRegex(@"AddFolderApplicationModelConvention\(\s*""/AuditLog""\s*,\s*model\s*=>\s*model\.Filters\.Add\(new\s+Histo\.Web\.Auth\.MaintenanceOnlyPageFilter\(\)\)\)")]
+    private static partial Regex AuditLogConventionRegex();
+
     [Fact]
     public void AuditLogFolder_IsRestrictedToMaintenanceGroup()
     {
         var program = ReadSource("src", "Histo.Web", "Program.cs");
 
         Assert.Matches(
-            new Regex(@"AddFolderApplicationModelConvention\(\s*""/AuditLog""\s*,\s*model\s*=>\s*model\.Filters\.Add\(new\s+Histo\.Web\.Auth\.MaintenanceOnlyPageFilter\(\)\)\)"),
+            AuditLogConventionRegex(),
             program);
     }
 

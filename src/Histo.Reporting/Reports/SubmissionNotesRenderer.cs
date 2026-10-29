@@ -20,7 +20,7 @@
 //     ├── Left : bold "Submission notes for Submission:" + bold SubmissionNumber
 //     └── Right: today's date "dd/MM/yyyy"
 //   Content:
-//     ├── Two-column row: left = "Submission Comments" (bold) + text;
+//     ├── Two-column row: left = "Submission Comments" (bold) + text,
 //     │                   right = "Submission Status Comments" (bold) + text
 //     └── 5 sections, always rendered regardless of row count (confirmed against
 //         SubmissionNotes-image.png reference — legacy always prints heading/column
@@ -61,12 +61,17 @@ namespace Histo.Reporting.Reports;
 /// </list>
 /// </para>
 /// </summary>
-public sealed class SubmissionNotesRenderer
+public static class SubmissionNotesRenderer
 {
-    private static readonly string[] TissueCommentHeaders = ["SenderRef", "Tissue Code", "Tissue Comment", "Tissue Archive Comment"];
-    private static readonly string[] BlockCommentHeaders = ["SenderRef", "Block Ref", "Block Comment", "Block Archive Comment"];
+    private const string SenderRefColumn = "SenderRef";
+    private const string BlockRefColumn = "BlockRef";
+
+    private static readonly string[] TissueCommentHeaders = [SenderRefColumn, "Tissue Code", "Tissue Comment", "Tissue Archive Comment"];
+    private static readonly string[] BlockCommentHeaders = [SenderRefColumn, "Block Ref", "Block Comment", "Block Archive Comment"];
     private static readonly string[] TestCommentHeaders = ["Block Ref", "Test", "Test Comment", "Test Archive Comment"];
-    private static readonly string[] TestCommentHeadersWithoutBlockRef = ["BlockRef", "Test", "Test Comment", "Test Archive Comment"];
+    private static readonly string[] TestCommentHeadersWithoutBlockRef = [BlockRefColumn, "Test", "Test Comment", "Test Archive Comment"];
+
+    private static readonly string[] TestCommentFields = [BlockRefColumn, "Test", "TestComment", "TestArchiveComment"];
 
     static SubmissionNotesRenderer()
     {
@@ -79,20 +84,20 @@ public sealed class SubmissionNotesRenderer
     /// </summary>
     /// <param name="ds">Populated DataSet containing the 6 named tables described above.</param>
     /// <returns>PDF content as a byte array.</returns>
-    public Task<byte[]> RenderAsync(DataSet ds)
+    public static Task<byte[]> RenderAsync(DataSet ds)
     {
         DataRow? submissionRow = ds.Tables["Submission"]?.Rows.Count > 0
             ? ds.Tables["Submission"]!.Rows[0] : null;
 
-        var submissionNumber        = submissionRow is not null ? Field(submissionRow, "SubmissionNumber")        : string.Empty;
-        var submissionComments      = submissionRow is not null ? Field(submissionRow, "SubmissionComments")      : string.Empty;
-        var submissionStatusComment = submissionRow is not null ? Field(submissionRow, "SubmissionStatusComment") : string.Empty;
+        var submissionNumber        = SubmissionField(submissionRow, "SubmissionNumber");
+        var submissionComments      = SubmissionField(submissionRow, "SubmissionComments");
+        var submissionStatusComment = SubmissionField(submissionRow, "SubmissionStatusComment");
 
-        var tissueRows      = ds.Tables["SubmissionTissues"]?.Rows.Cast<DataRow>().ToList()  ?? [];
-        var blockRows       = ds.Tables["SubmissionBlocks"]?.Rows.Cast<DataRow>().ToList()   ?? [];
-        var histologyRows   = ds.Tables["BlockHistology"]?.Rows.Cast<DataRow>().ToList()     ?? [];
-        var specialStainRows = ds.Tables["BlockSpecialStain"]?.Rows.Cast<DataRow>().ToList() ?? [];
-        var antibodyRows    = ds.Tables["BlockAntibodies"]?.Rows.Cast<DataRow>().ToList()    ?? [];
+        var tissueRows       = TableRows(ds, "SubmissionTissues");
+        var blockRows        = TableRows(ds, "SubmissionBlocks");
+        var histologyRows    = TableRows(ds, "BlockHistology");
+        var specialStainRows = TableRows(ds, "BlockSpecialStain");
+        var antibodyRows     = TableRows(ds, "BlockAntibodies");
 
         var reportDate = DateTime.Now.ToString("dd/MM/yyyy");
 
@@ -109,31 +114,10 @@ public sealed class SubmissionNotesRenderer
                 page.DefaultTextStyle(s => s.FontFamily("Arial").FontSize(9));
 
                 // ── Page Header — repeats on every page ──────────────────────────
-                page.Header().Column(headerCol =>
-                {
-                    headerCol.Item().Row(header =>
-                    {
-                        // Left: bold label + bold submission number (both bold, per visual reference)
-                        header.RelativeItem().Text(t =>
-                        {
-                            t.Span("Submission notes for Submission:  ").Bold();
-                            t.Span(submissionNumber).Bold();
-                        });
-                        // Right: today's date
-                        header.RelativeItem().AlignRight().Text(reportDate);
-                    });
-                    // Full-width rule under the title, per visual reference (SubmissionNotes-image.png).
-                    headerCol.Item().PaddingTop(2).PaddingBottom(8).LineHorizontal(0.5f);
-                });
+                ComposeHeader(page.Header(), submissionNumber, reportDate);
 
                 // ── Page Footer — repeats on every page ──────────────────────────
-                page.Footer().AlignRight().Text(t =>
-                {
-                    t.Span("Page ");
-                    t.CurrentPageNumber();
-                    t.Span(" of ");
-                    t.TotalPages();
-                });
+                ComposeFooter(page.Footer());
 
                 // ── Content ──────────────────────────────────────────────────────
                 page.Content().Column(col =>
@@ -143,197 +127,137 @@ public sealed class SubmissionNotesRenderer
                     // ════════════════════════════════════════════════════════════
                     // Submission Comments — two equal-width columns side by side
                     // ════════════════════════════════════════════════════════════
-                    col.Item().Row(row =>
-                    {
-                        // Left half: Submission Comments
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Spacing(2);
-                            c.Item().Text("Submission Comments").Bold();
-                            c.Item().Text(submissionComments);
-                        });
-
-                        // 20pt gutter between the two columns
-                        row.ConstantItem(20);
-
-                        // Right half: Submission Status Comments
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Spacing(2);
-                            c.Item().Text("Submission Status Comments").Bold();
-                            c.Item().Text(submissionStatusComment);
-                        });
-                    });
+                    ComposeSubmissionComments(col, submissionComments, submissionStatusComment);
 
                     // ════════════════════════════════════════════════════════════
                     // SECTION 1 — Submission tissue comments (SubmissionTissues)
                     // Heading/column headers always render; only data rows vary.
                     // ════════════════════════════════════════════════════════════
-                    col.Item().Column(section =>
-                    {
-                        section.Spacing(2);
-                        section.Item().Text("Submission tissue comments:").Bold().Italic();
-                        section.Item().Table(t =>
-                        {
-                            t.ColumnsDefinition(c =>
-                            {
-                                c.RelativeColumn(25); // SenderRef
-                                c.RelativeColumn(25); // Tissue Code
-                                c.RelativeColumn(25); // Tissue Comment
-                                c.RelativeColumn(25); // Tissue Archive Comment
-                            });
-
-                            foreach (var heading in TissueCommentHeaders)
-                                t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
-
-                            t.Cell().ColumnSpan(4).LineHorizontal(0.5f);
-
-                            foreach (var r in tissueRows)
-                            {
-                                t.Cell().PaddingVertical(2).Text(Field(r, "SenderRef"));
-                                t.Cell().PaddingVertical(2).Text(Field(r, "TissueCode"));
-                                t.Cell().PaddingVertical(2).Text(Field(r, "TissueComment"));
-                                t.Cell().PaddingVertical(2).Text(Field(r, "TissueArchiveComment"));
-                            }
-                        });
-                    });
+                    ComposeNotesSection(col, "Submission tissue comments:", TissueCommentHeaders,
+                        [SenderRefColumn, "TissueCode", "TissueComment", "TissueArchiveComment"], tissueRows);
 
                     // ════════════════════════════════════════════════════════════
                     // SECTION 2 — Submission blocks comments (SubmissionBlocks)
                     // Heading/column headers always render; only data rows vary.
                     // ════════════════════════════════════════════════════════════
-                    col.Item().Column(section =>
-                    {
-                        section.Spacing(2);
-                        section.Item().Text("Submission blocks comments:").Bold().Italic();
-                        section.Item().Table(t =>
-                        {
-                            t.ColumnsDefinition(c =>
-                            {
-                                c.RelativeColumn(25); // SenderRef
-                                c.RelativeColumn(25); // Block Ref
-                                c.RelativeColumn(25); // Block Comment
-                                c.RelativeColumn(25); // Block Archive Comment
-                            });
-
-                            foreach (var heading in BlockCommentHeaders)
-                                t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
-
-                            t.Cell().ColumnSpan(4).LineHorizontal(0.5f);
-
-                            foreach (var r in blockRows)
-                            {
-                                t.Cell().PaddingVertical(2).Text(Field(r, "SenderRef"));
-                                t.Cell().PaddingVertical(2).Text(Field(r, "BlockRef"));
-                                t.Cell().PaddingVertical(2).Text(Field(r, "BlockComment"));
-                                t.Cell().PaddingVertical(2).Text(Field(r, "BlockArchiveComment"));
-                            }
-                        });
-                    });
+                    ComposeNotesSection(col, "Submission blocks comments:", BlockCommentHeaders,
+                        [SenderRefColumn, BlockRefColumn, "BlockComment", "BlockArchiveComment"], blockRows);
 
                     // ════════════════════════════════════════════════════════════
                     // SECTION 3 — Histology tests comments (BlockHistology)
                     // Heading/column headers always render; only data rows vary.
                     // ════════════════════════════════════════════════════════════
-                    col.Item().Column(section =>
-                    {
-                        section.Spacing(2);
-                        section.Item().Text("Histology tests comments:").Bold().Italic();
-                        section.Item().Table(t =>
-                        {
-                            t.ColumnsDefinition(c =>
-                            {
-                                c.RelativeColumn(25); // Block Ref
-                                c.RelativeColumn(25); // Test
-                                c.RelativeColumn(25); // Test Comment
-                                c.RelativeColumn(25); // Test Archive Comment
-                            });
-
-                            foreach (var heading in TestCommentHeaders)
-                                t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
-
-                            t.Cell().ColumnSpan(4).LineHorizontal(0.5f);
-
-                            foreach (var r in histologyRows)
-                            {
-                                t.Cell().PaddingVertical(2).Text(Field(r, "BlockRef"));
-                                t.Cell().PaddingVertical(2).Text(Field(r, "Test"));
-                                t.Cell().PaddingVertical(2).Text(Field(r, "TestComment"));
-                                t.Cell().PaddingVertical(2).Text(Field(r, "TestArchiveComment"));
-                            }
-                        });
-                    });
+                    ComposeNotesSection(col, "Histology tests comments:", TestCommentHeaders, TestCommentFields, histologyRows);
 
                     // ════════════════════════════════════════════════════════════
                     // SECTION 4 — Special stain tests comments (BlockSpecialStain)
                     // Heading/column headers always render; only data rows vary.
                     // ════════════════════════════════════════════════════════════
-                    col.Item().Column(section =>
-                    {
-                        section.Spacing(2);
-                        section.Item().Text("Special stain tests comments:").Bold().Italic();
-                        section.Item().Table(t =>
-                        {
-                            t.ColumnsDefinition(c =>
-                            {
-                                c.RelativeColumn(25); // Block Ref
-                                c.RelativeColumn(25); // Test
-                                c.RelativeColumn(25); // Test Comment
-                                c.RelativeColumn(25); // Test Archive Comment
-                            });
-
-                            foreach (var heading in TestCommentHeaders)
-                                t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
-
-                            t.Cell().ColumnSpan(4).LineHorizontal(0.5f);
-
-                            foreach (var r in specialStainRows)
-                            {
-                                t.Cell().PaddingVertical(2).Text(Field(r, "BlockRef"));
-                                t.Cell().PaddingVertical(2).Text(Field(r, "Test"));
-                                t.Cell().PaddingVertical(2).Text(Field(r, "TestComment"));
-                                t.Cell().PaddingVertical(2).Text(Field(r, "TestArchiveComment"));
-                            }
-                        });
-                    });
+                    ComposeNotesSection(col, "Special stain tests comments:", TestCommentHeaders, TestCommentFields, specialStainRows);
 
                     // ════════════════════════════════════════════════════════════
                     // SECTION 5 — Antibodies tests comments (BlockAntibodies)
                     // Heading/column headers always render; only data rows vary.
                     // ════════════════════════════════════════════════════════════
-                    col.Item().Column(section =>
-                    {
-                        section.Spacing(2);
-                        section.Item().Text("Antibodies tests comments:").Bold().Italic();
-                        section.Item().Table(t =>
-                        {
-                            t.ColumnsDefinition(c =>
-                            {
-                                c.RelativeColumn(25); // BlockRef
-                                c.RelativeColumn(25); // Test
-                                c.RelativeColumn(25); // Test Comment
-                                c.RelativeColumn(25); // Test Archive Comment
-                            });
-
-                            foreach (var heading in TestCommentHeadersWithoutBlockRef)
-                                t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
-
-                            t.Cell().ColumnSpan(4).LineHorizontal(0.5f);
-
-                            foreach (var r in antibodyRows)
-                            {
-                                t.Cell().PaddingVertical(2).Text(Field(r, "BlockRef"));
-                                t.Cell().PaddingVertical(2).Text(Field(r, "Test"));
-                                t.Cell().PaddingVertical(2).Text(Field(r, "TestComment"));
-                                t.Cell().PaddingVertical(2).Text(Field(r, "TestArchiveComment"));
-                            }
-                        });
-                    });
+                    ComposeNotesSection(col, "Antibodies tests comments:", TestCommentHeadersWithoutBlockRef, TestCommentFields, antibodyRows);
                 });
             });
         }).GeneratePdf();
 
         return Task.FromResult(pdf);
+    }
+
+    private static string SubmissionField(DataRow? row, string column)
+        => row is not null ? Field(row, column) : string.Empty;
+
+    private static List<DataRow> TableRows(DataSet ds, string tableName)
+        => ds.Tables[tableName]?.Rows.Cast<DataRow>().ToList() ?? [];
+
+    private static void ComposeHeader(IContainer container, string submissionNumber, string reportDate)
+    {
+        container.Column(headerCol =>
+        {
+            headerCol.Item().Row(header =>
+            {
+                // Left: bold label + bold submission number (both bold, per visual reference)
+                header.RelativeItem().Text(t =>
+                {
+                    t.Span("Submission notes for Submission:  ").Bold();
+                    t.Span(submissionNumber).Bold();
+                });
+                // Right: today's date
+                header.RelativeItem().AlignRight().Text(reportDate);
+            });
+            // Full-width rule under the title, per visual reference (SubmissionNotes-image.png).
+            headerCol.Item().PaddingTop(2).PaddingBottom(8).LineHorizontal(0.5f);
+        });
+    }
+
+    private static void ComposeFooter(IContainer container)
+    {
+        container.AlignRight().Text(t =>
+        {
+            t.Span("Page ");
+            t.CurrentPageNumber();
+            t.Span(" of ");
+            t.TotalPages();
+        });
+    }
+
+    private static void ComposeSubmissionComments(ColumnDescriptor col, string comments, string statusComments)
+    {
+        col.Item().Row(row =>
+        {
+            row.RelativeItem().Column(c =>
+            {
+                c.Spacing(2);
+                c.Item().Text("Submission Comments").Bold();
+                c.Item().Text(comments);
+            });
+
+            // 20pt gutter between the two columns
+            row.ConstantItem(20);
+
+            row.RelativeItem().Column(c =>
+            {
+                c.Spacing(2);
+                c.Item().Text("Submission Status Comments").Bold();
+                c.Item().Text(statusComments);
+            });
+        });
+    }
+
+    private static void ComposeNotesSection(
+        ColumnDescriptor col,
+        string title,
+        string[] headers,
+        string[] fields,
+        List<DataRow> rows)
+    {
+        col.Item().Column(section =>
+        {
+            section.Spacing(2);
+            section.Item().Text(title).Bold().Italic();
+            section.Item().Table(t =>
+            {
+                t.ColumnsDefinition(c =>
+                {
+                    for (var i = 0; i < 4; i++)
+                        c.RelativeColumn(25);
+                });
+
+                foreach (var heading in headers)
+                    t.Cell().PaddingVertical(2).Text(heading).FontSize(8);
+
+                t.Cell().ColumnSpan(4).LineHorizontal(0.5f);
+
+                foreach (var r in rows)
+                {
+                    foreach (var field in fields)
+                        t.Cell().PaddingVertical(2).Text(Field(r, field));
+                }
+            });
+        });
     }
 
     /// <summary>

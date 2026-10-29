@@ -1,0 +1,31 @@
+@using Histo.Submissions.Models
+@model Histo.Web.Pages.Shared.BlockHistologyCells
+@{
+    var columns = new List<(string Code, string Prefix, string Label)>
+    {
+        (HistologyCode.Archive, "archive", "Archived"),
+        (HistologyCode.EO, "eo", "EO"),
+        (HistologyCode.HAndE, "hande", "H&E")
+    };
+    if (Model.IsTse)
+    {
+        columns.Add((HistologyCode.HeBse, "hebse", "H&E (BSE)"));
+        columns.Add((HistologyCode.IhcPrp, "ihcprp", "IHC Prp"));
+    }
+    else
+    {
+        columns.Add((HistologyCode.IhcOther, "ihcother", "IHC Other"));
+    }
+    columns.Add((HistologyCode.SpecialStain, "stain", "Special stain"));
+}
+@foreach (var c in columns)
+{
+    <td class="govuk-table__cell">
+        <div class="govuk-checkboxes govuk-checkboxes--small">
+            <div class="govuk-checkboxes__item">
+                <input type="checkbox" class="govuk-checkboxes__input" disabled checked="@Model.Codes.Contains(c.Code)" id="@(c.Prefix)-@Model.BlockId" />
+                <label class="govuk-label govuk-checkboxes__label" for="@(c.Prefix)-@Model.BlockId"><span class="govuk-visually-hidden">@c.Label</span></label>
+            </div>
+        </div>
+    </td>
+}

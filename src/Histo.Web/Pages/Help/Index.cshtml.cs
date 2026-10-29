@@ -19,5 +19,8 @@ public class HelpModel : HistoPageModel
 {
     public HelpModel(ISessionService session) : base(session) { }
 
-    public void OnGet() { }
+    public void OnGet()
+    {
+        // Static page: the view needs no model data.
+    }
 }

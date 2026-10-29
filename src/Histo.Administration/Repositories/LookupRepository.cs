@@ -15,6 +15,9 @@ namespace Histo.Administration.Repositories;
 /// </summary>
 public sealed class LookupRepository : ILookupRepository
 {
+    private const string DescriptionKey = "Description";
+    private const string IsActiveKey = "IsActive";
+
     private readonly IDbConnectionFactory _db;
 
     public LookupRepository(IDbConnectionFactory db) => _db = db;
@@ -219,8 +222,8 @@ public sealed class LookupRepository : ILookupRepository
         // UserID in insert parameters — only in update parameters. Pass only the columns
         // the SP expects: Description, IsActive, and Area (for area-scoped tables 18/19).
         var parameters = new DynamicParameters();
-        parameters.Add("Description", item.Name);
-        parameters.Add("IsActive", item.Active);
+        parameters.Add(DescriptionKey, item.Name);
+        parameters.Add(IsActiveKey, item.Active);
         // Code-keyed tables (e.g. Archive Location 16, QC Code 14, Remedial Action 15)
         // have a required @Code parameter on their insert SPs. Pass it when present.
         if (!string.IsNullOrEmpty(item.Code))
@@ -262,8 +265,8 @@ public sealed class LookupRepository : ILookupRepository
         {
             parameters.Add("ID", item.ID);
         }
-        parameters.Add("Description", item.Name);
-        parameters.Add("IsActive",    item.Active);
+        parameters.Add(DescriptionKey, item.Name);
+        parameters.Add(IsActiveKey,    item.Active);
         parameters.Add("UserID",      userId);
 
         using var conn = _db.CreateConnection();
@@ -287,7 +290,7 @@ public sealed class LookupRepository : ILookupRepository
         return new LookupItem
         {
             ID     = d.TryGetValue("Code",        out var code) ? ToIntSafe(code)               : 0,
-            Name   = d.TryGetValue("Description", out var desc) ? Convert.ToString(desc) ?? ""   : "",
+            Name   = d.TryGetValue(DescriptionKey, out var desc) ? Convert.ToString(desc) ?? ""   : "",
             Active = true,
         };
     }
@@ -306,8 +309,8 @@ public sealed class LookupRepository : ILookupRepository
         return new LookupItem
         {
             ID = d.TryGetValue("ID", out var id) ? ToIntSafe(id) : 0,
-            Name = d.TryGetValue("Description", out var desc) ? Convert.ToString(desc) ?? "" : "",
-            Active = d.TryGetValue("IsActive", out var active) ? Convert.ToBoolean(active) : true,
+            Name = d.TryGetValue(DescriptionKey, out var desc) ? Convert.ToString(desc) ?? "" : "",
+            Active = !d.TryGetValue(IsActiveKey, out var active) || Convert.ToBoolean(active),
             // Trimmed: several lookup Code columns are fixed-width char(n), so values come back
             // space-padded and fail exact-match comparisons against codes stored elsewhere.
             Code = d.TryGetValue("Code", out var code) ? Convert.ToString(code)?.Trim() : null,
@@ -326,7 +329,7 @@ public sealed class LookupRepository : ILookupRepository
         return new EditableLookup
         {
             ID                    = d.TryGetValue("ID",                    out var id)    ? ToIntSafe(id)                : 0,
-            TableName             = d.TryGetValue("Description",           out var desc)  ? Convert.ToString(desc) ?? "" : "",
+            TableName             = d.TryGetValue(DescriptionKey,           out var desc)  ? Convert.ToString(desc) ?? "" : "",
             SelectStoredProcedure = d.TryGetValue("SelectStoredProcedure", out var sel)   ? Convert.ToString(sel)  ?? "" : "",
             UpdateStoredProcedure = d.TryGetValue("UpdateStoredProcedure", out var upd)   ? Convert.ToString(upd)  ?? "" : "",
             InsertStoredProcedure = d.TryGetValue("InsertStoredProcedure", out var ins)   ? Convert.ToString(ins)  ?? "" : "",
@@ -372,13 +375,13 @@ public sealed class LookupRepository : ILookupRepository
         string name;
         if (d.TryGetValue("Name", out var nameVal) && nameVal is not null)
             name = nameVal.ToString()!;
-        else if (d.TryGetValue("Description", out var descVal) && descVal is not null)
+        else if (d.TryGetValue(DescriptionKey, out var descVal) && descVal is not null)
             name = descVal.ToString()!;
         else
             name = string.Empty;
 
         bool active;
-        if (d.TryGetValue("IsActive", out var isActiveVal) && isActiveVal is not null)
+        if (d.TryGetValue(IsActiveKey, out var isActiveVal) && isActiveVal is not null)
             active = Convert.ToBoolean(isActiveVal);
         else if (d.TryGetValue("Active", out var activeVal) && activeVal is not null)
             active = Convert.ToBoolean(activeVal);

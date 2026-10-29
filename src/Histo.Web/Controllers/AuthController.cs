@@ -80,7 +80,7 @@ public sealed class AuthController : ControllerBase
         var saml2AuthnResponse = new Saml2AuthnResponse(_saml2Config);
 
         // ReadSamlResponse validates the assertion signature and status.
-        binding.ReadSamlResponse(Request.ToGenericHttpRequest(), saml2AuthnResponse);
+        binding.ReadSamlResponse(await Request.ToGenericHttpRequestAsync(), saml2AuthnResponse);
 
         if (saml2AuthnResponse.Status != Saml2StatusCodes.Success)
         {

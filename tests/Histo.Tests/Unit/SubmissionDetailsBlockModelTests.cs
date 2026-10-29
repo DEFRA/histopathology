@@ -20,8 +20,11 @@ namespace Histo.Tests.Unit;
 /// editable-only-while-unset behaviour for the Create/Edit/View Submission journey
 /// (<c>SampleSummary</c>), with zero change to that journey's outcome.
 /// </summary>
-public class SubmissionDetailsBlockModelTests
+public partial class SubmissionDetailsBlockModelTests
 {
+    [System.Text.RegularExpressions.GeneratedRegex(@"<input[^>]*type=""checkbox""[^>]*name=""blockIds""[^>]*/>")]
+    private static partial System.Text.RegularExpressions.Regex BlockIdsCheckboxRegex();
+
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<ISubmissionService> _submissions = new();
     private readonly Mock<IBlockService> _blocks = new();
@@ -354,6 +357,30 @@ public class SubmissionDetailsBlockModelTests
     }
 
     [Fact]
+    public async Task OnPostBackAsync_NoBatchInContext_RedirectsToIndex()
+    {
+        var sut = CreateSut(1, new Animal { ID = 1, SenderRef = "S1" }, "/Submissions/SampleSummary?batchId=5");
+        sut.BatchId = null;
+
+        var result = await sut.OnPostBackAsync();
+
+        Assert.Equal("/Index", Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result).PageName);
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostSaveHistologyDetailsAsync_NoBatchInContext_RedirectsToIndex()
+    {
+        var sut = CreateSut(1, new Animal { ID = 1, SenderRef = "S1" }, "/Submissions/SampleSummary?batchId=5");
+        sut.BatchId = null;
+
+        var result = await sut.OnPostSaveHistologyDetailsAsync();
+
+        Assert.Equal("/Index", Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result).PageName);
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task OnPostBackAsync_PreExistingHistologyRefNoBlocks_LeavesRefAlone()
     {
         var animal = new Animal { ID = 1, SenderRef = "S1", HistoRefSet = true, HistologyRef = "26/40001" };
@@ -615,7 +642,7 @@ public class SubmissionDetailsBlockModelTests
         Assert.NotNull(dir);
 
         var markup = File.ReadAllText(Path.Combine(dir!.FullName, "src", "Histo.Web", "Pages", "Submissions", "SubmissionDetailsBlock.cshtml"));
-        var checkbox = System.Text.RegularExpressions.Regex.Match(markup, @"<input[^>]*type=""checkbox""[^>]*name=""blockIds""[^>]*/>");
+        var checkbox = BlockIdsCheckboxRegex().Match(markup);
 
         Assert.True(checkbox.Success, "Block select checkbox not found.");
         Assert.Contains("disabled=\"@(Model.IsViewMode ? \"disabled\" : null)\"", checkbox.Value);

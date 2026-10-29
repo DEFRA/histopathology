@@ -6,6 +6,7 @@ using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
+using Histo.Web.Pages.Shared;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.RegularExpressions;
 
@@ -261,12 +262,9 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         if (PMDateLocked) EditPMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
 
         var histoRefError = await ValidateHistologyRefAsync(EditHistologyRef, Animal.HistologyRef);
-        if (histoRefError is null)
-        {
-            // Legacy btSubmit_Click → ValidateData: Done needs at least one block on the sample.
-            if (!await HasCompletedBlockAsync(Animal.ID))
-                histoRefError = "At least one block must be added against the sample.";
-        }
+        // Legacy btSubmit_Click → ValidateData: Done needs at least one block on the sample.
+        if (histoRefError is null && !await HasCompletedBlockAsync(Animal.ID))
+            histoRefError = "At least one block must be added against the sample.";
         if (histoRefError is not null)
         {
             ErrorMessage = histoRefError;
@@ -328,26 +326,23 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
 
-        if (!IsViewMode && HrAssignedThisVisit && Animal is { HistoRefSet: true })
+        if (!IsViewMode && HrAssignedThisVisit && Animal is { HistoRefSet: true } && !await HasCompletedBlockAsync(Animal.ID))
         {
-            if (!await HasCompletedBlockAsync(Animal.ID))
+            await _submissions.UpdateAnimalAsync(new Animal
             {
-                await _submissions.UpdateAnimalAsync(new Animal
-                {
-                    ID = Animal.ID,
-                    BatchSubmissionID = Animal.BatchSubmissionID,
-                    SenderRef = Animal.SenderRef,
-                    NextBlockRef = Animal.NextBlockRef,
-                    HistoRefSet = false,
-                    HistologyRef = null,
-                    OnHold = Animal.OnHold,
-                    PMDate = Animal.PMDate,
-                    PMDateSet = Animal.PMDateSet,
-                    IsPGNumber = Animal.IsPGNumber,
-                    BookedHistologyRef = Animal.BookedHistologyRef,
-                    RowStamp = Animal.RowStamp,
-                }, Session.UserID);
-            }
+                ID = Animal.ID,
+                BatchSubmissionID = Animal.BatchSubmissionID,
+                SenderRef = Animal.SenderRef,
+                NextBlockRef = Animal.NextBlockRef,
+                HistoRefSet = false,
+                HistologyRef = null,
+                OnHold = Animal.OnHold,
+                PMDate = Animal.PMDate,
+                PMDateSet = Animal.PMDateSet,
+                IsPGNumber = Animal.IsPGNumber,
+                BookedHistologyRef = Animal.BookedHistologyRef,
+                RowStamp = Animal.RowStamp,
+            }, Session.UserID);
         }
 
         return LocalRedirect(BackLinkPage);
@@ -497,7 +492,7 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         {
             ErrorMessage = "Select exactly one block to edit.";
             var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
-            Blocks = allBlocks.Where(b => b.AnimalID == Animal!.ID).ToList();
+            Blocks = allBlocks.Where(b => b.AnimalID == Animal.ID).ToList();
             await LoadSupportingDataAsync();
             return Page();
         }
@@ -734,10 +729,7 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         // abandoned (backed out of, or never finished) block never shows as a blank row in this
         // summary; a block that completed Done always has at least one tissue by construction.
         Blocks = Blocks.Where(b => allTissues.Any(t => t.OwnerID == b.ID)).ToList();
-        var tissuesByBlockId = new Dictionary<int, IReadOnlyList<Tissue>>();
-        foreach (var block in Blocks)
-            tissuesByBlockId[block.ID] = allTissues.Where(t => t.OwnerID == block.ID).ToList();
-        TissuesByBlockId = tissuesByBlockId;
+        TissuesByBlockId = BlockGridLoader.GroupTissuesByBlock(Blocks, allTissues);
 
         // All 7 grid indicator columns (Archive/EO/H&E/H&E-BSE/IHC-PrP/IHC-Other/Special Stain)
         // are Histology test-type codes — see the HistologyOptions doc comment. Wrapped because
@@ -745,14 +737,7 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         try
         {
             HistologyOptions = await _lookups.GetHistologyTypesAsync();
-
-            // GetByBatchAsync excludes Special Stain/IHC-PrP/IHC-Other (worklist-only exclusion) —
-            // these grid checkboxes need every code, so they must use GetAllSelectionsByBatchAsync.
-            var allTests = await _blockTests.GetAllSelectionsByBatchAsync(BatchId ?? 0);
-            var histologyByBlock = new Dictionary<int, IReadOnlyList<string>>();
-            foreach (var block in Blocks)
-                histologyByBlock[block.ID] = allTests.Where(t => t.BlockID == block.ID && t.TestType == BlockTestType.Histology).Select(t => t.Code).ToList();
-            HistologyCodesByBlockId = histologyByBlock;
+            HistologyCodesByBlockId = await BlockGridLoader.LoadHistologyCodesByBlockAsync(_blockTests, BatchId ?? 0, Blocks);
         }
         catch (Exception ex)
         {

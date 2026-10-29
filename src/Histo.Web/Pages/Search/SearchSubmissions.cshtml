@@ -41,9 +41,9 @@
                 <label class="govuk-label" for="ProjectContractCode">Project or contract code</label>
                 <select class="govuk-select" asp-for="ProjectContractCode">
                     <option value="">-- Any --</option>
-                    @foreach (var p in Model.Projects)
+                    @foreach (var name in Model.Projects.Select(p => p.Name))
                     {
-                        <option value="@p.Name">@p.Name</option>
+                        <option value="@name">@name</option>
                     }
                 </select>
             </div>
@@ -51,9 +51,9 @@
                 <label class="govuk-label" for="ContactName">Pathologist</label>
                 <select class="govuk-select" asp-for="ContactName">
                     <option value="">-- Any --</option>
-                    @foreach (var c in Model.Contacts)
+                    @foreach (var name in Model.Contacts.Select(c => c.Name))
                     {
-                        <option value="@c.Name">@c.Name</option>
+                        <option value="@name">@name</option>
                     }
                 </select>
             </div>
@@ -225,7 +225,7 @@
                 </tr>
             </thead>
             <tbody class="govuk-table__body">
-                @foreach (var r in Model.PagedResults)
+                @foreach (var r in Model.GetPagedResults())
                 {
                     var isSelected = r.ID == Model.SelectedBatchId;
                     <tr class="govuk-table__row" @(isSelected ? "style=background-color:#bbd4ea" : "")>
