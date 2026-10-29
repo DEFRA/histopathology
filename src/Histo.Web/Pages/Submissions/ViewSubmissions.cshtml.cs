@@ -56,6 +56,9 @@ public class ViewSubmissionsModel : HistoPageModel
     private const int LookupContacts = 18;
     private const int LookupProjects = 19;
 
+    // A selected batch is client-supplied and drives the session, so it must be in the caller's area.
+    protected override int? RequestedBatchId => SelectedBatchId > 0 ? SelectedBatchId : null;
+
     public ViewSubmissionsModel(ISessionService session, IBatchService batches, IUserService users, ILookupService lookups,
         IBlockService blocks, ISubmissionService submissions, IBlockTestService tests)
         : base(session)

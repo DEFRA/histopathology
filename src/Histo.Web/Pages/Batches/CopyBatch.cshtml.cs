@@ -36,6 +36,9 @@ public class CopyBatchModel : HistoPageModel
     }
 
     [BindProperty] public int SourceBatchId { get; set; }
+
+    protected override int? RequestedBatchId =>
+        Histo.Web.Auth.RequestValues.GetPositiveInt(Request, "sourceBatchId", "SourceBatchId");
     [BindProperty] public List<AnimalRow> Animals { get; set; } = [];
 
     public IReadOnlyList<CopyBatchDisplayRow> DisplayRows => BuildDisplayRows(Animals);
