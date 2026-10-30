@@ -40,7 +40,7 @@ public partial class WriteFlowEndToEndTests(E2eHost host)
         return client.PostAsync(url, new FormUrlEncodedContent(form), TestContext.Current.CancellationToken);
     }
 
-    private Task<int> Count(string sql, params (string Name, object Value)[] p) => host.Database.ScalarAsync<int>(sql, p);
+    private Task<int> Count(string sql, params (string Name, object Value)[] p) => E2eDatabase.ScalarAsync<int>(sql, p);
 
     private Task<int> SamplesInBatchAsync(string senderRef, int batchId) =>
         Count("SELECT COUNT(*) FROM Animal a JOIN BatchSubmission s ON s.AnimalID = a.ID WHERE a.SenderRef = @r AND s.BatchID = @b",
@@ -93,9 +93,9 @@ public partial class WriteFlowEndToEndTests(E2eHost host)
 
     private async Task<int> SeedTissueAsync(int submissionId)
     {
-        var tissueCode = await host.Database.ScalarAsync<string>("SELECT TOP 1 TissueCode FROM BatchTissues WHERE TissueCode IS NOT NULL");
+        var tissueCode = await E2eDatabase.ScalarAsync<string>("SELECT TOP 1 TissueCode FROM BatchTissues WHERE TissueCode IS NOT NULL");
         Assert.False(string.IsNullOrEmpty(tissueCode), "Need an existing tissue code to seed with.");
-        return await host.Database.ScalarAsync<int>(
+        return await E2eDatabase.ScalarAsync<int>(
             "INSERT BatchTissues (BatchSubmissionID, TissueCode, NoPieces) VALUES (@s, @t, 1); SELECT SCOPE_IDENTITY();",
             ("@s", submissionId), ("@t", tissueCode!));
     }

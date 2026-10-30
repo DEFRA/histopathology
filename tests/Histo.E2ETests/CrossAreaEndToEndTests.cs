@@ -25,7 +25,7 @@ public partial class CrossAreaEndToEndTests(E2eHost host)
     private static string SampleSummary(int batchId) => $"/Submissions/SampleSummary?batchId={batchId}";
 
     private async Task<bool> ByPassSortAsync(int batchId) =>
-        await host.Database.ScalarAsync<bool>("SELECT ByPassSort FROM Batch WHERE ID = @id", ("@id", batchId));
+        await E2eDatabase.ScalarAsync<bool>("SELECT ByPassSort FROM Batch WHERE ID = @id", ("@id", batchId));
 
     private static async Task<string> TokenFromAsync(HttpClient client, string page)
     {

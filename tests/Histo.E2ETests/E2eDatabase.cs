@@ -31,7 +31,7 @@ public sealed class E2eDatabase : IAsyncDisposable
         return db;
     }
 
-    public async Task<T?> ScalarAsync<T>(string sql, params (string Name, object Value)[] parameters)
+    public static async Task<T?> ScalarAsync<T>(string sql, params (string Name, object Value)[] parameters)
     {
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync();
