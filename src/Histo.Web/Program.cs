@@ -107,6 +107,7 @@ try
     // A SQL Server health check (name "histology-db", tag "db") is planned for a later phase.
 
     // -- Razor Pages + MVC controllers (controllers needed for SAML2 endpoints) --
+    string[] anonymousPages = ["/AccessDenied", "/AccessibilityStatement", "/SessionError", "/Errors/ServiceProblem", "/Shared/Error"];
     builder.Services.AddRazorPages(options =>
                     {
                         options.Conventions.AddFolderApplicationModelConvention(
@@ -114,7 +115,7 @@ try
                         options.Conventions.AddFolderApplicationModelConvention(
                             "/AuditLog", model => model.Filters.Add(new Histo.Web.Auth.MaintenanceOnlyPageFilter()));
                         Histo.Web.Auth.GroupRestrictedPages.Apply(options);
-                        foreach (var page in new[] { "/AccessDenied", "/AccessibilityStatement", "/SessionError", "/Errors/ServiceProblem", "/Shared/Error" })
+                        foreach (var page in anonymousPages)
                             options.Conventions.AllowAnonymousToPage(page);
                     })
                     .AddSessionStateTempDataProvider();

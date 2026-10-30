@@ -107,7 +107,7 @@ public class AuthorizationFallbackAndAuditTests
 
         AuthorizationAudit.LogDenied(context, "batch outside user area", 3049);
 
-        var state = Assert.IsAssignableFrom<IReadOnlyList<KeyValuePair<string, object?>>>(Assert.Single(logger.States));
+        var state = Assert.IsType<IReadOnlyList<KeyValuePair<string, object?>>>(Assert.Single(logger.States), exactMatch: false);
         var values = state.ToDictionary(p => p.Key, p => p.Value);
         Assert.Equal(AuthorizationAudit.EventName, values["microsoft.custom_event.name"]);
         Assert.Equal("42", values["UserId"]);
@@ -128,8 +128,13 @@ public class AuthorizationFallbackAndAuditTests
     [Fact]
     public void LogDenied_WithoutContextOrServices_DoesNotThrow()
     {
-        AuthorizationAudit.LogDenied(null, "x");
-        AuthorizationAudit.LogDenied(new DefaultHttpContext(), "x");
+        var thrown = Record.Exception(() =>
+        {
+            AuthorizationAudit.LogDenied(null, "x");
+            AuthorizationAudit.LogDenied(new DefaultHttpContext(), "x");
+        });
+
+        Assert.Null(thrown);
     }
 
     [Fact]

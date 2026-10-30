@@ -13,16 +13,22 @@ public partial class WriteFlowEndToEndTests(E2eHost host)
     [GeneratedRegex("blockId=(\\d+)", RegexOptions.IgnoreCase)]
     private static partial Regex BlockIdPattern();
 
+    [GeneratedRegex("<[^>]+>")]
+    private static partial Regex HtmlTagPattern();
+
+    [GeneratedRegex(@"(Could not[^.]*\.|No pre-booked[^.]*\.|Enter a Histology[^.]*\.)")]
+    private static partial Regex PageMessagePattern();
+
     private TestUser Customer => TestUser.Customer(host.CustomerArea, host.CustomerUserId);
 
     private static void RequireDatabase(E2eHost h) =>
-        Assert.SkipUnless(h.Enabled, "Set HISTO_E2E_SERVER and HISTO_E2E_SOURCE_DB to run the database-backed end-to-end tests.");
+        Assert.SkipUnless(E2eHost.Enabled, "Set HISTO_E2E_SERVER and HISTO_E2E_SOURCE_DB to run the database-backed end-to-end tests.");
 
     private static async Task<string> TokenFromAsync(HttpClient client, string page)
     {
-        var response = await client.GetAsync(page);
+        var response = await client.GetAsync(page, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var match = TokenPattern().Match(await response.Content.ReadAsStringAsync());
+        var match = TokenPattern().Match(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         Assert.True(match.Success, $"Expected {page} to render a form with an antiforgery token.");
         return match.Groups[1].Value;
     }
@@ -31,7 +37,7 @@ public partial class WriteFlowEndToEndTests(E2eHost host)
     {
         var form = fields.ToDictionary(f => f.Key, f => f.Value);
         form["__RequestVerificationToken"] = token;
-        return client.PostAsync(url, new FormUrlEncodedContent(form));
+        return client.PostAsync(url, new FormUrlEncodedContent(form), TestContext.Current.CancellationToken);
     }
 
     private Task<int> Count(string sql, params (string Name, object Value)[] p) => host.Database.ScalarAsync<int>(sql, p);
@@ -75,7 +81,7 @@ public partial class WriteFlowEndToEndTests(E2eHost host)
         var senderRef = "E2E-" + Guid.NewGuid().ToString("N")[..8];
         // A Histo user can open both batches, so browsing the other batch leaves its submission in the session.
         using var client = host.App.CreateClientAs(TestUser.HistoUser(host.CustomerUserId));
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/Submissions/SampleSummary?batchId={host.OtherAreaBatchId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/Submissions/SampleSummary?batchId={host.OtherAreaBatchId}", TestContext.Current.CancellationToken)).StatusCode);
         var url = $"/Submissions/AddSubmission?batchId={host.OwnBatchId}";
         var token = await TokenFromAsync(client, url);
 
@@ -117,12 +123,12 @@ public partial class WriteFlowEndToEndTests(E2eHost host)
 
     private static async Task<int> ProvisionBlockAsync(HttpClient client, (int BatchId, int AnimalId, int SubmissionId) own)
     {
-        var add = await client.GetAsync($"/Blocks/BlockDetails?batchId={own.BatchId}&animalId={own.AnimalId}");
+        var add = await client.GetAsync($"/Blocks/BlockDetails?batchId={own.BatchId}&animalId={own.AnimalId}", TestContext.Current.CancellationToken);
         if (add.StatusCode != HttpStatusCode.Found)
         {
-            var html = await add.Content.ReadAsStringAsync();
-            var text = System.Text.RegularExpressions.Regex.Replace(html, "<[^>]+>", " ");
-            var error = System.Text.RegularExpressions.Regex.Match(text, @"(Could not[^.]*\.|No pre-booked[^.]*\.|Enter a Histology[^.]*\.)");
+            var html = await add.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+            var text = HtmlTagPattern().Replace(html, " ");
+            var error = PageMessagePattern().Match(text);
             // Pure origin/develop fails the same way against an older source schema, so this is an environment gap, not a regression.
             Assert.Skip($"Add block could not provision a block against this database ({add.StatusCode}; page message: {(error.Success ? error.Value : "none found")}).");
         }
