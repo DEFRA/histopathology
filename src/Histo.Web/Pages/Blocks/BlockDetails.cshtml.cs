@@ -389,6 +389,10 @@ public class BlockDetailsModel : HistoPageModel
         }
     }
 
+    /// <summary>Ownership check: the posted block ID must be one of the current batch's blocks.</summary>
+    private async Task<bool> BlockBelongsToBatchAsync(int blockId) =>
+        (await _blocks.GetByBatchAsync(BatchId ?? 0)).Any(b => b.ID == blockId);
+
     /// <summary>
     /// Legacy: btnCancel_Click — for a block still in the add flow (never reached a successful
     /// "Done"), Back discards it entirely rather than leaving an empty provisional row behind.
@@ -402,7 +406,7 @@ public class BlockDetailsModel : HistoPageModel
     /// </summary>
     public async Task<IActionResult> OnPostCancelAsync()
     {
-        if (IsAddFlow && BlockId is > 0)
+        if (IsAddFlow && BlockId is > 0 && await BlockBelongsToBatchAsync(BlockId.Value))
         {
             var tissues = await _submissions.GetTissuesByBlockAsync(BatchId ?? 0, BlockId.Value);
             Console.WriteLine($"[DIAG OnPostCancelAsync] Deleting {tissues.Count} tissue(s) and block {BlockId}.");

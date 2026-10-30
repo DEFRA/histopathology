@@ -114,6 +114,8 @@ try
                         options.Conventions.AddFolderApplicationModelConvention(
                             "/AuditLog", model => model.Filters.Add(new Histo.Web.Auth.MaintenanceOnlyPageFilter()));
                         Histo.Web.Auth.GroupRestrictedPages.Apply(options);
+                        foreach (var page in new[] { "/AccessDenied", "/AccessibilityStatement", "/SessionError", "/Errors/ServiceProblem", "/Shared/Error" })
+                            options.Conventions.AllowAnonymousToPage(page);
                     })
                     .AddSessionStateTempDataProvider();
     builder.Services.AddControllers(); // AuthController (SAML2 protocol endpoints)
@@ -134,6 +136,11 @@ try
     // Challenge via the cookie scheme so an expired cookie reaches OnRedirectToLogin (and the
     // /SessionError page) instead of going straight to Entra ID.
     builder.Services.AddAuthentication(o => o.DefaultChallengeScheme = "saml2");
+
+    // Deny by default: any endpoint without an explicit [AllowAnonymous] requires a signed-in user.
+    builder.Services.AddAuthorizationBuilder()
+        .SetFallbackPolicy(AuthorizationPolicies.FallbackRequireSignedIn())
+        .AddHistoPolicies();
 
     builder.Services.PostConfigure<CookieAuthenticationOptions>("saml2",
         options => StartupExtensions.ConfigureSamlCookie(options, idleTimeout));
@@ -215,7 +222,7 @@ try
 
     app.UseAuthorization();
 
-    app.MapHealthChecks("/health");
+    app.MapHealthChecks("/health").AllowAnonymous();
     app.MapControllers(); // AuthController — SAML2 /Saml2/* endpoints
     app.MapRazorPages();
 
@@ -223,7 +230,7 @@ try
 
     // Renamed to /Submissions/SampleSummary — "Block" is meaningless for Wet Tissue submissions.
     app.MapGet("/Submissions/BatchBlockSummary", (HttpRequest request) =>
-        Results.Redirect($"/Submissions/SampleSummary{request.QueryString}", permanent: true));
+        Results.Redirect($"/Submissions/SampleSummary{request.QueryString}", permanent: true)).AllowAnonymous();
 
     await app.RunAsync();
 }

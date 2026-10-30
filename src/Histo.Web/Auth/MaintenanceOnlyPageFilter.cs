@@ -19,8 +19,9 @@ public sealed class MaintenanceOnlyPageFilter : IAsyncPageFilter
             return;
         }
 
-        if (user.FindFirst(AppClaimTypes.GroupName)?.Value != MaintenanceGroup)
+        if (!AuthorizationPolicies.IsMaintenance(user))
         {
+            AuthorizationAudit.LogDenied(context.HttpContext, "group not permitted (Maintenance required)");
             context.Result = new ForbidResult();
             return;
         }

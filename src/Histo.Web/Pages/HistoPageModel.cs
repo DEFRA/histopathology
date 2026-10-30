@@ -51,6 +51,7 @@ public abstract class HistoPageModel : PageModel
         var groupName = User.FindFirst(AppClaimTypes.GroupName)?.Value;
         if (string.IsNullOrEmpty(groupName))
         {
+            AuthorizationAudit.LogDenied(context.HttpContext, "no active user record");
             context.Result = new RedirectToPageResult("/AccessDenied");
             return;
         }
@@ -94,7 +95,10 @@ public abstract class HistoPageModel : PageModel
     {
         var batch = await batches.GetByIdAsync(batchId);
         var allowed = BatchAccessDecision.IsAllowed(Session.IsHistoUser || Session.IsMaintenance, batch?.UserAreaCode, Session.UserAreaID);
-        return allowed ? null : Forbid();
+        if (allowed) return null;
+
+        AuthorizationAudit.LogDenied(HttpContext, "batch outside user area", batchId);
+        return Forbid();
     }
 }
 

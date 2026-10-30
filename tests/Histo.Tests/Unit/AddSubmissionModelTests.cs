@@ -450,6 +450,38 @@ public class AddSubmissionModelTests
     }
 
     [Fact]
+    public async Task OnPostAsync_StaleSubmissionIdFromAnotherBatch_AttachesTheSampleToThisBatchesSubmission()
+    {
+        _session.Object.BatchSubmissionID = 999;
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<BatchSubmission>)[new BatchSubmission { ID = 99, BatchID = 5, Order = 1 }]);
+        _submissions.Setup(s => s.AddAnimalAsync(99, "NewRef", 7, (string?)null, false, It.IsAny<CancellationToken>())).ReturnsAsync(123);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 999;
+        sut.SenderRef = "NewRef";
+
+        await sut.OnPostAsync();
+
+        _submissions.Verify(s => s.AddAnimalAsync(99, "NewRef", 7, (string?)null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _submissions.Verify(s => s.AddAnimalAsync(999, It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_StaleSubmissionIdAndNoSubmissionInBatch_CreatesADefaultSubmission()
+    {
+        _session.Object.BatchSubmissionID = 999;
+        _submissions.Setup(s => s.AddSubmissionAsync(It.Is<BatchSubmission>(b => b.BatchID == 5), 7, It.IsAny<CancellationToken>())).ReturnsAsync(200);
+        _submissions.Setup(s => s.AddAnimalAsync(200, "NewRef", 7, (string?)null, false, It.IsAny<CancellationToken>())).ReturnsAsync(123);
+        var sut = CreateSut(returnPage: null);
+        sut.BatchSubmissionId = 999;
+        sut.SenderRef = "NewRef";
+
+        await sut.OnPostAsync();
+
+        _submissions.Verify(s => s.AddAnimalAsync(200, "NewRef", 7, (string?)null, false, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task OnPostAsync_CopySubmissionReturnFlow_StagesTheUpdatedSenderRefWithoutCreatingSourceRecords()
     {
         _session.Object.BatchSubmissionID = 99;
