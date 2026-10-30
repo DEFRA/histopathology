@@ -16,20 +16,20 @@ public partial class CrossAreaEndToEndTests(E2eHost host)
     private TestUser Customer => TestUser.Customer(host.CustomerArea, host.CustomerUserId);
 
     private static void RequireDatabase(E2eHost h) =>
-        Assert.SkipUnless(h.Enabled, "Set HISTO_E2E_SERVER and HISTO_E2E_SOURCE_DB to run the database-backed end-to-end tests.");
+        Assert.SkipUnless(E2eHost.Enabled, "Set HISTO_E2E_SERVER and HISTO_E2E_SOURCE_DB to run the database-backed end-to-end tests.");
 
     private static bool IsDenied(HttpResponseMessage r) =>
         r.StatusCode == HttpStatusCode.Forbidden
         || (r.Headers.Location?.OriginalString.StartsWith("/AccessDenied", StringComparison.OrdinalIgnoreCase) ?? false);
 
-    private string SampleSummary(int batchId) => $"/Submissions/SampleSummary?batchId={batchId}";
+    private static string SampleSummary(int batchId) => $"/Submissions/SampleSummary?batchId={batchId}";
 
-    private async Task<bool> ByPassSortAsync(int batchId) =>
-        await host.Database.ScalarAsync<bool>("SELECT ByPassSort FROM Batch WHERE ID = @id", ("@id", batchId));
+    private static async Task<bool> ByPassSortAsync(int batchId) =>
+        await E2eDatabase.ScalarAsync<bool>("SELECT ByPassSort FROM Batch WHERE ID = @id", ("@id", batchId));
 
     private static async Task<string> TokenFromAsync(HttpClient client, string page)
     {
-        var html = await (await client.GetAsync(page)).Content.ReadAsStringAsync();
+        var html = await (await client.GetAsync(page, TestContext.Current.CancellationToken)).Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         var match = TokenPattern().Match(html);
         Assert.True(match.Success, "Expected the page to render a form with an antiforgery token.");
         return match.Groups[1].Value;
@@ -37,7 +37,7 @@ public partial class CrossAreaEndToEndTests(E2eHost host)
 
     private static Task<HttpResponseMessage> PostToggleAsync(HttpClient client, int batchId, string token) =>
         client.PostAsync($"/Submissions/SampleSummary?handler=ToggleByPassSort&batchId={batchId}",
-            new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = token }));
+            new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = token }), TestContext.Current.CancellationToken);
 
     [Fact]
     public async Task Customer_SeesTheirOwnAreasBatch_AndIsDeniedAnotherAreas()
@@ -45,8 +45,8 @@ public partial class CrossAreaEndToEndTests(E2eHost host)
         RequireDatabase(host);
         using var client = host.App.CreateClientAs(Customer);
 
-        var own = await client.GetAsync(SampleSummary(host.OwnBatchId));
-        var other = await client.GetAsync(SampleSummary(host.OtherAreaBatchId));
+        var own = await client.GetAsync(SampleSummary(host.OwnBatchId), TestContext.Current.CancellationToken);
+        var other = await client.GetAsync(SampleSummary(host.OtherAreaBatchId), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, own.StatusCode);
         Assert.True(IsDenied(other));
@@ -60,8 +60,8 @@ public partial class CrossAreaEndToEndTests(E2eHost host)
         foreach (var user in new[] { TestUser.HistoUser(host.CustomerUserId), TestUser.MaintenanceUser(host.CustomerUserId) })
         {
             using var client = host.App.CreateClientAs(user);
-            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(SampleSummary(host.OtherAreaBatchId))).StatusCode);
-            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(SampleSummary(host.OwnBatchId))).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(SampleSummary(host.OtherAreaBatchId), TestContext.Current.CancellationToken)).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(SampleSummary(host.OwnBatchId), TestContext.Current.CancellationToken)).StatusCode);
         }
     }
 
@@ -99,8 +99,8 @@ public partial class CrossAreaEndToEndTests(E2eHost host)
         RequireDatabase(host);
         using var client = host.App.CreateClientAs(Customer);
 
-        Assert.True(IsDenied(await client.GetAsync("/Admin/UserMaintenance")));
-        var search = await client.GetAsync("/Search/SearchMenu");
+        Assert.True(IsDenied(await client.GetAsync("/Admin/UserMaintenance", TestContext.Current.CancellationToken)));
+        var search = await client.GetAsync("/Search/SearchMenu", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Found, search.StatusCode);
     }
 
@@ -110,7 +110,7 @@ public partial class CrossAreaEndToEndTests(E2eHost host)
         RequireDatabase(host);
         using var client = host.App.CreateClientAs(TestUser.MaintenanceUser(host.CustomerUserId));
 
-        var response = await client.GetAsync("/Admin/UserMaintenance");
+        var response = await client.GetAsync("/Admin/UserMaintenance", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }

@@ -32,7 +32,7 @@ public sealed class E2eHost : IAsyncLifetime
 
     private Factory? _factory;
 
-    public bool Enabled => E2eDatabase.Enabled;
+    public static bool Enabled => E2eDatabase.Enabled;
     public E2eDatabase Database { get; private set; } = null!;
     public WebApplicationFactory<Program> App => _factory!;
 
@@ -51,12 +51,12 @@ public sealed class E2eHost : IAsyncLifetime
         // Areas with the most batches in the copy: one for the Customer, a different one for "someone else".
         CustomerArea = 3;
         OtherArea = 5;
-        CustomerUserId = await Database.ScalarAsync<int>("SELECT TOP 1 ID FROM [User] WHERE Active = 1 AND UserArea = @a ORDER BY ID", ("@a", CustomerArea));
-        OwnBatchId = await Database.ScalarAsync<int>("SELECT MAX(ID) FROM Batch WHERE SubmittedArea = @a", ("@a", CustomerArea.ToString()));
-        OtherAreaBatchId = await Database.ScalarAsync<int>("SELECT MAX(ID) FROM Batch WHERE SubmittedArea = @a", ("@a", OtherArea.ToString()));
+        CustomerUserId = await E2eDatabase.ScalarAsync<int>("SELECT TOP 1 ID FROM [User] WHERE Active = 1 AND UserArea = @a ORDER BY ID", ("@a", CustomerArea));
+        OwnBatchId = await E2eDatabase.ScalarAsync<int>("SELECT MAX(ID) FROM Batch WHERE SubmittedArea = @a", ("@a", CustomerArea.ToString()));
+        OtherAreaBatchId = await E2eDatabase.ScalarAsync<int>("SELECT MAX(ID) FROM Batch WHERE SubmittedArea = @a", ("@a", OtherArea.ToString()));
         Assert.True(CustomerUserId > 0 && OwnBatchId > 0 && OtherAreaBatchId > 0, "The source database has no suitable users or batches in the chosen areas.");
 
-        TestIdentity.UseHostSettings(Database.ConnectionString);
+        TestIdentity.UseHostSettings(E2eDatabase.ConnectionString);
         _factory = new Factory();
     }
 

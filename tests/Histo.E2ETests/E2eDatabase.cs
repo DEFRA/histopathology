@@ -16,7 +16,7 @@ public sealed class E2eDatabase : IAsyncDisposable
     public static string? SourceDb => Environment.GetEnvironmentVariable("HISTO_E2E_SOURCE_DB");
     public static bool Enabled => !string.IsNullOrWhiteSpace(Server) && !string.IsNullOrWhiteSpace(SourceDb);
 
-    public string ConnectionString =>
+    public static string ConnectionString =>
         $"Server={Server};Database={CopyName};Integrated Security=True;TrustServerCertificate=True;Encrypt=False;";
 
     private static string MasterConnectionString =>
@@ -27,11 +27,11 @@ public sealed class E2eDatabase : IAsyncDisposable
         var db = new E2eDatabase();
         await DropAsync();
         await RestoreFromSourceAsync();
-        await db.DeployRepoScriptsAsync();
+        await DeployRepoScriptsAsync();
         return db;
     }
 
-    public async Task<T?> ScalarAsync<T>(string sql, params (string Name, object Value)[] parameters)
+    public static async Task<T?> ScalarAsync<T>(string sql, params (string Name, object Value)[] parameters)
     {
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync();
@@ -88,7 +88,7 @@ public sealed class E2eDatabase : IAsyncDisposable
     }
 
     // sqlcmd resolves the manifest's ":r" includes relative to the script's own folder.
-    private async Task DeployRepoScriptsAsync()
+    private static async Task DeployRepoScriptsAsync()
     {
         var deployDir = FindDeployDirectory();
         var startInfo = new ProcessStartInfo("sqlcmd", $"-S \"{Server}\" -d {CopyName} -E -C -b -i Deploy.sql")

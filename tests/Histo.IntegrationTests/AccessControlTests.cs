@@ -90,8 +90,9 @@ public class AccessControlTests(HistoWebFactory factory)
 
     [Theory]
     [MemberData(nameof(HistoAndMaintenance))]
-    public async Task HistoOrMaintenancePages_AreOpenToHistoAndMaintenanceUsers(TestUser user)
+    public async Task HistoOrMaintenancePages_AreOpenToHistoAndMaintenanceUsers(string userName)
     {
+        var user = UserNamed(userName);
         var response = await GetAsync(user, "/Search/SearchMenu");
 
         Assert.False(IsDenied(response));
@@ -124,8 +125,9 @@ public class AccessControlTests(HistoWebFactory factory)
 
     [Theory]
     [MemberData(nameof(HistoAndMaintenance))]
-    public async Task HistoAndMaintenanceUsers_AreNotDeniedBatchesFromAnyArea(TestUser user)
+    public async Task HistoAndMaintenanceUsers_AreNotDeniedBatchesFromAnyArea(string userName)
     {
+        var user = UserNamed(userName);
         factory.AddBatch(100, areaCode: 7);
 
         var response = await GetAsync(user, "/Submissions/SubmissionDetails?batchId=100");
@@ -133,5 +135,7 @@ public class AccessControlTests(HistoWebFactory factory)
         Assert.False(IsDenied(response));
     }
 
-    public static TheoryData<TestUser> HistoAndMaintenance => new() { TestUser.Histo, TestUser.Maintenance };
+    public static TheoryData<string> HistoAndMaintenance => new() { "Histo", "Maintenance" };
+
+    private static TestUser UserNamed(string name) => name == "Histo" ? TestUser.Histo : TestUser.Maintenance;
 }
