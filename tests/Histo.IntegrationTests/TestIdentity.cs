@@ -30,7 +30,10 @@ public static class TestIdentity
     public static void UseHostSettings(string connectionString)
     {
         Environment.SetEnvironmentVariable("ConnectionStrings__HistologyDb", connectionString);
-        Environment.SetEnvironmentVariable("Saml2__IdPMetadataUrl", "");
+        Environment.SetEnvironmentVariable("AzureAd__TenantId", "00000000-0000-0000-0000-000000000001");
+        Environment.SetEnvironmentVariable("AzureAd__ClientId", "00000000-0000-0000-0000-000000000002");
+        Environment.SetEnvironmentVariable("AzureAd__ClientSecret", "integration-test-secret");
+        Environment.SetEnvironmentVariable("AzureAd__PublicOrigin", "https://localhost");
     }
 
     public static HttpClient CreateClientAs(this WebApplicationFactory<Program> factory, TestUser? user)

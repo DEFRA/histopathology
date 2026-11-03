@@ -12,20 +12,18 @@ using Histo.Web;
 using Histo.Web.Auth;
 using Histo.Web.Security;
 using Histo.Web.Services;
-using ITfoxtec.Identity.Saml2;
-using ITfoxtec.Identity.Saml2.MvcCore;
-using ITfoxtec.Identity.Saml2.MvcCore.Configuration;
-using ITfoxtec.Identity.Saml2.Schemas.Metadata;
 using Histo.Web.Telemetry;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Localization;
+using Microsoft.Identity.Web;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Serilog;
-using System.Security.Cryptography.X509Certificates;
 
 // Bootstrap Serilog before the host is built so startup errors are captured.
 Log.Logger = new LoggerConfiguration()
@@ -68,7 +66,7 @@ try
     // dev-cde.azure.defra.cloud terminates TLS and forwards to the App Service's
     // default hostname. Without this, Request.Scheme/Request.Host reflect the
     // origin (devcdewebaw1401.azurewebsites.net) rather than the public custom
-    // domain, causing absolute redirects (e.g. the SAML cookie challenge) to leak
+    // domain, causing absolute redirects (e.g. the OIDC redirect_uri) to leak
     // the origin hostname. Azure's edge proxy IPs are not fixed, so the default
     // KnownNetworks/KnownProxies allow-list is cleared to trust the forwarded
     // headers regardless of hop address.
@@ -106,7 +104,7 @@ try
     builder.Services.AddHealthChecks();
     // A SQL Server health check (name "histology-db", tag "db") is planned for a later phase.
 
-    // -- Razor Pages + MVC controllers (controllers needed for SAML2 endpoints) --
+    // -- Razor Pages + MVC controllers (controllers needed for the /auth endpoints) --
     string[] anonymousPages = ["/AccessDenied", "/AccessibilityStatement", "/SessionError", "/Errors/ServiceProblem", "/Shared/Error"];
     builder.Services.AddRazorPages(options =>
                     {
@@ -119,34 +117,79 @@ try
                             options.Conventions.AllowAnonymousToPage(page);
                     })
                     .AddSessionStateTempDataProvider();
-    builder.Services.AddControllers(); // AuthController (SAML2 protocol endpoints)
-    builder.Services.AddHttpClient();  // required for async IdP metadata loading post-build
+    builder.Services.AddControllers(); // AuthController (/auth/login, /auth/signout)
 
-    // -- Entra ID SAML2 authentication (Phase 1 — replaces ADR-006 bridge) -----
-    // Library: ITfoxtec.Identity.Saml2.MvcCore v4.20.1
-    // See: ENTRA-REGISTRATION.md for app registration checklist.
-    // See: docs/EntraID-Implementation-plan.md Phase B for migration steps.
-    var saml2Section = builder.Configuration.GetSection("Saml2");
+    // -- Entra ID OpenID Connect authentication -------------------------------
+    // Authorization code flow + PKCE via Microsoft.Identity.Web. See docs/ENTRA-REGISTRATION.md.
+    var azureAdSection = builder.Configuration.GetSection("AzureAd");
+    AzureAdConfigurationValidator.Validate(builder.Configuration);
+    var publicOrigin = azureAdSection["PublicOrigin"];
+    var forceLogin = azureAdSection.GetValue("ForceLogin", true);
 
-    var saml2Config = StartupExtensions.CreateSaml2Configuration(saml2Section);
+    builder.Services
+        .AddAuthentication(o =>
+        {
+            o.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+            // Challenge via the cookie scheme so an expired cookie reaches OnRedirectToLogin (and the
+            // /SessionError page) instead of going straight to Entra ID.
+            o.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        })
+        .AddMicrosoftIdentityWebApp(azureAdSection);
 
-    builder.Services.AddSingleton(saml2Config); // saml2Config ref captured for post-build metadata load below
+    builder.Services.AddScoped<OidcSignInHandler>();
 
-    builder.Services.AddSaml2(loginPath: "/Saml2/login", slidingExpiration: true, accessDeniedPath: "/AccessDenied");
+    // The registration signs ID tokens with an app-specific key, published only by the ?appid= metadata.
+    builder.Services.Configure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
+        options.MetadataAddress = OidcMetadata.AddressFor(azureAdSection));
 
-    // Challenge via the cookie scheme so an expired cookie reaches OnRedirectToLogin (and the
-    // /SessionError page) instead of going straight to Entra ID.
-    builder.Services.AddAuthentication(o => o.DefaultChallengeScheme = "saml2");
+    builder.Services.PostConfigure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
+    {
+        options.ResponseType = OpenIdConnectResponseType.Code;
+        options.UsePkce = true;
+        options.Scope.Add("email");
+
+        var originalRedirectToIdp = options.Events.OnRedirectToIdentityProvider;
+        options.Events.OnRedirectToIdentityProvider = async context =>
+        {
+            await originalRedirectToIdp(context);
+            OidcRedirects.ToIdentityProvider(context.ProtocolMessage, options.CallbackPath, publicOrigin, forceLogin);
+        };
+
+        var originalRedirectForSignOut = options.Events.OnRedirectToIdentityProviderForSignOut;
+        options.Events.OnRedirectToIdentityProviderForSignOut = async context =>
+        {
+            await originalRedirectForSignOut(context);
+            OidcRedirects.ToIdentityProviderForSignOut(context.ProtocolMessage, options.SignedOutCallbackPath, publicOrigin);
+        };
+
+        var originalTokenValidated = options.Events.OnTokenValidated;
+        options.Events.OnTokenValidated = async context =>
+        {
+            await originalTokenValidated(context);
+            await context.HttpContext.RequestServices.GetRequiredService<OidcSignInHandler>()
+                .OnTokenValidatedAsync(context.Principal);
+        };
+
+        options.Events.OnRemoteFailure = context =>
+        {
+            // Exception only — IdentityModel redacts PII; the response itself is never logged.
+            context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>()
+                .LogWarning(context.Failure, "OIDC sign-in failed at the callback.");
+            context.Response.Redirect("/AccessDenied");
+            context.HandleResponse();
+            return Task.CompletedTask;
+        };
+    });
 
     // Deny by default: any endpoint without an explicit [AllowAnonymous] requires a signed-in user.
     builder.Services.AddAuthorizationBuilder()
         .SetFallbackPolicy(AuthorizationPolicies.FallbackRequireSignedIn())
         .AddHistoPolicies();
 
-    builder.Services.PostConfigure<CookieAuthenticationOptions>("saml2",
-        options => StartupExtensions.ConfigureSamlCookie(options, idleTimeout));
+    builder.Services.PostConfigure<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme,
+        options => StartupExtensions.ConfigureAuthCookie(options, idleTimeout));
 
-    // Claims transformation — fallback DB lookup; normal path bakes claims in AuthController at ACS time.
+    // Claims transformation — per-request tblUser refresh; OidcSignInHandler bakes the claims in at sign-in.
     builder.Services.AddScoped<IClaimsTransformation, HistopathologyClaimsTransformation>();
 
     // -- Session --------------------------------------------------------------
@@ -187,11 +230,6 @@ try
 
     var app = builder.Build();
 
-    // -- Load IdP federation metadata (async — requires IHttpClientFactory from built container) --
-    // saml2Config is the same singleton object already registered; updating it here is safe
-    // because no requests are served until app.Run() is called.
-    await StartupExtensions.LoadIdpMetadataAsync(app, saml2Config);
-
     // -- Middleware pipeline --------------------------------------------------
     app.UseSecurityHeaders(sendHsts: !app.Environment.IsDevelopment());
     app.UseServiceProblemHandling();
@@ -217,14 +255,13 @@ try
     app.UseRouting();
     app.UseSession();
     app.UseAuthentication();
-    app.UseSaml2();         // ITfoxtec SAML2 middleware — must follow UseAuthentication
 
     app.UseSessionExpiryRedirect();
 
     app.UseAuthorization();
 
     app.MapHealthChecks("/health").AllowAnonymous();
-    app.MapControllers(); // AuthController — SAML2 /Saml2/* endpoints
+    app.MapControllers(); // AuthController — /auth/* endpoints
     app.MapRazorPages();
 
     app.MapSignIn();

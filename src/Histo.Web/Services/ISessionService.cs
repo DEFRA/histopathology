@@ -70,9 +70,9 @@ public interface ISessionService
 
     /// <summary>
     /// Hydrates all session identity fields from the claims attached to the authenticated
-    /// <see cref="System.Security.Claims.ClaimsPrincipal"/> after SAML sign-in.
+    /// <see cref="System.Security.Claims.ClaimsPrincipal"/> after Entra ID sign-in.
     /// Called by <see cref="Histo.Web.Pages.HistoPageModel"/> on the first request after
-    /// the SAML ACS redirect bakes app claims into the auth cookie.
+    /// the OIDC callback bakes app claims into the auth cookie.
     /// </summary>
     void PopulateFromClaims(System.Security.Claims.ClaimsPrincipal principal);
 

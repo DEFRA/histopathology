@@ -17,13 +17,13 @@ namespace Histo.Web.Pages;
 /// Two-gate access model:
 ///   Gate 1 — Authentication: checks <see cref="HttpContext.User.Identity.IsAuthenticated"/>.
 ///             If not authenticated, issues a ChallengeResult which redirects the browser to
-///             "/Saml2/login" (AuthController) → Entra ID → ACS → back to the requested page.
+///             "/auth/login" (AuthController) → Entra ID (OIDC) → /signin-oidc → back to the requested page.
 ///   Gate 2 — Authorisation: checks that the Entra ID user has an active row in tblUser
 ///             (confirmed by the presence of <see cref="AppClaimTypes.GroupName"/> claim).
 ///             If absent, redirects to AccessDenied.cshtml.
 ///
 /// On first authenticated request, user context (GroupName, UserID, etc.) is populated into
-/// the HTTP session from claims baked into the auth cookie at ACS time, so that the rest of
+/// the HTTP session from claims baked into the auth cookie at sign-in, so that the rest of
 /// the application can continue reading from <see cref="ISessionService"/> without change.
 /// </summary>
 public abstract class HistoPageModel : PageModel
@@ -40,10 +40,10 @@ public abstract class HistoPageModel : PageModel
         PageHandlerExecutionDelegate next)
     {
 
-        // Gate 1 — Authentication: redirect to Entra ID via SAML if not signed in.
+        // Gate 1 — Authentication: redirect to Entra ID if not signed in.
         if (User.Identity?.IsAuthenticated != true)
         {
-            context.Result = new ChallengeResult("saml2");
+            context.Result = new ChallengeResult(CookieAuthenticationDefaults.AuthenticationScheme);
             return;
         }
 

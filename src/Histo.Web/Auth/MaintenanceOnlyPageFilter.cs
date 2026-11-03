@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 
@@ -15,7 +16,7 @@ public sealed class MaintenanceOnlyPageFilter : IAsyncPageFilter
         var user = context.HttpContext.User;
         if (user.Identity?.IsAuthenticated != true)
         {
-            context.Result = new ChallengeResult("saml2");
+            context.Result = new ChallengeResult(CookieAuthenticationDefaults.AuthenticationScheme);
             return;
         }
 

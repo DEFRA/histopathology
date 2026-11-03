@@ -45,7 +45,7 @@ public class AccessControlTests(HistoWebFactory factory)
         var response = await GetAsync(null, path);
 
         Assert.Equal(HttpStatusCode.Found, response.StatusCode);
-        Assert.Contains("/Saml2/login", response.Headers.Location?.OriginalString);
+        Assert.Contains("/auth/login", response.Headers.Location?.OriginalString);
     }
 
     [Fact]
