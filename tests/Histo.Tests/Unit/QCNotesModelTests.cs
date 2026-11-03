@@ -57,7 +57,7 @@ public class QCNotesModelTests
 
         await sut.OnGetAsync();
 
-        Assert.Equal([3, 2, 1], sut.PagedEntries.Select(n => n.QCNoteRef).ToArray());
+        Assert.Equal([3, 2, 1], sut.GetPagedEntries().Select(n => n.QCNoteRef).ToArray());
     }
 
     [Fact]

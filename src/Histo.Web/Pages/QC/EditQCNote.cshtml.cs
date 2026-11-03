@@ -8,6 +8,8 @@ namespace Histo.Web.Pages.QC;
 /// <summary>Replaces <c>EditQCNote.aspx</c>.</summary>
 public class EditQCNoteModel : HistoPageModel
 {
+    private const string EditQcNoteTitle = "Edit QC Note";
+
     private readonly IQCNoteService _qc;
 
     public EditQCNoteModel(ISessionService session, IQCNoteService qc)
@@ -21,8 +23,8 @@ public class EditQCNoteModel : HistoPageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
-        ViewData["Title"] = "Edit QC Note";
-        ViewData["PageTitle"] = "Edit QC Note";
+        ViewData["Title"] = EditQcNoteTitle;
+        ViewData["PageTitle"] = EditQcNoteTitle;
         Note = await _qc.GetByIdAsync(NoteId);
         if (Note is null) return RedirectToPage("/QC/QCNotes");
         Text = Note.Text;
@@ -31,8 +33,8 @@ public class EditQCNoteModel : HistoPageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Edit QC Note";
-        ViewData["PageTitle"] = "Edit QC Note";
+        ViewData["Title"] = EditQcNoteTitle;
+        ViewData["PageTitle"] = EditQcNoteTitle;
         Note = await _qc.GetByIdAsync(NoteId);
         if (Note?.RowStamp is null) return RedirectToPage("/QC/QCNotes");
 

@@ -32,7 +32,7 @@ public class HistologyRefServiceTests
         _repo.Setup(r => r.DrawNextRefAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()))
             .ReturnsAsync("60002");
 
-        var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects);
+        var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects, ct: TestContext.Current.CancellationToken);
 
         Assert.Equal($"{ThisYear}/60002", result);
         _repo.Verify(r => r.GetCountersAsync(It.IsAny<CancellationToken>()), Times.Never);
@@ -50,7 +50,7 @@ public class HistologyRefServiceTests
                 new HistologyRef { Ref = $"{ThisYear}/60120" },
             ]);
 
-        var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects);
+        var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects, ct: TestContext.Current.CancellationToken);
 
         Assert.Equal($"{ThisYear}/60120", result);
         _repo.Verify(r => r.DrawNextRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -64,7 +64,7 @@ public class HistologyRefServiceTests
         _repo.Setup(r => r.DrawNextRefAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()))
             .ReturnsAsync("60002");
 
-        var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects);
+        var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects, ct: TestContext.Current.CancellationToken);
 
         Assert.Equal($"{ThisYear}/60002", result);
     }
@@ -75,7 +75,7 @@ public class HistologyRefServiceTests
         _repo.Setup(r => r.DrawNextRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
 
-        var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects);
+        var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects, ct: TestContext.Current.CancellationToken);
 
         Assert.Null(result);
     }
@@ -83,7 +83,7 @@ public class HistologyRefServiceTests
     [Fact]
     public async Task GetNextAvailableRefAsync_UnknownType_ReturnsNullWithoutHittingTheDatabase()
     {
-        var result = await CreateSut().GetNextAvailableRefAsync(999);
+        var result = await CreateSut().GetNextAvailableRefAsync(999, ct: TestContext.Current.CancellationToken);
 
         Assert.Null(result);
         _repo.Verify(r => r.DrawNextRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -103,7 +103,7 @@ public class HistologyRefServiceTests
         _repo.Setup(r => r.DrawNextRefAsync(HistologyRefTypeCode.GeneralPool, It.IsAny<CancellationToken>()))
             .ReturnsAsync(counterValue);
 
-        var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.GeneralPool);
+        var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.GeneralPool, ct: TestContext.Current.CancellationToken);
 
         Assert.Null(result);
     }
@@ -117,7 +117,7 @@ public class HistologyRefServiceTests
         _repo.Setup(r => r.DrawNextRefRunAsync(HistologyRefTypeCode.MouseProjects, 3, 60000, 90000, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<string>)["86236", "86237", "86238"]);
 
-        var result = await CreateSut().GetNextAvailableRefRunAsync(HistologyRefTypeCode.MouseProjects, 3);
+        var result = await CreateSut().GetNextAvailableRefRunAsync(HistologyRefTypeCode.MouseProjects, 3, ct: TestContext.Current.CancellationToken);
 
         Assert.Equal([$"{ThisYear}/86236", $"{ThisYear}/86237", $"{ThisYear}/86238"], result);
         _repo.Verify(r => r.GetUnusedRefsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -132,7 +132,7 @@ public class HistologyRefServiceTests
         _repo.Setup(r => r.DrawNextRefRunAsync(HistologyRefTypeCode.MouseProjects, 2, 60000, 90000, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<string>)["89999", "90000"]);
 
-        var result = await CreateSut().GetNextAvailableRefRunAsync(HistologyRefTypeCode.MouseProjects, 2);
+        var result = await CreateSut().GetNextAvailableRefRunAsync(HistologyRefTypeCode.MouseProjects, 2, ct: TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
     }
@@ -143,7 +143,7 @@ public class HistologyRefServiceTests
         _repo.Setup(r => r.DrawNextRefRunAsync(HistologyRefTypeCode.MouseProjects, 3, 60000, 90000, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<string>)["86236", "86237"]);
 
-        var result = await CreateSut().GetNextAvailableRefRunAsync(HistologyRefTypeCode.MouseProjects, 3);
+        var result = await CreateSut().GetNextAvailableRefRunAsync(HistologyRefTypeCode.MouseProjects, 3, ct: TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
     }
@@ -151,7 +151,7 @@ public class HistologyRefServiceTests
     [Fact]
     public async Task GetNextAvailableRefRunAsync_ZeroCount_DrawsNothing()
     {
-        var result = await CreateSut().GetNextAvailableRefRunAsync(HistologyRefTypeCode.MouseProjects, 0);
+        var result = await CreateSut().GetNextAvailableRefRunAsync(HistologyRefTypeCode.MouseProjects, 0, ct: TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
         _repo.Verify(r => r.DrawNextRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -165,7 +165,7 @@ public class HistologyRefServiceTests
         _repo.Setup(r => r.DrawNextRefAsync(HistologyRefTypeCode.GeneralPool, It.IsAny<CancellationToken>()))
             .ReturnsAsync(counterValue);
 
-        var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.GeneralPool);
+        var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.GeneralPool, ct: TestContext.Current.CancellationToken);
 
         Assert.Equal($"{ThisYear}/{counterValue}", result);
     }

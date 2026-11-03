@@ -5,8 +5,6 @@ namespace Histo.Submissions.Models;
 ///
 /// Legacy source: HistopathologyLib/clsAnimal.vb — DataTable columns produced by
 /// <c>GetBatchAnimal</c> (via <c>GetAnimalsForBatch</c>).
-///
-/// PG-number auto-reversal logic is in <see cref="Histo.Core.Domain.AnimalHelpers"/>.
 /// </summary>
 public sealed class Animal
 {

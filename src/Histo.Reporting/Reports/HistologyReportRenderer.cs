@@ -644,13 +644,5 @@ public static class HistologyReportRenderer
     /// Determines whether the RepeatBlock flag warrants a " *" suffix on BlockRef.
     /// Matches the <c>CreateBlockRefString</c> logic in SubmissionForm.aspx.vb.
     /// </summary>
-    private static bool IsRepeatBlock(string val)
-    {
-        if (string.IsNullOrWhiteSpace(val)) return false;
-        return val.Trim() switch
-        {
-            "0" or "false" or "False" or "FALSE" => false,
-            _ => true
-        };
-    }
+    private static bool IsRepeatBlock(string val) => IsChecked(val);
 }

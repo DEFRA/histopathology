@@ -23,25 +23,25 @@ public class SubmissionServiceImportedDataTests
     {
         var rows = new List<ImportedDataRow> { new() { SenderRef = "S1", Tissue = "Liver" } };
         _repoMock
-            .Setup(r => r.GetImportedDataAsync("3", default))
+            .Setup(r => r.GetImportedDataAsync("3", TestContext.Current.CancellationToken))
             .ReturnsAsync(rows);
 
         var sut = BuildSut();
-        var result = await sut.GetImportedDataAsync("3");
+        var result = await sut.GetImportedDataAsync("3", ct: TestContext.Current.CancellationToken);
 
-        Assert.Single(result);
-        Assert.Equal("S1", result[0].SenderRef);
+        var row = Assert.Single(result);
+        Assert.Equal("S1", row.SenderRef);
     }
 
     [Fact]
     public async Task GetImportedDataAsync_RepositoryThrows_ReturnsEmptyList()
     {
         _repoMock
-            .Setup(r => r.GetImportedDataAsync(It.IsAny<string?>(), default))
+            .Setup(r => r.GetImportedDataAsync(It.IsAny<string?>(), TestContext.Current.CancellationToken))
             .ThrowsAsync(new InvalidOperationException("DB error"));
 
         var sut = BuildSut();
-        var result = await sut.GetImportedDataAsync("3");
+        var result = await sut.GetImportedDataAsync("3", ct: TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
     }

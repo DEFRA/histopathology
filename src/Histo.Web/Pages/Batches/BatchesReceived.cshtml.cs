@@ -13,47 +13,31 @@ namespace Histo.Web.Pages.Batches;
 /// <c>grdBatches_SelectedIndexChanged</c> (SP <c>GetBatchWithStatus</c>, both redirect to
 /// <c>BatchBlocks.aspx</c> for a Received or InProgress submission).
 /// </summary>
-public class BatchesReceivedModel : GridPageModel
+public class BatchesReceivedModel : BatchListPageModelBase
 {
-    private readonly IBatchService _batches;
+    private const string BatchesReceivedTitle = "Batches received";
 
     public BatchesReceivedModel(ISessionService session, IBatchService batches)
-        : base(session) => _batches = batches;
+        : base(session, batches) { }
 
-    public IReadOnlyList<BatchListResult> Batches { get; private set; } = [];
+    protected override string ListTitle => BatchesReceivedTitle;
 
-    public int TotalCount => Batches.Count;
+    protected override Task<IReadOnlyList<BatchListResult>> FetchBatchesAsync() => BatchService.GetReceivedAsync();
 
-    public IReadOnlyList<BatchListResult> PagedEntries =>
-        (SortColumn switch
+    public IReadOnlyList<BatchListResult> GetPagedEntries() =>
+        TakePage(SortColumn switch
         {
-            "ID"                  => SortDesc ? Batches.OrderByDescending(b => b.ID)                  : Batches.OrderBy(b => b.ID),
-            "ProjectDescription"  => SortDesc ? Batches.OrderByDescending(b => b.ProjectDescription)  : Batches.OrderBy(b => b.ProjectDescription),
-            "ContactDescription"  => SortDesc ? Batches.OrderByDescending(b => b.ContactDescription)  : Batches.OrderBy(b => b.ContactDescription),
-            "Species"             => SortDesc ? Batches.OrderByDescending(b => b.Species)             : Batches.OrderBy(b => b.Species),
-            "BatchDate"           => SortDesc ? Batches.OrderByDescending(b => b.BatchDate)           : Batches.OrderBy(b => b.BatchDate),
-            "AllTissuesAssigned"  => SortDesc ? Batches.OrderByDescending(b => b.AllTissuesAssigned)  : Batches.OrderBy(b => b.AllTissuesAssigned),
+            "ID"                  => OrderBatches(b => b.ID),
+            "ProjectDescription"  => OrderBatches(b => b.ProjectDescription),
+            "ContactDescription"  => OrderBatches(b => b.ContactDescription),
+            "Species"             => OrderBatches(b => b.Species),
+            "BatchDate"           => OrderBatches(b => b.BatchDate),
+            "AllTissuesAssigned"  => OrderBatches(b => b.AllTissuesAssigned),
             // Legacy default (no column clicked yet): dtBatchesView.Sort = "ID DESC".
             _                     => Batches.OrderByDescending(b => b.ID),
-        })
-        .Skip((PageNumber - 1) * PageSize)
-        .Take(PageSize)
-        .ToList();
+        }, PageNumber);
 
-    /// <summary>Quick-Go: direct navigation by submission number.</summary>
-    [BindProperty]
-    public int? QuickGoId { get; set; }
-
-    /// <summary>Inline error message for Quick-Go validation failures.</summary>
-    public string? GoError { get; private set; }
-
-    public async Task OnGetAsync()
-    {
-        ViewData["Title"] = "Batches received";
-        ViewData["PageTitle"] = "Batches received";
-        Batches = await _batches.GetReceivedAsync();
-        PopulateGridViewData(TotalCount);
-    }
+    public async Task OnGetAsync() => await LoadListAsync();
 
     /// <summary>Row select — legacy source: <c>grdBatches_SelectedIndexChanged</c>, redirects to <c>BatchBlocks.aspx</c>.</summary>
     public IActionResult OnPostSelect(int batchId)
@@ -71,18 +55,11 @@ public class BatchesReceivedModel : GridPageModel
     /// </summary>
     public async Task<IActionResult> OnPostGoAsync()
     {
-        ViewData["Title"] = "Batches received";
-        ViewData["PageTitle"] = "Batches received";
-        Batches = await _batches.GetReceivedAsync();
-        PopulateGridViewData(TotalCount);
+        await LoadListAsync();
 
-        if (!QuickGoId.HasValue || QuickGoId.Value <= 0)
-        {
-            GoError = "Enter a submission number.";
-            return Page();
-        }
+        if (IsQuickGoIdMissing()) return Page();
 
-        var batch = await _batches.GetByIdAsync(QuickGoId.Value);
+        var batch = await BatchService.GetByIdAsync(QuickGoId.Value);
         // Legacy CheckBatchExists(..., Cassetted = 0): block-type (cassetted) submissions never go through Assign blocks.
         if (batch is null || batch.IsCassetted || batch.Status is not (BatchStatus.Received or BatchStatus.InProgress))
         {

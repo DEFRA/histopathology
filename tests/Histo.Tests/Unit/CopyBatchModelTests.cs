@@ -283,4 +283,85 @@ public class CopyBatchModelTests
         Assert.Contains("N1", json);
         Assert.Equal("True", sut.TempData["CopyBatch_IsCassetted"]);
     }
+
+    private void SetupSourceBatchData(IReadOnlyList<BatchSubmission> submissions, IReadOnlyList<Animal> blockAnimals, IReadOnlyList<Animal> animals)
+    {
+        _batches.Setup(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(MakeSourceBatch());
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(submissions);
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(blockAnimals);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(animals);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _lookups.Setup(l => l.GetLookupDataAsync(9, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Histo.Administration.Models.LookupItem>)[]);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_CassettedBatch_ListsBlockAnimalsOrderedBySenderRef()
+    {
+        SetupSourceBatchData(
+            [new BatchSubmission { ID = 900, BatchID = 10, AnimalID = 0, Order = 1 }],
+            [new Animal { ID = 2, SenderRef = "B" }, new Animal { ID = 1, SenderRef = "A" }],
+            []);
+
+        var sut = CreateSut();
+        await sut.OnGetAsync(10);
+
+        Assert.True(sut.IsCassetted);
+        Assert.Equal(["A", "B"], sut.Animals.Select(a => a.SenderRef));
+        _submissions.Verify(s => s.GetAnimalsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(901, 901)] // animal's own BatchSubmissionID is a real submission on this batch
+    [InlineData(555, 900)] // unknown BatchSubmissionID falls back to the first submission
+    public async Task OnGetAsync_AnimalWithoutOwnSubmissionRow_ResolvesSubmissionId(int animalBatchSubmissionId, int expectedSubmissionId)
+    {
+        SetupSourceBatchData(
+            [new BatchSubmission { ID = 900, BatchID = 10, AnimalID = 0, Order = 1 }, new BatchSubmission { ID = 901, BatchID = 10, AnimalID = 99, Order = 2 }],
+            [],
+            [new Animal { ID = 1, SenderRef = "A", BatchSubmissionID = animalBatchSubmissionId }]);
+
+        var sut = CreateSut();
+        await sut.OnGetAsync(10);
+
+        Assert.Equal(expectedSubmissionId, sut.Animals[0].SubmissionId);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_ReturningFromSenderRefPicker_RestoresAnimalsAndAppliesChosenRef()
+    {
+        _batches.Setup(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(MakeSourceBatch());
+        var sut = CreateSut();
+        sut.TempData["CopyBatch_Animals"] = System.Text.Json.JsonSerializer.Serialize(new List<CopyBatchModel.AnimalRow>
+        {
+            new() { AnimalId = 1, SenderRef = "A" },
+            new() { AnimalId = 2, SenderRef = "B" },
+        });
+        sut.TempData["CopyBatch_IsCassetted"] = "True";
+        sut.TempData["SenderRefPicker_Selected"] = "PICKED";
+        sut.TempData["CopyBatch_RowIndex"] = "1";
+
+        var result = await sut.OnGetAsync(10);
+
+        Assert.IsType<PageResult>(result);
+        Assert.True(sut.IsCassetted);
+        Assert.Equal(string.Empty, sut.Animals[0].NewSenderRef);
+        Assert.Equal("PICKED", sut.Animals[1].NewSenderRef);
+        _submissions.Verify(s => s.GetSubmissionsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_ReturningFromPickerWithOutOfRangeRow_LeavesNewSenderRefsUntouched()
+    {
+        _batches.Setup(b => b.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(MakeSourceBatch());
+        var sut = CreateSut();
+        sut.TempData["CopyBatch_Animals"] = System.Text.Json.JsonSerializer.Serialize(new List<CopyBatchModel.AnimalRow> { new() { AnimalId = 1, SenderRef = "A" } });
+        sut.TempData["SenderRefPicker_Selected"] = "PICKED";
+        sut.TempData["CopyBatch_RowIndex"] = "5";
+
+        await sut.OnGetAsync(10);
+
+        Assert.False(sut.IsCassetted);
+        Assert.Equal(string.Empty, sut.Animals[0].NewSenderRef);
+    }
 }

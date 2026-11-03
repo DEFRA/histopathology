@@ -33,9 +33,9 @@
                 <label class="govuk-label" for="ProjectContractCode">Project or contract code</label>
                 <select class="govuk-select" asp-for="ProjectContractCode">
                     <option value="">-- Any --</option>
-                    @foreach (var p in Model.Projects.Where(p => !string.IsNullOrWhiteSpace(p.Name)))
+                    @foreach (var name in Model.Projects.Where(p => !string.IsNullOrWhiteSpace(p.Name)).Select(p => p.Name))
                     {
-                        <option value="@p.Name">@p.Name</option>
+                        <option value="@name">@name</option>
                     }
                 </select>
             </div>
@@ -43,9 +43,9 @@
                 <label class="govuk-label" for="ContactName">Pathologist</label>
                 <select class="govuk-select" asp-for="ContactName">
                     <option value="">-- Any --</option>
-                    @foreach (var c in Model.Contacts.Where(c => !string.IsNullOrWhiteSpace(c.Name)))
+                    @foreach (var name in Model.Contacts.Where(c => !string.IsNullOrWhiteSpace(c.Name)).Select(c => c.Name))
                     {
-                        <option value="@c.Name">@c.Name</option>
+                        <option value="@name">@name</option>
                     }
                 </select>
             </div>
@@ -180,7 +180,7 @@
                 </tr>
             </thead>
             <tbody class="govuk-table__body">
-                @foreach (var r in Model.PagedResults)
+                @foreach (var r in Model.GetPagedResults())
                 {
                     var isSelected = r.ID == Model.SelectedBatchId;
                     <tr class="govuk-table__row" @(isSelected ? "style=background-color:#bbd4ea" : "")>
@@ -203,7 +203,7 @@
                                     value="@r.ID"
                                     class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0"
                                     data-module="govuk-button">
-                                Select
+                                Select<span class="govuk-visually-hidden"> submission @r.ID</span>
                             </button>
                         </td>
                     </tr>

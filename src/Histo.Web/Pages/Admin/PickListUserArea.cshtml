@@ -68,7 +68,7 @@
         </tr>
     </thead>
     <tbody class="govuk-table__body">
-        @foreach (var i in Model.PagedEntries)
+        @foreach (var i in Model.GetPagedEntries())
         {
             <tr class="govuk-table__row">
                 <td class="govuk-table__cell">@i.Name</td>

@@ -25,46 +25,46 @@ public class SubmissionServiceAnimalTests
     public async Task AddAnimalAsync_SetsNoHistologyRef()
     {
         _repoMock
-            .Setup(r => r.AddAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), default))
+            .Setup(r => r.AddAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), TestContext.Current.CancellationToken))
             .ReturnsAsync(1);
 
         var sut = BuildSut();
         await sut.AddAnimalAsync(
             batchSubmissionId: 1,
             senderRef: "PG012302",
-            userId: 1);
+            userId: 1, ct: TestContext.Current.CancellationToken);
 
         _repoMock.Verify(r => r.AddAnimalAsync(
             It.Is<Animal>(a => a.HistologyRef == null && !a.IsPGNumber),
             1,
-            default));
+            TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task AddAnimalAsync_SetsDefaultNextBlockRef_To01()
     {
         _repoMock
-            .Setup(r => r.AddAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), default))
+            .Setup(r => r.AddAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), TestContext.Current.CancellationToken))
             .ReturnsAsync(1);
 
         var sut = BuildSut();
-        await sut.AddAnimalAsync(1, "REF001", 1);
+        await sut.AddAnimalAsync(1, "REF001", 1, ct: TestContext.Current.CancellationToken);
 
         _repoMock.Verify(r => r.AddAnimalAsync(
             It.Is<Animal>(a => a.NextBlockRef == "01"),
             1,
-            default));
+            TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task AddAnimalAsync_RepositoryThrows_ReturnsZero()
     {
         _repoMock
-            .Setup(r => r.AddAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), default))
+            .Setup(r => r.AddAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), TestContext.Current.CancellationToken))
             .ThrowsAsync(new InvalidOperationException("DB error"));
 
         var sut = BuildSut();
-        var result = await sut.AddAnimalAsync(1, "REF001", 1);
+        var result = await sut.AddAnimalAsync(1, "REF001", 1, ct: TestContext.Current.CancellationToken);
 
         Assert.Equal(0, result);
         _loggerMock.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>(), It.IsAny<object[]>()));

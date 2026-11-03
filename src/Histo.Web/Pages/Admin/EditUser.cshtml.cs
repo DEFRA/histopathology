@@ -11,8 +11,10 @@ namespace Histo.Web.Pages.Admin;
 /// <c>UserMaintenance.aspx</c> grid (<c>clsUser.SaveUserData</c> update path via
 /// the <c>EditUser</c> stored procedure).
 /// </summary>
-public class EditUserModel : HistoPageModel, IUserFormFields
+public class EditUserModel : HistoPageModel, IUserForm
 {
+    private const string EditUserTitle = "Edit user";
+
     private readonly IUserService _users;
     private readonly ILookupService _lookups;
 
@@ -66,8 +68,8 @@ public class EditUserModel : HistoPageModel, IUserFormFields
 
     public async Task<IActionResult> OnGetAsync()
     {
-        ViewData["Title"] = "Edit user";
-        ViewData["PageTitle"] = "Edit user";
+        ViewData["Title"] = EditUserTitle;
+        ViewData["PageTitle"] = EditUserTitle;
         await LoadLookupsAsync();
 
         var user = (await _users.GetAllUsersAsync()).FirstOrDefault(u => u.UserID == UserId);
@@ -84,8 +86,8 @@ public class EditUserModel : HistoPageModel, IUserFormFields
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Edit user";
-        ViewData["PageTitle"] = "Edit user";
+        ViewData["Title"] = EditUserTitle;
+        ViewData["PageTitle"] = EditUserTitle;
         await LoadLookupsAsync();
 
         var existing = (await _users.GetAllUsersAsync()).FirstOrDefault(u => u.UserID == UserId);

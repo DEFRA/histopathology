@@ -53,7 +53,7 @@ public class SearchBlockRefsModel : GridPageModel
 
     public int TotalCount => Results.Count;
 
-    public IReadOnlyList<BlockRefRangeHelpers.BlockRefRangeRow> PagedResults =>
+    public IReadOnlyList<BlockRefRangeHelpers.BlockRefRangeRow> GetPagedResults() =>
         (SortColumn switch
         {
             "UnusedBlockRefs"    => SortDesc ? Results.OrderByDescending(r => r.UnusedBlockRefs)    : Results.OrderBy(r => r.UnusedBlockRefs),

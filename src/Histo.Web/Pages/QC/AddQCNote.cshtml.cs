@@ -14,6 +14,8 @@ namespace Histo.Web.Pages.QC;
 /// </summary>
 public class AddQCNoteModel : HistoPageModel
 {
+    private const string AddQcNoteTitle = "Add QC Note";
+
     private readonly IQCNoteService _qc;
 
     public AddQCNoteModel(ISessionService session, IQCNoteService qc)
@@ -26,16 +28,16 @@ public class AddQCNoteModel : HistoPageModel
 
     public IActionResult OnGet()
     {
-        ViewData["Title"] = "Add QC Note";
-        ViewData["PageTitle"] = "Add QC Note";
+        ViewData["Title"] = AddQcNoteTitle;
+        ViewData["PageTitle"] = AddQcNoteTitle;
         if (!Session.BatchID.HasValue) return RedirectToPage("/Index");
         return Page();
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Add QC Note";
-        ViewData["PageTitle"] = "Add QC Note";
+        ViewData["Title"] = AddQcNoteTitle;
+        ViewData["PageTitle"] = AddQcNoteTitle;
 
         if (!Session.BatchID.HasValue) return RedirectToPage("/Index");
 

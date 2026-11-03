@@ -19,6 +19,8 @@ namespace Histo.Web.Pages.Batches;
 /// </summary>
 public class EditBatchModel : HistoPageModel
 {
+    private const string EditSubmissionTitle = "Edit submission";
+
     private const int LookupContacts = 18;
     private const int LookupProjects = 19;
     private const int LookupFixation = 10;
@@ -148,8 +150,8 @@ public class EditBatchModel : HistoPageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
-        ViewData["Title"]     = "Edit submission";
-        ViewData["PageTitle"] = "Edit submission";
+        ViewData["Title"]     = EditSubmissionTitle;
+        ViewData["PageTitle"] = EditSubmissionTitle;
         if (Session.BatchID <= 0) return RedirectToPage("/Index");
 
         try { Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0); }
@@ -267,8 +269,8 @@ public class EditBatchModel : HistoPageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"]     = "Edit submission";
-        ViewData["PageTitle"] = "Edit submission";
+        ViewData["Title"]     = EditSubmissionTitle;
+        ViewData["PageTitle"] = EditSubmissionTitle;
 
         try { Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0); }
         catch (Exception ex) { SaveError = "Failed to load the submission. Please go back and try again."; _ = ex; await LoadLookupsAsync(); return Page(); }
@@ -280,81 +282,113 @@ public class EditBatchModel : HistoPageModel
         await LoadLockedTestCodesAsync(Batch.ID);
 
         // ---- Test-type validation (mirrors former EditBatchTestsModel) ----
-        if (SelectedHistologyCodes.Count == 0)
-        {
-            SaveError = "Select at least one histology type.";
-            return Page();
-        }
-        if (SelectedHistologyCodes.Contains(HistologyCode.Archive) && SelectedHistologyCodes.Count > 1)
-        {
-            SaveError = "Archive cannot be combined with other histology types.";
-            return Page();
-        }
-        if (SelectedHistologyCodes.Contains(HistologyCode.SpecialStain) && SelectedStainCodes.Count == 0)
-        {
-            SaveError = "Special Stain is selected — you must also select at least one special stain.";
-            return Page();
-        }
         var ihcSelected = SelectedHistologyCodes.Contains(HistologyCode.IhcPrp)
                        || SelectedHistologyCodes.Contains(HistologyCode.IhcOther);
-        if (ihcSelected && SelectedAntibodyCodes.Count == 0)
+        var validationError = await ValidateBeforeSaveAsync(Batch.ID, ihcSelected);
+        if (validationError is not null)
         {
-            SaveError = "IHC is selected — you must also select at least one antibody.";
-            return Page();
-        }
-
-        // Legacy source: BatchDetails.aspx.vb chkblHistology/Antibodies/SpecialStain_SelectedIndexChanged +
-        // HasTestBeenAllocated — a test type already ticked on a block can't be deselected at the batch
-        // level. Read before anything is saved; null means the read failed, which must not look like
-        // "nothing was previously selected" (that would silently let an in-use test through).
-        var previousTests = await _batches.TryGetBatchTestSelectionsAsync(Batch.ID);
-        if (previousTests is null)
-        {
-            SaveError = "Could not check existing test selections. Please try again.";
-            return Page();
-        }
-
-        bool DeselectedButAssigned(IEnumerable<string> previous, IReadOnlyList<string> nowSelected, IReadOnlyCollection<string> lockedCodes) =>
-            previous.Except(nowSelected, StringComparer.OrdinalIgnoreCase)
-                .Any(code => lockedCodes.Contains(code, StringComparer.OrdinalIgnoreCase));
-
-        if (DeselectedButAssigned(previousTests.Histology.Select(r => r.Code), SelectedHistologyCodes, LockedHistologyCodes)
-            || DeselectedButAssigned(previousTests.Antibodies.Select(r => r.Code), SelectedAntibodyCodes, LockedAntibodyCodes)
-            || DeselectedButAssigned(previousTests.Stains.Select(r => r.Code), SelectedStainCodes, LockedStainCodes))
-        {
-            SaveError = "The test cannot be de-selected as it has been assigned to a block.";
-            return Page();
-        }
-
-        // Legacy: rfvSafeToHandle — mandatory on both New and Edit (BatchDetails.aspx.vb ValidateMandatoryFields).
-        if (SafeToHandle is null)
-        {
-            SaveError = "Select whether the submission is adequately fixed.";
+            SaveError = validationError;
             return Page();
         }
 
         // ---- Parse BatchDate ----
         // Accepts both the manual DD/MM/YYYY format and the native date picker's ISO
         // yyyy-MM-dd format (the browser submits ISO regardless of display locale).
-        DateTime? batchDate = Batch.BatchDate;
-        if (!string.IsNullOrWhiteSpace(BatchDateStr))
+        if (!TryResolveBatchDate(out var batchDate))
         {
-            if (!DateTime.TryParseExact(BatchDateStr, ["dd/MM/yyyy", "d/M/yyyy", "yyyy-MM-dd"],
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.None, out var parsedDate))
-            {
-                SaveError = "Enter a valid date of submission in DD/MM/YYYY format.";
-                return Page();
-            }
-            batchDate = parsedDate;
+            SaveError = "Enter a valid date of submission in DD/MM/YYYY format.";
+            return Page();
         }
 
+        var updated = BuildUpdatedBatch(batchDate);
+
+        try
+        {
+            await _batches.UpdateAsync(updated, Session.UserID);
+        }
+        catch (Exception)
+        {
+            SaveError = "Failed to save the submission. Please try again.";
+            return Page();
+        }
+
+        // Clear stain/antibody selections if their triggering histology codes aren't selected.
+        var cleanedStainCodes    = ShowStains     ? SelectedStainCodes    : (IReadOnlyList<string>)[];
+        var cleanedAntibodyCodes = ihcSelected     ? SelectedAntibodyCodes : (IReadOnlyList<string>)[];
+        if (!await _batches.SaveBatchTestSelectionsAsync(Batch.ID, SelectedHistologyCodes, cleanedAntibodyCodes, cleanedStainCodes, Session.UserID))
+        {
+            SaveError = "Submission saved, but failed to save test types. Please try again.";
+            return Page();
+        }
+
+        return ProceedToSamples
+            ? RedirectToPage("/Submissions/SampleSummary", new { BatchId = Batch.ID })
+            : this.RedirectToReturnPage(ReturnPage, Session.ReturnPageQuery);
+    }
+
+    private async Task<string?> ValidateBeforeSaveAsync(int batchId, bool ihcSelected)
+    {
+        var testTypeError = ValidateTestTypeSelection(ihcSelected);
+        if (testTypeError is not null) return testTypeError;
+
+        // Legacy source: BatchDetails.aspx.vb HasTestBeenAllocated — a test type already ticked on a block can't be
+        // deselected at the batch level. Null means the read failed, which must not look like "nothing selected".
+        var previousTests = await _batches.TryGetBatchTestSelectionsAsync(batchId);
+        if (previousTests is null) return "Could not check existing test selections. Please try again.";
+
+        if (HasDeselectedAssignedTest(previousTests))
+            return "The test cannot be de-selected as it has been assigned to a block.";
+
+        // Legacy: rfvSafeToHandle — mandatory on both New and Edit.
+        if (SafeToHandle is null) return "Select whether the submission is adequately fixed.";
+
+        return null;
+    }
+
+    private string? ValidateTestTypeSelection(bool ihcSelected)
+    {
+        if (SelectedHistologyCodes.Count == 0)
+            return "Select at least one histology type.";
+        if (SelectedHistologyCodes.Contains(HistologyCode.Archive) && SelectedHistologyCodes.Count > 1)
+            return "Archive cannot be combined with other histology types.";
+        if (SelectedHistologyCodes.Contains(HistologyCode.SpecialStain) && SelectedStainCodes.Count == 0)
+            return "Special Stain is selected — you must also select at least one special stain.";
+        if (ihcSelected && SelectedAntibodyCodes.Count == 0)
+            return "IHC is selected — you must also select at least one antibody.";
+        return null;
+    }
+
+    private static bool DeselectedButAssigned(IEnumerable<string> previous, IReadOnlyList<string> nowSelected, IReadOnlyCollection<string> lockedCodes) =>
+        previous.Except(nowSelected, StringComparer.OrdinalIgnoreCase)
+            .Any(code => lockedCodes.Contains(code, StringComparer.OrdinalIgnoreCase));
+
+    private bool HasDeselectedAssignedTest(BatchTestSelections previousTests) =>
+        DeselectedButAssigned(previousTests.Histology.Select(r => r.Code), SelectedHistologyCodes, LockedHistologyCodes)
+        || DeselectedButAssigned(previousTests.Antibodies.Select(r => r.Code), SelectedAntibodyCodes, LockedAntibodyCodes)
+        || DeselectedButAssigned(previousTests.Stains.Select(r => r.Code), SelectedStainCodes, LockedStainCodes);
+
+    private bool TryResolveBatchDate(out DateTime? batchDate)
+    {
+        batchDate = Batch!.BatchDate;
+        if (string.IsNullOrWhiteSpace(BatchDateStr)) return true;
+
+        if (!DateTime.TryParseExact(BatchDateStr, ["dd/MM/yyyy", "d/M/yyyy", "yyyy-MM-dd"],
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var parsedDate))
+            return false;
+
+        batchDate = parsedDate;
+        return true;
+    }
+
+    private Batch BuildUpdatedBatch(DateTime? batchDate)
+    {
         // Legacy behaviour (per Help text): a Rejected submission reverts to Not Received
         // ("Submitted") when the customer edits and resubmits it — otherwise it stays stuck
         // as Rejected even though it has just been corrected and resubmitted.
-        var statusAfterSave = Batch.Status == BatchStatus.Rejected ? BatchStatus.Submitted : Batch.Status;
+        var statusAfterSave = Batch!.Status == BatchStatus.Rejected ? BatchStatus.Submitted : Batch.Status;
 
-        var updated = new Batch
+        return new Batch
         {
             ID                  = Batch.ID,
             Status              = statusAfterSave,
@@ -391,29 +425,6 @@ public class EditBatchModel : HistoPageModel
             ReceivedBy          = Batch.ReceivedBy,
             PostFixationOther   = Batch.PostFixationOther,
         };
-
-        try
-        {
-            await _batches.UpdateAsync(updated, Session.UserID);
-        }
-        catch (Exception)
-        {
-            SaveError = "Failed to save the submission. Please try again.";
-            return Page();
-        }
-
-        // Clear stain/antibody selections if their triggering histology codes aren't selected.
-        var cleanedStainCodes    = ShowStains     ? SelectedStainCodes    : (IReadOnlyList<string>)[];
-        var cleanedAntibodyCodes = ihcSelected     ? SelectedAntibodyCodes : (IReadOnlyList<string>)[];
-        if (!await _batches.SaveBatchTestSelectionsAsync(Batch.ID, SelectedHistologyCodes, cleanedAntibodyCodes, cleanedStainCodes, Session.UserID))
-        {
-            SaveError = "Submission saved, but failed to save test types. Please try again.";
-            return Page();
-        }
-
-        return ProceedToSamples
-            ? RedirectToPage("/Submissions/SampleSummary", new { BatchId = Batch.ID })
-            : this.RedirectToReturnPage(ReturnPage, Session.ReturnPageQuery);
     }
 
     private async Task LoadLookupsAsync()

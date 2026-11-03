@@ -83,8 +83,8 @@ public class LookupItemsModelTests
         await sut.OnGetAsync();
 
         Assert.Equal(15, sut.TotalCount);
-        Assert.Equal(10, sut.PagedEntries.Count);
-        Assert.Equal("C01", sut.PagedEntries.First().Code);
+        Assert.Equal(10, sut.GetPagedEntries().Count);
+        Assert.Equal("C01", sut.GetPagedEntries()[0].Code);
     }
 
     [Fact]
@@ -104,7 +104,76 @@ public class LookupItemsModelTests
 
         await sut.OnGetAsync();
 
-        Assert.Equal("Beta", sut.PagedEntries.First().Name);
+        Assert.Equal("Beta", sut.GetPagedEntries()[0].Name);
+    }
+
+    private async Task<LookupItemsModel> LoadAreaScopedPageAsync(string? sortColumn, bool sortDesc)
+    {
+        _lookups.Setup(l => l.ListEditableLookupsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<EditableLookup>)[new EditableLookup { ID = 18, TableName = "Pathologists" }]);
+        _lookups.Setup(l => l.GetLookupDataAsync(18, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[
+                new LookupItem { ID = 1, Area = "3", Name = "Zed", Active = true },
+                new LookupItem { ID = 2, Area = "4", Name = "Amy", Active = false },
+                new LookupItem { ID = 3, Area = "9", Name = "Mid", Active = true },
+            ]);
+        _lookups.Setup(l => l.GetUserAreasAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[
+                new LookupItem { ID = 3, Name = "Pathology" },
+                new LookupItem { ID = 4, Name = "Abattoir" },
+            ]);
+        var sut = CreateSut();
+        sut.TableId = 18;
+        sut.SortColumn = sortColumn;
+        sut.SortDesc = sortDesc;
+
+        await sut.OnGetAsync();
+        return sut;
+    }
+
+    [Fact]
+    public async Task GetPagedEntries_AreaScopedTable_DefaultSortUsesAreaNameFallingBackToRawArea()
+    {
+        var sut = await LoadAreaScopedPageAsync(null, false);
+
+        // Area names resolve to Abattoir/Pathology; unmatched area "9" keeps its raw value.
+        var entries = sut.GetPagedEntries();
+        Assert.Equal([3, 2, 1], entries.Select(i => i.ID).ToArray());
+        Assert.Equal("9", sut.FirstColumnValue(entries[0]));
+        Assert.Equal("Abattoir", sut.FirstColumnValue(entries[1]));
+        Assert.Equal("Pathology", sut.FirstColumnValue(entries[2]));
+    }
+
+    [Theory]
+    [InlineData("Code", false, new[] { 3, 2, 1 })]
+    [InlineData("Code", true, new[] { 1, 2, 3 })]
+    [InlineData("Description", false, new[] { 2, 3, 1 })]
+    [InlineData("Active", false, new[] { 2, 1, 3 })]
+    [InlineData("Active", true, new[] { 1, 3, 2 })]
+    public async Task GetPagedEntries_SortColumn_OrdersEntries(string column, bool desc, int[] expectedIds)
+    {
+        var sut = await LoadAreaScopedPageAsync(column, desc);
+
+        Assert.Equal(expectedIds, sut.GetPagedEntries().Select(i => i.ID).ToArray());
+    }
+
+    [Fact]
+    public async Task GetPagedEntries_SortByCodeOnCodeKeyedTable_OrdersByCode()
+    {
+        _lookups.Setup(l => l.ListEditableLookupsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<EditableLookup>)[new EditableLookup { ID = 16, TableName = "Archive Location" }]);
+        _lookups.Setup(l => l.GetLookupDataAsync(16, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupItem>)[
+                new LookupItem { ID = 1, Code = "B", Name = "One", Active = true },
+                new LookupItem { ID = 2, Code = "A", Name = "Two", Active = true },
+            ]);
+        var sut = CreateSut();
+        sut.TableId = 16;
+        sut.SortColumn = "Code";
+
+        await sut.OnGetAsync();
+
+        Assert.Equal([2, 1], sut.GetPagedEntries().Select(i => i.ID).ToArray());
     }
 
     [Fact]
@@ -124,7 +193,7 @@ public class LookupItemsModelTests
         await sut.OnGetAsync();
 
         Assert.Equal(1, sut.TotalCount);
-        Assert.Single(sut.PagedEntries);
+        Assert.Single(sut.GetPagedEntries());
     }
 }
 

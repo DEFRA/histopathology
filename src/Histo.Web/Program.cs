@@ -8,6 +8,7 @@ using Histo.QualityControl;
 using Histo.Reporting.Reports;
 using Histo.Reporting.Services;
 using Histo.Submissions;
+using Histo.Web;
 using Histo.Web.Auth;
 using Histo.Web.Security;
 using Histo.Web.Services;
@@ -50,26 +51,16 @@ try
            .ReadFrom.Services(services)
            .Enrich.FromLogContext()
            .WriteTo.Console();
-    }, writeToProviders: IsAzureMonitorConfigured(builder.Configuration));
+    }, writeToProviders: StartupExtensions.IsAzureMonitorConfigured(builder.Configuration));
 
     // -- Strongly-typed options -----------------------------------------------
     builder.Services.Configure<AppOptions>(
         builder.Configuration.GetSection(AppOptions.SectionName));
 
     // One idle timeout drives both the auth cookie and the server-side session.
-    const string AuthCookieName = "Histo.Auth";
-    const string SessionCookieName = "Histo.Session";
-    const string SessionMarkerKey = "SessionStarted";
     var idleTimeout = TimeSpan.FromMinutes(Math.Max(1, builder.Configuration.GetValue("Session:IdleTimeoutMinutes", 20)));
 
-    // Optional shared key ring so auth/session cookies survive restarts and scale-out.
-    var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
-    if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
-    {
-        builder.Services.AddDataProtection()
-            .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath))
-            .SetApplicationName("Histo.Web");
-    }
+    builder.AddSharedDataProtection();
 
     // -- Forwarded headers (reverse proxy / edge in front of App Service) -----
     // dev-cde.azure.defra.cloud terminates TLS and forwards to the App Service's
@@ -111,16 +102,19 @@ try
 
     // -- Health checks --------------------------------------------------------
     builder.Services.AddHealthChecks();
-    // TODO Phase 1+: add SQL health check:
-    //   .AddSqlServer(connectionString, name: "histology-db", tags: ["db"]);
+    // A SQL Server health check (name "histology-db", tag "db") is planned for a later phase.
 
     // -- Razor Pages + MVC controllers (controllers needed for the /auth endpoints) --
+    string[] anonymousPages = ["/AccessDenied", "/AccessibilityStatement", "/SessionError", "/Errors/ServiceProblem", "/Shared/Error"];
     builder.Services.AddRazorPages(options =>
                     {
                         options.Conventions.AddFolderApplicationModelConvention(
                             "/Admin", model => model.Filters.Add(new Histo.Web.Auth.MaintenanceOnlyPageFilter()));
                         options.Conventions.AddFolderApplicationModelConvention(
                             "/AuditLog", model => model.Filters.Add(new Histo.Web.Auth.MaintenanceOnlyPageFilter()));
+                        Histo.Web.Auth.GroupRestrictedPages.Apply(options);
+                        foreach (var page in anonymousPages)
+                            options.Conventions.AllowAnonymousToPage(page);
                     })
                     .AddSessionStateTempDataProvider();
     builder.Services.AddControllers(); // AuthController (/auth/login, /auth/signout)
@@ -183,64 +177,13 @@ try
         };
     });
 
-    // The default cookie challenge/forbid handlers build an ABSOLUTE redirect URI from
-    // Request.Scheme/Request.Host. Behind a reverse proxy that doesn't forward a trusted
-    // X-Forwarded-Host (or forwards headers UseForwardedHeaders isn't picking up), that
-    // leaks the App Service origin hostname instead of the public custom domain. Forcing
-    // a relative redirect removes the dependency on Request.Host entirely — the browser
-    // resolves it against whatever host is currently in the address bar.
-    builder.Services.PostConfigure<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme, options =>
-    {
-        options.Cookie.Name = AuthCookieName;
-        options.Cookie.HttpOnly = true;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        options.ExpireTimeSpan = idleTimeout;
-        options.SlidingExpiration = true;
-        options.LoginPath = "/auth/login";
-        options.AccessDeniedPath = "/AccessDenied";
-        // Keep challenges on the cookie handler so OnRedirectToLogin (and /SessionError) always runs.
-        options.ForwardChallenge = null;
+    // Deny by default: any endpoint without an explicit [AllowAnonymous] requires a signed-in user.
+    builder.Services.AddAuthorizationBuilder()
+        .SetFallbackPolicy(AuthorizationPolicies.FallbackRequireSignedIn())
+        .AddHistoPolicies();
 
-        var originalValidatePrincipal = options.Events.OnValidatePrincipal;
-        options.Events.OnValidatePrincipal = async context =>
-        {
-            await originalValidatePrincipal(context);
-            await SingleSessionPolicy.ValidateAsync(context);
-        };
-
-        var originalRedirectToLogin = options.Events.OnRedirectToLogin;
-        options.Events.OnRedirectToLogin = context =>
-        {
-            var request = context.Request;
-
-            // A leftover auth cookie means the user was signed in and timed out, not a first visit.
-            // /signin is exempt: it deletes the stale cookie but this request still carries it.
-            if (request.Headers.Accept.ToString().Contains("text/html", StringComparison.OrdinalIgnoreCase)
-                && request.Cookies.ContainsKey(AuthCookieName)
-                && !request.Path.StartsWithSegments("/signin"))
-            {
-                context.Response.Redirect("/SessionError");
-                return Task.CompletedTask;
-            }
-
-            if (Uri.TryCreate(context.RedirectUri, UriKind.Absolute, out var absoluteUri))
-                context.RedirectUri = absoluteUri.PathAndQuery;
-
-            // Only GET requests can be replayed after sign-in; anything else returns to the home page.
-            if (!HttpMethods.IsGet(request.Method))
-                context.RedirectUri = $"{options.LoginPath}?{options.ReturnUrlParameter}={Uri.EscapeDataString("/Index")}";
-
-            return originalRedirectToLogin(context);
-        };
-
-        var originalRedirectToAccessDenied = options.Events.OnRedirectToAccessDenied;
-        options.Events.OnRedirectToAccessDenied = context =>
-        {
-            if (Uri.TryCreate(context.RedirectUri, UriKind.Absolute, out var absoluteUri))
-                context.RedirectUri = absoluteUri.PathAndQuery;
-            return originalRedirectToAccessDenied(context);
-        };
-    });
+    builder.Services.PostConfigure<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme,
+        options => StartupExtensions.ConfigureAuthCookie(options, idleTimeout));
 
     // Claims transformation — per-request tblUser refresh; OidcSignInHandler bakes the claims in at sign-in.
     builder.Services.AddScoped<IClaimsTransformation, HistopathologyClaimsTransformation>();
@@ -250,7 +193,7 @@ try
     builder.Services.AddSession(o =>
     {
         o.IdleTimeout = idleTimeout;
-        o.Cookie.Name = SessionCookieName;
+        o.Cookie.Name = StartupExtensions.SessionCookieName;
         o.Cookie.HttpOnly = true;
         o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
         o.Cookie.IsEssential = true;
@@ -278,54 +221,14 @@ try
     builder.Services.AddTransient<HistologyReportDataSetBuilder>();
     builder.Services.AddTransient<QCNoteDataSetBuilder>();
     builder.Services.AddTransient<SubmissionNotesDataSetBuilder>();
-    builder.Services.AddTransient<SubmissionNotesRenderer>();
 
-    // -- Azure Monitor (OpenTelemetry) telemetry ------------------------------
-    // Matches the standard App Service setting name (APPLICATIONINSIGHTS_CONNECTION_STRING,
-    // top-level, the same key Azure's own extension uses). Skipped when unset (e.g. local dev).
-    // OpenTelemetry does not emit the Request-Context app-id response header.
-    if (IsAzureMonitorConfigured(builder.Configuration))
-    {
-        // Serilog forwards to the OpenTelemetry provider (writeToProviders), so the default
-        // providers are cleared here to avoid duplicate console output.
-        builder.Logging.ClearProviders();
-        builder.Services.AddOpenTelemetry().UseAzureMonitor(o =>
-            o.ConnectionString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]);
-    }
+    builder.AddAzureMonitorIfConfigured();
 
     var app = builder.Build();
 
     // -- Middleware pipeline --------------------------------------------------
     app.UseSecurityHeaders(sendHsts: !app.Environment.IsDevelopment());
-
-    if (app.Environment.IsDevelopment())
-    {
-        app.UseDeveloperExceptionPage();
-    }
-    else
-    {
-        // GDS "There is a problem with the service" for all unhandled 5xx. Explicitly tracks
-        // the exception (with URL/user context) before redirecting, so a genuinely unhandled
-        // failure is fully visible in Application Insights rather than just an opaque TraceId.
-        app.UseExceptionHandler(errorApp =>
-        {
-            errorApp.Run(context =>
-            {
-                var error = context.Features.Get<IExceptionHandlerPathFeature>()?.Error;
-                if (error is not null)
-                {
-                    var telemetry = context.RequestServices.GetRequiredService<TelemetryHelper>();
-                    telemetry.TrackException(error, "GlobalExceptionHandler", new Dictionary<string, string>
-                    {
-                        ["url"] = context.Request.Path.Value ?? string.Empty,
-                    });
-                }
-                context.Response.Redirect("/Errors/ServiceProblem");
-                return Task.CompletedTask;
-            });
-        });
-        app.UseStatusCodePagesWithReExecute("/Errors/ServiceProblem");
-    }
+    app.UseServiceProblemHandling();
 
     app.UseSerilogRequestLogging();
 
@@ -349,68 +252,34 @@ try
     app.UseSession();
     app.UseAuthentication();
 
-    // The auth cookie can outlive the server-side session (restart, idle expiry). A request that
-    // arrives signed in with a session cookie but no marker means the session expired -> timeout page.
-    // Static files are served earlier by UseStaticFiles and non-HTML requests are ignored.
-    string[] sessionExpirySkippedPaths = ["/health", "/auth", "/signin-oidc", "/signout-oidc", "/signout-callback-oidc", "/Errors", "/AccessDenied", "/SessionError", "/signin"];
-    app.Use(async (context, next) =>
-    {
-        if (context.User.Identity?.IsAuthenticated == true
-            && context.Request.Headers.Accept.ToString().Contains("text/html", StringComparison.OrdinalIgnoreCase)
-            && !sessionExpirySkippedPaths.Any(p => context.Request.Path.StartsWithSegments(p)))
-        {
-            await context.Session.LoadAsync();
-            if (context.Session.GetString(SessionMarkerKey) is null)
-            {
-                context.Session.SetString(SessionMarkerKey, "1");
-                if (context.Request.Cookies.ContainsKey(SessionCookieName))
-                {
-                    context.Response.Redirect("/SessionError");
-                    return;
-                }
-            }
-        }
-
-        await next();
-    });
+    app.UseSessionExpiryRedirect();
 
     app.UseAuthorization();
 
-    app.MapHealthChecks("/health");
+    app.MapHealthChecks("/health").AllowAnonymous();
     app.MapControllers(); // AuthController — /auth/* endpoints
     app.MapRazorPages();
 
-    // Re-sign-in after a timeout: drop the stale cookies, then challenge the cookie scheme, which
-    // routes to /auth/login with a return to the home page (locally the dev bypass skips this).
-    app.MapGet("/signin", (HttpContext context) =>
-    {
-        context.Response.Cookies.Delete(AuthCookieName);
-        context.Response.Cookies.Delete(SessionCookieName);
-
-        if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("DevAuth:BypassEntraId"))
-            return Results.Redirect("/Index");
-
-        return Results.Challenge(new AuthenticationProperties { RedirectUri = "/Index" }, [CookieAuthenticationDefaults.AuthenticationScheme]);
-    }).AllowAnonymous();
+    app.MapSignIn();
 
     // Renamed to /Submissions/SampleSummary — "Block" is meaningless for Wet Tissue submissions.
     app.MapGet("/Submissions/BatchBlockSummary", (HttpRequest request) =>
-        Results.Redirect($"/Submissions/SampleSummary{request.QueryString}", permanent: true));
+        Results.Redirect($"/Submissions/SampleSummary{request.QueryString}", permanent: true)).AllowAnonymous();
 
-    app.Run();
+    await app.RunAsync();
 }
-catch (Exception ex) when (ex is not HostAbortedException)
+catch (Exception ex) when (ex is not HostAbortedException && LogFatal(ex))
 {
-    Log.Fatal(ex, "Histo.Web terminated unexpectedly");
+    // Unreachable: LogFatal always returns false so the exception propagates after being logged.
     throw;
 }
 finally
 {
-    Log.CloseAndFlush();
+    await Log.CloseAndFlushAsync();
 }
 
-static bool IsAzureMonitorConfigured(IConfiguration configuration)
+static bool LogFatal(Exception ex)
 {
-    var connectionString = configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
-    return !string.IsNullOrWhiteSpace(connectionString) && !connectionString.StartsWith("__", StringComparison.Ordinal);
+    Log.Fatal(ex, "Histo.Web terminated unexpectedly");
+    return false;
 }

@@ -29,6 +29,8 @@ public class PrintSubmissionModel : HistoPageModel
 
     public Batch? Batch { get; private set; }
 
+    protected override int? RequestedBatchId => Session.BatchID;
+
     /// <summary>Mirrors legacy <c>EnableSubmissionNotes</c> — only offered when notes exist.</summary>
     public bool HasNotes { get; private set; }
 

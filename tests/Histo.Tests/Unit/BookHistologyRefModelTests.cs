@@ -105,6 +105,6 @@ public class BookHistologyRefModelTests
 
         var markup = File.ReadAllText(Path.Combine(dir!.FullName, "src", "Histo.Web", "Pages", "Bookings", "BookHistologyRef.cshtml"));
 
-        Assert.Contains("onclick=\"return confirm('Are you sure you want to book", markup);
+        Assert.Contains("data-confirm=\"Are you sure you want to book", markup);
     }
 }

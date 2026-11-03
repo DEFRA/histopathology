@@ -26,7 +26,7 @@ public class BlockServiceTests
             .Callback<Block, int, bool, CancellationToken>((b, _, _, _) => saved = b)
             .ReturnsAsync(99);
 
-        var id = await CreateSut().AddBlockAsync(5, 2, "01", ExistingOrders, 7, "CUST", "note", true, Ct);
+        var id = await CreateSut().AddBlockAsync(5, 2, "01", ExistingOrders, 7, new BlockOptions("CUST", "note", true), Ct);
 
         Assert.Equal(99, id);
         Assert.NotNull(saved);

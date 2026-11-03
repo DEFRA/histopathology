@@ -1,0 +1,18 @@
+@*
+    First four sortable headers shared by the batch list grids. Model = true renders
+    sentence-case labels ("Submission number"), false renders title-case ("Submission Number").
+*@
+@model bool
+@{
+    var labels = Model
+        ? new[] { "Submission number", "Project code" }
+        : new[] { "Submission Number", "Project Code" };
+}
+@{ ViewData["Label"] = labels[0]; ViewData["Column"] = "ID"; }
+<partial name="_SortableHeader" />
+@{ ViewData["Label"] = labels[1]; ViewData["Column"] = "ProjectDescription"; }
+<partial name="_SortableHeader" />
+@{ ViewData["Label"] = "Pathologist"; ViewData["Column"] = "ContactDescription"; }
+<partial name="_SortableHeader" />
+@{ ViewData["Label"] = "Species"; ViewData["Column"] = "Species"; }
+<partial name="_SortableHeader" />

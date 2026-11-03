@@ -53,7 +53,7 @@ public class TelemetryHelperTests
         CreateSut().TrackEvent("SubmissionCreated", new Dictionary<string, string> { ["BatchId"] = "5" });
 
         var invocation = _logger.Invocations.Single(i => i.Method.Name == nameof(ILogger.Log));
-        var state = Assert.IsAssignableFrom<IEnumerable<KeyValuePair<string, object?>>>(invocation.Arguments[2]).ToList();
+        var state = Assert.IsType<IEnumerable<KeyValuePair<string, object?>>>(invocation.Arguments[2], exactMatch: false).ToList();
         Assert.Equal(LogLevel.Information, (LogLevel)invocation.Arguments[0]);
         Assert.Contains(new KeyValuePair<string, object?>("microsoft.custom_event.name", "SubmissionCreated"), state);
         Assert.Contains(new KeyValuePair<string, object?>("BatchId", "5"), state);
@@ -65,7 +65,7 @@ public class TelemetryHelperTests
         CreateSut().TrackEvent("SamplesDispatched");
 
         var invocation = _logger.Invocations.Single(i => i.Method.Name == nameof(ILogger.Log));
-        var state = Assert.IsAssignableFrom<IEnumerable<KeyValuePair<string, object?>>>(invocation.Arguments[2]).ToList();
+        var state = Assert.IsType<IEnumerable<KeyValuePair<string, object?>>>(invocation.Arguments[2], exactMatch: false).ToList();
         var only = Assert.Single(state);
         Assert.Equal("SamplesDispatched", only.Value);
     }

@@ -1,0 +1,37 @@
+@*
+    Shared "Go directly to submission number" form for the batch list pages.
+    Set ViewData["GoErrorPlain"] = true to render the error as plain text instead of an anchor to the input.
+*@
+@model Histo.Web.Pages.Batches.IQuickGoModel
+@{
+    var plainError = ViewData["GoErrorPlain"] is true;
+}
+<div class="govuk-form-group">
+    @if (!string.IsNullOrEmpty(Model.GoError))
+    {
+        <div class="govuk-error-summary" data-module="govuk-error-summary">
+            <div role="alert">
+                <h2 class="govuk-error-summary__title">There is a problem</h2>
+                <div class="govuk-error-summary__body">
+                    <ul class="govuk-list govuk-error-summary__list">
+                        @if (plainError)
+                        {
+                            <li>@Model.GoError</li>
+                        }
+                        else
+                        {
+                            <li><a href="#QuickGoId">@Model.GoError</a></li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    }
+    <form method="post" asp-page-handler="Go">
+        <label class="govuk-label" asp-for="QuickGoId">Go directly to submission number</label>
+        <div class="app-field-with-button">
+            <input class="govuk-input govuk-input--width-10" type="number" asp-for="QuickGoId" min="1" />
+            <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Go</button>
+        </div>
+    </form>
+</div>

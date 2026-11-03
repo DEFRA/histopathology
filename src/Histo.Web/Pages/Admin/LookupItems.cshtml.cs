@@ -37,31 +37,33 @@ public class LookupItemsModel : GridPageModel
     public IReadOnlyDictionary<string, string> AreaNameById { get; private set; } = new Dictionary<string, string>();
     public string? StatusMessage { get; private set; }
 
-    private IReadOnlyList<LookupItem> FilteredItems =>
+    private List<LookupItem> GetFilteredItems() =>
         Items.Where(i => ShowDeactivated || i.Active).ToList();
 
-    public int TotalCount => FilteredItems.Count;
+    public int TotalCount => GetFilteredItems().Count;
 
     /// <summary>The value shown/sorted in the first column — Area name for area-scoped tables, Code (or ID) otherwise.</summary>
-    private string FirstColumnValue(LookupItem i) =>
-        ShowAreaColumn ? (AreaNameById.TryGetValue(i.Area ?? string.Empty, out var name) ? name : i.Area) ?? string.Empty
-                       : i.Code ?? i.ID.ToString();
-
-    public IReadOnlyList<LookupItem> PagedEntries
+    public string FirstColumnValue(LookupItem i)
     {
-        get
-        {
-            IOrderedEnumerable<LookupItem> sorted = SortColumn switch
-            {
-                "Code" => SortDesc ? FilteredItems.OrderByDescending(FirstColumnValue) : FilteredItems.OrderBy(FirstColumnValue),
-                "Description" => SortDesc ? FilteredItems.OrderByDescending(i => i.Name) : FilteredItems.OrderBy(i => i.Name),
-                "Active" => SortDesc ? FilteredItems.OrderByDescending(i => i.Active) : FilteredItems.OrderBy(i => i.Active),
-                _ => FilteredItems.OrderBy(FirstColumnValue),
-            };
-            return sorted.Skip((PageNumber - 1) * PageSize).Take(PageSize).ToList();
-        }
+        if (!ShowAreaColumn)
+            return i.Code ?? i.ID.ToString();
+
+        var area = i.Area ?? string.Empty;
+        return (AreaNameById.TryGetValue(area, out var name) ? name : i.Area) ?? string.Empty;
     }
 
+    public IReadOnlyList<LookupItem> GetPagedEntries()
+    {
+        var filtered = GetFilteredItems();
+        IOrderedEnumerable<LookupItem> sorted = SortColumn switch
+        {
+            "Code" => SortDesc ? filtered.OrderByDescending(FirstColumnValue) : filtered.OrderBy(FirstColumnValue),
+            "Description" => SortDesc ? filtered.OrderByDescending(i => i.Name) : filtered.OrderBy(i => i.Name),
+            "Active" => SortDesc ? filtered.OrderByDescending(i => i.Active) : filtered.OrderBy(i => i.Active),
+            _ => filtered.OrderBy(FirstColumnValue),
+        };
+        return sorted.Skip((PageNumber - 1) * PageSize).Take(PageSize).ToList();
+    }
     public async Task OnGetAsync()
     {
         ViewData["Title"] = "Pick list items";

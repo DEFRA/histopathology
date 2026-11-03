@@ -1,0 +1,13 @@
+@model Histo.Web.Pages.Archive.ArchiveFilter
+<div class="govuk-grid-column-one-third">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="@Model.Id">@Model.Label</label>
+        <select class="govuk-select" id="@Model.Id" name="@Model.Id">
+            <option value="">-- All --</option>
+            @foreach (var o in Model.Options)
+            {
+                <option value="@o" selected="@(Model.Selected == o)">@o</option>
+            }
+        </select>
+    </div>
+</div>

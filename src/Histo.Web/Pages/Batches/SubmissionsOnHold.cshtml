@@ -31,8 +31,8 @@
                     <td class="govuk-table__cell">@a.HistologyRef</td>
                     <td class="govuk-table__cell">
                         <div class="govuk-checkboxes__item">
-                            <input class="govuk-checkboxes__input" type="checkbox" name="OnHoldAnimalIds" value="@a.ID" checked="@a.OnHold" />
-                            <label class="govuk-label govuk-checkboxes__label"><span class="govuk-visually-hidden">On hold for @a.SenderRef</span></label>
+                            <input class="govuk-checkboxes__input" type="checkbox" name="OnHoldAnimalIds" value="@a.ID" checked="@a.OnHold" id="on-hold-@a.ID" />
+                            <label class="govuk-label govuk-checkboxes__label" for="on-hold-@a.ID"><span class="govuk-visually-hidden">On hold for @a.SenderRef</span></label>
                         </div>
                     </td>
                 </tr>

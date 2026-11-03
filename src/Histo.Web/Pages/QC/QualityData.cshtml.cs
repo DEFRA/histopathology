@@ -148,7 +148,7 @@ public class QualityDataModel : GridPageModel
 
     public string GetTestName(BlockTest t) => QCNoteText.TestName(_testNameMap, t);
 
-    public IReadOnlyList<BlockTest> PagedEntries =>
+    public IReadOnlyList<BlockTest> GetPagedEntries() =>
         (SortColumn switch
         {
             "BlockRef"    => SortDesc ? Tests.OrderByDescending(t => t.BlockRef)         : Tests.OrderBy(t => t.BlockRef),
@@ -203,7 +203,7 @@ public class QualityDataModel : GridPageModel
             .Where(n => !string.IsNullOrEmpty(n))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(n => n)
-            .ToList()!;
+            .ToList();
 
         Tests = ApplyCurrentFilter(allTests).ToList();
         NoteWarning = TempData[QCNoteText.WarningTempDataKey] as string;

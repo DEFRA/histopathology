@@ -1,5 +1,5 @@
-/****** Object:  StoredProcedure [dbo].[EditResetHistologyRef] ******/
-/****** ONE-TIME DEPLOYMENT SCRIPT — Safe to re-run via pipeline ******/
+-- Object:  StoredProcedure [dbo].[EditResetHistologyRef]
+-- ONE-TIME DEPLOYMENT SCRIPT — Safe to re-run via pipeline
 -- ============================================================================
 -- dbo.EditResetHistologyRef
 -- ============================================================================

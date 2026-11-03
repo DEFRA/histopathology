@@ -35,6 +35,8 @@ namespace Histo.Web.Pages.Batches;
 /// </summary>
 public class EditBatchTestsModel : HistoPageModel
 {
+    private const string EditTestTypesTitle = "Edit test types";
+
     // Legacy lookup table IDs (HistopathologySystem/Common.vb)
     private const int LookupTseAntibodies    = 4;   // LOOKUP_TSE_ANTIBODIES
     private const int LookupNonTseAntibodies = 5;   // LOOKUP_NONTSE_ANTIBODIES
@@ -94,8 +96,8 @@ public class EditBatchTestsModel : HistoPageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
-        ViewData["Title"]     = "Edit test types";
-        ViewData["PageTitle"] = "Edit test types";
+        ViewData["Title"]     = EditTestTypesTitle;
+        ViewData["PageTitle"] = EditTestTypesTitle;
         if (Session.BatchID <= 0) return RedirectToPage("/Index");
 
         Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0);
@@ -114,8 +116,8 @@ public class EditBatchTestsModel : HistoPageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"]     = "Edit test types";
-        ViewData["PageTitle"] = "Edit test types";
+        ViewData["Title"]     = EditTestTypesTitle;
+        ViewData["PageTitle"] = EditTestTypesTitle;
 
         Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0);
         if (Batch is null) return RedirectToPage("/Index");

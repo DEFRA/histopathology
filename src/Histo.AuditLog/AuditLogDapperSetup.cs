@@ -1,6 +1,6 @@
-using System.Reflection;
 using Dapper;
 using Histo.AuditLog.Models;
+using System.Reflection;
 
 namespace Histo.AuditLog;
 
@@ -13,32 +13,32 @@ namespace Histo.AuditLog;
 public static class AuditLogDapperSetup
 {
     /// <summary>
-    /// Configures a <see cref="CustomPropertyTypeMap"/> for <see cref="AuditLogEntry"/>
-    /// that redirects the SP column <c>DateTime</c> (SQL keyword alias returned by all
-    /// audit log stored procedures) to the <see cref="AuditLogEntry.ChangedAt"/> property.
+    /// Configures a type map for <see cref="AuditLogEntry"/> that redirects the SP column
+    /// <c>DateTime</c> (SQL keyword alias returned by all audit log stored procedures) to the
+    /// <see cref="AuditLogEntry.ChangedAt"/> property.
     ///
-    /// All other columns map by name case-insensitively as usual.
-    /// This allows <c>QueryAsync&lt;AuditLogEntry&gt;()</c> to be used throughout
+    /// All other columns map by name case-insensitively as usual, and unrecognised columns are
+    /// skipped. This allows <c>QueryAsync&lt;AuditLogEntry&gt;()</c> to be used throughout
     /// <c>AuditLogRepository</c> without a dynamic intermediate step.
     /// </summary>
-    public static void RegisterTypeMaps()
-    {
-        SqlMapper.SetTypeMap(
-            typeof(AuditLogEntry),
-            new CustomPropertyTypeMap(
-                typeof(AuditLogEntry),
-                (type, columnName) =>
-                {
-                    // The audit log SPs return the timestamp column as "DateTime"
-                    // (a SQL Server keyword used as an alias). Map it to ChangedAt.
-                    if (string.Equals(columnName, "DateTime", StringComparison.OrdinalIgnoreCase))
-                        return type.GetProperty(nameof(AuditLogEntry.ChangedAt))!;
+    public static void RegisterTypeMaps() =>
+        SqlMapper.SetTypeMap(typeof(AuditLogEntry), new AuditLogTypeMap());
 
-                    // Return null for unrecognised columns so Dapper skips them rather than
-                    // throwing NullReferenceException when the SP returns extra columns.
-                    return type.GetProperty(
-                        columnName,
-                        BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-                }));
+    private sealed class AuditLogTypeMap : SqlMapper.ITypeMap
+    {
+        private readonly DefaultTypeMap _inner = new(typeof(AuditLogEntry));
+
+        public ConstructorInfo? FindConstructor(string[] names, Type[] types) => _inner.FindConstructor(names, types);
+
+        public ConstructorInfo? FindExplicitConstructor() => _inner.FindExplicitConstructor();
+
+        public SqlMapper.IMemberMap GetConstructorParameter(ConstructorInfo constructor, string columnName) =>
+            _inner.GetConstructorParameter(constructor, columnName);
+
+        // The audit log SPs return the timestamp as "DateTime" (a SQL Server keyword used as an alias).
+        public SqlMapper.IMemberMap? GetMember(string columnName) =>
+            _inner.GetMember(string.Equals(columnName, "DateTime", StringComparison.OrdinalIgnoreCase)
+                ? nameof(AuditLogEntry.ChangedAt)
+                : columnName);
     }
 }

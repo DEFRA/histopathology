@@ -15,13 +15,13 @@ public class PickListMaintenanceModel : GridPageModel
 
     public IReadOnlyList<EditableLookup> Lookups { get; private set; } = [];
 
-    private IReadOnlyList<EditableLookup> FilteredLookups =>
+    private List<EditableLookup> GetFilteredLookups() =>
         Lookups.Where(l => l.TableName != "User Area").ToList();
 
-    public int TotalCount => FilteredLookups.Count;
+    public int TotalCount => GetFilteredLookups().Count;
 
-    public IReadOnlyList<EditableLookup> PagedEntries =>
-        (SortDesc ? FilteredLookups.OrderByDescending(l => l.TableName) : FilteredLookups.OrderBy(l => l.TableName))
+    public IReadOnlyList<EditableLookup> GetPagedEntries() =>
+        (SortDesc ? GetFilteredLookups().OrderByDescending(l => l.TableName) : GetFilteredLookups().OrderBy(l => l.TableName))
         .Skip((PageNumber - 1) * PageSize)
         .Take(PageSize)
         .ToList();

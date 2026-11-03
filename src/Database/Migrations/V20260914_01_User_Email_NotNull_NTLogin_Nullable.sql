@@ -82,7 +82,9 @@ BEGIN
     RETURN;
 END;
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_User_Email' AND object_id = OBJECT_ID('dbo.[User]'))
+DECLARE @UserTableId INT = OBJECT_ID('dbo.[User]');
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_User_Email' AND object_id = @UserTableId)
     CREATE UNIQUE NONCLUSTERED INDEX IX_User_Email ON dbo.[User] (Email);
 
 PRINT '--- V20260914_01: making NTLogin nullable and IX_User_NTLogin non-unique ---';
@@ -91,9 +93,9 @@ PRINT '--- V20260914_01: making NTLogin nullable and IX_User_NTLogin non-unique 
 -- (Email is the identity key now — see IX_User_Email above), so uniqueness is no longer
 -- enforced regardless of whether the existing index was unique. If it backs a UNIQUE
 -- constraint (Msg 3723), DROP INDEX is rejected — the constraint itself has to be dropped.
-IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_User_NTLogin' AND object_id = OBJECT_ID('dbo.[User]'))
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_User_NTLogin' AND object_id = @UserTableId)
 BEGIN
-    IF EXISTS (SELECT 1 FROM sys.key_constraints WHERE name = 'IX_User_NTLogin' AND parent_object_id = OBJECT_ID('dbo.[User]'))
+    IF EXISTS (SELECT 1 FROM sys.key_constraints WHERE name = 'IX_User_NTLogin' AND parent_object_id = @UserTableId)
         ALTER TABLE dbo.[User] DROP CONSTRAINT IX_User_NTLogin;
     ELSE
         DROP INDEX IX_User_NTLogin ON dbo.[User];

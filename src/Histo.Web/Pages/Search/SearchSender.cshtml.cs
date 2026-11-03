@@ -19,6 +19,9 @@ namespace Histo.Web.Pages.Search;
 /// </summary>
 public class SearchSenderModel : GridPageModel
 {
+    private const string SelectSenderRefTitle = "Select sender ref";
+    private const string SearchBySenderTitle = "Search by Sender";
+
     private readonly ISubmissionService _submissions;
 
     public SearchSenderModel(ISessionService session, ISubmissionService submissions)
@@ -37,7 +40,7 @@ public class SearchSenderModel : GridPageModel
     public IReadOnlyList<SenderSearchResult> Results { get; private set; } = [];
 
     /// <summary>Current page of <see cref="Results"/> for the GDS pagination component.</summary>
-    public IReadOnlyList<SenderSearchResult> PagedResults =>
+    public IReadOnlyList<SenderSearchResult> GetPagedResults() =>
         Results.Skip((PageNumber - 1) * PageSize).Take(PageSize).ToList();
 
     /// <summary>True once a search has run (always, after GET/POST) so the view knows
@@ -46,15 +49,15 @@ public class SearchSenderModel : GridPageModel
 
     public async Task OnGetAsync()
     {
-        ViewData["Title"]     = IsPickerMode ? "Select sender ref" : "Search by Sender";
-        ViewData["PageTitle"] = IsPickerMode ? "Select sender ref" : "Search by Sender";
+        ViewData["Title"]     = IsPickerMode ? SelectSenderRefTitle : SearchBySenderTitle;
+        ViewData["PageTitle"] = IsPickerMode ? SelectSenderRefTitle : SearchBySenderTitle;
         await RunSearchAsync();
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"]     = IsPickerMode ? "Select sender ref" : "Search by Sender";
-        ViewData["PageTitle"] = IsPickerMode ? "Select sender ref" : "Search by Sender";
+        ViewData["Title"]     = IsPickerMode ? SelectSenderRefTitle : SearchBySenderTitle;
+        ViewData["PageTitle"] = IsPickerMode ? SelectSenderRefTitle : SearchBySenderTitle;
         await RunSearchAsync();
         return Page();
     }

@@ -1,0 +1,9 @@
+@*
+    Single-button POST form posting batchId to a page handler.
+    Model = (batch id, handler name, button text).
+*@
+@model (int Id, string Handler, string Text)
+<form method="post">
+    <input type="hidden" name="batchId" value="@Model.Id" />
+    <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-page-handler="@Model.Handler">@Model.Text<span class="govuk-visually-hidden"> submission @Model.Id</span></button>
+</form>

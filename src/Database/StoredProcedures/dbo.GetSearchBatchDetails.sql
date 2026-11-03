@@ -1,4 +1,4 @@
-/****** Object:  StoredProcedure [dbo].[GetSearchBatchDetails]    Script Date: 08/10/2026 21:57:45 ******/
+-- Object:  StoredProcedure [dbo].[GetSearchBatchDetails]    Script Date: 08/10/2026 21:57:45
 SET ANSI_NULLS ON
 GO
 

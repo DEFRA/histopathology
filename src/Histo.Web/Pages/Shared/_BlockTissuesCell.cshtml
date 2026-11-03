@@ -1,0 +1,23 @@
+@model Histo.Web.Pages.Shared.BlockTissuesCell
+<td class="govuk-table__cell">
+    @if (Model.Tissues.Any())
+    {
+        <details class="govuk-details govuk-!-margin-bottom-0">
+            <summary class="govuk-details__summary">
+                <span class="govuk-details__summary-text">@Model.Tissues.Count tissue(s)</span>
+            </summary>
+            <div class="govuk-details__text">
+                <ul class="govuk-list">
+                    @foreach (var t in Model.Tissues)
+                    {
+                        <li>@t.NoPieces x @Model.TissueName(t.TissueCode)</li>
+                    }
+                </ul>
+            </div>
+        </details>
+    }
+    else
+    {
+        <span>None</span>
+    }
+</td>

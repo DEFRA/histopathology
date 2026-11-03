@@ -10,50 +10,33 @@ namespace Histo.Web.Pages.Batches;
 /// Lists batches not yet received — replaces <c>BatchesNotReceived.aspx</c>.
 /// Histopathology User and Maintenance groups only.
 /// </summary>
-public class BatchesNotReceivedModel : GridPageModel
+public class BatchesNotReceivedModel : BatchListPageModelBase
 {
-    private readonly IBatchService _batches;
+    private const string BatchesNotReceivedTitle = "Batches not received";
 
     public BatchesNotReceivedModel(ISessionService session, IBatchService batches)
-        : base(session)
+        : base(session, batches)
     {
-        _batches = batches;
         // Legacy default view was newest submission first when no sort had been chosen.
         SortDesc = true;
     }
 
-    public IReadOnlyList<BatchListResult> Batches { get; private set; } = [];
+    protected override string ListTitle => BatchesNotReceivedTitle;
 
-    public int TotalCount => Batches.Count;
+    protected override Task<IReadOnlyList<BatchListResult>> FetchBatchesAsync() => BatchService.GetNotReceivedAsync();
 
-    public IReadOnlyList<BatchListResult> PagedEntries =>
-        (SortColumn switch
+    public IReadOnlyList<BatchListResult> GetPagedEntries() =>
+        TakePage(SortColumn switch
         {
-            "ProjectDescription" => SortDesc ? Batches.OrderByDescending(b => b.ProjectDescription) : Batches.OrderBy(b => b.ProjectDescription),
-            "ContactDescription" => SortDesc ? Batches.OrderByDescending(b => b.ContactDescription) : Batches.OrderBy(b => b.ContactDescription),
-            "Species"            => SortDesc ? Batches.OrderByDescending(b => b.Species)            : Batches.OrderBy(b => b.Species),
-            "SubmissionDate"     => SortDesc ? Batches.OrderByDescending(b => b.SubmissionDate)     : Batches.OrderBy(b => b.SubmissionDate),
-            "OtherSubmittedBy"   => SortDesc ? Batches.OrderByDescending(b => b.OtherSubmittedBy)   : Batches.OrderBy(b => b.OtherSubmittedBy),
-            _                    => SortDesc ? Batches.OrderByDescending(b => b.ID)                  : Batches.OrderBy(b => b.ID),
-        })
-        .Skip((PageNumber - 1) * PageSize)
-        .Take(PageSize)
-        .ToList();
+            "ProjectDescription" => OrderBatches(b => b.ProjectDescription),
+            "ContactDescription" => OrderBatches(b => b.ContactDescription),
+            "Species"            => OrderBatches(b => b.Species),
+            "SubmissionDate"     => OrderBatches(b => b.SubmissionDate),
+            "OtherSubmittedBy"   => OrderBatches(b => b.OtherSubmittedBy),
+            _                    => OrderBatches(b => b.ID),
+        }, PageNumber);
 
-    /// <summary>Quick-Go: direct navigation by submission number.</summary>
-    [BindProperty]
-    public int? QuickGoId { get; set; }
-
-    /// <summary>Inline error message for Quick-Go validation failures.</summary>
-    public string? GoError { get; private set; }
-
-    public async Task OnGetAsync()
-    {
-        ViewData["Title"] = "Batches not received";
-        ViewData["PageTitle"] = "Batches not received";
-        Batches = await _batches.GetNotReceivedAsync();
-        PopulateGridViewData(TotalCount);
-    }
+    public async Task OnGetAsync() => await LoadListAsync();
 
     public async Task<IActionResult> OnPostReceiveAsync(int batchId)
     {
@@ -63,18 +46,11 @@ public class BatchesNotReceivedModel : GridPageModel
 
     public async Task<IActionResult> OnPostGoAsync()
     {
-        ViewData["Title"] = "Batches not received";
-        ViewData["PageTitle"] = "Batches not received";
-        Batches = await _batches.GetNotReceivedAsync();
-        PopulateGridViewData(TotalCount);
+        await LoadListAsync();
 
-        if (!QuickGoId.HasValue || QuickGoId.Value <= 0)
-        {
-            GoError = "Enter a submission number.";
-            return Page();
-        }
+        if (IsQuickGoIdMissing()) return Page();
 
-        var batch = await _batches.GetByIdAsync(QuickGoId.Value);
+        var batch = await BatchService.GetByIdAsync(QuickGoId.Value);
         if (batch is null || batch.Status != BatchStatus.Submitted)
         {
             GoError = $"Submission {QuickGoId.Value} could not be found or is not awaiting receipt.";

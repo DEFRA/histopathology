@@ -31,7 +31,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.GetLookupDataAsync(11, true, It.IsAny<CancellationToken>()))
             .ReturnsAsync(SampleLookupItems);
 
-        var result = await CreateSut().GetLookupDataAsync(11, includeInactive: true);
+        var result = await CreateSut().GetLookupDataAsync(11, includeInactive: true, ct: TestContext.Current.CancellationToken);
 
         Assert.Same(SampleLookupItems, result);
     }
@@ -42,7 +42,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.GetLookupDataAsync(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var result = await CreateSut().GetLookupDataAsync(11);
+        var result = await CreateSut().GetLookupDataAsync(11, ct: TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
         _logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>(), It.IsAny<object[]>()), Times.Once);
@@ -56,7 +56,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.GetUserAreaDataAsync(11, "Histopath", It.IsAny<CancellationToken>()))
             .ReturnsAsync(SampleLookupItems);
 
-        var result = await CreateSut().GetUserAreaDataAsync(11, "Histopath");
+        var result = await CreateSut().GetUserAreaDataAsync(11, "Histopath", ct: TestContext.Current.CancellationToken);
 
         Assert.Same(SampleLookupItems, result);
     }
@@ -67,7 +67,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.GetUserAreaDataAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var result = await CreateSut().GetUserAreaDataAsync(11, "Histopath");
+        var result = await CreateSut().GetUserAreaDataAsync(11, "Histopath", ct: TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
         _logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>(), It.IsAny<object[]>()), Times.Once);
@@ -81,7 +81,7 @@ public class LookupServiceTests
         IReadOnlyList<EditableLookup> expected = [new EditableLookup { ID = 1, TableName = "Species" }];
         _repo.Setup(r => r.ListEditableLookupsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(expected);
 
-        var result = await CreateSut().ListEditableLookupsAsync();
+        var result = await CreateSut().ListEditableLookupsAsync(ct: TestContext.Current.CancellationToken);
 
         Assert.Same(expected, result);
     }
@@ -92,7 +92,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.ListEditableLookupsAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var result = await CreateSut().ListEditableLookupsAsync();
+        var result = await CreateSut().ListEditableLookupsAsync(ct: TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
         _logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>()), Times.Once);
@@ -106,7 +106,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.GetContactsByAreaAsync("Histopath", It.IsAny<CancellationToken>()))
             .ReturnsAsync(SampleLookupItems);
 
-        var result = await CreateSut().GetContactsByAreaAsync("Histopath");
+        var result = await CreateSut().GetContactsByAreaAsync("Histopath", ct: TestContext.Current.CancellationToken);
 
         Assert.Same(SampleLookupItems, result);
     }
@@ -117,7 +117,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.GetContactsByAreaAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var result = await CreateSut().GetContactsByAreaAsync("Histopath");
+        var result = await CreateSut().GetContactsByAreaAsync("Histopath", ct: TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
         _logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>(), It.IsAny<object[]>()), Times.Once);
@@ -131,7 +131,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.GetProjectsByAreaAsync("Histopath", It.IsAny<CancellationToken>()))
             .ReturnsAsync(SampleLookupItems);
 
-        var result = await CreateSut().GetProjectsByAreaAsync("Histopath");
+        var result = await CreateSut().GetProjectsByAreaAsync("Histopath", ct: TestContext.Current.CancellationToken);
 
         Assert.Same(SampleLookupItems, result);
     }
@@ -142,7 +142,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.GetProjectsByAreaAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var result = await CreateSut().GetProjectsByAreaAsync("Histopath");
+        var result = await CreateSut().GetProjectsByAreaAsync("Histopath", ct: TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
         _logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>(), It.IsAny<object[]>()), Times.Once);
@@ -155,7 +155,7 @@ public class LookupServiceTests
     {
         _repo.Setup(r => r.GetUserGroupsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(SampleLookupItems);
 
-        var result = await CreateSut().GetUserGroupsAsync();
+        var result = await CreateSut().GetUserGroupsAsync(ct: TestContext.Current.CancellationToken);
 
         Assert.Same(SampleLookupItems, result);
     }
@@ -166,7 +166,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.GetUserGroupsAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var result = await CreateSut().GetUserGroupsAsync();
+        var result = await CreateSut().GetUserGroupsAsync(ct: TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
         _logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>()), Times.Once);
@@ -179,7 +179,7 @@ public class LookupServiceTests
     {
         _repo.Setup(r => r.GetUserAreasAsync(true, It.IsAny<CancellationToken>())).ReturnsAsync(SampleLookupItems);
 
-        var result = await CreateSut().GetUserAreasAsync(includeInactive: true);
+        var result = await CreateSut().GetUserAreasAsync(includeInactive: true, ct: TestContext.Current.CancellationToken);
 
         Assert.Same(SampleLookupItems, result);
     }
@@ -190,7 +190,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.GetUserAreasAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var result = await CreateSut().GetUserAreasAsync();
+        var result = await CreateSut().GetUserAreasAsync(ct: TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
         _logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>()), Times.Once);
@@ -203,7 +203,7 @@ public class LookupServiceTests
     {
         _repo.Setup(r => r.GetImportedTablesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(SampleLookupItems);
 
-        var result = await CreateSut().GetImportedTablesAsync();
+        var result = await CreateSut().GetImportedTablesAsync(ct: TestContext.Current.CancellationToken);
 
         Assert.Same(SampleLookupItems, result);
     }
@@ -214,7 +214,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.GetImportedTablesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var result = await CreateSut().GetImportedTablesAsync();
+        var result = await CreateSut().GetImportedTablesAsync(ct: TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
         _logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>()), Times.Once);
@@ -227,7 +227,7 @@ public class LookupServiceTests
     {
         _repo.Setup(r => r.GetSpeciesLookupAsync(It.IsAny<CancellationToken>())).ReturnsAsync(SampleLookupItems);
 
-        var result = await CreateSut().GetSpeciesLookupAsync();
+        var result = await CreateSut().GetSpeciesLookupAsync(ct: TestContext.Current.CancellationToken);
 
         Assert.Same(SampleLookupItems, result);
     }
@@ -238,7 +238,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.GetSpeciesLookupAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var result = await CreateSut().GetSpeciesLookupAsync();
+        var result = await CreateSut().GetSpeciesLookupAsync(ct: TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
         _logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>()), Times.Once);
@@ -251,7 +251,7 @@ public class LookupServiceTests
     {
         _repo.Setup(r => r.GetHistologyTypesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(SampleLookupItems);
 
-        var result = await CreateSut().GetHistologyTypesAsync();
+        var result = await CreateSut().GetHistologyTypesAsync(ct: TestContext.Current.CancellationToken);
 
         Assert.Same(SampleLookupItems, result);
     }
@@ -262,7 +262,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.GetHistologyTypesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var result = await CreateSut().GetHistologyTypesAsync();
+        var result = await CreateSut().GetHistologyTypesAsync(ct: TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
         _logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>()), Times.Once);
@@ -275,7 +275,7 @@ public class LookupServiceTests
     {
         _repo.Setup(r => r.GetPremiumChargesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(SampleLookupItems);
 
-        var result = await CreateSut().GetPremiumChargesAsync();
+        var result = await CreateSut().GetPremiumChargesAsync(ct: TestContext.Current.CancellationToken);
 
         Assert.Same(SampleLookupItems, result);
     }
@@ -286,7 +286,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.GetPremiumChargesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var result = await CreateSut().GetPremiumChargesAsync();
+        var result = await CreateSut().GetPremiumChargesAsync(ct: TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
         _logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>()), Times.Once);
@@ -299,7 +299,7 @@ public class LookupServiceTests
     {
         _repo.Setup(r => r.GetHistologyRefTypesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(SampleLookupItems);
 
-        var result = await CreateSut().GetHistologyRefTypesAsync();
+        var result = await CreateSut().GetHistologyRefTypesAsync(ct: TestContext.Current.CancellationToken);
 
         Assert.Same(SampleLookupItems, result);
     }
@@ -310,7 +310,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.GetHistologyRefTypesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var result = await CreateSut().GetHistologyRefTypesAsync();
+        var result = await CreateSut().GetHistologyRefTypesAsync(ct: TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
         _logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>()), Times.Once);
@@ -324,7 +324,7 @@ public class LookupServiceTests
         var item = new LookupItem { ID = 0, Code = "A", Name = "Alpha" };
         _repo.Setup(r => r.CreateLookupItemAsync(11, item, 7, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
-        var result = await CreateSut().CreateLookupItemAsync(11, item, 7);
+        var result = await CreateSut().CreateLookupItemAsync(11, item, 7, ct: TestContext.Current.CancellationToken);
 
         Assert.True(result);
     }
@@ -336,7 +336,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.CreateLookupItemAsync(It.IsAny<int>(), It.IsAny<LookupItem>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var result = await CreateSut().CreateLookupItemAsync(11, item, 7);
+        var result = await CreateSut().CreateLookupItemAsync(11, item, 7, ct: TestContext.Current.CancellationToken);
 
         Assert.False(result);
         _logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>(), It.IsAny<object[]>()), Times.Once);
@@ -350,7 +350,7 @@ public class LookupServiceTests
         var item = new LookupItem { ID = 1, Code = "A", Name = "Alpha" };
         _repo.Setup(r => r.UpdateLookupItemAsync(11, item, 7, "A", It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
-        var result = await CreateSut().UpdateLookupItemAsync(11, item, 7, "A");
+        var result = await CreateSut().UpdateLookupItemAsync(11, item, 7, "A", ct: TestContext.Current.CancellationToken);
 
         Assert.True(result);
     }
@@ -362,7 +362,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.UpdateLookupItemAsync(It.IsAny<int>(), It.IsAny<LookupItem>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var result = await CreateSut().UpdateLookupItemAsync(11, item, 7);
+        var result = await CreateSut().UpdateLookupItemAsync(11, item, 7, ct: TestContext.Current.CancellationToken);
 
         Assert.False(result);
         _logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>(), It.IsAny<object[]>()), Times.Once);
@@ -376,7 +376,7 @@ public class LookupServiceTests
         IReadOnlyList<SpeciesItem> expected = [new SpeciesItem { SpeciesID = 1, Species = "Bovine" }];
         _repo.Setup(r => r.GetSpeciesItemsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(expected);
 
-        var result = await CreateSut().GetSpeciesItemsAsync();
+        var result = await CreateSut().GetSpeciesItemsAsync(ct: TestContext.Current.CancellationToken);
 
         Assert.Same(expected, result);
     }
@@ -387,7 +387,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.GetSpeciesItemsAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var result = await CreateSut().GetSpeciesItemsAsync();
+        var result = await CreateSut().GetSpeciesItemsAsync(ct: TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
         _logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>()), Times.Once);
@@ -400,7 +400,7 @@ public class LookupServiceTests
     {
         _repo.Setup(r => r.AddSpeciesItemAsync(1, "Bovine", "Cattle", It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
-        var result = await CreateSut().AddSpeciesItemAsync(1, "Bovine", "Cattle");
+        var result = await CreateSut().AddSpeciesItemAsync(1, "Bovine", "Cattle", ct: TestContext.Current.CancellationToken);
 
         Assert.True(result);
     }
@@ -411,7 +411,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.AddSpeciesItemAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var result = await CreateSut().AddSpeciesItemAsync(1, "Bovine", "Cattle");
+        var result = await CreateSut().AddSpeciesItemAsync(1, "Bovine", "Cattle", ct: TestContext.Current.CancellationToken);
 
         Assert.False(result);
         _logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>(), It.IsAny<object[]>()), Times.Once);
@@ -424,7 +424,7 @@ public class LookupServiceTests
     {
         _repo.Setup(r => r.UpdateSpeciesItemAsync(1, "Bovine", "Cattle", 7, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
-        var result = await CreateSut().UpdateSpeciesItemAsync(1, "Bovine", "Cattle", 7);
+        var result = await CreateSut().UpdateSpeciesItemAsync(1, "Bovine", "Cattle", 7, ct: TestContext.Current.CancellationToken);
 
         Assert.True(result);
     }
@@ -435,7 +435,7 @@ public class LookupServiceTests
         _repo.Setup(r => r.UpdateSpeciesItemAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var result = await CreateSut().UpdateSpeciesItemAsync(1, "Bovine", "Cattle", 7);
+        var result = await CreateSut().UpdateSpeciesItemAsync(1, "Bovine", "Cattle", 7, ct: TestContext.Current.CancellationToken);
 
         Assert.False(result);
         _logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>(), It.IsAny<object[]>()), Times.Once);

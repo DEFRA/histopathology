@@ -1,5 +1,5 @@
-﻿/****** Object:  StoredProcedure [dbo].[GetUserByEmail]    Script Date: 04/09/2026 18:03:46 ******/
-/****** ONE-TIME DEPLOYMENT SCRIPT — Safe to re-run via pipeline ******/
+﻿-- Object:  StoredProcedure [dbo].[GetUserByEmail]    Script Date: 04/09/2026 18:03:46
+-- ONE-TIME DEPLOYMENT SCRIPT — Safe to re-run via pipeline
 
 SET ANSI_NULLS OFF
 GO

@@ -41,7 +41,7 @@ public class BatchesForArchivingModelTests
 
         await sut.OnGetAsync();
 
-        Assert.Equal([3, 2, 1], sut.PagedEntries.Select(b => b.ID));
+        Assert.Equal([3, 2, 1], sut.GetPagedEntries().Select(b => b.ID));
     }
 
     [Fact]

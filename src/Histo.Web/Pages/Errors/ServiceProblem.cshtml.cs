@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace Histo.Web.Pages.Errors;
 
 [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-[IgnoreAntiforgeryToken]
 public class ServiceProblemModel : PageModel
 {
     private readonly ILogger<ServiceProblemModel> _logger;

@@ -17,6 +17,8 @@ namespace Histo.Web.Pages.Batches;
 /// </summary>
 public class EditSubmissionStatusModel : HistoPageModel
 {
+    private const string EditSubmissionStatusTitle = "Edit submission status";
+
     private readonly IBatchService  _batches;
     private readonly ILookupService _lookups;
     private readonly IUserService   _users;
@@ -60,8 +62,8 @@ public class EditSubmissionStatusModel : HistoPageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
-        ViewData["Title"]     = "Edit submission status";
-        ViewData["PageTitle"] = "Edit submission status";
+        ViewData["Title"]     = EditSubmissionStatusTitle;
+        ViewData["PageTitle"] = EditSubmissionStatusTitle;
         if (Session.BatchID <= 0) return RedirectToPage("/Index");
 
         Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0);
@@ -77,8 +79,8 @@ public class EditSubmissionStatusModel : HistoPageModel
 
     public async Task<IActionResult> OnPostSaveAsync()
     {
-        ViewData["Title"]     = "Edit submission status";
-        ViewData["PageTitle"] = "Edit submission status";
+        ViewData["Title"]     = EditSubmissionStatusTitle;
+        ViewData["PageTitle"] = EditSubmissionStatusTitle;
 
         Batch = await _batches.GetByIdAsync(Session.BatchID ?? 0);
         if (Batch?.RowStamp is null) return RedirectToPage("/Index");
@@ -106,38 +108,15 @@ public class EditSubmissionStatusModel : HistoPageModel
 
         // Full field carry-forward — this page never touches header fields, so every field
         // EditBatch owns must be passed through unchanged (EditBatch SP takes the whole row).
-        var updated = new Batch
-        {
-            ID                  = Batch.ID,
-            Status              = Status ?? Batch.Status,
-            Comments            = Batch.Comments,
-            StatusComments      = StatusComments,
-            BatchDate           = Batch.BatchDate,
-            ReceivedDate        = Batch.ReceivedDate,
-            CompletedDate       = completedDate,
-            SubmittedByUserID   = Batch.SubmittedByUserID,
-            UserAreaCode        = Batch.UserAreaCode,
-            IsCassetted      = Batch.IsCassetted,
-            ByPassSort          = Batch.ByPassSort,
-            RowStamp            = Batch.RowStamp,
-            BatchType           = Batch.BatchType,
-            ProjectContractCode = Batch.ProjectContractCode,
-            ContactName         = Batch.ContactName,
-            Species             = Batch.Species,
-            Fixation            = Batch.Fixation,
-            CustomerReceivedDate = Batch.CustomerReceivedDate,
-            SubmittedBy         = Batch.SubmittedBy,
-            SubmittedArea       = Batch.SubmittedArea,
-            OtherSubmittedBy    = Batch.OtherSubmittedBy,
-            OtherSubmittedArea  = Batch.OtherSubmittedArea ?? "",
-            SafeToHandle        = Batch.SafeToHandle,
-            IsBlocked           = Batch.IsBlocked,
-            SampleSameProjects  = Batch.SampleSameProjects,
-            AllTissuesAssigned  = Batch.AllTissuesAssigned,
-            TimeReceived        = Batch.TimeReceived,
-            ReceivedBy          = Batch.ReceivedBy,
-            PostFixationOther   = Batch.PostFixationOther,
-        };
+        var updated = BatchCarryForward.Create(Batch, new BatchCarryForward.Edits(
+            Status:            Status ?? Batch.Status,
+            CustomerRef:       string.Empty,
+            StatusComments:    StatusComments,
+            ReceivedDate:      Batch.ReceivedDate,
+            CompletedDate:     completedDate,
+            TimeReceived:      Batch.TimeReceived,
+            ReceivedBy:        Batch.ReceivedBy,
+            PostFixationOther: Batch.PostFixationOther));
 
         try
         {
