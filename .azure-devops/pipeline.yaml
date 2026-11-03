@@ -1,7 +1,6 @@
 trigger:
   branches:
     include:
-      - feature/OIDC
       - develop
       - main
 
@@ -15,7 +14,6 @@ schedules:
     branches:
       include:
         - develop
-        - feature/OIDC
     always: true
 
 parameters:
@@ -202,9 +200,8 @@ stages:
   - stage: DEV
     displayName: DEV
     dependsOn: Build
-    # Only deploy the OIDC feature branch to DEV for this migration work.
-    # Azure DevOps exposes the full branch ref in Build.SourceBranch (e.g. refs/heads/feature/OIDC).
-    condition: and(succeeded(), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranch'], 'refs/heads/feature/OIDC'), eq('${{ parameters.deployToDev }}', true))
+    # develop-only: DEV/TST deploy from develop, Pre-Prod/Prod deploy from main.
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranchName'], 'develop'), eq('${{ parameters.deployToDev }}', true))
     variables:
     - name: appName
       value: 'DEVCDEWEBAW1401'
