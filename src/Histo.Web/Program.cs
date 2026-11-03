@@ -138,6 +138,10 @@ try
 
     builder.Services.AddScoped<OidcSignInHandler>();
 
+    // The registration signs ID tokens with an app-specific key, published only by the ?appid= metadata.
+    builder.Services.Configure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
+        options.MetadataAddress = OidcMetadata.AddressFor(azureAdSection));
+
     builder.Services.PostConfigure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
     {
         options.ResponseType = OpenIdConnectResponseType.Code;
