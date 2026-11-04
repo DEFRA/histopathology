@@ -624,7 +624,7 @@ stages:
     - name: oidcClientId
       value: '__PROD_APP_ID__'
     - name: oidcClientSecretUri
-      value: 'https://prdcdeinfkv1401.vault.azure.net/secrets/histo-prod-azuread-clientsecret/'
+      value: 'https://prdcdeinfkv1401.vault.azure.net/secrets/histo-prd-azuread-clientsecret/'
     - name: sqlServer
       value: 'prdcdeinfsq1401.database.windows.net,1433'
     - name: sqlServerHost
