@@ -348,9 +348,9 @@ stages:
     - name: appId
       value: '2f7f564e-38a4-4cc7-aa92-0ee8c8cfc974'
     - name: oidcClientId
-      value: '$(AzureAdClientId)'
+      value: '2f7f564e-38a4-4cc7-aa92-0ee8c8cfc974'
     - name: oidcClientSecretUri
-      value: '$(AzureAdClientSecretUri)'
+      value: 'https://tstcdeinfkv1401.vault.azure.net/secrets/histo-tst-azuread-clientsecret/'
     - name: sqlServer
       value: 'tstcdeinfsq1401.database.windows.net,1433'
     - name: sqlServerHost
