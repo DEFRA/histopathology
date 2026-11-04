@@ -86,8 +86,8 @@ public class SecurityHardeningTests
         if (stamp is not null) identity.AddClaim(new Claim(AppClaimTypes.SessionStamp, stamp));
         var principal = new ClaimsPrincipal(identity);
 
-        var scheme = new AuthenticationScheme("saml2", null, typeof(CookieAuthenticationHandler));
-        var ticket = new AuthenticationTicket(principal, "saml2");
+        var scheme = new AuthenticationScheme(CookieAuthenticationDefaults.AuthenticationScheme, null, typeof(CookieAuthenticationHandler));
+        var ticket = new AuthenticationTicket(principal, CookieAuthenticationDefaults.AuthenticationScheme);
         return new CookieValidatePrincipalContext(
             new DefaultHttpContext { RequestServices = services }, scheme, new CookieAuthenticationOptions(), ticket);
     }

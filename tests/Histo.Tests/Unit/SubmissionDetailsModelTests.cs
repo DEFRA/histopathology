@@ -271,6 +271,9 @@ public class SubmissionDetailsModelTests
     [Fact]
     public async Task OnPostDeleteTissueAsync_DeletesAndRefreshesBatchFlag()
     {
+        SetupAnimal();
+        _submissions.Setup(s => s.GetTissuesBySubmissionAsync(42, 77, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Tissue>)[new Tissue { ID = 3, TissueCode = "BR", NoPieces = 1 }]);
         _session.Object.BatchID = 42;
         _session.Object.AnimalID = 5;
         var sut = CreateSut();
@@ -280,5 +283,20 @@ public class SubmissionDetailsModelTests
         Assert.IsType<RedirectToPageResult>(result);
         _submissions.Verify(s => s.DeleteTissueAsync(3, TissueOwner.Submission, 9, It.IsAny<CancellationToken>()), Times.Once);
         _batches.Verify(b => b.RefreshAllTissuesAssignedAsync(42, 9, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnPostDeleteTissueAsync_TissueNotOnThisSample_IsNotDeleted()
+    {
+        SetupAnimal();
+        _submissions.Setup(s => s.GetTissuesBySubmissionAsync(42, 77, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Tissue>)[new Tissue { ID = 3, TissueCode = "BR", NoPieces = 1 }]);
+        _session.Object.BatchID = 42;
+        _session.Object.AnimalID = 5;
+        var sut = CreateSut();
+
+        await sut.OnPostDeleteTissueAsync(999);
+
+        _submissions.Verify(s => s.DeleteTissueAsync(It.IsAny<int>(), It.IsAny<TissueOwner>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

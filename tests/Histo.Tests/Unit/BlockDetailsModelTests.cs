@@ -608,6 +608,7 @@ public class BlockDetailsModelTests
         // Regression: clicking "Add block" auto-provisions a real DB row on first load (see
         // OnGetAsync's Add-mode branch) — Back must discard it if the user leaves without doing
         // anything, matching legacy btnCancel_Click, instead of leaving an empty orphan block.
+        BlockInBatch(319181);
         _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _blocks.Setup(b => b.DeleteBlockAsync(319181, 7, It.IsAny<CancellationToken>())).ReturnsAsync(true);
         var sut = CreateSut(animalId: 2, blockId: 319181);
@@ -627,6 +628,7 @@ public class BlockDetailsModelTests
         // immediately and independently — Cancel must still be able to fully discard a never-"Done"
         // block even when tissues were already added, instead of silently no-oping on the FK-guarded
         // block delete and leaving an incomplete block + its tissues behind.
+        BlockInBatch(319181);
         _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
             new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR" },
             new Tissue { ID = 2, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "OTHER" },
@@ -648,6 +650,7 @@ public class BlockDetailsModelTests
     {
         // Regression: BlockTestService.SaveTestSelectionsAsync re-throws on failure (unlike the
         // other cleanup calls here) — Cancel must still complete and redirect, not surface a 500.
+        BlockInBatch(319181);
         _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _blockTests.Setup(t => t.SaveTestSelectionsAsync(5, 319181, It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
             It.IsAny<IReadOnlyList<string>>(), 7, It.IsAny<CancellationToken>())).ThrowsAsync(new InvalidOperationException("boom"));
@@ -661,6 +664,25 @@ public class BlockDetailsModelTests
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
         Assert.Equal("/Submissions/SubmissionDetailsBlock", redirect.PageName);
     }
+
+    [Fact]
+    public async Task OnPostCancelAsync_BlockFromAnotherBatch_IsNotDeleted()
+    {
+        BlockInBatch(111);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.IsAddFlow = true;
+
+        var result = await sut.OnPostCancelAsync();
+
+        _blocks.Verify(b => b.DeleteBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _submissions.Verify(s => s.DeleteTissueAsync(It.IsAny<int>(), It.IsAny<TissueOwner>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+    }
+
+    private void BlockInBatch(int blockId) =>
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = blockId, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+        ]);
 
     [Fact]
     public async Task OnPostCancelAsync_EditingEstablishedBlock_DoesNotDeleteIt()

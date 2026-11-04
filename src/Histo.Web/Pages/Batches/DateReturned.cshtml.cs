@@ -45,6 +45,8 @@ public class DateReturnedModel : HistoPageModel
     public Batch? Batch { get; private set; }
     public string? Error { get; private set; }
 
+    protected override int? RequestedBatchId => Session.BatchID;
+
     /// <summary>
     /// Back-link target. In <see cref="ReadOnly"/> mode this always returns to BatchDetails, since
     /// that's the only page that link can come from — honouring <see cref="ISessionService.ReturnPage"/>

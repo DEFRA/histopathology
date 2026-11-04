@@ -44,6 +44,8 @@ public class SampleSummaryModel : GridPageModel
 
     public IReadOnlyList<Animal> Animals { get; private set; } = [];
 
+    protected override int? RequestedBatchId => BatchId is > 0 ? BatchId : Session.BatchID;
+
     /// <summary>Current page of <see cref="Animals"/>, sorted by the selected column or — when no
     /// column is selected — the existing default/bypass-sort order already applied to <see cref="Animals"/>.</summary>
     public IReadOnlyList<Animal> PagedEntries => GetPagedEntries();

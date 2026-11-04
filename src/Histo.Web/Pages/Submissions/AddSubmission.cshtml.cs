@@ -324,10 +324,12 @@ public class AddSubmissionModel : HistoPageModel
     private async Task<int?> GetOrCreateSubmissionIdAsync(int batchId)
     {
         var submissionId = BatchSubmissionId ?? Session.BatchSubmissionID;
-        if (submissionId is > 0)
+        var existing = await _submissions.GetSubmissionsByBatchAsync(batchId);
+
+        // The posted/session submission ID must belong to this batch, otherwise samples would be attached to another batch.
+        if (submissionId is > 0 && existing.Any(s => s.ID == submissionId))
             return submissionId;
 
-        var existing = await _submissions.GetSubmissionsByBatchAsync(batchId);
         if (existing.Count > 0)
             return existing[0].ID;
 

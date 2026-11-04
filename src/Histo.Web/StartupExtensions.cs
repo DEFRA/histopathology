@@ -2,14 +2,11 @@ using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Histo.Web.Auth;
 using Histo.Web.Security;
 using Histo.Web.Telemetry;
-using ITfoxtec.Identity.Saml2;
-using ITfoxtec.Identity.Saml2.Schemas.Metadata;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics;
 using Serilog;
-using System.Security.Cryptography.X509Certificates;
 
 namespace Histo.Web;
 
@@ -21,7 +18,7 @@ internal static class StartupExtensions
     private const string SessionMarkerKey = "SessionStarted";
 
     private static readonly string[] SessionExpirySkippedPaths =
-        ["/health", "/Saml2", "/Errors", "/AccessDenied", "/SessionError", "/signin"];
+        ["/health", "/auth", "/signin-oidc", "/signout-oidc", "/signout-callback-oidc", "/Errors", "/AccessDenied", "/SessionError", "/signin"];
 
     internal static bool IsAzureMonitorConfigured(IConfiguration configuration)
     {
@@ -40,60 +37,23 @@ internal static class StartupExtensions
             .SetApplicationName("Histo.Web");
     }
 
-    internal static Saml2Configuration CreateSaml2Configuration(IConfigurationSection saml2Section)
-    {
-        var saml2Config = new Saml2Configuration
-        {
-            Issuer             = saml2Section["SPEntityId"] ?? string.Empty,
-            SignatureAlgorithm = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
-            CertificateValidationMode = System.ServiceModel.Security.X509CertificateValidationMode.ChainTrust,
-            RevocationMode            = X509RevocationMode.NoCheck,
-        };
-
-        // Entra ID sets the assertion's <AudienceRestriction> to the SP Entity ID — without
-        // registering it here, audience validation always fails (IDX10214) regardless of
-        // what the IdP sends, since AllowedAudienceUris would otherwise be empty.
-        if (!string.IsNullOrEmpty(saml2Config.Issuer))
-            saml2Config.AllowedAudienceUris.Add(saml2Config.Issuer);
-
-        ConfigureSigningCertificate(saml2Config, saml2Section["SPCertificateThumbprint"]);
-        return saml2Config;
-    }
-
-    // SP signing certificate (optional in dev; required in all deployed environments).
-    private static void ConfigureSigningCertificate(Saml2Configuration saml2Config, string? thumbprint)
-    {
-        if (string.IsNullOrEmpty(thumbprint))
-        {
-            Log.Warning("Saml2:SPCertificateThumbprint is not configured — SP will not sign AuthnRequests. Required for all non-development environments.");
-            return;
-        }
-
-        using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
-        store.Open(OpenFlags.ReadOnly);
-        var cert = store.Certificates
-            .Find(X509FindType.FindByThumbprint, thumbprint, false)
-            .OfType<X509Certificate2>()
-            .FirstOrDefault();
-        if (cert is not null)
-            saml2Config.SigningCertificate = cert;
-        else
-            Log.Warning("SP signing certificate with thumbprint {Thumbprint} was not found in the certificate store.", thumbprint);
-    }
-
     // The default cookie challenge/forbid handlers build an ABSOLUTE redirect URI from
     // Request.Scheme/Request.Host. Behind a reverse proxy that doesn't forward a trusted
     // X-Forwarded-Host (or forwards headers UseForwardedHeaders isn't picking up), that
     // leaks the App Service origin hostname instead of the public custom domain. Forcing
     // a relative redirect removes the dependency on Request.Host entirely — the browser
     // resolves it against whatever host is currently in the address bar.
-    internal static void ConfigureSamlCookie(CookieAuthenticationOptions options, TimeSpan idleTimeout)
+    internal static void ConfigureAuthCookie(CookieAuthenticationOptions options, TimeSpan idleTimeout)
     {
         options.Cookie.Name = AuthCookieName;
         options.Cookie.HttpOnly = true;
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
         options.ExpireTimeSpan = idleTimeout;
         options.SlidingExpiration = true;
+        options.LoginPath = "/auth/login";
+        options.AccessDeniedPath = "/AccessDenied";
+        // Keep challenges on the cookie handler so OnRedirectToLogin (and /SessionError) always runs.
+        options.ForwardChallenge = null;
 
         var originalValidatePrincipal = options.Events.OnValidatePrincipal;
         options.Events.OnValidatePrincipal = async context =>
@@ -156,49 +116,6 @@ internal static class StartupExtensions
         builder.Logging.ClearProviders();
         builder.Services.AddOpenTelemetry().UseAzureMonitor(o =>
             o.ConnectionString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]);
-    }
-
-    // IdPMetadataUrl format: https://login.microsoftonline.com/{tenant-id}/federationmetadata/2007-06/federationmetadata.xml?appid={app-id}
-    internal static async Task LoadIdpMetadataAsync(WebApplication app, Saml2Configuration saml2Config)
-    {
-        var idpMetadataUrl = app.Configuration.GetSection("Saml2")["IdPMetadataUrl"];
-        if (string.IsNullOrEmpty(idpMetadataUrl) || !Uri.TryCreate(idpMetadataUrl, UriKind.Absolute, out var metadataUri))
-        {
-            Log.Warning("Saml2:IdPMetadataUrl is not a valid URL. " +
-                        "Set it to: https://login.microsoftonline.com/{{tenant-id}}/federationmetadata/2007-06/federationmetadata.xml?appid={{app-id}}");
-            return;
-        }
-
-        try
-        {
-            var httpClientFactory = app.Services.GetRequiredService<IHttpClientFactory>();
-            var entityDescriptor  = new EntityDescriptor();
-            await entityDescriptor.ReadIdPSsoDescriptorFromUrlAsync(httpClientFactory, metadataUri);
-
-            if (entityDescriptor.IdPSsoDescriptor != null)
-                ApplyIdpDescriptor(saml2Config, entityDescriptor.IdPSsoDescriptor);
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Could not load IdP metadata from {MetadataUrl}. " +
-                "Configure Saml2:IdPMetadataUrl with the Entra ID federation metadata URL.", idpMetadataUrl);
-        }
-    }
-
-    private static void ApplyIdpDescriptor(Saml2Configuration saml2Config, IdPSsoDescriptor descriptor)
-    {
-        saml2Config.SingleSignOnDestination = descriptor.SingleSignOnServices
-            .FirstOrDefault(s => s.Binding.OriginalString.Contains("HTTP-Redirect"))?.Location
-            ?? descriptor.SingleSignOnServices.FirstOrDefault()?.Location;
-
-        saml2Config.SingleLogoutDestination = descriptor.SingleLogoutServices
-            .FirstOrDefault()?.Location;
-
-        saml2Config.SignatureValidationCertificates.AddRange(descriptor.SigningCertificates);
-
-        Log.Information("Loaded SAML2 IdP metadata. SSO: {SsoUrl}. Signing certs: {CertCount}.",
-            saml2Config.SingleSignOnDestination,
-            saml2Config.SignatureValidationCertificates.Count);
     }
 
     internal static void UseServiceProblemHandling(this WebApplication app)
@@ -269,7 +186,7 @@ internal static class StartupExtensions
     }
 
     // Re-sign-in after a timeout: drop the stale cookies, then challenge the cookie scheme, which
-    // routes to /Saml2/login with a return to the home page (locally the dev bypass skips this).
+    // routes to /auth/login with a return to the home page (locally the dev bypass skips this).
     internal static void MapSignIn(this WebApplication app)
     {
         app.MapGet("/signin", (HttpContext context) =>
@@ -280,7 +197,7 @@ internal static class StartupExtensions
             if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("DevAuth:BypassEntraId"))
                 return Results.Redirect("/Index");
 
-            return Results.Challenge(new AuthenticationProperties { RedirectUri = "/Index" }, ["saml2"]);
+            return Results.Challenge(new AuthenticationProperties { RedirectUri = "/Index" }, [CookieAuthenticationDefaults.AuthenticationScheme]);
         }).AllowAnonymous();
     }
 }

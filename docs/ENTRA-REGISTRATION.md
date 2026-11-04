@@ -6,11 +6,11 @@
 
 ---
 
-## 1. Enterprise Application Settings
+## 1. App Registration Settings
 
 | Setting | Required value | Notes |
 |---|---|---|
-| App type | Non-gallery application | SSO via SAML |
+| App type | App registration (OpenID Connect) | Replaces the SAML Enterprise Application |
 | Application name | `HistopathologySystem` | Matches the legacy app name |
 | Assignment required | **No** | App `tblUser` table is the access gate; see `EntraID-Authentication-Process-Flow.md` |
 | Visible to users (My Apps) | No (recommended) | Prevents app appearing for users with no DB row |
@@ -18,46 +18,43 @@
 
 ---
 
-## 2. SAML Single Sign-On Configuration
+## 2. Authentication (Web platform)
 
-| Setting | Placeholder | Where to find / how to set |
-|---|---|---|
-| **Identifier (Entity ID)** | `__SP_ENTITY_ID_PLACEHOLDER__` | Set to the app's public URL, e.g. `https://histo.apha.gov.uk` |
-| **Reply URL (ACS)** | `__ACS_URL_PLACEHOLDER__` | `https://{app-host}/Saml2/acs` |
-| **Sign-on URL** | `__SIGN_ON_URL_PLACEHOLDER__` | `https://{app-host}/Saml2/login` |
-| **Logout URL** | `__LOGOUT_URL_PLACEHOLDER__` | `https://{app-host}/Saml2/slo` |
-| **NameID format** | `emailAddress` | Entra ID → SAML → NameIdentifier claim |
-| **Signature algorithm** | `RSA-SHA256` | Set in Signing section |
-| **Signing certificate** | Download `.cer` from Entra ID portal | Used to validate assertions in `appsettings.json` |
+| Setting | Value |
+|---|---|
+| **Redirect URI** | `https://{app-host}/signin-oidc` (one per environment; add `https://localhost:{port}/signin-oidc` to dev only) |
+| **Front-channel logout URL** | `https://{app-host}/signout-oidc` |
+| **Implicit grant (access / ID tokens)** | Both **off** — the app uses authorization code + PKCE |
+| **Client credential** | Client secret stored in Key Vault; App Service setting `AzureAd__ClientSecret` = Key Vault reference |
+| **API permissions** | `Microsoft Graph → User.Read` (delegated, default) plus `openid`, `profile`, `email` |
 
 ---
 
-## 3. Attribute / Claim Mapping
+## 3. Token Configuration (optional claims, ID token)
 
-Configure these in: Enterprise Application → Single sign-on → Attributes & Claims
+| Claim | Notes |
+|---|---|
+| `email` | Primary lookup key in `tblUser.Email` |
+| `preferred_username` | Emitted by default; UPN fallback when `email` is absent (guest accounts) |
+| `sid` | Lets `/signout-oidc` match the front-channel logout to the signed-in session |
 
-| Claim name | Source attribute | Notes |
-|---|---|---|
-| `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress` | `user.mail` | Primary lookup key in `tblUser.Email` |
-| `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name` | `user.displayname` | Display name |
-| `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier` | `user.userprincipalname` | NameID |
+No group or role claims are needed — groups and areas come from `tblUser`.
 
 ---
 
-## 4. Required `appsettings.json` Keys
+## 4. Required Configuration Keys
 
-After registration, populate these values in each environment's `appsettings.{env}.json`:
+Set per environment as App Service settings (`AzureAd__X`):
 
 | Key | Description |
 |---|---|
-| `Saml2:Issuer` | SP Entity ID — must match "Identifier" above |
-| `Saml2:SingleSignOnDestination` | Entra ID SSO URL — from SAML SSO setup page |
-| `Saml2:SingleLogoutDestination` | Entra ID SLO URL — from SAML SSO setup page |
-| `Saml2:IdPSigningCertificate` | Base64-encoded Entra ID signing certificate (`.cer` → base64) |
-| `Saml2:SPCertificateThumbprint` | SP signing cert thumbprint — from IIS/Key Vault cert store |
-| `Saml2:ForceAuthn` | `true` to make Entra ID re-prompt for credentials on every sign-in (e.g. after a session timeout); default `false` |
+| `AzureAd:TenantId` | Directory (tenant) ID |
+| `AzureAd:ClientId` | Application (client) ID |
+| `AzureAd:ClientSecret` | Key Vault reference only — never committed |
+| `AzureAd:PublicOrigin` | Public https origin (e.g. `https://dev-cde.azure.defra.cloud`) used for `redirect_uri` behind the edge proxy |
+| `AzureAd:ForceLogin` | `true` (default) sends `prompt=login`, so re-sign-in after a timeout asks for credentials |
 | `Session:IdleTimeoutMinutes` | Idle timeout for the auth cookie and session (default `20`, minimum `1`) |
-| `DataProtection:KeysPath` | Optional shared path for data-protection keys (cookies survive restarts/scale-out) |
+| `DataProtection:KeysPath` | Shared key ring — **required when running more than one instance**, or the OIDC `state` cannot be decrypted on the callback |
 
 ---
 
@@ -73,12 +70,11 @@ After registration, populate these values in each environment's `appsettings.{en
 
 ## 6. Post-Registration Checklist
 
-- [ ] Entra ID Enterprise Application created (SAML SSO type)
-- [ ] Entity ID, ACS URL, and Sign-on URL configured
-- [ ] Attribute/claim mapping set up (email, display name, NameID)
-- [ ] Entra ID signing certificate downloaded and base64-encoded into `appsettings.{env}.json`
-- [ ] `appsettings.Development.json` SSO/SLO URLs populated (dev tenant or test app)
-- [ ] SP signing certificate provisioned for non-dev environments
+- [ ] App registration created per environment (Web platform, redirect + front-channel logout URLs)
+- [ ] Optional ID token claims `email` and `sid` added
+- [ ] Client secret created and stored in Key Vault; App Service has `get` access to it
+- [ ] Pipeline variables `oidcClientId` / `oidcClientSecretUri` set for the stage
+- [ ] SAML Enterprise Application SSO and signing certificate retired after OIDC sign-off
 - [ ] `ISS-009` data migration run: `tblUser.Email` values verified against Entra ID UPNs
 - [ ] Dry-run reconciliation report produced and reviewed before go-live
 - [x] `Login.cshtml` and `Login.cshtml.cs` decommissioned — deleted 2026-08-28 (see `docs/ADR/ADR-006-manual-login-page-bridge.md`)

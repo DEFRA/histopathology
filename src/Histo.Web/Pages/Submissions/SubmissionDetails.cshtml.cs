@@ -195,6 +195,11 @@ public class SubmissionDetailsModel : HistoPageModel
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
 
+        // tissueId is client-controlled and DeleteTissue acts on the ID alone, so it must belong to this sample.
+        var owned = Animal is null ? [] : await _submissions.GetTissuesBySubmissionAsync(BatchId ?? 0, Animal.BatchSubmissionID);
+        if (owned.All(t => t.ID != tissueId))
+            return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
+
         await _submissions.DeleteTissueAsync(tissueId, TissueOwner.Submission, Session.UserID);
         await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 
@@ -19,13 +20,13 @@ public sealed class HistoOrMaintenancePageFilter : IAsyncPageFilter
         var user = context.HttpContext.User;
         if (user.Identity?.IsAuthenticated != true)
         {
-            context.Result = new ChallengeResult("saml2");
+            context.Result = new ChallengeResult(CookieAuthenticationDefaults.AuthenticationScheme);
             return;
         }
 
-        var group = user.FindFirst(AppClaimTypes.GroupName)?.Value;
-        if (group is not (HistoGroup or MaintenanceGroup))
+        if (!AuthorizationPolicies.IsHistoOrMaintenance(user))
         {
+            AuthorizationAudit.LogDenied(context.HttpContext, "group not permitted (Histopathology User or Maintenance required)");
             context.Result = new RedirectToPageResult("/Index");
             return;
         }
