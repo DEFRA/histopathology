@@ -610,7 +610,6 @@ stages:
   - stage: Prod
     displayName: PROD
     dependsOn:
-      - PreProd
       - Build
     # main-only: Pre-Prod/Prod deploy from main, DEV/TST deploy from develop.
     condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.PreProd.result, 'Succeeded', 'Skipped'), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.deployToProd }}', true))
