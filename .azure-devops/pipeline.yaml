@@ -32,6 +32,11 @@ parameters:
     type: boolean
     default: false
 
+  - name: deployToProd
+    displayName: Deploy to PROD
+    type: boolean
+    default: false
+
   - name: runSonar
     displayName: Run SonarCloud analysis
     type: boolean
@@ -65,11 +70,6 @@ parameters:
     displayName: Reset histology reference in Pre-Prod
     type: boolean
     default: false
-
-  # - name: deployToProd
-  #   displayName: Deploy to PROD
-  #   type: boolean
-  #   default: false
 
 variables:
   - name: buildConfiguration
@@ -485,9 +485,9 @@ stages:
     - name: appId
       value: 'f7c254a0-c424-4f68-b38c-842e01824a2b'
     - name: oidcClientId
-      value: '$(AzureAdClientId)'
+      value: 'f7c254a0-c424-4f68-b38c-842e01824a2b'
     - name: oidcClientSecretUri
-      value: '$(AzureAdClientSecretUri)'
+      value: 'https://precdeinfkv1401.vault.azure.net/secrets/histo-pre-azuread-clientsecret/'
     - name: sqlServer
       value: 'precdeinfsq1401.database.windows.net,1433'
     - name: sqlServerHost
@@ -607,110 +607,139 @@ stages:
                       -Authentication__Bypass "false"
                       -ConnectionStrings__HistologyDb "Server=tcp:$(sqlServer);Database=$(dbName);Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Managed Identity;"
 
-  # - stage: Prod
-  #   displayName: PROD
-  #   dependsOn: Build
-  #   # main-only: Pre-Prod/Prod deploy from main, DEV/TST deploy from develop.
-  #   condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.deployToProd }}', true))
-  #   variables:
-  #   - name: appName
-  #     value: 'PRD-CDE-Web-App'
-  #   - name: tenantId
-  #     value: '770a2450-0227-4c62-90c7-4e38537f1102'
-  #   - name: appId
-  #     value: '__PROD_APP_ID__'
-  #   - name: sqlServer
-  #     value: 'prdcdeinfsq1401.database.windows.net,1433'
-  #   - name: sqlServerHost
-  #     value: 'prdcdeinfsq1401.database.windows.net'
-  #   - name: dbName
-  #     value: 'histopathology'
-  #   - name: dbScriptsChanged
-  #     value: $[ stageDependencies.Build.build.outputs['detectDbChanges.dbScriptsChanged'] ]
-  #   jobs:
-  #     - deployment: deploy_prod
-  #       environment: 'prod'
-  #       pool:
-  #         name: 'DEFRA-COMMON-UBUNTU-SSV5'
-  #       strategy:
-  #         runOnce:
-  #           deploy:
-  #             steps:
-  #               - download: current
-  #                 artifact: drop
-  #
-  #               - script: |
-  #                   set -euo pipefail
-  #                   LOG_DIR="$(Agent.TempDirectory)/db-deploy-log"
-  #                   mkdir -p "$LOG_DIR"
-  #                   LOG_FILE="$LOG_DIR/db-deploy-PROD.log"
-  #                   if [ "$(dbScriptsChanged)" = "true" ]; then
-  #                     DECISION="Database script changes detected in this build - database deployment WILL be applied for PROD."
-  #                   elif [ "${{ parameters.runDatabaseScripts }}" = "True" ] || [ "${{ parameters.runDatabaseScripts }}" = "true" ]; then
-  #                     DECISION="'Run database deployment scripts' was selected (fresh / DR deployment) - database deployment WILL be applied for PROD."
-  #                   else
-  #                     DECISION="No database script changes and no manual request - database deployment WILL BE SKIPPED for PROD."
-  #                   fi
-  #                   {
-  #                     echo " Database deployment - PROD"
-  #                     echo "Server     : $(sqlServerHost)"
-  #                     echo "Database   : $(dbName)"
-  #                     echo "Decision   : $DECISION"
-  #                   } | tee "$LOG_FILE"
-  #                 displayName: 'Log database deployment decision'
-  #
-  #               - task: AzureCLI@2
-  #                 displayName: 'Apply database scripts'
-  #                 condition: or(eq(variables['dbScriptsChanged'], 'true'), eq('${{ parameters.runDatabaseScripts }}', true))
-  #                 inputs:
-  #                   azureSubscription: 'AZR-CDE-PRD1'
-  #                   scriptType: bash
-  #                   scriptLocation: inlineScript
-  #                   inlineScript: |
-  #                     set -euo pipefail
-  #
-  #                     TOOLS="$(Agent.TempDirectory)/sqlcmd"
-  #                     mkdir -p "$TOOLS"
-  #                     curl -sSL --fail --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
-  #                       https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.2/sqlcmd-linux-amd64.tar.bz2
-  #                     tar -xjf "$TOOLS/sqlcmd.tar.bz2" -C "$TOOLS"
-  #
-  #                     LOG_FILE="$(Agent.TempDirectory)/db-deploy-log/db-deploy-PROD.log"
-  #                     cd "$(Pipeline.Workspace)/drop/sql/Deploy"
-  #
-  #                     {
-  #                       echo "The following scripts will be applied, in order, to database '$(dbName)' on '$(sqlServerHost)':"
-  #                       grep -E '^[[:space:]]*:r[[:space:]]' Deploy.sql | sed -E 's#^[[:space:]]*:r[[:space:]]*(\.\./)*#  - #' || true
-  #                     } | tee -a "$LOG_FILE"
-  #
-  #                     "$TOOLS/sqlcmd" -S "$(sqlServerHost)" -d "$(dbName)" \
-  #                       --authentication-method ActiveDirectoryAzCli \
-  #                       -i "Deploy.sql" -b -t 0 2>&1 | tee -a "$LOG_FILE"
-  #
-  #                     echo "The scripts listed above ran successfully against database '$(dbName)' on server '$(sqlServerHost)'." | tee -a "$LOG_FILE"
-  #
-  #               - task: PublishPipelineArtifact@1
-  #                 displayName: 'Publish database deployment log'
-  #                 condition: and(succeededOrFailed(), or(eq(variables['dbScriptsChanged'], 'true'), eq('${{ parameters.runDatabaseScripts }}', true)))
-  #                 inputs:
-  #                   targetPath: '$(Agent.TempDirectory)/db-deploy-log'
-  #                   artifactName: 'db-deploy-log-PROD'
-  #
-  #               - task: AzureWebApp@1
-  #                 inputs:
-  #                   azureSubscription: 'AZR-CDE-PRD1'
-  #                   appType: 'webAppLinux'
-  #                   appName: '$(appName)'
-  #                   package: '$(Pipeline.Workspace)/drop/*.zip'
-  #                   runtimeStack: 'DOTNETCORE|10.0'
-  #                   deploymentMethod: 'zipDeploy'
-  #                   appSettings: >-
-  #                     -Saml2__SPEntityId "https://cde.azure.defra.cloud"
-  #                     -Saml2__PublicOrigin "https://cde.azure.defra.cloud"
-  #                     -Saml2__IdPEntityId "https://sts.windows.net/$(tenantId)/"
-  #                     -Saml2__IdPMetadataUrl "https://login.microsoftonline.com/$(tenantId)/federationmetadata/2007-06/federationmetadata.xml?appid=$(appId)"
-  #                     -Authentication__Bypass "false"
-  #                     -ConnectionStrings__HistologyDb "Server=tcp:$(sqlServer);Database=$(dbName);Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Managed Identity;"
+  - stage: Prod
+    displayName: PROD
+    dependsOn:
+      - Build
+    # main-only: Pre-Prod/Prod deploy from main, DEV/TST deploy from develop.
+    condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.PreProd.result, 'Succeeded', 'Skipped'), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.deployToProd }}', true))
+    variables:
+    - name: appName
+      value: 'PRDCDEWEBAW1401'
+    - name: tenantId
+      value: '770a2450-0227-4c62-90c7-4e38537f1102'
+    - name: appId
+      value: '__PROD_APP_ID__'
+    - name: oidcClientId
+      value: '__PROD_APP_ID__'
+    - name: oidcClientSecretUri
+      value: 'https://prdcdeinfkv1401.vault.azure.net/secrets/histo-prd-azuread-clientsecret/'
+    - name: sqlServer
+      value: 'prdcdeinfsq1401.database.windows.net,1433'
+    - name: sqlServerHost
+      value: 'prdcdeinfsq1401.database.windows.net'
+    - name: dbName
+      value: 'histopathology'
+    - name: dbScriptsChanged
+      value: $[ stageDependencies.Build.build.outputs['detectDbChanges.dbScriptsChanged'] ]
+    jobs:
+      - deployment: deploy_prod
+        environment: 'prod'
+        pool:
+          name: 'DEFRA-COMMON-UBUNTU-SSV5'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: drop
+
+                - script: |
+                    set -euo pipefail
+
+                    LOG_DIR="$(Agent.TempDirectory)/db-deploy-log"
+                    mkdir -p "$LOG_DIR"
+                    LOG_FILE="$LOG_DIR/db-deploy-PROD.log"
+
+                    if [ "$(dbScriptsChanged)" = "true" ]; then
+                      DECISION="Database script changes detected in this build - database deployment WILL be applied for PROD."
+                    elif [ "${{ parameters.runDatabaseScripts }}" = "True" ] || [ "${{ parameters.runDatabaseScripts }}" = "true" ]; then
+                      DECISION="'Run database deployment scripts' was selected (fresh / DR deployment) - database deployment WILL be applied for PROD."
+                    else
+                      DECISION="No database script changes and no manual request - database deployment WILL BE SKIPPED for PROD."
+                    fi
+
+                    {
+                      echo "============================================================"
+                      echo " Database deployment - PROD"
+                      echo "============================================================"
+                      printf 'Decided at : %(%Y-%m-%dT%H:%M:%SZ)T\n' -1
+                      echo "Server     : $(sqlServerHost)"
+                      echo "Database   : $(dbName)"
+                      echo "Build      : $(Build.BuildNumber)"
+                      echo "Commit     : $(Build.SourceVersion)"
+                      echo "Decision   : $DECISION"
+                    } | tee "$LOG_FILE"
+                  displayName: 'Log database deployment decision'
+
+                - task: AzureCLI@2
+                  displayName: 'Apply database scripts'
+                  condition: or(eq(variables['dbScriptsChanged'], 'true'), eq('${{ parameters.runDatabaseScripts }}', true))
+                  inputs:
+                    azureSubscription: 'AZR-CDE-PRD1'
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+
+                      TOOLS="$(Agent.TempDirectory)/sqlcmd"
+                      mkdir -p "$TOOLS"
+                      curl -sSL --fail --proto '=https' --tlsv1.2 --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
+                        https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.2/sqlcmd-linux-amd64.tar.bz2
+                      tar -xjf "$TOOLS/sqlcmd.tar.bz2" -C "$TOOLS"
+
+                      LOG_FILE="$(Agent.TempDirectory)/db-deploy-log/db-deploy-PROD.log"
+                      cd "$(Pipeline.Workspace)/drop/sql/Deploy"
+
+                      if [ "$(dbScriptsChanged)" = "true" ]; then
+                        TRIGGER="database script changes detected in this build"
+                      else
+                        TRIGGER="manually requested - fresh / DR deployment"
+                      fi
+
+                      {
+                        echo
+                        printf 'Started    : %(%Y-%m-%dT%H:%M:%SZ)T\n' -1
+                        echo "Triggered  : $TRIGGER"
+                        echo
+                        echo "The following scripts will be applied, in order, to database '$(dbName)' on '$(sqlServerHost)':"
+                        grep -E '^[[:space:]]*:r[[:space:]]' Deploy.sql | sed -E 's#^[[:space:]]*:r[[:space:]]*(\./)*#  - #' || true
+                        echo
+                        echo "--- sqlcmd output ---"
+                      } | tee -a "$LOG_FILE"
+
+                      "$TOOLS/sqlcmd" -S "$(sqlServerHost)" -d "$(dbName)" \
+                        --authentication-method ActiveDirectoryAzCli \
+                        -i "Deploy.sql" -b -t 0 2>&1 | tee -a "$LOG_FILE"
+
+                      {
+                        echo
+                        printf 'Completed  : %(%Y-%m-%dT%H:%M:%SZ)T\n' -1
+                        echo "The scripts listed above ran successfully against database '$(dbName)' on server '$(sqlServerHost)'."
+                      } | tee -a "$LOG_FILE"
+
+                - task: PublishPipelineArtifact@1
+                  displayName: 'Publish database deployment log'
+                  condition: and(succeededOrFailed(), or(eq(variables['dbScriptsChanged'], 'true'), eq('${{ parameters.runDatabaseScripts }}', true)))
+                  inputs:
+                    targetPath: '$(Agent.TempDirectory)/db-deploy-log'
+                    artifactName: 'db-deploy-log-PROD'
+
+                - task: AzureWebApp@1
+                  inputs:
+                    azureSubscription: 'AZR-CDE-PRD1'
+                    appType: 'webAppLinux'
+                    appName: '$(appName)'
+                    package: '$(Pipeline.Workspace)/drop/*.zip'
+                    runtimeStack: 'DOTNETCORE|10.0'
+                    deploymentMethod: 'zipDeploy'
+                    appSettings: >-
+                      -AzureAd__TenantId "$(tenantId)"
+                      -AzureAd__ClientId "$(oidcClientId)"
+                      -AzureAd__ClientSecret "@Microsoft.KeyVault(SecretUri=$(oidcClientSecretUri))"
+                      -AzureAd__PublicOrigin "https://histopathology.azure.defra.cloud"
+                      -Authentication__Bypass "false"
+                      -ConnectionStrings__HistologyDb "Server=tcp:$(sqlServer);Database=$(dbName);Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Managed Identity;"
 
   - stage: HistologyReferenceReset
     displayName: Histology Reference Reset
