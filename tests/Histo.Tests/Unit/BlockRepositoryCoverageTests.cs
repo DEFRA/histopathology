@@ -121,6 +121,22 @@ public class BlockRepositoryCoverageTests
         };
 
     [Fact]
+    public async Task Save_NewBlock_MapsSenderRefFromFullWidthGetBatchAnimalResultSet()
+    {
+        var wide = Table(
+            ("ID", typeof(int)), ("SenderRef", typeof(string)), ("HistologyRef", typeof(string)),
+            ("NextBlockRef", typeof(string)), ("OnHold", typeof(bool)), ("PMDate", typeof(DateTime)),
+            ("RowStamp", typeof(byte[])));
+        wide.Rows.Add(8, " S1 ", "26/1", "02", false, new DateTime(2026, 1, 1), new byte[8]);
+        var db = SaveDb(batchAnimal: Sets(wide), otherRefs: Sets(Strings()));
+
+        var id = await new BlockRepository(db).SaveAsync(NewBlock(blockRef: "01"), 3, ct: Ct);
+
+        Assert.Equal(77, id);
+        Assert.Equal("BookBlockRef:S1", Assert.Single(db.Commands, c => c.Text == "sp_getapplock").Parameters["Resource"]);
+    }
+
+    [Fact]
     public async Task Save_NewUsedBlock_SenderOnBatchAndRefFree_InsertsUnderLockAndCommits()
     {
         var db = SaveDb(batchAnimal: Sets(Animals((8, " S1 "))), otherRefs: Sets(Strings("09")));
