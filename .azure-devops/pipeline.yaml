@@ -611,6 +611,7 @@ stages:
     displayName: PROD
     dependsOn:
       - Build
+      - PreProd
     # main-only: Pre-Prod/Prod deploy from main, DEV/TST deploy from develop.
     condition: and(in(dependencies.Build.result, 'Succeeded'), in(dependencies.PreProd.result, 'Succeeded', 'Skipped'), ne(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.deployToProd }}', true))
     variables:
@@ -619,7 +620,7 @@ stages:
     - name: tenantId
       value: '770a2450-0227-4c62-90c7-4e38537f1102'
     - name: appId
-      value: '__PROD_APP_ID__'
+      value: '6a46ba34-8f48-4819-809c-3d3d66633b0c'
     - name: oidcClientId
       value: '__PROD_APP_ID__'
     - name: oidcClientSecretUri
@@ -720,7 +721,7 @@ stages:
 
                 - task: PublishPipelineArtifact@1
                   displayName: 'Publish database deployment log'
-                  condition: and(succeededOrFailed(), or(eq(variables['dbScriptsChanged'], 'true'), eq('${{ parameters.runDatabaseScripts }}', true)))
+                  condition: and(succeeded(), or(eq(variables['dbScriptsChanged'], 'true'), eq('${{ parameters.runDatabaseScripts }}', true)))
                   inputs:
                     targetPath: '$(Agent.TempDirectory)/db-deploy-log'
                     artifactName: 'db-deploy-log-PROD'
