@@ -75,7 +75,7 @@ try
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
-        options.KnownIPNetworks.Clear();
+        options.KnownNetworks.Clear();
         options.KnownProxies.Clear();
     });
 
@@ -212,6 +212,28 @@ try
     app.UseSaml2();         // ITfoxtec SAML2 middleware — must follow UseAuthentication
 
     app.UseSessionExpiryRedirect();
+    // Local-dev only: impersonate DevAuth:UserEmail (resolved against tblUser) instead of signing in via Entra ID.
+    if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("DevAuth:BypassEntraId"))
+    {
+        var devEmail = app.Configuration["DevAuth:UserEmail"] ?? string.Empty;
+        Log.Warning("DevAuth:BypassEntraId is ON — Entra ID sign-in is bypassed; acting as {Email}.", devEmail);
+        app.Use(async (context, next) =>
+        {
+            if (context.User.Identity?.IsAuthenticated != true)
+            {
+                var identity = new System.Security.Claims.ClaimsIdentity(
+                    [
+                        new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, "dev-bypass"),
+                        new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Email, devEmail),
+                    ],
+                    authenticationType: "DevBypass");
+                var transformation = context.RequestServices.GetRequiredService<IClaimsTransformation>();
+                context.User = await transformation.TransformAsync(new System.Security.Claims.ClaimsPrincipal(identity));
+            }
+            await next();
+        });
+    }
+
 
     app.UseAuthorization();
 

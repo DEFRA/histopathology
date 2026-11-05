@@ -77,6 +77,7 @@ public class UserMaintenanceModel : GridPageModel
 
     public async Task OnGetAsync()
     {
+        System.Diagnostics.Debugger.Break(); // TEMP: remove after debugging
         ViewData["Title"] = "User maintenance";
         ViewData["PageTitle"] = "User maintenance";
         StatusMessage = TempData["StatusMessage"] as string;

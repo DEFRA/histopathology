@@ -2,7 +2,7 @@
 
   <!-- Phase 1 stub — no source files yet. Implementation begins in Phase 3. -->
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Histo.Reporting</RootNamespace>

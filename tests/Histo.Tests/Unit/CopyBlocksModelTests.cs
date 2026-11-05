@@ -39,7 +39,7 @@ public class CopyBlocksModelTests
         _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BlockTest>)[]);
         _blocks.Setup(b => b.CopyBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<int>(),
-                It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>()))
+                It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(99);
     }
 

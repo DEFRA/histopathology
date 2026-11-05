@@ -74,7 +74,7 @@ public class CopySamplesModelTests
             ]);
         _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BlockTest>)[]);
-        _blocks.Setup(b => b.CopyBlockAsync(sourceBlock, 5, 20, It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>()))
+        _blocks.Setup(b => b.CopyBlockAsync(sourceBlock, 5, 20, It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(55);
 
         var sut = CreateSut();
@@ -108,9 +108,9 @@ public class CopySamplesModelTests
         _submissions.Setup(s => s.GetTissuesByBlockAsync(9, 1, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _blockTests.Setup(t => t.GetAllSelectionsByBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<BlockTest>)[]);
-        _blocks.Setup(b => b.CopyBlockAsync(sourceBlock, 5, It.IsAny<int>(), It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>()))
+        _blocks.Setup(b => b.CopyBlockAsync(sourceBlock, 5, It.IsAny<int>(), It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(55);
-        _blocks.Setup(b => b.CopyBlockAsync(sourceBlock, 5, failingAnimalId, It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>()))
+        _blocks.Setup(b => b.CopyBlockAsync(sourceBlock, 5, failingAnimalId, It.IsAny<List<string>>(), It.IsAny<List<int>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
         var sut = CreateSut();
