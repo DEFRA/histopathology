@@ -46,7 +46,7 @@ public class OidcSignInHandlerTests
         Assert.Equal("2", principal.FindFirstValue(AppClaimTypes.GroupId));
         Assert.Equal("Histopath", principal.FindFirstValue(AppClaimTypes.UserArea));
         Assert.Equal("7", principal.FindFirstValue(AppClaimTypes.UserAreaId));
-        Assert.Equal(await _cache.GetStringAsync("session-stamp:42"), principal.FindFirstValue(AppClaimTypes.SessionStamp));
+        Assert.Equal(await _cache.GetStringAsync("session-stamp:42", TestContext.Current.CancellationToken), principal.FindFirstValue(AppClaimTypes.SessionStamp));
     }
 
     [Theory]
