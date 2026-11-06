@@ -46,6 +46,7 @@ public sealed class OidcSignInHandler
         identity.AddClaim(SingleSessionPolicy.StampClaim(
             await SingleSessionPolicy.IssueStampAsync(_cache, user.UserID.ToString())));
 
-        _logger.LogInformation("OIDC sign-in completed. ObjectId: {ObjectId}", objectId);
+        if (_logger.IsEnabled(LogLevel.Information))
+            _logger.LogInformation("OIDC sign-in completed. ObjectId: {ObjectId}", objectId);
     }
 }

@@ -36,7 +36,7 @@ public sealed class HistopathologyClaimsTransformation : IClaimsTransformation
 
     public async Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
     {
-        if (principal.Identity?.IsAuthenticated != true)
+        if (principal.Identity is not ClaimsIdentity { IsAuthenticated: true } identity)
             return principal;
 
         var email = EntraIdClaims.Email(principal);
@@ -58,7 +58,7 @@ public sealed class HistopathologyClaimsTransformation : IClaimsTransformation
             return principal; // no GroupName added → HistoPageModel redirects to AccessDenied
         }
 
-        ApplyAppClaims((ClaimsIdentity)principal.Identity!, user);
+        ApplyAppClaims(identity, user);
         return principal;
     }
 
