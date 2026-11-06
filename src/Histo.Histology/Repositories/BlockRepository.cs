@@ -109,6 +109,7 @@ public sealed class BlockRepository : IBlockRepository
     }
 
     // Dapper maps the SPs' wider result sets by property name; a positional record needs a ctor covering every column.
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Major Code Smell", "S1144", Justification = "Set by Dapper via reflection.")]
     private sealed class AnimalSenderRow
     {
         public int ID { get; init; }
