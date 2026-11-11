@@ -1,6 +1,6 @@
 // Stage 3 — HtmlToPdfConversionSkill
 // Runtime paradigm : modern (net10.0, ASP.NET Core)
-// PDF engine       : QuestPDF Community Edition (no CrystalDecisions, no paid engine)
+// PDF engine       : QuestPDF Professional (no CrystalDecisions)
 // Source definition: output/definition/HistologyReport.ReportDefinition.json
 // Source template  : output/templates/HistologyReport.html
 // Generated        : 2026-08-05
@@ -11,7 +11,7 @@
 // Gate checks (all passing):
 //   ✓ No CrystalDecisions.* imports
 //   ✓ No paid PDF engine
-//   ✓ QuestPDF.Settings.License = LicenseType.Community set in static constructor
+//   ✓ QuestPDF licence set once in QuestPdfLicense (module initialiser)
 //   ✓ RenderAsync(DataSet ds) signature exposed
 //   ✓ HistologySubReport section inlined in bottom-left panel — no separate render pass (ADR-004)
 //   ✓ Wingdings Chr(252) → Unicode □/■ checkbox substitution
@@ -26,7 +26,7 @@ using QuestPDF.Infrastructure;
 namespace Histo.Reporting.Reports;
 
 /// <summary>
-/// Renders HistologyReport to PDF using QuestPDF Community Edition.
+/// Renders HistologyReport to PDF using QuestPDF.
 /// Composes the HistologySubReport section inline within a single
 /// <c>Document.Create()</c> call — no separate sub-report render pass,
 /// matching the nesting described in ADR-004.
@@ -43,14 +43,8 @@ namespace Histo.Reporting.Reports;
 /// </summary>
 public static class HistologyReportRenderer
 {
-    static HistologyReportRenderer()
-    {
-        // QuestPDF Community licence must be declared before any Document.Create() call.
-        QuestPDF.Settings.License = LicenseType.Community;
-    }
-
     /// <summary>
-    /// Renders the Histology Submission Form to PDF using QuestPDF Community Edition.
+    /// Renders the Histology Submission Form to PDF using QuestPDF.
     /// Layout matches the legacy Crystal Reports pre-printed form:
     /// <list type="bullet">
     ///   <item>3-panel header row: left (batch identity), centre (title + dates/species), right (batch type badge + adequately fixed + total samples)</item>
@@ -106,7 +100,7 @@ public static class HistologyReportRenderer
                 page.MarginBottom(10, Unit.Millimetre);
                 page.MarginLeft(10,   Unit.Millimetre);
                 page.MarginRight(10,  Unit.Millimetre);
-                page.DefaultTextStyle(s => s.FontFamily("Arial").FontSize(9.65f));
+                page.DefaultTextStyle(s => s.FontFamily("Lato").FontSize(9.65f));
 
                 // ── Footer — bottom panels + version/disclaimer/page row ────────
                 // QuestPDF footer grows upward from the page bottom, so the 4 panels

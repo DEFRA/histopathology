@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.RazorPages.Infrastructure;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 
@@ -38,7 +39,10 @@ public class BatchAccessGuardTests
         var httpContext = new DefaultHttpContext
         {
             User = new ClaimsPrincipal(identity),
-            RequestServices = new ServiceCollection().AddSingleton(_batches.Object).BuildServiceProvider(),
+            RequestServices = new ServiceCollection()
+                .AddSingleton(_batches.Object)
+                .AddSingleton<IConfiguration>(new ConfigurationBuilder().Build())
+                .BuildServiceProvider(),
         };
         var pageContext = new PageContext(new ActionContext(httpContext, new RouteData(), new PageActionDescriptor()));
         var model = new ArchiveMenuModel(_session.Object) { PageContext = pageContext, BatchId = batchId };

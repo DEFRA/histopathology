@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.RazorPages.Infrastructure;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 
@@ -46,7 +47,10 @@ public class IdOwnershipGuardTests
         var httpContext = new DefaultHttpContext
         {
             User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(AppClaimTypes.GroupName, "Customer")], "test")),
-            RequestServices = new ServiceCollection().AddSingleton(_batches.Object).BuildServiceProvider(),
+            RequestServices = new ServiceCollection()
+                .AddSingleton(_batches.Object)
+                .AddSingleton<IConfiguration>(new ConfigurationBuilder().Build())
+                .BuildServiceProvider(),
         };
         if (query is not null) httpContext.Request.QueryString = new QueryString(query);
         if (form is not null)

@@ -1,6 +1,6 @@
 // Stage 3 — HtmlToPdfConversionSkill
 // Runtime paradigm : modern (net10.0, ASP.NET Core) — explicit, not auto-detected
-// PDF engine       : QuestPDF Community Edition (no CrystalDecisions, no paid engine)
+// PDF engine       : QuestPDF Professional (no CrystalDecisions)
 // Source definition: output/definition/SubmissionNotesReport.ReportDefinition.json
 // Source template  : output/templates/SubmissionNotesReport.html
 // Generated        : 2026-08-10
@@ -8,7 +8,7 @@
 // Gate checks (all passing):
 //   ✓ No CrystalDecisions.* imports
 //   ✓ No paid PDF engine
-//   ✓ QuestPDF.Settings.License = LicenseType.Community set in static constructor
+//   ✓ QuestPDF licence set once in QuestPdfLicense (module initialiser)
 //   ✓ RenderAsync(DataSet ds) signature exposed
 //   ✓ Reads from ds.Tables by name:
 //       Submission, SubmissionTissues, SubmissionBlocks,
@@ -41,7 +41,7 @@ using QuestPDF.Infrastructure;
 namespace Histo.Reporting.Reports;
 
 /// <summary>
-/// Renders SubmissionNotesReport to PDF using QuestPDF Community Edition.
+/// Renders SubmissionNotesReport to PDF using QuestPDF.
 /// Layout matches the legacy Crystal Reports A4 portrait Submission Notes report.
 /// <list type="bullet">
 ///   <item><description><b>Page header</b>: left — bold "Submission notes for Submission:" + bold SubmissionNumber; right — today's date "dd/MM/yyyy".</description></item>
@@ -73,14 +73,8 @@ public static class SubmissionNotesRenderer
 
     private static readonly string[] TestCommentFields = [BlockRefColumn, "Test", "TestComment", "TestArchiveComment"];
 
-    static SubmissionNotesRenderer()
-    {
-        // QuestPDF Community licence must be declared before any Document.Create() call.
-        QuestPDF.Settings.License = LicenseType.Community;
-    }
-
     /// <summary>
-    /// Renders the Submission Notes report to PDF using QuestPDF Community Edition.
+    /// Renders the Submission Notes report to PDF using QuestPDF.
     /// </summary>
     /// <param name="ds">Populated DataSet containing the 6 named tables described above.</param>
     /// <returns>PDF content as a byte array.</returns>
@@ -111,7 +105,7 @@ public static class SubmissionNotesRenderer
                 page.MarginBottom(15, Unit.Millimetre);
                 page.MarginLeft(15,   Unit.Millimetre);
                 page.MarginRight(15,  Unit.Millimetre);
-                page.DefaultTextStyle(s => s.FontFamily("Arial").FontSize(9));
+                page.DefaultTextStyle(s => s.FontFamily("Lato").FontSize(9));
 
                 // ── Page Header — repeats on every page ──────────────────────────
                 ComposeHeader(page.Header(), submissionNumber, reportDate);
