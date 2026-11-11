@@ -158,7 +158,8 @@ public static class HistologyReportRenderer
                         {
                             b.Spacing(2);
                             b.Item().Text("Fixation").Bold().FontSize(9.65f);
-                            b.Item().Text(fixation).FontSize(9.65f);
+                            // ShowIf: QuestPDF 2026+ reserves a blank line for empty text; older versions collapsed it.
+                            b.Item().ShowIf(!string.IsNullOrEmpty(fixation)).Text(fixation).FontSize(9.65f);
 
                             b.Item().PaddingTop(3).Text("Post Fixation").Bold().FontSize(9.65f);
 

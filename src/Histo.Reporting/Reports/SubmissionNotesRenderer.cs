@@ -206,7 +206,7 @@ public static class SubmissionNotesRenderer
             {
                 c.Spacing(2);
                 c.Item().Text("Submission Comments").Bold();
-                c.Item().Text(comments);
+                c.Item().ShowIf(!string.IsNullOrEmpty(comments)).Text(comments);
             });
 
             // 20pt gutter between the two columns
@@ -216,7 +216,7 @@ public static class SubmissionNotesRenderer
             {
                 c.Spacing(2);
                 c.Item().Text("Submission Status Comments").Bold();
-                c.Item().Text(statusComments);
+                c.Item().ShowIf(!string.IsNullOrEmpty(statusComments)).Text(statusComments);
             });
         });
     }
