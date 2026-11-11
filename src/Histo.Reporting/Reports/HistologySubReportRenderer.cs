@@ -72,7 +72,7 @@ public static class HistologySubReportRenderer
                 // For standalone rendering A4 with zero margin preserves that expectation.
                 page.Size(PageSizes.A4);
                 page.Margin(0);
-                page.DefaultTextStyle(style => style.FontFamily("Lato").FontSize(9));
+                page.DefaultTextStyle(style => style.FontFamily("Liberation Sans").FontSize(9));
 
                 page.Content().Column(col =>
                 {

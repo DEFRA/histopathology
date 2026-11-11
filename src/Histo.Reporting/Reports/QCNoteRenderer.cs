@@ -79,7 +79,7 @@ public static class QCNoteRenderer
                 page.MarginBottom(15, Unit.Millimetre);
                 page.MarginLeft(15,   Unit.Millimetre);
                 page.MarginRight(15,  Unit.Millimetre);
-                page.DefaultTextStyle(s => s.FontFamily("Lato").FontSize(9));
+                page.DefaultTextStyle(s => s.FontFamily("Liberation Sans").FontSize(9));
 
                 // ── Footer — CreatedBy left, DateCreated right ───────────────────
                 // Pinned to the page bottom; grows upward so content area remains
@@ -137,8 +137,8 @@ public static class QCNoteRenderer
                         body.Spacing(4);
                         var qcTextHasEmbeddedSummary = qcText.TrimStart().StartsWith("Sender Ref", StringComparison.Ordinal);
                         if (!string.IsNullOrEmpty(testSummary) && !qcTextHasEmbeddedSummary)
-                            body.Item().Text(testSummary).FontFamily("Lato").FontSize(9);
-                        body.Item().Text(qcText).FontFamily("Lato").FontSize(9);
+                            body.Item().Text(testSummary).FontFamily("Liberation Mono").FontSize(9);
+                        body.Item().Text(qcText).FontFamily("Liberation Mono").FontSize(9);
                     });
                 });
             });

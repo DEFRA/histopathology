@@ -105,7 +105,7 @@ public static class SubmissionNotesRenderer
                 page.MarginBottom(15, Unit.Millimetre);
                 page.MarginLeft(15,   Unit.Millimetre);
                 page.MarginRight(15,  Unit.Millimetre);
-                page.DefaultTextStyle(s => s.FontFamily("Lato").FontSize(9));
+                page.DefaultTextStyle(s => s.FontFamily("Liberation Sans").FontSize(9));
 
                 // ── Page Header — repeats on every page ──────────────────────────
                 ComposeHeader(page.Header(), submissionNumber, reportDate);

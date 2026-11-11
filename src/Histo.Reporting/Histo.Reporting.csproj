@@ -17,6 +17,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- QuestPDF 2026.9+ ignores system fonts; Liberation Sans/Mono (SIL OFL) are metric-compatible with Arial/Courier-width text and are auto-registered from the output folder. -->
+    <Content Include="Fonts\*.ttf" CopyToOutputDirectory="PreserveNewest" Link="Fonts\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Histo.Infrastructure\Histo.Infrastructure.csproj" />
     <ProjectReference Include="..\Histo.Submissions\Histo.Submissions.csproj" />
     <ProjectReference Include="..\Histo.Administration\Histo.Administration.csproj" />

@@ -100,7 +100,7 @@ public static class HistologyReportRenderer
                 page.MarginBottom(10, Unit.Millimetre);
                 page.MarginLeft(10,   Unit.Millimetre);
                 page.MarginRight(10,  Unit.Millimetre);
-                page.DefaultTextStyle(s => s.FontFamily("Lato").FontSize(9.65f));
+                page.DefaultTextStyle(s => s.FontFamily("Liberation Sans").FontSize(9.65f));
 
                 // ── Footer — bottom panels + version/disclaimer/page row ────────
                 // QuestPDF footer grows upward from the page bottom, so the 4 panels
