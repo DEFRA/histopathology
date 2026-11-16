@@ -18,8 +18,9 @@
         </tr>
     </thead>
     <tbody class="govuk-table__body">
-        @foreach (var tableName in Model.GetPagedEntries().Select(l => l.TableName))
+        @foreach (var lookup in Model.GetPagedEntries())
         {
+            var tableName = lookup.TableName;
             <tr class="govuk-table__row">
                 <td class="govuk-table__cell">@tableName</td>
                 <td class="govuk-table__cell govuk-table__cell--numeric">
@@ -29,7 +30,7 @@
                     }
                     else
                     {
-                        <a asp-page="/Admin/LookupItems" class="govuk-link">Edit items<span class="govuk-visually-hidden"> for @tableName</span></a>
+                        <a asp-page="/Admin/LookupItems" asp-route-tableId="@lookup.ID" class="govuk-link">Edit items<span class="govuk-visually-hidden"> for @tableName</span></a>
                     }
                 </td>
             </tr>
