@@ -581,7 +581,6 @@ public class SubmissionRepositoryTests
 
     private static FakeDb CopyDb(Action<FakeDb.ExecutedCommand>? extra = null) => new()
     {
-        OnQuery = c => c.Text == "GetUnusedHistologyRefs" ? Sets(Table(("Ref", typeof(string)))) : null,
         OnExecute = c =>
         {
             extra?.Invoke(c);
@@ -609,7 +608,7 @@ public class SubmissionRepositoryTests
         Assert.False(db.RolledBack);
         Assert.Equal(
             ["AddBatch", "AddHistology", "AddHistology", "AddAntibodies", "AddSpecialStain", "AddSubmittedAs",
-             "GetUnusedHistologyRefs", "GetNextHistologyRef", "AddAnimal", "AddBatchSubmission", "AddTissue",
+             "GetNextHistologyRef", "AddAnimal", "AddBatchSubmission", "AddTissue",
              "AddBlock", "AddBlockTissue", "AddBlockHistology", "AddBlockAntibodies", "AddBlockStain",
              "AddBlock", "AddBlockTissue", "AddBlockHistology", "AddBlockAntibodies", "AddBlockStain"],
             db.Commands.Select(c => c.Text));
@@ -758,21 +757,24 @@ public class SubmissionRepositoryTests
     }
 
     [Fact]
-    public async Task CreateBatchWithCopiedSamples_ReusesPooledCurrentYearRefInTypeRange_WithoutDrawingNext()
+    public async Task CreateBatchWithCopiedSamples_PooledRefsExist_IgnoresThePoolAndDrawsFromTheCounter()
     {
         var year = DateTime.Now.Year % 100;
         var pool = Table(("Ref", typeof(string)));
-        pool.Rows.Add($"{year:D2}/20007");
         pool.Rows.Add($"{year:D2}/20003");
-        pool.Rows.Add($"{year:D2}/10003");
-        pool.Rows.Add($"{(year + 1) % 100:D2}/20001");
         var db = CopyDb();
+        var original = db.OnExecute;
+        db.OnExecute = c =>
+        {
+            original(c);
+            if (c.Text == "GetNextHistologyRef") Out(c, "NextHistologyRef", "20005");
+        };
         db.OnQuery = c => c.Text == "GetUnusedHistologyRefs" ? Sets(pool) : null;
 
         await new SubmissionRepository(db).CreateBatchWithCopiedSamplesAsync(new Batch(), Codes, null, [Sample(histologyType: 2)], 7, Ct);
 
-        Assert.DoesNotContain(db.Commands, c => c.Text == "GetNextHistologyRef");
-        Assert.Equal($"{year:D2}/20003", db.Commands.Single(c => c.Text == "AddAnimal").Parameters["HistologyRef"]);
+        Assert.DoesNotContain(db.Commands, c => c.Text == "GetUnusedHistologyRefs");
+        Assert.Equal($"{year:D2}/20005", db.Commands.Single(c => c.Text == "AddAnimal").Parameters["HistologyRef"]);
     }
 
     [Theory]

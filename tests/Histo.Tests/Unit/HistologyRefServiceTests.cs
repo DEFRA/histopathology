@@ -40,7 +40,7 @@ public class HistologyRefServiceTests
     }
 
     [Fact]
-    public async Task GetNextAvailableRefAsync_PrefersLowestPooledRefOfTheCurrentYear()
+    public async Task GetNextAvailableRefAsync_PooledRefsExist_IgnoresThePoolAndDrawsFromTheCounter()
     {
         _repo.Setup(r => r.GetUnusedRefsAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<HistologyRef>)
@@ -49,11 +49,13 @@ public class HistologyRefServiceTests
                 new HistologyRef { Ref = $"{ThisYear}/60500" },
                 new HistologyRef { Ref = $"{ThisYear}/60120" },
             ]);
+        _repo.Setup(r => r.DrawNextRefAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()))
+            .ReturnsAsync("60002");
 
         var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects, ct: TestContext.Current.CancellationToken);
 
-        Assert.Equal($"{ThisYear}/60120", result);
-        _repo.Verify(r => r.DrawNextRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal($"{ThisYear}/60002", result);
+        _repo.Verify(r => r.GetUnusedRefsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

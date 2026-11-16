@@ -41,6 +41,7 @@ public class SubmissionDetailsBlockHandlerTests
         _lookups.Setup(l => l.GetHistologyTypesAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[]);
         _histologyRefs.Setup(h => h.GetUnusedRefsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<HistologyRef>)[]);
         _histologyRefs.Setup(h => h.GetCountersAsync(It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<HistologyRefCounter>)[]);
+        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
     }
 
     private SubmissionDetailsBlockModel CreateSut(Animal? animal = null, int? batchId = 5, int? animalId = 1,
@@ -572,68 +573,51 @@ public class SubmissionDetailsBlockHandlerTests
     }
 
     [Fact]
-    public async Task OnPostGetNextHistologyRef_PooledRefOfCurrentYear_UsesLowestPooledRef()
+    public async Task OnPostGetNextHistologyRef_DrawsFromTheCounterAndIgnoresPooledRefs()
     {
         var sut = CreateSut(new Animal { ID = 1 });
         sut.HistologyRefType = HistologyRefTypeCode.GeneralPool;
         _histologyRefs.Setup(h => h.GetUnusedRefsAsync(4, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<HistologyRef>)[
-            new HistologyRef { Ref = $"{Yy}/40009", HistologyType = 4 },
-            new HistologyRef { Ref = $"{Yy}/40005", HistologyType = 4 },
-            new HistologyRef { Ref = "01/40001", HistologyType = 4 },
+            new HistologyRef { Ref = $"{Yy}/40064", HistologyType = 4 },
         ]);
+        _histologyRefs.Setup(h => h.GetNextAvailableRefAsync(4, It.IsAny<CancellationToken>())).ReturnsAsync($"{Yy}/40699");
 
         await sut.OnPostGetNextHistologyRefAsync();
 
-        Assert.Equal($"{Yy}/40005", sut.Animal!.HistologyRef);
+        Assert.Equal($"{Yy}/40699", sut.Animal!.HistologyRef);
         Assert.True(sut.HrAssignedThisVisit);
-        Assert.Equal($"{Yy}/40005", sut.EditHistologyRef);
+        Assert.Equal($"{Yy}/40699", sut.EditHistologyRef);
+        Assert.Null(sut.ErrorMessage);
+        _histologyRefs.Verify(h => h.GetUnusedRefsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task OnPostGetNextHistologyRef_EmptyPool_MintsFromCounterAndAdvancesIt()
+    public async Task OnPostGetNextHistologyRef_SaveRejected_ShowsErrorAndDoesNotShowTheRefAsAssigned()
     {
         var sut = CreateSut(new Animal { ID = 1 });
         sut.HistologyRefType = HistologyRefTypeCode.GeneralPool;
-        _histologyRefs.Setup(h => h.GetCountersAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<HistologyRefCounter>)[new HistologyRefCounter { Type = 4, NextHistologyRef = "40010" }]);
-        _histologyRefs.Setup(h => h.SetCounterAsync(4, "40011", It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _histologyRefs.Setup(h => h.GetNextAvailableRefAsync(4, It.IsAny<CancellationToken>())).ReturnsAsync($"{Yy}/40699");
+        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
         await sut.OnPostGetNextHistologyRefAsync();
 
-        Assert.EndsWith("/40010", sut.Animal!.HistologyRef, StringComparison.Ordinal);
-        Assert.Null(sut.ErrorMessage);
+        Assert.Contains("could not be saved", sut.ErrorMessage, StringComparison.Ordinal);
+        Assert.Null(sut.Animal!.HistologyRef);
+        Assert.False(sut.HrAssignedThisVisit);
     }
 
-    [Theory]
-    [InlineData(false, "40010")]
-    [InlineData(true, "abc")]
-    [InlineData(true, "39999")]
-    [InlineData(true, "60000")]
-    public async Task OnPostGetNextHistologyRef_CounterUnusable_ShowsNoRefAvailable(bool hasCounter, string next)
+    [Fact]
+    public async Task OnPostGetNextHistologyRef_NoRefAvailable_ShowsNoRefAvailable()
     {
         var sut = CreateSut(new Animal { ID = 1 });
         sut.HistologyRefType = HistologyRefTypeCode.GeneralPool;
-        _histologyRefs.Setup(h => h.GetCountersAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(hasCounter ? (IReadOnlyList<HistologyRefCounter>)[new HistologyRefCounter { Type = 4, NextHistologyRef = next }] : []);
+        _histologyRefs.Setup(h => h.GetNextAvailableRefAsync(4, It.IsAny<CancellationToken>())).ReturnsAsync((string?)null);
 
         await sut.OnPostGetNextHistologyRefAsync();
 
         Assert.Contains("No histology reference is available", sut.ErrorMessage, StringComparison.Ordinal);
         Assert.False(sut.HrAssignedThisVisit);
-    }
-
-    [Fact]
-    public async Task OnPostGetNextHistologyRef_CounterAdvanceFails_ShowsNoRefAvailable()
-    {
-        var sut = CreateSut(new Animal { ID = 1 });
-        sut.HistologyRefType = HistologyRefTypeCode.GeneralPool;
-        _histologyRefs.Setup(h => h.GetCountersAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<HistologyRefCounter>)[new HistologyRefCounter { Type = 4, NextHistologyRef = "40010" }]);
-        _histologyRefs.Setup(h => h.SetCounterAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
-
-        await sut.OnPostGetNextHistologyRefAsync();
-
-        Assert.NotNull(sut.ErrorMessage);
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

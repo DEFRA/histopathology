@@ -32,10 +32,10 @@ public interface IHistologyRefService
 
     /// <summary>
     /// Draws the next available ref for a type, formatted as <c>yy/NNNNN</c> with the CURRENT
-    /// two-digit year. Takes the lowest-numbered current-year ref from the pre-booked-but-unused
-    /// pool (<see cref="GetUnusedRefsAsync"/>) first, then falls back to minting from the type's
-    /// counter and advancing it. Returns <see langword="null"/> when the type has no range of its
-    /// own (e.g. "use pg number") or no counter row.
+    /// two-digit year, by minting from the type's counter and advancing it. The pre-booked unused
+    /// pool is deliberately NOT used — legacy never read persisted pool rows when picking, and handing
+    /// them to unrelated samples gave scattered out-of-order refs. Returns <see langword="null"/> when
+    /// the type has no range of its own (e.g. "use pg number") or no counter row.
     ///
     /// Legacy source: <c>clsHistology.GetNextAvailableHistologyRef</c> (SP <c>GetNextHistologyRef</c>).
     /// </summary>

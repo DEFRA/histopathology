@@ -206,9 +206,9 @@ public class HistologyRefServiceCoverageTests
     }
 
     [Fact]
-    public async Task GetNextAvailableRefAsync_PoolThrows_ReturnsNullAndLogs()
+    public async Task GetNextAvailableRefAsync_CounterDrawThrows_ReturnsNullAndLogs()
     {
-        _repo.Setup(r => r.GetUnusedRefsAsync(1, Ct)).ThrowsAsync(Boom);
+        _repo.Setup(r => r.DrawNextRefAsync(1, Ct)).ThrowsAsync(Boom);
 
         Assert.Null(await Sut().GetNextAvailableRefAsync(1, Ct));
         VerifyLogged();

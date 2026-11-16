@@ -472,12 +472,8 @@ public partial class SubmissionDetailsBlockModelTests
     {
         var animal = new Animal { ID = 1, SenderRef = "S1", HistologyRef = "16/40135" };
         _session.Setup(s => s.UserArea).Returns("Histopath");
-        _histologyRefs.Setup(h => h.GetUnusedRefsAsync(HistologyRefTypeCode.Neuropath, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<HistologyRef>)[]);
-        _histologyRefs.Setup(h => h.GetCountersAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<HistologyRefCounter>)[new HistologyRefCounter { Type = HistologyRefTypeCode.Neuropath, NextHistologyRef = "10001" }]);
-        _histologyRefs.Setup(h => h.SetCounterAsync(HistologyRefTypeCode.Neuropath, "10002", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+        _histologyRefs.Setup(h => h.GetNextAvailableRefAsync(HistologyRefTypeCode.Neuropath, It.IsAny<CancellationToken>()))
+            .ReturnsAsync($"{DateTime.Now.Year % 100:D2}/10001");
         Animal? saved = null;
         _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .Callback<Animal, int, CancellationToken>((a, _, _) => saved = a)
@@ -492,16 +488,12 @@ public partial class SubmissionDetailsBlockModelTests
     }
 
     [Fact]
-    public async Task OnPostGetNextHistologyRefAsync_NoPreBookedRef_FallsBackToCounterAndAdvancesIt()
+    public async Task OnPostGetNextHistologyRefAsync_DrawsFromTheCounterService()
     {
         var animal = new Animal { ID = 1, SenderRef = "S1" };
         _session.Setup(s => s.UserArea).Returns("Histopath");
-        _histologyRefs.Setup(h => h.GetUnusedRefsAsync(HistologyRefTypeCode.Neuropath, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<HistologyRef>)[]);
-        _histologyRefs.Setup(h => h.GetCountersAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<HistologyRefCounter>)[new HistologyRefCounter { Type = HistologyRefTypeCode.Neuropath, NextHistologyRef = "10001" }]);
-        _histologyRefs.Setup(h => h.SetCounterAsync(HistologyRefTypeCode.Neuropath, "10002", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+        _histologyRefs.Setup(h => h.GetNextAvailableRefAsync(HistologyRefTypeCode.Neuropath, It.IsAny<CancellationToken>()))
+            .ReturnsAsync($"{DateTime.Now.Year % 100:D2}/10001");
         Animal? saved = null;
         _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .Callback<Animal, int, CancellationToken>((a, _, _) => saved = a)
@@ -513,59 +505,27 @@ public partial class SubmissionDetailsBlockModelTests
 
         Assert.Equal($"{DateTime.Now.Year % 100:D2}/10001", saved?.HistologyRef);
         Assert.False(saved!.IsPGNumber);
-        _histologyRefs.Verify(h => h.SetCounterAsync(HistologyRefTypeCode.Neuropath, "10002", It.IsAny<CancellationToken>()), Times.Once);
         // EditHistologyRef belongs to a different <form> than this handler posts, so it must be
         // repopulated here or the redisplayed page shows the field blank despite the save succeeding.
         Assert.Equal(saved.HistologyRef, sut.EditHistologyRef);
     }
 
     [Fact]
-    public async Task OnPostGetNextHistologyRefAsync_PrefersLowestPooledRefOfTheCurrentYear()
+    public async Task OnPostGetNextHistologyRefAsync_PooledRefsExist_AreNeverRead()
     {
-        var thisYear = $"{DateTime.Now.Year % 100:D2}";
         var animal = new Animal { ID = 1, SenderRef = "S1" };
         _session.Setup(s => s.UserArea).Returns("Histopath");
-        _histologyRefs.Setup(h => h.GetUnusedRefsAsync(HistologyRefTypeCode.GeneralPool, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<HistologyRef>)
-            [
-                new HistologyRef { Ref = "08/40070" },
-                new HistologyRef { Ref = $"{thisYear}/40500" },
-                new HistologyRef { Ref = $"{thisYear}/40120" },
-            ]);
-        Animal? saved = null;
+        _histologyRefs.Setup(h => h.GetNextAvailableRefAsync(HistologyRefTypeCode.GeneralPool, It.IsAny<CancellationToken>()))
+            .ReturnsAsync($"{DateTime.Now.Year % 100:D2}/40800");
         _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Callback<Animal, int, CancellationToken>((a, _, _) => saved = a)
             .ReturnsAsync(true);
         var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
         sut.HistologyRefType = HistologyRefTypeCode.GeneralPool;
 
         await sut.OnPostGetNextHistologyRefAsync();
 
-        Assert.Equal($"{thisYear}/40120", saved?.HistologyRef);
-        _histologyRefs.Verify(h => h.GetCountersAsync(It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task OnPostGetNextHistologyRefAsync_PoolHoldsOnlyPriorYearRefs_FallsBackToCounter()
-    {
-        var animal = new Animal { ID = 1, SenderRef = "S1" };
-        _session.Setup(s => s.UserArea).Returns("Histopath");
-        _histologyRefs.Setup(h => h.GetUnusedRefsAsync(HistologyRefTypeCode.GeneralPool, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<HistologyRef>)[new HistologyRef { Ref = "08/40070" }]);
-        _histologyRefs.Setup(h => h.GetCountersAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<HistologyRefCounter>)[new HistologyRefCounter { Type = HistologyRefTypeCode.GeneralPool, NextHistologyRef = "40800" }]);
-        _histologyRefs.Setup(h => h.SetCounterAsync(HistologyRefTypeCode.GeneralPool, "40801", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
-        Animal? saved = null;
-        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Callback<Animal, int, CancellationToken>((a, _, _) => saved = a)
-            .ReturnsAsync(true);
-        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
-        sut.HistologyRefType = HistologyRefTypeCode.GeneralPool;
-
-        await sut.OnPostGetNextHistologyRefAsync();
-
-        Assert.Equal($"{DateTime.Now.Year % 100:D2}/40800", saved?.HistologyRef);
+        Assert.Equal($"{DateTime.Now.Year % 100:D2}/40800", sut.Animal!.HistologyRef);
+        _histologyRefs.Verify(h => h.GetUnusedRefsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

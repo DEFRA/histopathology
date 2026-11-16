@@ -176,17 +176,8 @@ public sealed class HistologyRefService : IHistologyRefService
             if (!HistologyRefTypeCode.TryGetRange(histologyType, out var lowerBoundInclusive, out var upperBoundExclusive))
                 return null;
 
-            // Pre-booked-but-unused refs of this type are consumed first, lowest number first, so
-            // auto-generate matches SubmissionDetailsBlock's "Get next ref" button exactly. Only
-            // this calendar year's refs are eligible — a pooled ref stores its own year prefix
-            // from whenever it was booked, so the pool still holds refs from years gone by.
-            var fromPool = (await _repo.GetUnusedRefsAsync(histologyType, ct))
-                .Select(r => r.Ref?.Trim())
-                .Where(Histo.Core.Domain.HistologyRefHelpers.IsCurrentYear)
-                .OrderBy(Histo.Core.Domain.HistologyRefHelpers.RefNumber)
-                .FirstOrDefault();
-            if (fromPool is not null) return fromPool;
-
+            // Counter only, never the unused pool: legacy never read persisted pool rows when
+            // picking, and handing them to unrelated samples gave scattered out-of-order refs.
             // Legacy clsHistology.vb::GetNextAvailableHistologyRef — the GetNextHistologyRef SP
             // reads and advances the counter itself.
             return await DrawFromCounterAsync(histologyType, lowerBoundInclusive, upperBoundExclusive, ct);
