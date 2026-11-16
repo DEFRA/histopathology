@@ -625,9 +625,9 @@ stages:
     - name: tenantId
       value: '770a2450-0227-4c62-90c7-4e38537f1102'
     - name: appId
-      value: '__PROD_APP_ID__'
+      value: '6a46ba34-8f48-4819-809c-3d3d66633b0c'
     - name: oidcClientId
-      value: '__PROD_APP_ID__'
+      value: '6a46ba34-8f48-4819-809c-3d3d66633b0c'
     - name: oidcClientSecretUri
       value: 'https://prdcdeinfkv1401.vault.azure.net/secrets/histo-prd-azuread-clientsecret/'
     - name: sqlServer
