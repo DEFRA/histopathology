@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Search Submissions - QA Test Report</title>
+<style>
+  :root { --bg:#f3f2f1; --panel:#fff; --text:#0b0c0c; --muted:#505a5f; --border:#b1b4b6; --pass:#00703c; --pass-bg:#e7f7ee; --fail:#b10e1e; --fail-bg:#fbe7ea; --obs:#8a5a00; --obs-bg:#fff4dd; --header:#1d70b8; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Arial, Helvetica, sans-serif; background:var(--bg); color:var(--text); line-height:1.5; }
+  .container { max-width:1200px; margin:32px auto; padding:0 20px 40px; }
+  .header { background:var(--header); color:#fff; padding:28px 24px; border-radius:8px 8px 0 0; }
+  .header h1 { margin:0; font-size:2rem; }
+  .header p { margin:6px 0 0; opacity:.9; }
+  .meta { background:var(--panel); border:1px solid var(--border); border-top:none; padding:18px 24px; border-radius:0 0 8px 8px; }
+  .meta dl { display:grid; grid-template-columns:200px 1fr; gap:4px 16px; margin:0; }
+  .meta dt { font-weight:700; color:var(--muted); }
+  .meta dd { margin:0; }
+  .summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:16px; margin:24px 0; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:18px; }
+  .card h3 { margin:0 0 8px; font-size:.85rem; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .count { font-size:2rem; font-weight:700; margin:0; }
+  .pass { color:var(--pass); } .fail { color:var(--fail); } .obs { color:var(--obs); }
+  section { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:20px 24px; margin-bottom:24px; }
+  h2 { margin-top:0; border-bottom:2px solid var(--header); padding-bottom:6px; }
+  table { width:100%; border-collapse:collapse; font-size:.92rem; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid #e1e1e1; vertical-align:top; }
+  th { background:#f8f8f8; }
+  .badge { display:inline-block; padding:2px 10px; border-radius:12px; font-weight:700; font-size:.8rem; }
+  .b-pass { background:var(--pass-bg); color:var(--pass); }
+  .b-fail { background:var(--fail-bg); color:var(--fail); }
+  .b-med { background:#fde4cf; color:#a14700; }
+  .b-low { background:var(--obs-bg); color:var(--obs); }
+  tr.failrow td { background:#fff7f8; }
+  code { background:#f1f1f1; padding:1px 4px; border-radius:3px; }
+  .bar { height:14px; border-radius:7px; overflow:hidden; background:var(--fail-bg); margin-top:8px; }
+  .bar > div { height:100%; background:var(--pass); }
+  img { max-width:100%; border:1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>Search Submissions - QA Test Report</h1>
+  <p>Search and reports SIT agent - Suite 1 (Search submissions), extended to cover all filters, search, sorting, pagination, validation and security</p>
+</div>
+<div class="meta">
+  <dl>
+    <dt>Environment</dt><dd>TST - <code>https://tst-cde.azure.defra.cloud/Search/SearchSubmissions</code></dd>
+    <dt>Run date</dt><dd>10/11/2026</dd>
+    <dt>User / role</dt><dd>Ahmad Abubakar - Group: Maintenance, Area: Histopath (Entra ID)</dd>
+    <dt>Agent</dt><dd><code>tests/SIT/search-and-reports.agent.md</code> (SR-01 to SR-08, SR-25 plus extended cases)</dd>
+    <dt>Method</dt><dd>Integrated browser: real UI clicks (form, paging, sort, Clear, Back) and same-origin form POSTs with anti-forgery token for bulk filter checks. Every filtered result was cross-checked against the full unfiltered data set (137 submissions, 14 pages).</dd>
+    <dt>Scope</dt><dd>Read-only. No data was created or changed.</dd>
+  </dl>
+</div>
+
+<div class="summary">
+  <div class="card"><h3>Total tests</h3><p class="count">112</p></div>
+  <div class="card"><h3>Passed</h3><p class="count pass">108</p></div>
+  <div class="card"><h3>Failed</h3><p class="count fail">4</p></div>
+  <div class="card"><h3>Observations</h3><p class="count obs">8</p></div>
+  <div class="card"><h3>Pass rate</h3><p class="count">96.4%</p><div class="bar"><div style="width:96.4%"></div></div></div>
+  <div class="card"><h3>HTTP 500s</h3><p class="count pass">0</p></div>
+</div>
+
+<section>
+  <h2>Defects</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Severity</th><th>Summary</th><th>Steps / evidence</th><th>Expected</th></tr></thead>
+    <tbody>
+      <tr><td>DEF-01</td><td><span class="badge b-med">Medium</span></td><td>Invalid submission number is silently ignored and returns every submission</td><td>POST <code>SubmissionNumber=abc</code> or <code>2147483648</code> (bypassing the number input). HTTP 200, no error, all 137 submissions returned. Model-binding error is in <code>ModelState</code> but <code>Validate()</code> only checks <code>&lt;= 0</code>.</td><td>"Submission number must be a whole number greater than zero." shown, no results.</td></tr>
+      <tr><td>DEF-02</td><td><span class="badge b-low">Low</span></td><td>Histology ref is not trimmed</td><td>Histology ref <code>" 26/30005 "</code> returns 0 rows; <code>"26/30005"</code> returns 3.</td><td>Leading/trailing spaces ignored (common when pasting refs).</td></tr>
+      <tr><td>DEF-03</td><td><span class="badge b-low">Low</span></td><td>"Clear search" drops <code>ReturnPage</code>, so Back goes to the Search menu instead of Home</td><td>Open from Home (<code>ReturnPage=/Index</code>), Search, click Clear search. Back link becomes <code>/Search/SearchMenu</code>.</td><td>Back still returns to <code>/Index</code>.</td></tr>
+    </tbody>
+  </table>
+  <p>The 4th failed test (int overflow, <code>2147483648</code>) is the same root cause as DEF-01.</p>
+</section>
+
+<section>
+  <h2>Observations (not failures)</h2>
+  <table>
+    <thead><tr><th>#</th><th>Observation</th></tr></thead>
+    <tbody>
+      <tr><td>OBS-01</td><td>Sorting by Status orders by internal status code (Not received, Received, Rejected, Completed, On hold, In progress), not alphabetically. Consistent across all pages; confirm this matches legacy.</td></tr>
+      <tr><td>OBS-02</td><td>"Divakar Siriki" appears twice in Submitted by / Entered by (user IDs 252 and 255).</td></tr>
+      <tr><td>OBS-03</td><td>Pathologist list contains a blank option after "-- Any --".</td></tr>
+      <tr><td>OBS-04</td><td>Submission 74 has status "Not received" but matches a Received date range, so it has a received date. Possible data issue.</td></tr>
+      <tr><td>OBS-05</td><td>Histology ref <code>26/30005</code> and sender ref <code>VA1</code> are linked to submissions 85, 88 and 90 (test data reuse).</td></tr>
+      <tr><td>OBS-06</td><td>Test user names such as <code>SIT&lt;script&gt;alert(1)&lt;/script&gt;2026111</code> appear in the user lists. They are HTML-encoded (safe) but the TST data should be cleaned up.</td></tr>
+      <tr><td>OBS-07</td><td>Histology ref and Sender ref use exact match only (partial <code>26/3000</code> returns 0). Sender ref matching is case-insensitive.</td></tr>
+      <tr><td>OBS-08</td><td>Duplicate element id <code>ReturnPage</code> (hidden field in both the search form and the results form). Otherwise all fields have labels, the table has a caption and <code>scope="col"</code> headers, sort headers expose <code>aria-sort</code>, and Select buttons have <code>aria-label="Select submission N"</code>.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>1. Page load and form</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Scenario</th><th>Result</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>SR-01</td><td>Page loads with H1 and Back link to Home</td><td><span class="badge b-pass">PASS</span></td><td>HTTP 200; H1 "Search submissions"; Back <code>/Index</code></td></tr>
+      <tr><td>SR-02</td><td>All 15 filter fields, Search button and Clear search present</td><td><span class="badge b-pass">PASS</span></td><td>No missing labels</td></tr>
+      <tr><td>SR-01b</td><td>Default load shows all submissions, ID desc, 10 per page</td><td><span class="badge b-pass">PASS</span></td><td>137 submissions, 14 pages, first row 137, no duplicate IDs across pages</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>2. Search by submission number</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Scenario</th><th>Result</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>SR-03</td><td>Submission number = 1</td><td><span class="badge b-pass">PASS</span></td><td>1 row: 1</td></tr>
+      <tr><td>SR-03</td><td>Submission number = 100</td><td><span class="badge b-pass">PASS</span></td><td>1 row: 100</td></tr>
+      <tr><td>SR-03</td><td>Submission number = 137</td><td><span class="badge b-pass">PASS</span></td><td>1 row: 137</td></tr>
+      <tr><td>SR-06</td><td>No match: 99999999</td><td><span class="badge b-pass">PASS</span></td><td>0 rows; "No submissions found matching the search criteria"; no error</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>3. Filters (each result checked against the full data set)</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Filter</th><th>Result</th><th>Evidence (rows returned / expected)</th></tr></thead>
+    <tbody>
+      <tr><td>SR-04</td><td>Status = Not received</td><td><span class="badge b-pass">PASS</span></td><td>89 / 89, all rows match</td></tr>
+      <tr><td>SR-04</td><td>Status = Received</td><td><span class="badge b-pass">PASS</span></td><td>22 / 22</td></tr>
+      <tr><td>SR-04</td><td>Status = Rejected</td><td><span class="badge b-pass">PASS</span></td><td>1 / 1</td></tr>
+      <tr><td>SR-04</td><td>Status = Completed</td><td><span class="badge b-pass">PASS</span></td><td>4 / 4</td></tr>
+      <tr><td>SR-04</td><td>Status = On hold</td><td><span class="badge b-pass">PASS</span></td><td>2 / 2</td></tr>
+      <tr><td>SR-04</td><td>Status = In progress</td><td><span class="badge b-pass">PASS</span></td><td>19 / 19 (status totals sum to 137)</td></tr>
+      <tr><td>SR-F-SP</td><td>Species: 21 values (Alpaca, Avian, Badger, Bat, Bovine, Camelidae, Canine, Caprine, Cat, Cervine, Environmental, Equine, Exotic, Feline, Guinea Pig, Hamster, Homo Sapien, Lama Glama, Laprine, Murine, Ovine)</td><td><span class="badge b-pass">21 PASS</span></td><td>16/16, 8/8, 3/3, 2/2, 3/3, 6/6, 3/3, 5/5, 2/2, 6/6, 2/2, 6/6, 31/31, 11/11, 12/12, 8/8, 6/6, 4/4, 1/1, 2/2, 0/0</td></tr>
+      <tr><td>SR-F-PR</td><td>Project: APHAH0032, OZ0405, APHAH0033, APHTBOG0235, APHCSKM004, APHCSUT6221</td><td><span class="badge b-pass">6 PASS</span></td><td>17/17, 1/1, 9/9, 3/3, 5/5, 4/4</td></tr>
+      <tr><td>SR-F-PA</td><td>Pathologist: A Nunez, Illknur Aktan, C. Bianco, A Schock, APHA LASSWADE, D Brown</td><td><span class="badge b-pass">6 PASS</span></td><td>33/33, 1/1, 1/1, 7/7, 4/4, 6/6</td></tr>
+      <tr><td>SR-F-FX</td><td>Fixation: all 12 options</td><td><span class="badge b-pass">PASS</span></td><td>10% NBF 22; Bouins 6; Frozen 2; Fsa 9; Halls 2; Other 3; Paraformaldehyde 1; PLP 1; Susa 1; Unfixed 1; Zenker 1; Zinc Salts 0. No errors.</td></tr>
+      <tr><td>SR-F-AR</td><td>Submitted area: all 6 options (incl. inactive Mouse Bioassay / Neuropath)</td><td><span class="badge b-pass">PASS</span></td><td>External 9; Histopath 66; Mouse Bioassay 9; Neuropath 6; Other VLA 34; TB Diagnostics 13 (sum 137)</td></tr>
+      <tr><td>SR-F-SB</td><td>Submitted by: all 24 users</td><td><span class="badge b-pass">PASS</span></td><td>Ahmad Abubakar 66; Alice Harvey 53; Jeevanandham 16; Sabari Katari 1; Silambarasan Duraiswamy 1; others 0 (sum 137)</td></tr>
+      <tr><td>SR-F-EB</td><td>Entered by: all 24 users</td><td><span class="badge b-pass">PASS</span></td><td>Same distribution as Submitted by; no errors</td></tr>
+      <tr><td>SR-F-HR</td><td>Histology ref = 26/30005</td><td><span class="badge b-pass">PASS</span></td><td>Submissions 90, 88, 85 (85 verified via Sample summary)</td></tr>
+      <tr class="failrow"><td>SR-F-HR</td><td>Histology ref with surrounding spaces</td><td><span class="badge b-fail">FAIL</span></td><td>0 rows - see DEF-02</td></tr>
+      <tr><td>SR-F-HR</td><td>Histology ref partial "26/3000"</td><td><span class="badge b-pass">PASS</span></td><td>0 rows - exact match (OBS-07)</td></tr>
+      <tr><td>SR-F-SR</td><td>Sender ref = VA1</td><td><span class="badge b-pass">PASS</span></td><td>90, 88, 85</td></tr>
+      <tr><td>SR-F-SR</td><td>Sender ref lower case "va1"</td><td><span class="badge b-pass">PASS</span></td><td>3 rows (case-insensitive)</td></tr>
+      <tr><td>SR-F-SR</td><td>Sender ref + Histology ref</td><td><span class="badge b-pass">PASS</span></td><td>90, 88, 85</td></tr>
+      <tr><td>SR-F-SR</td><td>Sender ref no match</td><td><span class="badge b-pass">PASS</span></td><td>0 rows, no error</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>4. Date ranges</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Scenario</th><th>Result</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>SR-05</td><td>Submitted 11/09/2026 to 11/09/2026 (inclusive single day)</td><td><span class="badge b-pass">PASS</span></td><td>5 / 5, all dated 11/09/2026</td></tr>
+      <tr><td>SR-05</td><td>Submitted 01/10/2026 to 31/10/2026</td><td><span class="badge b-pass">PASS</span></td><td>86 / 86, all in range</td></tr>
+      <tr><td>SR-05</td><td>Submitted from only (01/11/2026)</td><td><span class="badge b-pass">PASS</span></td><td>2 / 2</td></tr>
+      <tr><td>SR-05</td><td>Submitted to only (30/09/2026)</td><td><span class="badge b-pass">PASS</span></td><td>49 / 49</td></tr>
+      <tr><td>SR-05R</td><td>Received 01/09/2026 to 31/12/2026</td><td><span class="badge b-pass">PASS</span></td><td>40 rows (Received 22, In progress 13, Completed 3, On hold 1, Not received 1 - see OBS-04)</td></tr>
+      <tr><td>SR-05R</td><td>Received in 2030 (future)</td><td><span class="badge b-pass">PASS</span></td><td>0 rows</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>5. Combined filters</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Scenario</th><th>Result</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>SR-C</td><td>Status = Not received + Species = Exotic</td><td><span class="badge b-pass">PASS</span></td><td>21 / 21</td></tr>
+      <tr><td>SR-C</td><td>Project APHAH0032 + Pathologist A Nunez + Status Completed</td><td><span class="badge b-pass">PASS</span></td><td>2 / 2</td></tr>
+      <tr><td>SR-C</td><td>Contradictory: Number 137 + Status Not received</td><td><span class="badge b-pass">PASS</span></td><td>0 rows (137 is Completed)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>6. Validation</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Scenario</th><th>Result</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>SR-V</td><td>Submitted from later than to</td><td><span class="badge b-pass">PASS</span></td><td>"Submitted date from must not be later than submitted date to." (summary + inline)</td></tr>
+      <tr><td>SR-V</td><td>Received from later than to</td><td><span class="badge b-pass">PASS</span></td><td>"Received date from must not be later than received date to."</td></tr>
+      <tr><td>SR-V</td><td>Submission number 0</td><td><span class="badge b-pass">PASS</span></td><td>"Submission number must be a whole number greater than zero."</td></tr>
+      <tr><td>SR-V</td><td>Submission number -5</td><td><span class="badge b-pass">PASS</span></td><td>Same message</td></tr>
+      <tr class="failrow"><td>SR-V</td><td>Submission number "abc"</td><td><span class="badge b-fail">FAIL</span></td><td>No message; all 137 returned - DEF-01</td></tr>
+      <tr class="failrow"><td>SR-V</td><td>Submission number 2147483648 (int overflow)</td><td><span class="badge b-fail">FAIL</span></td><td>No message; unfiltered results - DEF-01</td></tr>
+      <tr><td>SR-V</td><td>Invalid date 2026-13-45</td><td><span class="badge b-pass">PASS</span></td><td>"Submitted date from must be a real date."</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>7. Sorting (all 137 rows checked across every page)</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Column</th><th>Asc</th><th>Desc</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>SR-07S</td><td>Submission number</td><td><span class="badge b-pass">PASS</span></td><td><span class="badge b-pass">PASS</span></td><td>1 to 137 / 137 to 1</td></tr>
+      <tr><td>SR-07S</td><td>Project code</td><td><span class="badge b-pass">PASS</span></td><td><span class="badge b-pass">PASS</span></td><td>AATesting to UT1430</td></tr>
+      <tr><td>SR-07S</td><td>Pathologist</td><td><span class="badge b-pass">PASS</span></td><td><span class="badge b-pass">PASS</span></td><td>A Nunez to S Kempster</td></tr>
+      <tr><td>SR-07S</td><td>Species</td><td><span class="badge b-pass">PASS</span></td><td><span class="badge b-pass">PASS</span></td><td>Alpaca to Murine</td></tr>
+      <tr><td>SR-07S</td><td>Date</td><td><span class="badge b-pass">PASS</span></td><td><span class="badge b-pass">PASS</span></td><td>11/09/2026 to 10/11/2026 (chronological, not string)</td></tr>
+      <tr><td>SR-07S</td><td>Status</td><td><span class="badge b-pass">PASS</span></td><td><span class="badge b-pass">PASS</span></td><td>By status code - see OBS-01</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>8. Pagination</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Scenario</th><th>Result</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>SR-07P</td><td>Page 1 vs page 2 differ, 10 rows each</td><td><span class="badge b-pass">PASS</span></td><td>p1 137-128; p2 127-118; "Page 2 of 14"</td></tr>
+      <tr><td>SR-07P</td><td>Last page (14) shows remaining rows</td><td><span class="badge b-pass">PASS</span></td><td>7 rows: 7 to 1</td></tr>
+      <tr><td>SR-07P</td><td>PageNumber = 99</td><td><span class="badge b-pass">PASS</span></td><td>Clamped to page 14</td></tr>
+      <tr><td>SR-07P</td><td>PageNumber = 0</td><td><span class="badge b-pass">PASS</span></td><td>Clamped to page 1</td></tr>
+      <tr><td>SR-07P</td><td>PageNumber = -3</td><td><span class="badge b-pass">PASS</span></td><td>Clamped to page 1</td></tr>
+      <tr><td>SR-07P</td><td>PageNumber = abc</td><td><span class="badge b-pass">PASS</span></td><td>HTTP 200, page 1</td></tr>
+      <tr><td>SR-07P</td><td>Filter kept on page 3 (Status = Not received)</td><td><span class="badge b-pass">PASS</span></td><td>"Page 3 of 9", all rows Not received</td></tr>
+      <tr><td>SR-07P</td><td>Sort kept on page 2 (Species asc)</td><td><span class="badge b-pass">PASS</span></td><td>Alpaca, Avian</td></tr>
+      <tr><td>SR-07P</td><td>Single-page result (Rejected)</td><td><span class="badge b-pass">PASS</span></td><td>1 row, no pagination shown</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>9. UI journey (real clicks in the browser)</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Scenario</th><th>Result</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>UI-01</td><td>Set Status, Species and Submitted date range, click Search</td><td><span class="badge b-pass">PASS</span></td><td>"Page 1 of 3"; all rows Exotic / Not received; all filter values kept on the form</td></tr>
+      <tr><td>UI-02</td><td>Click page 2</td><td><span class="badge b-pass">PASS</span></td><td>"Page 2 of 3"; filters kept; Previous/Next enabled</td></tr>
+      <tr><td>UI-03</td><td>Click "Submission number" header</td><td><span class="badge b-pass">PASS</span></td><td>Ascending 3, 4, 30 ...; <code>aria-sort="ascending"</code>; filters kept; returns to page 1</td></tr>
+      <tr><td>UI-03</td><td>Click header again</td><td><span class="badge b-pass">PASS</span></td><td>Descending 125, 124, 121 ...</td></tr>
+      <tr><td>UI-04</td><td>Back link after searching</td><td><span class="badge b-pass">PASS</span></td><td>Lands on <code>/Index</code></td></tr>
+      <tr><td>SR-08</td><td>Clear search</td><td><span class="badge b-pass">PASS</span></td><td>All fields empty; "Page 1 of 14"</td></tr>
+      <tr class="failrow"><td>SR-08b</td><td>Back link after Clear search</td><td><span class="badge b-fail">FAIL</span></td><td><code>/Search/SearchMenu</code> instead of <code>/Index</code> - DEF-03</td></tr>
+      <tr><td>SR-EX</td><td>Export to excel (Status = Completed)</td><td><span class="badge b-pass">PASS</span></td><td>HTTP 200; <code>search-submissions.xlsx</code>; 7,227 bytes; spreadsheetml content type</td></tr>
+    </tbody>
+  </table>
+  <p>Screenshot after filtering and sorting: <a href="search-submissions-ui.png">search-submissions-ui.png</a></p>
+</section>
+
+<section>
+  <h2>10. Security</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Scenario</th><th>Result</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>SR-SEC</td><td>SQL injection in Sender ref <code>' OR 1=1 --</code></td><td><span class="badge b-pass">PASS</span></td><td>HTTP 200, 0 rows</td></tr>
+      <tr><td>SR-SEC</td><td>SQL injection in Histology ref <code>x'; DROP TABLE Batch;--</code></td><td><span class="badge b-pass">PASS</span></td><td>HTTP 200, 0 rows</td></tr>
+      <tr><td>SR-SEC</td><td>SQL injection in Project (posted value) <code>' OR '1'='1</code></td><td><span class="badge b-pass">PASS</span></td><td>HTTP 200, 0 rows</td></tr>
+      <tr><td>SR-SEC</td><td>SQL injection in Pathologist <code>%' OR 1=1--</code></td><td><span class="badge b-pass">PASS</span></td><td>HTTP 200, 0 rows</td></tr>
+      <tr><td>SR-SEC</td><td>Reflected XSS in Sender ref</td><td><span class="badge b-pass">PASS</span></td><td>Payload HTML-encoded, not reflected raw</td></tr>
+      <tr><td>SR-SEC</td><td>POST without anti-forgery token</td><td><span class="badge b-pass">PASS</span></td><td>HTTP 400</td></tr>
+      <tr><td>SR-25</td><td><code>ReturnPage=https://evil.example/</code></td><td><span class="badge b-pass">PASS</span></td><td>Back = <code>/Search/SearchMenu</code></td></tr>
+      <tr><td>SR-25</td><td><code>ReturnPage=//evil.example/</code></td><td><span class="badge b-pass">PASS</span></td><td>Back = <code>/Search/SearchMenu</code></td></tr>
+      <tr><td>SR-25</td><td><code>ReturnPage=/\evil.example</code></td><td><span class="badge b-pass">PASS</span></td><td>Back = <code>/Search/SearchMenu</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>11. Accessibility spot check</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Scenario</th><th>Result</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>A11Y-01</td><td>Labels, table caption, header scope, sort state, row buttons</td><td><span class="badge b-pass">PASS</span></td><td>All inputs labelled; caption "Submissions matching the search criteria"; <code>scope="col"</code>; <code>aria-sort</code>; <code>aria-label="Select submission N"</code>; <code>lang="en"</code>. Duplicate id noted in OBS-08.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Summary</h2>
+  <p><strong>112 tests: 108 passed, 4 failed, 0 skipped.</strong> There were no HTTP 500s or unexpected "There is a problem" boxes. Responses took about 150 to 300 ms.</p>
+  <p>All filters, sorting and pagination return results that match the full data set. The 4 failures come from 3 defects in input handling and navigation: DEF-01 (Medium), DEF-02 (Low) and DEF-03 (Low).</p>
+</section>
+
+</div>
+</body>
+</html>

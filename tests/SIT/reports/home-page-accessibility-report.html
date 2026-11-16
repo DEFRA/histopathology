@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home Page Accessibility Report</title>
+  <style>
+    :root {
+      --bg: #f3f2f1;
+      --panel: #ffffff;
+      --text: #0b0c0c;
+      --muted: #505a5f;
+      --border: #b1b4b6;
+      --pass: #00703c;
+      --pass-bg: #e7f7ee;
+      --fail: #b10e1e;
+      --fail-bg: #fbe7ea;
+      --skip: #6f777b;
+      --skip-bg: #eef2f5;
+      --header: #1d70b8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 1100px;
+      margin: 32px auto;
+      padding: 0 20px 40px;
+    }
+    .header {
+      background: var(--header);
+      color: white;
+      padding: 28px 24px;
+      border-radius: 8px 8px 0 0;
+    }
+    .header h1 { margin: 0; font-size: 2rem; }
+    .meta, .notes {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-top: none;
+      padding: 18px 24px;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin: 20px 0 28px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+    }
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 0.83rem;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .count {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0;
+    }
+    .pass { color: var(--pass); }
+    .fail { color: var(--fail); }
+    .skip { color: var(--skip); }
+    .status {
+      display: inline-block;
+      min-width: 88px;
+      text-align: center;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      margin-right: 10px;
+    }
+    .status.pass { background: var(--pass-bg); color: var(--pass); border-color: rgba(0,112,60,0.3); }
+    .status.fail { background: var(--fail-bg); color: var(--fail); border-color: rgba(177,14,30,0.25); }
+    .status.skip { background: var(--skip-bg); color: var(--skip); border-color: rgba(111,119,123,0.25); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      margin-top: 18px;
+    }
+    th, td {
+      border-bottom: 1px solid var(--border);
+      padding: 12px 14px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f8f8f8;
+    }
+    .section {
+      margin-top: 30px;
+    }
+    .section h2 {
+      margin-bottom: 10px;
+      font-size: 1.5rem;
+    }
+    code {
+      background: #f3f2f1;
+      border: 1px solid #b1b4b6;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: Consolas, monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Home Page Accessibility Report</h1>
+    </div>
+
+    <div class="meta">
+      <p><strong>Environment:</strong> TST</p>
+      <p><strong>Page:</strong> https://tst-cde.azure.defra.cloud/</p>
+      <p><strong>Page title:</strong> Home — Histopathology System</p>
+      <p><strong>Time:</strong> 2026-11-10</p>
+    </div>
+
+    <div class="summary">
+      <div class="card">
+        <h3>Pass</h3>
+        <p class="count pass">7</p>
+      </div>
+      <div class="card">
+        <h3>Failed</h3>
+        <p class="count fail">1</p>
+      </div>
+      <div class="card">
+        <h3>Skipped</h3>
+        <p class="count skip">0</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Detailed results</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Check</th>
+            <th>Status</th>
+            <th>Evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>A11Y-01</td>
+            <td>Page has valid HTML language attribute</td>
+            <td><span class="status pass">PASS</span></td>
+            <td>HTML element was present and had a language attribute.</td>
+          </tr>
+          <tr>
+            <td>A11Y-02</td>
+            <td>Single H1 present</td>
+            <td><span class="status pass">PASS</span></td>
+            <td>H1 text observed: “Welcome to the Histopathology Submissions System”.</td>
+          </tr>
+          <tr>
+            <td>A11Y-03</td>
+            <td>Skip link and main target present</td>
+            <td><span class="status pass">PASS</span></td>
+            <td>Found <code>a[href="#main-content"]</code> and <code>#main-content</code>.</td>
+          </tr>
+          <tr>
+            <td>A11Y-04</td>
+            <td>No duplicate IDs</td>
+            <td><span class="status pass">PASS</span></td>
+            <td>No duplicate element IDs were detected.</td>
+          </tr>
+          <tr>
+            <td>A11Y-05</td>
+            <td>Labelled controls in main content</td>
+            <td><span class="status pass">PASS</span></td>
+            <td>Controls checked in main content had label coverage or accessible name support.</td>
+          </tr>
+          <tr>
+            <td>A11Y-06</td>
+            <td>Image alt text checks</td>
+            <td><span class="status fail">FAIL</span></td>
+            <td>One image had empty alt text and was marked as decorative via <code>aria-hidden="true"</code>.<br>
+              Example: <code>&lt;img src="/assets/images/apha_icon.png" alt="" aria-hidden="true" ...&gt;</code></td>
+          </tr>
+          <tr>
+            <td>A11Y-07</td>
+            <td>Table heading checks</td>
+            <td><span class="status pass">PASS</span></td>
+            <td>No tables were present on the home page, so no table semantics issue was found.</td>
+          </tr>
+          <tr>
+            <td>A11Y-08</td>
+            <td>Empty link/button checks</td>
+            <td><span class="status pass">PASS</span></td>
+            <td>No empty links or buttons were found on the page.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Overall assessment</h2>
+      <div class="notes">
+        <p><strong>Overall result:</strong> <span class="status fail">FAIL</span></p>
+        <p>The home page is mostly compliant with the project’s accessibility heuristic checks, but it has one issue: a decorative image is rendered with empty alt text and <code>aria-hidden="true"</code>. This is acceptable if the image is purely decorative, but it should be reviewed to confirm the visual branding is not meant to convey meaning.</p>
+        <p><strong>Recommendation:</strong> If the image is decorative, keep it hidden from assistive technology and verify it does not carry essential information. If it contributes meaning, provide meaningful alt text instead.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

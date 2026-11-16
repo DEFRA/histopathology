@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Search Screen QA Report</title>
+  <style>
+    :root {
+      --bg: #f3f2f1;
+      --panel: #ffffff;
+      --text: #0b0c0c;
+      --muted: #505a5f;
+      --border: #b1b4b6;
+      --pass: #00703c;
+      --pass-bg: #e7f7ee;
+      --fail: #b10e1e;
+      --fail-bg: #fbe7ea;
+      --skip: #6f777b;
+      --skip-bg: #eef2f5;
+      --header: #1d70b8;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 1100px;
+      margin: 32px auto;
+      padding: 0 20px 40px;
+    }
+    .header {
+      background: var(--header);
+      color: white;
+      padding: 28px 24px;
+      border-radius: 8px 8px 0 0;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 2rem;
+    }
+    .meta {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-top: none;
+      padding: 18px 24px;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin: 20px 0 28px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+    }
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 0.9rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .count {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0;
+    }
+    .pass { color: var(--pass); }
+    .fail { color: var(--fail); }
+    .skip { color: var(--skip); }
+
+    .status {
+      display: inline-block;
+      min-width: 88px;
+      text-align: center;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      margin-right: 10px;
+    }
+    .status.pass { background: var(--pass-bg); color: var(--pass); border-color: rgba(0,112,60,0.3); }
+    .status.fail { background: var(--fail-bg); color: var(--fail); border-color: rgba(177,14,30,0.25); }
+    .status.skip { background: var(--skip-bg); color: var(--skip); border-color: rgba(111,119,123,0.25); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      border-bottom: 1px solid var(--border);
+      padding: 12px 14px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f8f8f8;
+    }
+    .evidence {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-top: 6px;
+    }
+    .section {
+      margin-top: 30px;
+    }
+    .section h2 {
+      margin-bottom: 14px;
+      font-size: 1.5rem;
+    }
+    .muted {
+      color: var(--muted);
+    }
+    .notes {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Search Screen QA Report</h1>
+    </div>
+
+    <div class="meta">
+      <p><strong>Environment:</strong> TST</p>
+      <p><strong>URL:</strong> https://tst-cde.azure.defra.cloud/Search/SearchSubmissions?ReturnPage=%2FIndex</p>
+      <p><strong>Tester:</strong> QA engineer</p>
+      <p><strong>Date:</strong> 2026-11-10</p>
+    </div>
+
+    <div class="summary">
+      <div class="card">
+        <h3>Pass</h3>
+        <p class="count pass">4</p>
+      </div>
+      <div class="card">
+        <h3>Failed</h3>
+        <p class="count fail">0</p>
+      </div>
+      <div class="card">
+        <h3>Skipped</h3>
+        <p class="count skip">6</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Executed tests</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Test</th>
+            <th>Status</th>
+            <th>Evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>SS-01</td>
+            <td>Page loads and renders Search submissions form</td>
+            <td><span class="status pass">PASS</span></td>
+            <td>
+              Page title: “Search submissions — Histopathology System”<br />
+              H1: “Search submissions”<br />
+              Fields present: Submission number, Status, Project or contract code, Pathologist
+            </td>
+          </tr>
+          <tr>
+            <td>SS-02</td>
+            <td>Empty search returns live submissions</td>
+            <td><span class="status pass">PASS</span></td>
+            <td>
+              URL: https://tst-cde.azure.defra.cloud/Search/SearchSubmissions?handler=Search<br />
+              Returned rows included submission 137, 136, 135, etc.
+            </td>
+          </tr>
+          <tr>
+            <td>SS-03</td>
+            <td>Invalid date range validation</td>
+            <td><span class="status pass">PASS</span></td>
+            <td>
+              Error summary: “Submitted date from must not be later than submitted date to.”<br />
+              Result rows cleared as expected.
+            </td>
+          </tr>
+          <tr>
+            <td>SS-04</td>
+            <td>Sender ref search</td>
+            <td><span class="status pass">PASS</span></td>
+            <td>
+              Search for Satreg returned rows for submissions 125, 123, and 122.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Skipped tests</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Test</th>
+            <th>Status</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>SS-05</td>
+            <td>Paging</td>
+            <td><span class="status skip">SKIP</span></td>
+            <td>Not executed in this focused QA pass.</td>
+          </tr>
+          <tr>
+            <td>SS-06</td>
+            <td>Sorting</td>
+            <td><span class="status skip">SKIP</span></td>
+            <td>Not executed in this focused QA pass.</td>
+          </tr>
+          <tr>
+            <td>SS-07</td>
+            <td>Excel export</td>
+            <td><span class="status skip">SKIP</span></td>
+            <td>Not executed in this focused QA pass.</td>
+          </tr>
+          <tr>
+            <td>SS-08</td>
+            <td>Invalid numeric input handling</td>
+            <td><span class="status skip">SKIP</span></td>
+            <td>Not executed in this focused QA pass.</td>
+          </tr>
+          <tr>
+            <td>SS-09</td>
+            <td>Cross-status totals validation</td>
+            <td><span class="status skip">SKIP</span></td>
+            <td>Not executed in this focused QA pass.</td>
+          </tr>
+          <tr>
+            <td>SS-10</td>
+            <td>Legacy parity comparison</td>
+            <td><span class="status skip">SKIP</span></td>
+            <td>Legacy environment not opened in the current QA session.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Overall result</h2>
+      <div class="notes">
+        <p><strong>Overall status:</strong> PASS</p>
+        <p>The core search screen behaviors tested in the TST environment are working as expected. No functional failures were observed in the checks executed.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
