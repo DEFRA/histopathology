@@ -71,6 +71,11 @@ parameters:
     type: boolean
     default: false
 
+  - name: resetHistologyRefProd
+    displayName: Reset histology reference in PROD
+    type: boolean
+    default: false
+
 variables:
   - name: buildConfiguration
     value: 'Release'
@@ -817,6 +822,35 @@ stages:
             displayName: 'Execute EditResetHistologyRef (Pre-Prod)'
             inputs:
               azureSubscription: 'AZR-CDE-PRE1'
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+
+                TOOLS="$(Agent.TempDirectory)/sqlcmd"
+                mkdir -p "$TOOLS"
+                curl -sSL --fail --proto '=https' --tlsv1.2 --max-time 60 -o "$TOOLS/sqlcmd.tar.bz2" \
+                  https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.2/sqlcmd-linux-amd64.tar.bz2
+                tar -xjf "$TOOLS/sqlcmd.tar.bz2" -C "$TOOLS"
+
+                echo "Executing dbo.EditResetHistologyRef against $(sqlServerHost)/$(dbName)"
+                "$TOOLS/sqlcmd" -S "$(sqlServerHost)" -d "$(dbName)" \
+                  --authentication-method ActiveDirectoryAzCli \
+                  -Q "EXECUTE dbo.EditResetHistologyRef" -b
+
+      - job: reset_prod
+        displayName: 'Reset histology reference (PROD)'
+        condition: or(eq(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.resetHistologyRefProd }}', true))
+        pool:
+          name: 'DEFRA-COMMON-UBUNTU-SSV5'
+        variables:
+          sqlServerHost: 'prdcdeinfsq1401.database.windows.net'
+          dbName: 'histopathology'
+        steps:
+          - task: AzureCLI@2
+            displayName: 'Execute EditResetHistologyRef (PROD)'
+            inputs:
+              azureSubscription: 'AZR-CDE-PRD1'
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
