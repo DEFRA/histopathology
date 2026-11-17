@@ -518,6 +518,7 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         {
             string? nextRef;
             bool isPgNumber;
+            var keepsCurrentRef = false;
             if (HistologyRefType.Value == HistologyRefTypeCode.UsePgNumber)
             {
                 // "use pg number" reverses the sample's own PG-format Sender Ref into a Histology
@@ -530,6 +531,13 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
                 if (!isValidPgFormat)
                     ErrorMessage = "PG Number Format: PGNNNN/NN";
             }
+            else if (KeepsCurrentRefForType(Animal, HistologyRefType.Value))
+            {
+                // Legacy ProcessNextHistologyRef filed the current ref as unused, then found it again for the same type.
+                nextRef = Animal.HistologyRef;
+                isPgNumber = false;
+                keepsCurrentRef = true;
+            }
             else
             {
                 nextRef = await _histologyRefs.GetNextAvailableRefAsync(HistologyRefType.Value);
@@ -539,7 +547,7 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
                                    "Check the next available reference for this type on the Edit Histology Reference page.";
             }
 
-            if (nextRef is not null)
+            if (nextRef is not null && !keepsCurrentRef)
             {
                 var updated = new Animal
                 {
@@ -583,6 +591,17 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         await LoadSupportingDataAsync();
 
         return Page();
+    }
+
+    private static bool KeepsCurrentRefForType(Animal animal, int histologyType)
+    {
+        var current = animal.HistologyRef?.Trim();
+        return !animal.IsPGNumber
+            && current is { Length: > 0 }
+            && HistologyRefRegex().IsMatch(current)
+            && int.TryParse(current[..2], out var year)
+            && !IsPreviousYearHistoRef(year)
+            && HistologyRefTypeCode.FromExistingRef(current) == histologyType;
     }
 
     /// <summary>

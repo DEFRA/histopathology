@@ -511,6 +511,39 @@ public partial class SubmissionDetailsBlockModelTests
     }
 
     [Fact]
+    public async Task OnPostGetNextHistologyRefAsync_SameTypeRepick_KeepsCurrentRefWithoutDrawing()
+    {
+        var current = $"{DateTime.Now.Year % 100:D2}/10005";
+        var animal = new Animal { ID = 1, SenderRef = "S1", HistoRefSet = true, HistologyRef = current };
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+        sut.HistologyRefType = HistologyRefTypeCode.Neuropath;
+
+        await sut.OnPostGetNextHistologyRefAsync();
+
+        _histologyRefs.Verify(h => h.GetNextAvailableRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal(current, sut.EditHistologyRef);
+    }
+
+    [Fact]
+    public async Task OnPostGetNextHistologyRefAsync_PreviousYearRef_SameType_DrawsNew()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "S1", HistoRefSet = true, HistologyRef = "16/10005" };
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _histologyRefs.Setup(h => h.GetNextAvailableRefAsync(HistologyRefTypeCode.Neuropath, It.IsAny<CancellationToken>()))
+            .ReturnsAsync($"{DateTime.Now.Year % 100:D2}/10006");
+        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+        sut.HistologyRefType = HistologyRefTypeCode.Neuropath;
+
+        await sut.OnPostGetNextHistologyRefAsync();
+
+        _histologyRefs.Verify(h => h.GetNextAvailableRefAsync(HistologyRefTypeCode.Neuropath, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task OnPostGetNextHistologyRefAsync_TypedPmDate_IsKeptForSave()
     {
         var animal = new Animal { ID = 1, SenderRef = "S1" };
