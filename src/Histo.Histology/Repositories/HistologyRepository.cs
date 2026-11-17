@@ -107,7 +107,7 @@ public sealed class HistologyRepository : IHistologyRepository
     }
 
     /// <inheritdoc/>
-    public async Task<string?> DrawNextRefAsync(int histologyType, CancellationToken ct = default)
+    public async Task<string?> DrawNextRefAsync(int histologyType, int upperExclusive, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
 
@@ -128,6 +128,11 @@ public sealed class HistologyRepository : IHistologyRepository
             if (string.IsNullOrWhiteSpace(next)) return null;
 
             var drawn = next.Trim();
+
+            // Past the type's range: hand it back for the caller to refuse rather than skip on through
+            // numbers that belong to the next type, which would drag the counter out of its range.
+            if (int.TryParse(drawn, out var number) && number >= upperExclusive) return drawn;
+
             var taken = await conn.ExecuteScalarAsync<int>(
                 "CountAnimalsByHistologyRef",
                 new { HistologyRef = Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(drawn) },

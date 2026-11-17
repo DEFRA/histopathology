@@ -136,12 +136,25 @@ public class HistologyRepositoryTests
             ScalarResult = 0,
         };
 
-        var drawn = await new HistologyRepository(db).DrawNextRefAsync(4, Ct);
+        var drawn = await new HistologyRepository(db).DrawNextRefAsync(4, 60000, Ct);
 
         Assert.Equal("40001", drawn);
         Assert.Equal(4, db.Commands[0].Parameters["Type"]);
         Assert.Equal("CountAnimalsByHistologyRef", db.Commands[1].Text);
         Assert.EndsWith("/40001", (string)db.Commands[1].Parameters["HistologyRef"]!);
+    }
+
+    [Fact]
+    public async Task DrawNextRef_DrawnNumberPastTheRange_IsReturnedWithoutSkippingOnThroughTheNextType()
+    {
+        var db = new FakeDb
+        {
+            OnExecute = c => { if (c.Text == "GetNextHistologyRef") c.Command.Parameters["NextHistologyRef"].Value = "60000"; },
+            ScalarResult = 1,
+        };
+
+        Assert.Equal("60000", await new HistologyRepository(db).DrawNextRefAsync(4, 60000, Ct));
+        Assert.Single(db.Commands);
     }
 
     [Theory]
@@ -155,7 +168,7 @@ public class HistologyRepositoryTests
             OnExecute = c => { if (c.Text == "GetNextHistologyRef") c.Command.Parameters["NextHistologyRef"].Value = next; },
         };
 
-        Assert.Null(await new HistologyRepository(db).DrawNextRefAsync(4, Ct));
+        Assert.Null(await new HistologyRepository(db).DrawNextRefAsync(4, 60000, Ct));
         Assert.Single(db.Commands);
     }
 
@@ -168,7 +181,7 @@ public class HistologyRepositoryTests
             ScalarResult = 1,
         };
 
-        Assert.Null(await new HistologyRepository(db).DrawNextRefAsync(4, Ct));
+        Assert.Null(await new HistologyRepository(db).DrawNextRefAsync(4, 60000, Ct));
         Assert.Equal(2000, db.Commands.Count);
     }
 

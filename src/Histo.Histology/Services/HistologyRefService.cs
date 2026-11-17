@@ -221,7 +221,18 @@ public sealed class HistologyRefService : IHistologyRefService
 
     private async Task<string?> DrawFromCounterAsync(int histologyType, int lowerInclusive, int upperExclusive, CancellationToken ct)
     {
-        var claimed = await _repo.DrawNextRefAsync(histologyType, ct);
+        var counter = (await _repo.GetCountersAsync(ct)).FirstOrDefault(c => c.Type == histologyType);
+        if (counter is null) return null;
+
+        // The SP advances the counter whatever it hands back, so refuse before drawing once the type is
+        // exhausted (or the counter is garbage) — otherwise each attempt would push it further out of range.
+        if (!int.TryParse(counter.NextHistologyRef, out var current) || current < lowerInclusive || current >= upperExclusive)
+        {
+            LogCounterOutOfRange(histologyType, counter.NextHistologyRef, lowerInclusive, upperExclusive);
+            return null;
+        }
+
+        var claimed = await _repo.DrawNextRefAsync(histologyType, upperExclusive, ct);
         if (claimed is null) return null;
 
         // The counter is an unconstrained varchar(5), so it can hold a non-numeric or
@@ -229,12 +240,15 @@ public sealed class HistologyRefService : IHistologyRefService
         // garbage), so refuse rather than write it.
         if (!int.TryParse(claimed, out var number) || number < lowerInclusive || number >= upperExclusive)
         {
-            _logger.LogError(
-                "Histology ref counter for type {HistologyType} holds '{Claimed}', which is not a number in the range {Lower}-{Upper}. No ref was drawn.",
-                null, histologyType, claimed, lowerInclusive, upperExclusive - 1);
+            LogCounterOutOfRange(histologyType, claimed, lowerInclusive, upperExclusive);
             return null;
         }
 
         return Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(claimed);
     }
+
+    private void LogCounterOutOfRange(int histologyType, string? value, int lowerInclusive, int upperExclusive) =>
+        _logger.LogError(
+            "Histology ref counter for type {HistologyType} holds '{Claimed}', which is not a number in the range {Lower}-{Upper}. No ref was drawn.",
+            null, histologyType, value ?? string.Empty, lowerInclusive, upperExclusive - 1);
 }

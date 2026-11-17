@@ -59,9 +59,11 @@ public interface IHistologyRepository
     /// (pre-increment) 5-digit number, or <see langword="null"/> if the type has no counter row.
     /// This is the one draw legacy uses (clsHistology.vb::GetNextAvailableHistologyRef) — the
     /// read and the increment happen inside the SP, not across two round trips. Numbers already held
-    /// by a sample this year are skipped (and so consumed from the counter) rather than returned.
+    /// by a sample this year are skipped (and so consumed from the counter) rather than returned, but
+    /// drawing stops at <paramref name="upperExclusive"/> so an exhausted type can't keep advancing its
+    /// counter into the next type's number range.
     /// </summary>
-    Task<string?> DrawNextRefAsync(int histologyType, CancellationToken ct = default);
+    Task<string?> DrawNextRefAsync(int histologyType, int upperExclusive, CancellationToken ct = default);
 
     /// <summary>
     /// Reserves <paramref name="count"/> consecutive numbers from a type's counter in a single

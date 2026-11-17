@@ -7,11 +7,10 @@ using Moq;
 namespace Histo.Tests.Unit;
 
 /// <summary>
-/// Verifies <see cref="HistologyRefService.GetNextAvailableRefAsync"/> takes this calendar year's
-/// lowest pre-booked-but-unused ref first, then falls back to the <c>GetNextHistologyRef</c> SP
+/// Verifies <see cref="HistologyRefService.GetNextAvailableRefAsync"/> refuses a type whose counter is
+/// outside its range, then draws from the <c>GetNextHistologyRef</c> SP
 /// (<see cref="IHistologyRepository.DrawNextRefAsync"/>), which reads and advances the counter in
-/// one server-side step rather than a racy <see cref="IHistologyRepository.GetCountersAsync"/> +
-/// <see cref="IHistologyRepository.UpdateCounterAsync"/> pair.
+/// one server-side step. The unused pool is never read.
 /// </summary>
 public class HistologyRefServiceTests
 {
@@ -20,22 +19,28 @@ public class HistologyRefServiceTests
 
     private static string ThisYear => $"{DateTime.Now.Year % 100:D2}";
 
-    public HistologyRefServiceTests() =>
+    public HistologyRefServiceTests()
+    {
         _repo.Setup(r => r.GetUnusedRefsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<HistologyRef>)[]);
+        GivenCounters((1, "10001"), (2, "20001"), (3, "30001"), (4, "40001"), (5, "60001"));
+    }
+
+    private void GivenCounters(params (int Type, string Next)[] counters) =>
+        _repo.Setup(r => r.GetCountersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<HistologyRefCounter>)[.. counters.Select(c => new HistologyRefCounter { Type = c.Type, NextHistologyRef = c.Next })]);
 
     private HistologyRefService CreateSut() => new(_repo.Object, _logger.Object);
 
     [Fact]
     public async Task GetNextAvailableRefAsync_EmptyPool_DrawsFromTheCounterSpAndPrefixesTheYear()
     {
-        _repo.Setup(r => r.DrawNextRefAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()))
+        _repo.Setup(r => r.DrawNextRefAsync(HistologyRefTypeCode.MouseProjects, 90000, It.IsAny<CancellationToken>()))
             .ReturnsAsync("60002");
 
         var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects, ct: TestContext.Current.CancellationToken);
 
         Assert.Equal($"{ThisYear}/60002", result);
-        _repo.Verify(r => r.GetCountersAsync(It.IsAny<CancellationToken>()), Times.Never);
         _repo.Verify(r => r.UpdateCounterAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -49,7 +54,7 @@ public class HistologyRefServiceTests
                 new HistologyRef { Ref = $"{ThisYear}/60500" },
                 new HistologyRef { Ref = $"{ThisYear}/60120" },
             ]);
-        _repo.Setup(r => r.DrawNextRefAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()))
+        _repo.Setup(r => r.DrawNextRefAsync(HistologyRefTypeCode.MouseProjects, 90000, It.IsAny<CancellationToken>()))
             .ReturnsAsync("60002");
 
         var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects, ct: TestContext.Current.CancellationToken);
@@ -63,7 +68,7 @@ public class HistologyRefServiceTests
     {
         _repo.Setup(r => r.GetUnusedRefsAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<HistologyRef>)[new HistologyRef { Ref = "08/60070" }]);
-        _repo.Setup(r => r.DrawNextRefAsync(HistologyRefTypeCode.MouseProjects, It.IsAny<CancellationToken>()))
+        _repo.Setup(r => r.DrawNextRefAsync(HistologyRefTypeCode.MouseProjects, 90000, It.IsAny<CancellationToken>()))
             .ReturnsAsync("60002");
 
         var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects, ct: TestContext.Current.CancellationToken);
@@ -74,12 +79,38 @@ public class HistologyRefServiceTests
     [Fact]
     public async Task GetNextAvailableRefAsync_NoCounterRow_ReturnsNull()
     {
-        _repo.Setup(r => r.DrawNextRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string?)null);
+        GivenCounters();
 
         var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.MouseProjects, ct: TestContext.Current.CancellationToken);
 
         Assert.Null(result);
+        _repo.Verify(r => r.DrawNextRefAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetNextAvailableRefAsync_ExhaustedType_RefusesWithoutAdvancingTheCounter()
+    {
+        // 60000 is the first number of the next type's range: drawing here would drag the counter on into it.
+        GivenCounters((4, "60000"));
+
+        var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.GeneralPool, ct: TestContext.Current.CancellationToken);
+
+        Assert.Null(result);
+        _repo.Verify(r => r.DrawNextRefAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>(), It.IsAny<object[]>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("df")]
+    [InlineData("100")]
+    public async Task GetNextAvailableRefAsync_CounterRowOutsideTheRange_RefusesWithoutDrawing(string counterValue)
+    {
+        GivenCounters((4, counterValue));
+
+        var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.GeneralPool, ct: TestContext.Current.CancellationToken);
+
+        Assert.Null(result);
+        _repo.Verify(r => r.DrawNextRefAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -88,7 +119,7 @@ public class HistologyRefServiceTests
         var result = await CreateSut().GetNextAvailableRefAsync(999, ct: TestContext.Current.CancellationToken);
 
         Assert.Null(result);
-        _repo.Verify(r => r.DrawNextRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repo.Verify(r => r.DrawNextRefAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         _repo.Verify(r => r.GetUnusedRefsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -102,7 +133,7 @@ public class HistologyRefServiceTests
     [InlineData("60000")] // past the General Pool ceiling (max valid is 59999)
     public async Task GetNextAvailableRefAsync_CounterOutsideTheTypeRange_ReturnsNull(string counterValue)
     {
-        _repo.Setup(r => r.DrawNextRefAsync(HistologyRefTypeCode.GeneralPool, It.IsAny<CancellationToken>()))
+        _repo.Setup(r => r.DrawNextRefAsync(HistologyRefTypeCode.GeneralPool, 60000, It.IsAny<CancellationToken>()))
             .ReturnsAsync(counterValue);
 
         var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.GeneralPool, ct: TestContext.Current.CancellationToken);
@@ -125,7 +156,7 @@ public class HistologyRefServiceTests
         _repo.Verify(r => r.GetUnusedRefsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         // The whole run is reserved in ONE repository call — never one draw per number.
         _repo.Verify(r => r.DrawNextRefRunAsync(It.IsAny<int>(), It.IsAny<int>(), 60000, 90000, It.IsAny<CancellationToken>()), Times.Once);
-        _repo.Verify(r => r.DrawNextRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repo.Verify(r => r.DrawNextRefAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -156,7 +187,7 @@ public class HistologyRefServiceTests
         var result = await CreateSut().GetNextAvailableRefRunAsync(HistologyRefTypeCode.MouseProjects, 0, ct: TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
-        _repo.Verify(r => r.DrawNextRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repo.Verify(r => r.DrawNextRefAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Theory]
@@ -164,7 +195,7 @@ public class HistologyRefServiceTests
     [InlineData("59999")]
     public async Task GetNextAvailableRefAsync_GeneralPoolBoundsAreInclusive(string counterValue)
     {
-        _repo.Setup(r => r.DrawNextRefAsync(HistologyRefTypeCode.GeneralPool, It.IsAny<CancellationToken>()))
+        _repo.Setup(r => r.DrawNextRefAsync(HistologyRefTypeCode.GeneralPool, 60000, It.IsAny<CancellationToken>()))
             .ReturnsAsync(counterValue);
 
         var result = await CreateSut().GetNextAvailableRefAsync(HistologyRefTypeCode.GeneralPool, ct: TestContext.Current.CancellationToken);

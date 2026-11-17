@@ -208,7 +208,8 @@ public class HistologyRefServiceCoverageTests
     [Fact]
     public async Task GetNextAvailableRefAsync_CounterDrawThrows_ReturnsNullAndLogs()
     {
-        _repo.Setup(r => r.DrawNextRefAsync(1, Ct)).ThrowsAsync(Boom);
+        _repo.Setup(r => r.GetCountersAsync(Ct)).ReturnsAsync([Counter(1, "10001")]);
+        _repo.Setup(r => r.DrawNextRefAsync(1, 20000, Ct)).ThrowsAsync(Boom);
 
         Assert.Null(await Sut().GetNextAvailableRefAsync(1, Ct));
         VerifyLogged();
@@ -221,7 +222,8 @@ public class HistologyRefServiceCoverageTests
     public async Task GetNextAvailableRefAsync_CounterOutsideTypeRange_ReturnsNull(string claimed)
     {
         _repo.Setup(r => r.GetUnusedRefsAsync(1, Ct)).ReturnsAsync([]);
-        _repo.Setup(r => r.DrawNextRefAsync(1, Ct)).ReturnsAsync(claimed);
+        _repo.Setup(r => r.GetCountersAsync(Ct)).ReturnsAsync([Counter(1, "10001")]);
+        _repo.Setup(r => r.DrawNextRefAsync(1, 20000, Ct)).ReturnsAsync(claimed);
 
         Assert.Null(await Sut().GetNextAvailableRefAsync(1, Ct));
         VerifyLogged();
@@ -231,7 +233,8 @@ public class HistologyRefServiceCoverageTests
     public async Task GetNextAvailableRefAsync_CounterEmpty_ReturnsNull()
     {
         _repo.Setup(r => r.GetUnusedRefsAsync(1, Ct)).ReturnsAsync([]);
-        _repo.Setup(r => r.DrawNextRefAsync(1, Ct)).ReturnsAsync((string?)null);
+        _repo.Setup(r => r.GetCountersAsync(Ct)).ReturnsAsync([Counter(1, "10001")]);
+        _repo.Setup(r => r.DrawNextRefAsync(1, 20000, Ct)).ReturnsAsync((string?)null);
 
         Assert.Null(await Sut().GetNextAvailableRefAsync(1, Ct));
     }

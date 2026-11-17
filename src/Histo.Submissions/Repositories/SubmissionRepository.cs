@@ -475,6 +475,16 @@ public sealed class SubmissionRepository : ISubmissionRepository
         };
         if (upper == 0) return null;
 
+        // The SP advances the counter whatever it hands back, so refuse before drawing once the type is
+        // exhausted — otherwise each copy would push the counter further out of its range.
+        var counters = await conn.QueryAsync("GetHistologyRefs", transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
+        var counterRow = counters.Cast<IDictionary<string, object>>()
+            .FirstOrDefault(r => r.TryGetValue("Type", out var t) && Convert.ToInt32(t) == histologyType.Value);
+        var current = counterRow is not null && counterRow.TryGetValue("NextHistologyRef", out var currentValue)
+            ? Convert.ToString(currentValue)?.Trim()
+            : null;
+        if (!int.TryParse(current, out var currentNumber) || currentNumber < lower || currentNumber >= upper) return null;
+
         // The counter row is not locked; a concurrent copy taking the same ref is rejected by AddAnimal (return 2) and rolls back.
         var p = new DynamicParameters();
         p.Add("Type", histologyType.Value, dbType: System.Data.DbType.Int32);
