@@ -2,11 +2,14 @@ namespace Histo.Web.Auth;
 
 public static class RequestValues
 {
-    /// <summary>First positive integer found for any of the keys in the query string, then the form.</summary>
+    /// <summary>First positive integer found for any of the keys in the route, then the query string, then the form.</summary>
     public static int? GetPositiveInt(HttpRequest request, params string[] keys)
     {
         foreach (var key in keys)
         {
+            if (request.RouteValues.TryGetValue(key, out var route)
+                && int.TryParse(Convert.ToString(route, System.Globalization.CultureInfo.InvariantCulture), out var fromRoute)
+                && fromRoute > 0) return fromRoute;
             if (TryParse(request.Query[key], out var fromQuery)) return fromQuery;
             if (request.HasFormContentType && TryParse(request.Form[key], out var fromForm)) return fromForm;
         }
