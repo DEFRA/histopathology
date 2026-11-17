@@ -43,6 +43,20 @@ public class HistologyRepositoryTests
     }
 
     [Fact]
+    public async Task GetReleasedRefsForSender_PassesSenderAndYearPrefix_AndMapsRows()
+    {
+        var db = new FakeDb { OnQuery = _ => Single(UnusedPool(("26/10004 ", "A, HISTO1"))) };
+
+        var item = Assert.Single(await new HistologyRepository(db).GetReleasedRefsForSenderAsync("HISTO1", "26/", Ct));
+
+        Assert.Equal("26/10004", item.Ref);
+        Assert.Equal("A, HISTO1", item.SenderRef);
+        Assert.Equal("HISTO1", db.Commands[0].Parameters["SenderRef"]);
+        Assert.Equal("26/", db.Commands[0].Parameters["Prefix"]);
+        Assert.Contains("Used = 0", db.Commands[0].Text);
+    }
+
+    [Fact]
     public async Task GetUnusedRefs_NullSenderRef_MapsToEmptyString()
     {
         var db = new FakeDb { OnQuery = _ => Single(UnusedPool(("26/20001", null))) };

@@ -190,6 +190,29 @@ public sealed class HistologyRefService : IHistologyRefService
     }
 
     /// <inheritdoc/>
+    public async Task<string?> FindReleasedRefForSenderAsync(string senderRef, int histologyType, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(senderRef)) return null;
+
+        try
+        {
+            var rows = await _repo.GetReleasedRefsForSenderAsync(senderRef.Trim(), Histo.Core.Domain.HistologyRefHelpers.CurrentYearPrefix, ct);
+            return rows
+                .Where(r => HistologyRefTypeCode.FromExistingRef(r.Ref) == histologyType
+                            && (r.SenderRef ?? string.Empty).Split(',', StringSplitOptions.TrimEntries)
+                                .Contains(senderRef.Trim(), StringComparer.OrdinalIgnoreCase))
+                .Select(r => r.Ref)
+                .OrderBy(r => r, StringComparer.Ordinal)
+                .FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to look up released histology refs for a sample.", ex);
+            return null;
+        }
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<string>> GetNextAvailableRefRunAsync(int histologyType, int count, CancellationToken ct = default)
     {
         try

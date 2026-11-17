@@ -544,6 +544,48 @@ public partial class SubmissionDetailsBlockModelTests
     }
 
     [Fact]
+    public async Task OnPostGetNextHistologyRefAsync_SampleReleasedARefOfThatType_ReusesItWithoutDrawing()
+    {
+        var released = $"{DateTime.Now.Year % 100:D2}/10004";
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _histologyRefs.Setup(h => h.FindReleasedRefForSenderAsync("S1", HistologyRefTypeCode.Neuropath, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(released);
+        Animal? saved = null;
+        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<Animal, int, CancellationToken>((a, _, _) => saved = a)
+            .ReturnsAsync(true);
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+        sut.HistologyRefType = HistologyRefTypeCode.Neuropath;
+
+        await sut.OnPostGetNextHistologyRefAsync();
+
+        Assert.Equal(released, saved?.HistologyRef);
+        _histologyRefs.Verify(h => h.GetNextAvailableRefAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostGetNextHistologyRefAsync_ReleasedRefNowHeldElsewhere_DrawsFromTheCounter()
+    {
+        var released = $"{DateTime.Now.Year % 100:D2}/10004";
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _histologyRefs.Setup(h => h.FindReleasedRefForSenderAsync("S1", HistologyRefTypeCode.Neuropath, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(released);
+        _submissions.Setup(s => s.IsHistologyRefInUseAsync(released, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _histologyRefs.Setup(h => h.GetNextAvailableRefAsync(HistologyRefTypeCode.Neuropath, It.IsAny<CancellationToken>()))
+            .ReturnsAsync($"{DateTime.Now.Year % 100:D2}/10005");
+        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+        sut.HistologyRefType = HistologyRefTypeCode.Neuropath;
+
+        await sut.OnPostGetNextHistologyRefAsync();
+
+        _histologyRefs.Verify(h => h.GetNextAvailableRefAsync(HistologyRefTypeCode.Neuropath, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task OnPostGetNextHistologyRefAsync_TypedPmDate_IsKeptForSave()
     {
         var animal = new Animal { ID = 1, SenderRef = "S1" };

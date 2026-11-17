@@ -540,7 +540,11 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
             }
             else
             {
-                nextRef = await _histologyRefs.GetNextAvailableRefAsync(HistologyRefType.Value);
+                // A ref this same sample released earlier (e.g. via Back) is reused before drawing a new one.
+                var released = await _histologyRefs.FindReleasedRefForSenderAsync(Animal.SenderRef, HistologyRefType.Value);
+                nextRef = released is not null && !await _submissions.IsHistologyRefInUseAsync(released)
+                    ? released
+                    : await _histologyRefs.GetNextAvailableRefAsync(HistologyRefType.Value);
                 isPgNumber = false;
                 if (nextRef is null)
                     ErrorMessage = "No histology reference is available for the selected type. " +

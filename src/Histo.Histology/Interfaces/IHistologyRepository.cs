@@ -39,6 +39,13 @@ public interface IHistologyRepository
     Task<IReadOnlyList<HistologyRef>> GetAllUnusedRefsAsync(CancellationToken ct = default);
 
     /// <summary>
+    /// Unused pool rows whose sender-ref list mentions <paramref name="senderRef"/>, limited to refs starting
+    /// with <paramref name="yearPrefix"/> (e.g. "26/"). Reads the table directly because
+    /// <c>GetUnusedHistologyRefs</c> returns no sender ref. The caller matches the sender ref exactly.
+    /// </summary>
+    Task<IReadOnlyList<HistologyRef>> GetReleasedRefsForSenderAsync(string senderRef, string yearPrefix, CancellationToken ct = default);
+
+    /// <summary>
     /// Returns the current "next histology ref" counter for every histology type.
     /// Maps to the (parameterless) <c>GetHistologyRefs</c> stored procedure — confirmed
     /// against the database directly. Legacy source: clsHistology.vb::GetHistologyRefsTable.

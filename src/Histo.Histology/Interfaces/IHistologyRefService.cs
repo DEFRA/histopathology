@@ -42,6 +42,13 @@ public interface IHistologyRefService
     Task<string?> GetNextAvailableRefAsync(int histologyType, CancellationToken ct = default);
 
     /// <summary>
+    /// A current-year ref of <paramref name="histologyType"/> that this sample's own sender ref released earlier
+    /// (lowest first), or <see langword="null"/>. Legacy ProcessNextHistologyRef filed the ref it replaced as
+    /// unused for that sender ref and type, then found it again before drawing a new one.
+    /// </summary>
+    Task<string?> FindReleasedRefForSenderAsync(string senderRef, int histologyType, CancellationToken ct = default);
+
+    /// <summary>
     /// Draws <paramref name="count"/> refs for one run of samples (e.g. a mouse-number range copy),
     /// all from the type's counter so they are consecutive: starting at 26/60001 a run of three is
     /// 60001, 60002, 60003. The pre-booked pool is deliberately NOT used — a pooled ref sits far from
