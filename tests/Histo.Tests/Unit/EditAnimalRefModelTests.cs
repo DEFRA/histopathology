@@ -1,3 +1,5 @@
+using Histo.Histology.Interfaces;
+using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Pages.Admin;
@@ -16,14 +18,23 @@ public class EditAnimalRefModelTests
 {
     private readonly Mock<ISessionService> _session = new();
     private readonly Mock<ISubmissionService> _submissions = new();
+    private readonly Mock<IHistologyRefService> _histologyRefs = new();
+
+    private static string Yy => $"{DateTime.Now.Year % 100:D2}";
 
     public EditAnimalRefModelTests()
     {
         _session.SetupGet(s => s.UserID).Returns(9);
+        _histologyRefs.Setup(h => h.GetCountersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<HistologyRefCounter>)
+            [
+                new HistologyRefCounter { Type = HistologyRefTypeCode.Neuropath, NextHistologyRef = "10001" },
+                new HistologyRefCounter { Type = HistologyRefTypeCode.GeneralPool, NextHistologyRef = "40500" },
+            ]);
     }
 
     private EditAnimalRefModel CreateSut(string original = "", string newSender = "", string newHisto = "") =>
-        new(_session.Object, _submissions.Object)
+        new(_session.Object, _submissions.Object, _histologyRefs.Object)
         {
             OriginalSenderRef = original,
             NewSenderRef = newSender,
@@ -186,6 +197,102 @@ public class EditAnimalRefModelTests
 
         _submissions.Verify(s => s.UpdateAnimalHistologyRefAsync("AB1", string.Empty, 9, It.IsAny<CancellationToken>()), Times.Once);
         Assert.StartsWith("The old Histology Ref has been removed.", sut.SuccessMessage);
+    }
+
+    [Theory]
+    [InlineData("40500")]   // equal to the next counter
+    [InlineData("40999")]   // above it
+    public async Task SaveHistologyRef_CurrentYearRefAtOrAboveTheCounter_IsRefused(string number)
+    {
+        var sut = CreateSut("AB1", newHisto: $"{Yy}/{number}");
+
+        await sut.OnPostSaveHistologyRefAsync();
+
+        Assert.Equal($"The Histology Ref entered is higher than or equal to the current next Histology Ref ({Yy}/40500) for the selected area.", sut.Error);
+        Assert.Equal("NewHistologyRef", sut.ErrorField);
+        _submissions.Verify(s => s.UpdateAnimalHistologyRefAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SaveHistologyRef_CurrentYearRefBelowTheCounter_IsSaved()
+    {
+        var sut = CreateSut("AB1", newHisto: $"{Yy}/40499");
+
+        await sut.OnPostSaveHistologyRefAsync();
+
+        _submissions.Verify(s => s.UpdateAnimalHistologyRefAsync("AB1", $"{Yy}/40499", 9, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("25/99999")]   // an earlier year isn't numbered against this year's counters
+    [InlineData("99/40999")]   // 1990s
+    public async Task SaveHistologyRef_EarlierYearRef_SkipsTheCounterCheck(string histologyRef)
+    {
+        var sut = CreateSut("AB1", newHisto: histologyRef);
+
+        await sut.OnPostSaveHistologyRefAsync();
+
+        _submissions.Verify(s => s.UpdateAnimalHistologyRefAsync("AB1", histologyRef, 9, It.IsAny<CancellationToken>()), Times.Once);
+        _histologyRefs.Verify(h => h.GetCountersAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SaveHistologyRef_CurrentYearRefOutsideEveryTypeRange_IsRefused()
+    {
+        var sut = CreateSut("AB1", newHisto: $"{Yy}/99999");
+
+        await sut.OnPostSaveHistologyRefAsync();
+
+        Assert.Equal("The Histology Ref entered is outside the number range of every histology type.", sut.Error);
+        _submissions.Verify(s => s.UpdateAnimalHistologyRefAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SaveHistologyRef_NoCounterRowForTheType_IsRefused()
+    {
+        var sut = CreateSut("AB1", newHisto: $"{Yy}/30001");   // TB Diag has no counter row in the fixture
+
+        await sut.OnPostSaveHistologyRefAsync();
+
+        Assert.Equal("The next available Histology Ref for this type could not be checked.", sut.Error);
+        _submissions.Verify(s => s.UpdateAnimalHistologyRefAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SaveHistologyRef_PgSampleWithTheReversedPgNumber_IsSaved()
+    {
+        var sut = CreateSut("PG0200/25", newHisto: "25/00200");
+
+        await sut.OnPostSaveHistologyRefAsync();
+
+        _submissions.Verify(s => s.UpdateAnimalHistologyRefAsync("PG0200/25", "25/00200", 9, It.IsAny<CancellationToken>()), Times.Once);
+        _histologyRefs.Verify(h => h.GetCountersAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("26/40001")]   // a valid ref, but not this PG number's
+    [InlineData("")]           // legacy refuses to blank a PG sample's ref
+    public async Task SaveHistologyRef_PgSampleWithAnyOtherRef_IsRefused(string histologyRef)
+    {
+        var sut = CreateSut("PG0200/25", newHisto: histologyRef);
+
+        await sut.OnPostSaveHistologyRefAsync();
+
+        Assert.Equal("The Histology Ref is not correct for the PG Number entered.", sut.Error);
+        Assert.Equal("NewHistologyRef", sut.ErrorField);
+        _submissions.Verify(s => s.UpdateAnimalHistologyRefAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("PG0200/01")]
+    [InlineData("PG0200/85")]
+    public async Task SaveHistologyRef_PgSampleFromBefore2002_IsNotChecked(string senderRef)
+    {
+        var sut = CreateSut(senderRef, newHisto: "26/40001");
+
+        await sut.OnPostSaveHistologyRefAsync();
+
+        _submissions.Verify(s => s.UpdateAnimalHistologyRefAsync(senderRef, "26/40001", 9, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
