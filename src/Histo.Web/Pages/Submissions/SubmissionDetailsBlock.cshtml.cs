@@ -571,11 +571,12 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
             }
         }
 
-        // This handler posts a separate <form> from the one holding EditHistologyRef/EditPMDate,
-        // so those bind properties never travel with this request — repopulate them from Animal
-        // (same as OnGetAsync) or the page redisplays with both fields blanked out.
+        // The posted HR would otherwise be redisplayed in place of the one just drawn.
+        ModelState.Remove(nameof(EditHistologyRef));
         EditHistologyRef = Animal.HistologyRef;
-        EditPMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
+        // Legacy kept a typed PM date across the type pick; it is saved with "Save details".
+        if (PMDateLocked || string.IsNullOrWhiteSpace(EditPMDate))
+            EditPMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
 
         var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
         Blocks = allBlocks.Where(b => b.AnimalID == Animal.ID).ToList();

@@ -511,6 +511,37 @@ public partial class SubmissionDetailsBlockModelTests
     }
 
     [Fact]
+    public async Task OnPostGetNextHistologyRefAsync_TypedPmDate_IsKeptForSave()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "S1" };
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        _histologyRefs.Setup(h => h.GetNextAvailableRefAsync(HistologyRefTypeCode.Neuropath, It.IsAny<CancellationToken>()))
+            .ReturnsAsync($"{DateTime.Now.Year % 100:D2}/10001");
+        _submissions.Setup(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        var sut = CreateSut(1, animal, "/Batches/BatchBlocks?batchId=5");
+        sut.HistologyRefType = HistologyRefTypeCode.Neuropath;
+        sut.EditPMDate = "2026-03-05";
+
+        await sut.OnPostGetNextHistologyRefAsync();
+
+        Assert.Equal("2026-03-05", sut.EditPMDate);
+    }
+
+    [Fact]
+    public async Task OnPostGetNextHistologyRefAsync_LockedPmDate_ShowsStoredValueNotPostedOne()
+    {
+        var animal = new Animal { ID = 1, SenderRef = "S1", PMDate = "05/03/2026", PMDateSet = true };
+        _session.Setup(s => s.UserArea).Returns("Histopath");
+        var sut = CreateSut(1, animal, "/Submissions/SampleSummary?batchId=5");
+        sut.EditPMDate = "2020-01-01";
+
+        await sut.OnPostGetNextHistologyRefAsync();
+
+        Assert.Equal(Histo.Core.Domain.DateFormatHelpers.ToIsoDate(animal.PMDate), sut.EditPMDate);
+    }
+
+    [Fact]
     public async Task OnPostGetNextHistologyRefAsync_PooledRefsExist_AreNeverRead()
     {
         var animal = new Animal { ID = 1, SenderRef = "S1" };
