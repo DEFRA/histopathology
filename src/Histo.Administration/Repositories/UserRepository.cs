@@ -151,7 +151,7 @@ public sealed class UserRepository : IUserRepository
             AreaCode  = d.TryGetValue("UserArea",   out var area) ? ToIntSafe(area)              : 0,
             AreaName  = d.TryGetValue("AreaName",   out var an)   ? Convert.ToString(an)  ?? ""  : "",
             Email     = d.TryGetValue("Email",      out var em)   ? Convert.ToString(em)  ?? ""  : "",
-            Active    = d.TryGetValue("Active",     out var act)  ? Convert.ToBoolean(act)        : false,
+            Active    = d.TryGetValue("Active",     out var act)  && Convert.ToBoolean(act),
         };
     }
 

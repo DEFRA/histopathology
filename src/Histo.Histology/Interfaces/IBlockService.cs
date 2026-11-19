@@ -15,7 +15,7 @@ public interface IBlockService
     Task<IReadOnlyList<string>> GetBlockRefsOnOtherBatchesAsync(int animalId, int excludeBatchId, CancellationToken ct = default);
 
     Task<int> AddBlockAsync(int batchId, int animalId, string blockRef, IEnumerable<int> existingOrders, int userId,
-        string? customerRef = null, string? comment = null, bool repeatBlock = false, CancellationToken ct = default);
+        BlockOptions? options = null, CancellationToken ct = default);
 
     /// <summary>As <see cref="AddBlockAsync"/>, but keeps <paramref name="blockRef"/> even if another submission of the sample already uses it.</summary>
     Task<int> AddBlockKeepingRefAsync(int batchId, int animalId, string blockRef, IEnumerable<int> existingOrders, int userId,

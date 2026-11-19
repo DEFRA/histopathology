@@ -1,4 +1,4 @@
-/****** Object:  StoredProcedure [dbo].[GetAnimalBlockRefsOnOtherBatches] ******/
+-- Object:  StoredProcedure [dbo].[GetAnimalBlockRefsOnOtherBatches]
 -- ============================================================================
 -- dbo.GetAnimalBlockRefsOnOtherBatches
 -- ============================================================================

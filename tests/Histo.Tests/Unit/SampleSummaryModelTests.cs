@@ -82,6 +82,38 @@ public class SampleSummaryModelTests
         Assert.Equal(1, _session.Object.BatchID);
     }
 
+    [Fact]
+    public async Task OnGetAsync_BlockedBatch_ListsOnlyAnimalsWithBlocks()
+    {
+        _batches.Setup(b => b.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 1, IsBlocked = true });
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1, SenderRef = "A" }]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1, SenderRef = "A" }, new Animal { ID = 2, SenderRef = "B" }]);
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        await sut.OnGetAsync();
+
+        Assert.Equal([1], sut.Animals.Select(a => a.ID).ToArray());
+    }
+
+    [Fact]
+    public async Task OnGetAsync_NotBlockedBatchWithSomeBlockedAnimals_MergesInAnimalsWithoutBlocks()
+    {
+        _batches.Setup(b => b.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new Batch { ID = 1, IsBlocked = false });
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1, SenderRef = "A" }]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 1, SenderRef = "A" }, new Animal { ID = 2, SenderRef = "B" }]);
+        var sut = CreateSut();
+        sut.BatchId = 1;
+
+        await sut.OnGetAsync();
+
+        Assert.Equal([1, 2], sut.Animals.Select(a => a.ID).OrderBy(id => id).ToArray());
+    }
+
     [Theory]
     [InlineData("SenderRef", false, new[] { 1, 2 })]
     [InlineData("SenderRef", true, new[] { 2, 1 })]

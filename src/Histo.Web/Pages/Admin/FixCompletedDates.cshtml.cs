@@ -12,6 +12,8 @@ namespace Histo.Web.Pages.Admin;
 /// </summary>
 public class FixCompletedDatesModel : HistoPageModel
 {
+    private const string FixCompletedDatesTitle = "Fix Completed Dates";
+
     private readonly IBatchService _batches;
 
     public FixCompletedDatesModel(ISessionService session, IBatchService batches)
@@ -21,14 +23,14 @@ public class FixCompletedDatesModel : HistoPageModel
 
     public void OnGet()
     {
-        ViewData["Title"] = "Fix Completed Dates";
-        ViewData["PageTitle"] = "Fix Completed Dates";
+        ViewData["Title"] = FixCompletedDatesTitle;
+        ViewData["PageTitle"] = FixCompletedDatesTitle;
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Fix Completed Dates";
-        ViewData["PageTitle"] = "Fix Completed Dates";
+        ViewData["Title"] = FixCompletedDatesTitle;
+        ViewData["PageTitle"] = FixCompletedDatesTitle;
         BatchesUpdated = await _batches.FixCompletedDatesAsync();
         return Page();
     }

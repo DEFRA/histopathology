@@ -9,6 +9,9 @@ namespace Histo.Core.Domain;
 /// </summary>
 public static class HelpSectionMap
 {
+    private const string AuditLogsAnchor = "audit-logs";
+    private const string PickListAnchor = "pick-list-maintenance";
+
     private static readonly Dictionary<string, string> PageToAnchor = new(StringComparer.OrdinalIgnoreCase)
     {
         ["/Index"] = "home-screen",
@@ -48,16 +51,16 @@ public static class HelpSectionMap
         ["/Admin/UserMaintenance"] = "user-maintenance",
         ["/Admin/AddUser"] = "user-maintenance",
         ["/Admin/EditUser"] = "user-maintenance",
-        ["/AuditLog/AuditLogMenu"] = "audit-logs",
-        ["/AuditLog/AuditLogByDate"] = "audit-logs",
-        ["/AuditLog/AuditLogByUser"] = "audit-logs",
-        ["/AuditLog/AuditLogBySubmission"] = "audit-logs",
+        ["/AuditLog/AuditLogMenu"] = AuditLogsAnchor,
+        ["/AuditLog/AuditLogByDate"] = AuditLogsAnchor,
+        ["/AuditLog/AuditLogByUser"] = AuditLogsAnchor,
+        ["/AuditLog/AuditLogBySubmission"] = AuditLogsAnchor,
         ["/Search/ViewImportedData"] = "view-imported-data",
-        ["/Admin/PickListMaintenance"] = "pick-list-maintenance",
-        ["/Admin/LookupItems"] = "pick-list-maintenance",
-        ["/Admin/AddLookupItem"] = "pick-list-maintenance",
-        ["/Admin/EditLookupItem"] = "pick-list-maintenance",
-        ["/Admin/PickListUserArea"] = "pick-list-maintenance",
+        ["/Admin/PickListMaintenance"] = PickListAnchor,
+        ["/Admin/LookupItems"] = PickListAnchor,
+        ["/Admin/AddLookupItem"] = PickListAnchor,
+        ["/Admin/EditLookupItem"] = PickListAnchor,
+        ["/Admin/PickListUserArea"] = PickListAnchor,
         ["/Search/SearchTest"] = "search-test-totals",
         ["/Search/SearchBlockRefs"] = "search-block-refs",
         ["/Search/SearchArchiveLocation"] = "search-archive-location",

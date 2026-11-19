@@ -108,10 +108,12 @@ public sealed class BlockRepository : IBlockRepository
         return blockAnimals.Where(a => a.ID == animalId).Select(a => a.SenderRef?.Trim()).FirstOrDefault();
     }
 
+    // Dapper maps the SPs' wider result sets by property name; a positional record needs a ctor covering every column.
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Major Code Smell", "S1144", Justification = "Set by Dapper via reflection.")]
     private sealed class AnimalSenderRow
     {
-        public int ID { get; set; }
-        public string? SenderRef { get; set; }
+        public int ID { get; init; }
+        public string? SenderRef { get; init; }
     }
 
     /// <summary>Refs held by the animal on other submissions, including unclaimed pre-booked placeholders.</summary>

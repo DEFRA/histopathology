@@ -2,8 +2,7 @@
    Minimal top-level header nav — task links live on the Index.cshtml home page
    grid menu instead, per GDS pattern (header = global wayfinding only).
    Visible links are determined by the user's GroupName stored in ISessionService.
-   Emits <li class="govuk-service-navigation__item"> items only — the enclosing
-   <ul id="navigation" class="govuk-service-navigation__list"> lives in _Layout.cshtml.
+   Emits the <ul id="navigation" class="govuk-service-navigation__list"> and its items.
 *@
 @inject Histo.Web.Services.ISessionService SessionSvc
 
@@ -19,6 +18,7 @@
     var helpHref = "/Help/Index" + (helpAnchor is not null ? $"#{helpAnchor}" : "");
 }
 
+<ul class="govuk-service-navigation__list" id="navigation">
 @if (isHisto || isMaint)
 {
     <li class="govuk-service-navigation__item">
@@ -43,7 +43,9 @@
 }
 
 <li class="govuk-service-navigation__item">
+    @* Same-origin link: no rel="noopener", because noopener always opens a fresh tab and would defeat reusing the named one. *@
     <a class="govuk-service-navigation__link" href="@helpHref"
-       target="_blank" rel="noreferrer noopener" data-leave-check="submission">Help</a>
+       target="histo-help" data-leave-check="submission">Help<span class="govuk-visually-hidden"> (opens in new tab)</span></a>
 </li>
+</ul>
 

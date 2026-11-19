@@ -22,6 +22,9 @@ public static class AppClaimTypes
     /// <summary>User area display name from <c>tblUser.AreaName</c>.</summary>
     public const string UserArea   = Base + "user-area";
 
+    /// <summary>Display name from <c>tblUser.Name</c>; the IdP's name claim is the UPN (an email address).</summary>
+    public const string UserName   = Base + "user-name";
+
     /// <summary>Integer area code from <c>tblUser.UserArea</c>.</summary>
     public const string UserAreaId = Base + "user-area-id";
 
@@ -29,5 +32,5 @@ public static class AppClaimTypes
     public const string SessionStamp = Base + "session-stamp";
 
     /// <summary>Every app-issued claim type, used to clear stale claims before re-issuing them.</summary>
-    public static readonly string[] All = [GroupName, UserDbId, GroupId, UserArea, UserAreaId];
+    public static readonly string[] All = [GroupName, UserDbId, GroupId, UserArea, UserAreaId, UserName];
 }

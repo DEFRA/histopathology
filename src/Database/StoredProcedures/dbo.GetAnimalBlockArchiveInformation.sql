@@ -1,5 +1,5 @@
-/****** Object:  StoredProcedure [dbo].[GetAnimalBlockArchiveInformation] ******/
-/****** ONE-TIME DEPLOYMENT SCRIPT — Safe to re-run via pipeline ******/
+-- Object:  StoredProcedure [dbo].[GetAnimalBlockArchiveInformation]
+-- ONE-TIME DEPLOYMENT SCRIPT — Safe to re-run via pipeline
 
 -- Aliases [BatchBlock].[ID] as BlockID (was a second, unaliased "ID" column, identical
 -- name to [Batch].[ID]) — a result set with two same-named columns can't be typed-mapped

@@ -56,7 +56,7 @@
            NonTSE submissions load table 5 (LOOKUP_NONTSE_ANTIBODIES). *@
         <div class="govuk-form-group"
              id="antibodies-section"
-             style="@(Model.ShowAntibodies ? "" : "display:none")">
+             hidden="@(Model.ShowAntibodies ? null : "hidden")">
             <fieldset class="govuk-fieldset">
                 <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">
                     <h2 class="govuk-fieldset__heading">Antibodies</h2>
@@ -86,7 +86,7 @@
            Legacy: chkblSpecialStain.Enabled = True when "Special Stain" is checked in histology list. *@
         <div class="govuk-form-group"
              id="stains-section"
-             style="@(Model.ShowStains ? "" : "display:none")">
+             hidden="@(Model.ShowStains ? null : "hidden")">
             <fieldset class="govuk-fieldset">
                 <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">
                     <h2 class="govuk-fieldset__heading">Special stains</h2>
@@ -158,8 +158,8 @@ else
                 var showAntibodies = IHC_CODES.some(function (c) { return checked.indexOf(c) !== -1; });
                 var showStains     = checked.indexOf(STAIN_CODE) !== -1;
 
-                antibodiesDiv.style.display = showAntibodies ? '' : 'none';
-                stainsDiv.style.display     = showStains     ? '' : 'none';
+antibodiesDiv.hidden = !showAntibodies;
+            stainsDiv.hidden     = !showStains;
 
                 // Clear selections when section is hidden to avoid submitting stale values.
                 if (!showAntibodies) {

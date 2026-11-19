@@ -79,7 +79,7 @@ public static class BatchStatus
     public static string TagClass(string status) => status switch
     {
         Submitted  => "grey",
-        Received   => "turquoise",
+        Received   => "purple",
         InProgress => "teal",
         OnHold     => "orange",
         Completed  => "green",
@@ -94,7 +94,7 @@ public static class BatchStatus
     public static string TagClassForText(string? rawText) => NormalizeDisplayText(rawText) switch
     {
         "Not received" => "grey",
-        "Received"     => "turquoise",
+        "Received"     => "purple",
         "In progress"  => "teal",
         "On hold"      => "orange",
         "Completed"    => "green",

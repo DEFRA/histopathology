@@ -156,6 +156,26 @@ public class ReceiveBatchModelTests
         Assert.Equal("Select the time the submission was received or rejected.", sut.Error);
     }
 
+    [Theory]
+    [InlineData(BatchStatus.Received)]
+    [InlineData(BatchStatus.Rejected)]
+    public async Task OnPostSaveAsync_MissingDateReceived_ReturnsPageWithError(string status)
+    {
+        _session.Object.BatchID = 1;
+        _batches.Setup(b => b.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(MakeBatch());
+        var sut = CreateSut();
+        sut.Status = status;
+        sut.ReceivedByUserId = 5;
+        sut.TimeReceived = "1";
+        sut.DateReceived = null;
+        sut.Reason = "Some reason";
+
+        var result = await sut.OnPostSaveAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Equal("Enter the date the submission was received or rejected.", sut.Error);
+    }
+
     [Fact]
     public async Task OnPostSaveAsync_RejectedWithoutReason_ReturnsPageWithError()
     {

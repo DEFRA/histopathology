@@ -3,6 +3,7 @@ using Histo.Reporting.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Net.Http.Headers;
 
 namespace Histo.Web.Pages.Reports;
 
@@ -16,6 +17,7 @@ namespace Histo.Web.Pages.Reports;
 /// Crystal Reports <c>HistologyReport.rpt</c> (with embedded sub-report
 /// <c>HistologySubReport.rpt</c>) and streamed the PDF via <c>Response.WriteFile</c>.
 /// </summary>
+[ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
 public class HistologyReportModel : HistoPageModel
 {
     private readonly HistologyReportDataSetBuilder _dataSetBuilder;
@@ -31,9 +33,14 @@ public class HistologyReportModel : HistoPageModel
         _config         = config;
     }
 
+    // In the URL so a refreshed report tab keeps showing the batch it was opened for.
+    [BindProperty(SupportsGet = true)] public int? BatchId { get; set; }
+
+    protected override int? RequestedBatchId => BatchId is > 0 ? BatchId : Session.BatchID;
+
     public async Task<IActionResult> OnGetAsync(CancellationToken ct = default)
     {
-        var batchId = Session.BatchID;
+        var batchId = RequestedBatchId;
         if (batchId is null or <= 0)
             return RedirectToPage("/Index");
 
@@ -43,6 +50,9 @@ public class HistologyReportModel : HistoPageModel
         var ds  = await _dataSetBuilder.BuildAsync(batchId.Value, ct);
         var pdf = await HistologyReportRenderer.RenderAsync(ds, rowsPerPage);
 
-        return File(pdf, "application/pdf", $"HistologyReport-{batchId}.pdf");
+        // "inline" makes the browser display the PDF; the filename is used if the user saves it.
+        Response.Headers[HeaderNames.ContentDisposition] =
+            new ContentDispositionHeaderValue("inline") { FileName = $"HistologyReport-{batchId}.pdf" }.ToString();
+        return File(pdf, "application/pdf");
     }
 }

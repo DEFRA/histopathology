@@ -25,7 +25,7 @@ public class QCNotesModel : GridPageModel
     public int? BatchID => Session.BatchID;
     public bool IsGlobalView => !Session.BatchID.HasValue || Session.BatchID.Value == 0;
 
-    public IReadOnlyList<QCNote> PagedEntries =>
+    public IReadOnlyList<QCNote> GetPagedEntries() =>
         (SortColumn switch
         {
             "SubmissionNo" => SortDesc ? Notes.OrderByDescending(n => n.ID)                  : Notes.OrderBy(n => n.ID),

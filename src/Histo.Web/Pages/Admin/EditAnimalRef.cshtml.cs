@@ -1,4 +1,6 @@
 using Histo.Core.Domain;
+using Histo.Histology.Interfaces;
+using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
@@ -19,20 +21,24 @@ namespace Histo.Web.Pages.Admin;
 /// Resolves ISS-022. Legacy source: HistopathologySystem/EditHistologyRef.aspx.vb,
 /// HistopathologyLib/clsAnimal.vb (<c>UpdateAnimalSenderRef</c>/<c>UpdateAnimalHistologyRef</c>).
 ///
-/// Deliberate simplification: the legacy page also validated that a manually
-/// entered Histology Ref did not exceed the "next available" pool counter for
-/// its type (cross-referencing <c>clsHistology.GetHistologyRefsTable</c>). That
-/// counter is owned by the separate pool-counter workflow
-/// (<see cref="Bookings.EditHistologyRefModel"/>) and is not re-validated here —
-/// consistent with other documented simplifications in this codebase (e.g. ISS-018)
-/// where cross-referencing unverifiable legacy state was deliberately deferred.
+/// Legacy validation kept: a PG-number sample's Histology Ref must be the reverse of its PG number
+/// (PG years 2001 and earlier are not checked), and any other current-year ref must be lower than
+/// the type's next counter (<c>clsHistology.GetHistologyRefsTable</c>). Refs from earlier years are
+/// not numbered against this year's counters and skip the counter check.
 /// </summary>
 public class EditAnimalRefModel : HistoPageModel
 {
-    private readonly ISubmissionService _submissions;
+    private const string OriginalSenderRefField = "OriginalSenderRef";
 
-    public EditAnimalRefModel(ISessionService session, ISubmissionService submissions)
-        : base(session) => _submissions = submissions;
+    private readonly ISubmissionService _submissions;
+    private readonly IHistologyRefService _histologyRefs;
+
+    public EditAnimalRefModel(ISessionService session, ISubmissionService submissions, IHistologyRefService histologyRefs)
+        : base(session)
+    {
+        _submissions = submissions;
+        _histologyRefs = histologyRefs;
+    }
 
     [BindProperty] public string OriginalSenderRef { get; set; } = string.Empty;
     [BindProperty] public string NewSenderRef { get; set; } = string.Empty;
@@ -58,7 +64,7 @@ public class EditAnimalRefModel : HistoPageModel
         if (string.IsNullOrWhiteSpace(OriginalSenderRef))
         {
             Error = "You must enter a Sample Ref.";
-            ErrorField = "OriginalSenderRef";
+            ErrorField = OriginalSenderRefField;
             return Page();
         }
 
@@ -68,12 +74,12 @@ public class EditAnimalRefModel : HistoPageModel
         // matching the legacy EditHistologyRef.aspx::getHistologyRef behaviour which called
         // clsAnimal.GetAnimalBySender with the exact sender ref supplied.
         var matches = await _submissions.GetAnimalBySenderAsync(OriginalSenderRef);
-        var match = matches.FirstOrDefault();
+        var match = matches.Count > 0 ? matches[0] : null;
 
         if (match is null)
         {
             Error = "Sample Ref. not found.";
-            ErrorField = "OriginalSenderRef";
+            ErrorField = OriginalSenderRefField;
             return Page();
         }
 
@@ -89,7 +95,7 @@ public class EditAnimalRefModel : HistoPageModel
         if (string.IsNullOrWhiteSpace(OriginalSenderRef))
         {
             Error = "You must enter a Sample Ref.";
-            ErrorField = "OriginalSenderRef";
+            ErrorField = OriginalSenderRefField;
             return Page();
         }
 
@@ -128,7 +134,7 @@ public class EditAnimalRefModel : HistoPageModel
         if (string.IsNullOrWhiteSpace(OriginalSenderRef))
         {
             Error = "You must enter a Sample Ref.";
-            ErrorField = "OriginalSenderRef";
+            ErrorField = OriginalSenderRefField;
             return Page();
         }
 
@@ -137,12 +143,10 @@ public class EditAnimalRefModel : HistoPageModel
             ? string.Empty
             : NewHistologyRef.Trim();
 
-        // Note: the PG-number auto-reversal check (formerly hardcoded isNeuropath: true here,
-        // a pre-existing latent bug) was removed together with the Neuropath user area — see
-        // docs/Mouse-Bioassay-Neuropath-Removal-Analysis.md, section 3, item 4.
-        if (NewHistologyRef.Length > 0 && !ValidationHelpers.ValidateHistoRef(NewHistologyRef, isHistologyUser: false))
+        var validationError = await ValidateHistologyRefAsync();
+        if (validationError is not null)
         {
-            Error = "You must enter a valid Histology Ref.";
+            Error = validationError;
             ErrorField = "NewHistologyRef";
             return Page();
         }
@@ -165,6 +169,46 @@ public class EditAnimalRefModel : HistoPageModel
 
         return Page();
     }
+
+    /// <summary>
+    /// Legacy <c>cmdSaveHistologyRef_Click</c> validation: a PG-number sample must carry the reversed PG
+    /// number; any other ref must be well formed and, for the current year, below the type's next counter.
+    /// </summary>
+    private async Task<string?> ValidateHistologyRefAsync()
+    {
+        if (SenderRefHelpers.TryParsePgNumber(OriginalSenderRef, out _, out var pgYear))
+        {
+            var correct = SenderRefHelpers.HistologyRefFromPgNumber(OriginalSenderRef);
+            return !IsPreEqual01(pgYear) && correct is not null && NewHistologyRef != correct
+                ? "The Histology Ref is not correct for the PG Number entered."
+                : null;
+        }
+
+        if (NewHistologyRef.Length == 0) return null;
+
+        if (!ValidationHelpers.ValidateHistoRef(NewHistologyRef, isHistologyUser: false))
+            return "You must enter a valid Histology Ref.";
+
+        // Legacy IsPreviousYearHistoRef: earlier years and 1970-1999 aren't numbered against this year's counters.
+        var refYear = int.Parse(NewHistologyRef[..2]);
+        if (refYear < DateTime.Now.Year % 100 || refYear >= 70) return null;
+
+        var type = HistologyRefTypeCode.FromExistingRef(NewHistologyRef);
+        if (type is null)
+            return "The Histology Ref entered is outside the number range of every histology type.";
+
+        var counter = (await _histologyRefs.GetCountersAsync()).FirstOrDefault(c => c.Type == type);
+        if (counter is null || !int.TryParse(counter.NextHistologyRef, out var next))
+            return "The next available Histology Ref for this type could not be checked.";
+
+        return int.Parse(NewHistologyRef[^5..]) >= next
+            ? $"The Histology Ref entered is higher than or equal to the current next Histology Ref ({HistologyRefHelpers.CurrentYearPrefix}{counter.NextHistologyRef.Trim()}) for the selected area."
+            : null;
+    }
+
+    /// <summary>Legacy <c>IsPreEqual01</c>: PG years 2000, 2001 and 1970-1999 are not checked.</summary>
+    private static bool IsPreEqual01(string year) =>
+        year is "00" or "01" || (int.TryParse(year, out var y) && y >= 70);
 
     private void SetTitle()
     {

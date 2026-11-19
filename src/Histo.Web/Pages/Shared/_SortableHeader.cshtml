@@ -21,7 +21,11 @@
 
     var isActive  = !string.IsNullOrEmpty(column) && string.Equals(currentSortColumn, column, StringComparison.OrdinalIgnoreCase);
     var nextDesc  = isActive && !currentSortDesc;
-    var ariaSort  = isActive ? (currentSortDesc ? "descending" : "ascending") : "none";
+    var ariaSort  = "none";
+    if (isActive)
+    {
+        ariaSort = currentSortDesc ? "descending" : "ascending";
+    }
     var separator = string.IsNullOrEmpty(sortBase) ? string.Empty : "&";
     var href      = $"?{sortBase}{separator}SortColumn={Uri.EscapeDataString(column)}&SortDesc={(nextDesc ? "true" : "false")}";
 }

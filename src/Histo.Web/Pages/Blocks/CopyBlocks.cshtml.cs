@@ -16,13 +16,14 @@ namespace Histo.Web.Pages.Blocks;
 ///
 /// Also reproduces legacy's <c>cbAutoGenerateHisto</c> "Auto Generate Histology Refs" option:
 /// when ticked, every target sample that doesn't already have a histology ref is assigned the
-/// next available ref of the same type as the source sample's own ref. The PG-number-reversal
-/// fallback (<c>DefaultHistoRefPGReverse</c>) is NOT reproduced — that path was deliberately
-/// removed app-wide with the Neuropath/Mouse Bioassay area (see
-/// docs/Mouse-Bioassay-Neuropath-Removal-Analysis.md); only the counter-draw path applies here.
+/// next available ref of the same type as the source sample's own ref. When the source sample's
+/// ref is its own PG number reversed (legacy <c>IsPGNumber</c>), each PG-format target instead
+/// gets its own PG number reversed (legacy <c>GenerateHistoFromPG</c>), not a counter draw.
 /// </summary>
 public class CopyBlocksModel : HistoPageModel
 {
+    private const string CopyBlocksTitle = "Copy Blocks";
+
     private readonly IBlockService _blocks;
     private readonly ISubmissionService _submissions;
     private readonly IBatchService _batches;
@@ -49,6 +50,9 @@ public class CopyBlocksModel : HistoPageModel
     /// </summary>
     [BindProperty(SupportsGet = true)] public int? AnimalId { get; set; }
 
+    /// <summary>No-JavaScript "Select all" link: pre-ticks every target sample.</summary>
+    [BindProperty(SupportsGet = true)] public bool SelectAll { get; set; }
+
     [BindProperty] public List<int> BlockIds { get; set; } = [];
     [BindProperty] public List<int> TargetAnimalIds { get; set; } = [];
 
@@ -57,6 +61,7 @@ public class CopyBlocksModel : HistoPageModel
 
     public IReadOnlyList<Block> SourceBlocks { get; private set; } = [];
     public IReadOnlyList<Animal> TargetAnimals { get; private set; } = [];
+    public Animal? SourceAnimal { get; private set; }
     public string? Error { get; private set; }
 
     public string BackLinkPage => AnimalId is > 0
@@ -65,8 +70,8 @@ public class CopyBlocksModel : HistoPageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
-        ViewData["Title"] = "Copy Blocks";
-        ViewData["PageTitle"] = "Copy Blocks";
+        ViewData["Title"] = CopyBlocksTitle;
+        ViewData["PageTitle"] = CopyBlocksTitle;
 
         var blockIdsCsv = TempData.Peek("CopyBlockIds") as string;
         var batchId = BatchId ?? Session.BatchID;
@@ -85,8 +90,8 @@ public class CopyBlocksModel : HistoPageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Copy Blocks";
-        ViewData["PageTitle"] = "Copy Blocks";
+        ViewData["Title"] = CopyBlocksTitle;
+        ViewData["PageTitle"] = CopyBlocksTitle;
 
         var batchId = BatchId ?? Session.BatchID;
         if (batchId is null || BlockIds.Count == 0)
@@ -129,7 +134,8 @@ public class CopyBlocksModel : HistoPageModel
         }
 
         var statusMessage = BuildCopyStatusMessage(sourceBlocks.Count, copyResult);
-        TempData["StatusMessage"] = statusMessage;
+        // Own key: the shared "StatusMessage" is read by the admin pages (e.g. User maintenance), which would otherwise show this if left unread.
+        TempData["CopyBlocksStatusMessage"] = statusMessage;
         return RedirectToOrigin(batchId);
     }
 
@@ -153,68 +159,114 @@ public class CopyBlocksModel : HistoPageModel
         int batchId,
         int userId,
         IReadOnlyList<Block> allBlocks,
-        IReadOnlyList<Block> sourceBlocks,
+        List<Block> sourceBlocks,
         IReadOnlyList<BlockTest> allTests,
         IReadOnlyList<Animal> animals,
         Animal? sourceAnimal)
     {
-        var histologyType = AutoGenerateHistologyRefs && sourceBlocks.Count > 0
-            ? HistologyRefTypeCode.FromExistingRef(sourceAnimal?.HistologyRef)
-            : null;
-        if (AutoGenerateHistologyRefs && sourceBlocks.Count > 0 && histologyType is null)
-        {
-            return (0, $"No histology refs were generated because the reference type could not be determined from sample {sourceAnimal?.SenderRef ?? "the source sample"}. Give that sample a histology reference first.", 0, 0, null);
-        }
-
-        var histoRefsAssigned = 0;
-        var skippedExisting = 0;
-        var copiedTo = 0;
-        string? histoRefProblem = null;
-        string? errorMessage = null;
+        var plan = PlanHistologyRefs(sourceBlocks, sourceAnimal);
+        var tally = new CopyTally();
 
         foreach (var targetAnimalId in TargetAnimalIds)
         {
             var target = animals.FirstOrDefault(a => a.ID == targetAnimalId);
             if (target is null) continue;
 
-            try
-            {
-                await SampleCopyHelper.CopyBlocksToAnimalAsync(
-                    new SampleCopyServices(_blocks, _submissions, _blockTests), sourceBlocks, allBlocks, allTests, batchId, target, userId);
-            }
-            catch (InvalidOperationException ex)
+            var copyError = await TryCopyBlocksAsync(batchId, userId, allBlocks, sourceBlocks, allTests, target);
+            if (copyError is not null)
             {
                 await _submissions.UpdateAnimalAsync(target, userId);
-                errorMessage = copiedTo == 0
-                    ? ex.Message
-                    : $"{ex.Message} {copiedTo} other sample(s) were copied successfully.";
+                var errorMessage = tally.CopiedTo == 0
+                    ? copyError
+                    : $"{copyError} {tally.CopiedTo} other sample(s) were copied successfully.";
                 await LoadDisplayDataAsync();
-                return (histoRefsAssigned, histoRefProblem, skippedExisting, copiedTo, errorMessage);
+                return (tally.HistoRefsAssigned, tally.HistoRefProblem, tally.SkippedExisting, tally.CopiedTo, errorMessage);
             }
 
-            var drawRef = histologyType is not null && !target.HistoRefSet;
-            if (histologyType is not null && target.HistoRefSet) skippedExisting++;
-
-            if (drawRef)
-            {
-                var nextRef = await SampleCopyHelper.DrawRefMatchingAsync(_histologyRefs, sourceAnimal?.HistologyRef);
-                if (nextRef is null)
-                {
-                    histoRefProblem = "No more histology references are available for that reference type.";
-                }
-                else
-                {
-                    target.HistologyRef = nextRef;
-                    target.HistoRefSet = true;
-                    histoRefsAssigned++;
-                }
-            }
-
+            await AssignHistologyRefAsync(target, plan, tally);
             await _submissions.UpdateAnimalAsync(target, userId);
-            copiedTo++;
+            tally.CopiedTo++;
         }
 
-        return (histoRefsAssigned, histoRefProblem, skippedExisting, copiedTo, null);
+        return (tally.HistoRefsAssigned, tally.HistoRefProblem, tally.SkippedExisting, tally.CopiedTo, null);
+    }
+
+    private async Task<string?> TryCopyBlocksAsync(
+        int batchId, int userId, IReadOnlyList<Block> allBlocks, List<Block> sourceBlocks,
+        IReadOnlyList<BlockTest> allTests, Animal target)
+    {
+        try
+        {
+            await SampleCopyHelper.CopyBlocksToAnimalAsync(
+                new SampleCopyServices(_blocks, _submissions, _blockTests), sourceBlocks, allBlocks, allTests, batchId, target, userId);
+            return null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ex.Message;
+        }
+    }
+
+    private HistoRefPlan PlanHistologyRefs(List<Block> sourceBlocks, Animal? sourceAnimal)
+    {
+        // Legacy's IsPGNumber is a session-only flag, so a PG source is also recognised by its ref being its own sender ref reversed.
+        var pgOwnRef = SenderRefHelpers.HistologyRefFromPgNumber(sourceAnimal?.SenderRef);
+        var sourceIsPg = AutoGenerateHistologyRefs && sourceAnimal is not null
+            && (sourceAnimal.IsPGNumber || (pgOwnRef is not null && string.Equals(pgOwnRef, sourceAnimal.HistologyRef?.Trim(), StringComparison.Ordinal)));
+        var histologyType = AutoGenerateHistologyRefs && !sourceIsPg && sourceBlocks.Count > 0
+            ? HistologyRefTypeCode.FromExistingRef(sourceAnimal?.HistologyRef)
+            : null;
+        var typeUnknown = AutoGenerateHistologyRefs && !sourceIsPg && sourceBlocks.Count > 0 && histologyType is null;
+        return new HistoRefPlan(sourceAnimal, sourceIsPg, histologyType is not null, typeUnknown);
+    }
+
+    private async Task AssignHistologyRefAsync(Animal target, HistoRefPlan plan, CopyTally tally)
+    {
+        // The block copy must never be skipped because a ref can't be drawn (e.g. a PG-style source ref).
+        if (plan.TypeUnknown && !target.HistoRefSet)
+            tally.HistoRefProblem = $"No histology refs were generated because the reference type could not be determined from sample {plan.SourceAnimal?.SenderRef ?? "the source sample"}. Give that sample a histology reference first.";
+
+        var drawRef = plan.HasType && !target.HistoRefSet;
+        if (AutoGenerateHistologyRefs && target.HistoRefSet) tally.SkippedExisting++;
+
+        if (plan.SourceIsPg && !target.HistoRefSet)
+            AssignPgRef(target, tally);
+
+        if (drawRef)
+        {
+            var nextRef = await SampleCopyHelper.DrawRefMatchingAsync(_histologyRefs, plan.SourceAnimal?.HistologyRef);
+            if (nextRef is null)
+                tally.HistoRefProblem = "No more histology references are available for that reference type.";
+            else
+                SetAssignedRef(target, nextRef, tally);
+        }
+    }
+
+    // Legacy: PG source gives each PG-format target its own PG number reversed (YY/0NNNN).
+    private static void AssignPgRef(Animal target, CopyTally tally)
+    {
+        var pgRef = SenderRefHelpers.HistologyRefFromPgNumber(target.SenderRef);
+        if (pgRef is null)
+            tally.HistoRefProblem = $"No histology ref was generated for sample {target.SenderRef} because its sender ref is not in PG number format (PGNNNN/NN).";
+        else
+            SetAssignedRef(target, pgRef, tally);
+    }
+
+    private static void SetAssignedRef(Animal target, string histologyRef, CopyTally tally)
+    {
+        target.HistologyRef = histologyRef;
+        target.HistoRefSet = true;
+        tally.HistoRefsAssigned++;
+    }
+
+    private sealed record HistoRefPlan(Animal? SourceAnimal, bool SourceIsPg, bool HasType, bool TypeUnknown);
+
+    private sealed class CopyTally
+    {
+        public int HistoRefsAssigned { get; set; }
+        public string? HistoRefProblem { get; set; }
+        public int SkippedExisting { get; set; }
+        public int CopiedTo { get; set; }
     }
 
     private RedirectToPageResult RedirectToOrigin(int? batchId) => AnimalId is > 0
@@ -233,6 +285,7 @@ public class CopyBlocksModel : HistoPageModel
 
         var sourceAnimalId = SourceBlocks[0].AnimalID;
         var animals = await GetAllAnimalsAsync(batchId);
+        SourceAnimal = animals.FirstOrDefault(a => a.ID == sourceAnimalId);
         TargetAnimals = animals.Where(a => a.ID != sourceAnimalId).OrderBy(a => a.SenderRef).ToList();
         return true;
     }

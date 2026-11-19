@@ -178,7 +178,8 @@ public sealed class SessionService : ISessionService
     /// <inheritdoc/>
     public void PopulateFromClaims(ClaimsPrincipal principal)
     {
-        _session.SetString(KeyUserName,  principal.FindFirstValue(ClaimTypes.Name) ?? string.Empty);
+        _session.SetString(KeyUserName,  principal.FindFirstValue(AppClaimTypes.UserName)
+                                         ?? principal.FindFirstValue(ClaimTypes.Name) ?? string.Empty);
         _session.SetString(KeyGroupName, principal.FindFirstValue(AppClaimTypes.GroupName) ?? string.Empty);
         _session.SetString(KeyUserEmail, principal.FindFirstValue(ClaimTypes.Email)
                                          ?? principal.FindFirstValue("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")

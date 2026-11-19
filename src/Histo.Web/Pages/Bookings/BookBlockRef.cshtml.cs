@@ -16,6 +16,9 @@ namespace Histo.Web.Pages.Bookings;
 /// </summary>
 public class BookBlockRefModel : HistoPageModel
 {
+    private const string BookBlocksTitle = "Book blocks";
+    private const string RangeCannotBeCreatedMessage = "The range requested cannot be created.";
+
     private readonly IBlockService _blocks;
 
     public BookBlockRefModel(ISessionService session, IBlockService blocks)
@@ -32,8 +35,8 @@ public class BookBlockRefModel : HistoPageModel
 
     public void OnGet()
     {
-        ViewData["Title"] = "Book blocks";
-        ViewData["PageTitle"] = "Book blocks";
+        ViewData["Title"] = BookBlocksTitle;
+        ViewData["PageTitle"] = BookBlocksTitle;
     }
 
     // Legacy source: BookBlockRef.aspx.vb::lbSearchBlockRefs_Click — a full postback that
@@ -53,8 +56,8 @@ public class BookBlockRefModel : HistoPageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Book blocks";
-        ViewData["PageTitle"] = "Book blocks";
+        ViewData["Title"] = BookBlocksTitle;
+        ViewData["PageTitle"] = BookBlocksTitle;
 
         if (string.IsNullOrWhiteSpace(SenderRefFrom))
         {
@@ -62,132 +65,138 @@ public class BookBlockRefModel : HistoPageModel
             return Page();
         }
 
-        if (string.IsNullOrWhiteSpace(BlockRefFrom) || !SenderRefHelpers.IsValidBlockRef(BlockRefFrom.Trim()))
+        var blockRangeError = ResolveBlockRefRange(BlockRefFrom, BlockRefTo, out var blockRefFrom, out var blockRefTo);
+        if (blockRangeError is not null)
         {
-            Error = "The requested block ref range cannot be created.";
+            Error = blockRangeError;
             return Page();
-        }
-        var blockRefFrom = int.Parse(BlockRefFrom.Trim());
-
-        int blockRefTo;
-        if (!string.IsNullOrWhiteSpace(BlockRefTo))
-        {
-            if (!SenderRefHelpers.IsValidBlockRef(BlockRefTo.Trim()))
-            {
-                Error = "The requested block ref range cannot be created.";
-                return Page();
-            }
-            blockRefTo = int.Parse(BlockRefTo.Trim());
-            if (blockRefTo <= blockRefFrom)
-            {
-                Error = "The requested block ref range cannot be created.";
-                return Page();
-            }
-        }
-        else
-        {
-            blockRefTo = blockRefFrom;
         }
 
         // Resolve the Sender Ref range to process — mirrors ProcessMultipleBookings/
         // ValidatePGNumberRange/ValidateMouseNumberRange (legacy source above).
-        var senderRefFrom = SenderRefFrom.Trim();
-        var senderRefTo = SenderRefTo?.Trim();
-        List<string>? senderRefs;
-
-        if (SenderRefHelpers.IsPgNumber(senderRefFrom))
+        var senderRangeError = ResolveSenderRefs(SenderRefFrom.Trim(), SenderRefTo?.Trim(), out var senderRefs);
+        if (senderRangeError is not null)
         {
-            if (!SenderRefHelpers.TryParsePgNumber(senderRefFrom, out var idFrom, out var year))
-            {
-                Error = "The range requested cannot be created.";
-                return Page();
-            }
-
-            var idTo = idFrom;
-            if (!string.IsNullOrEmpty(senderRefTo))
-            {
-                if (!SenderRefHelpers.IsPgNumber(senderRefTo) || !SenderRefHelpers.TryParsePgNumber(senderRefTo, out idTo, out var yearTo))
-                {
-                    Error = "The range requested cannot be created.";
-                    return Page();
-                }
-                if (yearTo != year) { Error = "PG Number years must be the same."; return Page(); }
-                if (idTo <= idFrom) { Error = "The requested sender ref range cannot be created."; return Page(); }
-            }
-
-            senderRefs = [.. Enumerable.Range(idFrom, idTo - idFrom + 1).Select(i => SenderRefHelpers.FormatPgNumber(i, year))];
-        }
-        else if (SenderRefHelpers.IsMouseNumber(senderRefFrom))
-        {
-            if (!SenderRefHelpers.TryParseMouseNumber(senderRefFrom, out var idFrom))
-            {
-                Error = "The range requested cannot be created.";
-                return Page();
-            }
-
-            var idTo = idFrom;
-            if (!string.IsNullOrEmpty(senderRefTo))
-            {
-                if (!SenderRefHelpers.IsMouseNumber(senderRefTo) || !SenderRefHelpers.TryParseMouseNumber(senderRefTo, out idTo))
-                {
-                    Error = "The range requested cannot be created.";
-                    return Page();
-                }
-                if (idTo <= idFrom) { Error = "The requested sender ref range cannot be created."; return Page(); }
-            }
-
-            senderRefs = [.. Enumerable.Range(idFrom, idTo - idFrom + 1).Select(SenderRefHelpers.FormatMouseNumber)];
-        }
-        else
-        {
-            // Legacy note (BookBlockRef.aspx): "If an alternative range is used, only the first
-            // Sender Ref in the range will have blocks booked" — a non-PG/non-Mouse Sender Ref To
-            // is silently ignored; only SenderRefFrom itself is processed.
-            senderRefs = [senderRefFrom];
+            Error = senderRangeError;
+            return Page();
         }
 
         var requestedRefs = Enumerable.Range(blockRefFrom, blockRefTo - blockRefFrom + 1).ToList();
         foreach (var senderRef in senderRefs)
+            await BookSenderRefAsync(senderRef, requestedRefs);
+
+        SuccessMessage = BuildSuccessMessage(senderRefs.Count * (blockRefTo - blockRefFrom + 1));
+        return Page();
+    }
+
+    private const string InvalidBlockRangeMessage = "The requested block ref range cannot be created.";
+    private const string InvalidSenderRangeMessage = "The requested sender ref range cannot be created.";
+
+    private static string? ResolveBlockRefRange(string? from, string? to, out int blockRefFrom, out int blockRefTo)
+    {
+        blockRefFrom = 0;
+        blockRefTo = 0;
+        if (string.IsNullOrWhiteSpace(from) || !SenderRefHelpers.IsValidBlockRef(from.Trim()))
+            return InvalidBlockRangeMessage;
+        blockRefFrom = int.Parse(from.Trim());
+
+        if (string.IsNullOrWhiteSpace(to))
         {
-            // One atomic call: the duplicate check, sample resolution and inserts all run on a
-            // single locked transaction, so concurrent bookings cannot both claim the same ref.
-            var results = await _blocks.BookPreBookedBlocksAsync(senderRef, requestedRefs);
-            if (results is null)
+            blockRefTo = blockRefFrom;
+            return null;
+        }
+
+        if (!SenderRefHelpers.IsValidBlockRef(to.Trim())) return InvalidBlockRangeMessage;
+        blockRefTo = int.Parse(to.Trim());
+        return blockRefTo <= blockRefFrom ? InvalidBlockRangeMessage : null;
+    }
+
+    private static string? ResolveSenderRefs(string from, string? to, out List<string> senderRefs)
+    {
+        senderRefs = [];
+        if (SenderRefHelpers.IsPgNumber(from)) return ResolvePgRange(from, to, senderRefs);
+        if (SenderRefHelpers.IsMouseNumber(from)) return ResolveMouseRange(from, to, senderRefs);
+
+        // Legacy note (BookBlockRef.aspx): "If an alternative range is used, only the first
+        // Sender Ref in the range will have blocks booked" — a non-PG/non-Mouse Sender Ref To
+        // is silently ignored; only SenderRefFrom itself is processed.
+        senderRefs.Add(from);
+        return null;
+    }
+
+    private static string? ResolvePgRange(string from, string? to, List<string> senderRefs)
+    {
+        if (!SenderRefHelpers.TryParsePgNumber(from, out var idFrom, out var year))
+            return RangeCannotBeCreatedMessage;
+
+        var idTo = idFrom;
+        if (!string.IsNullOrEmpty(to))
+        {
+            if (!SenderRefHelpers.IsPgNumber(to) || !SenderRefHelpers.TryParsePgNumber(to, out idTo, out var yearTo))
+                return RangeCannotBeCreatedMessage;
+            if (yearTo != year) return "PG Number years must be the same.";
+            if (idTo <= idFrom) return InvalidSenderRangeMessage;
+        }
+
+        senderRefs.AddRange(Enumerable.Range(idFrom, idTo - idFrom + 1).Select(i => SenderRefHelpers.FormatPgNumber(i, year)));
+        return null;
+    }
+
+    private static string? ResolveMouseRange(string from, string? to, List<string> senderRefs)
+    {
+        if (!SenderRefHelpers.TryParseMouseNumber(from, out var idFrom))
+            return RangeCannotBeCreatedMessage;
+
+        var idTo = idFrom;
+        if (!string.IsNullOrEmpty(to))
+        {
+            if (!SenderRefHelpers.IsMouseNumber(to) || !SenderRefHelpers.TryParseMouseNumber(to, out idTo))
+                return RangeCannotBeCreatedMessage;
+            if (idTo <= idFrom) return InvalidSenderRangeMessage;
+        }
+
+        senderRefs.AddRange(Enumerable.Range(idFrom, idTo - idFrom + 1).Select(SenderRefHelpers.FormatMouseNumber));
+        return null;
+    }
+
+    private async Task BookSenderRefAsync(string senderRef, List<int> requestedRefs)
+    {
+        // One atomic call: the duplicate check, sample resolution and inserts all run on a
+        // single locked transaction, so concurrent bookings cannot both claim the same ref.
+        var results = await _blocks.BookPreBookedBlocksAsync(senderRef, requestedRefs);
+        if (results is null)
+        {
+            ResultMessages.Add($"Sample: {senderRef} — booking failed, so no blocks were booked.");
+            return;
+        }
+
+        var numberSuccess = 0;
+        var numberFails = 0;
+
+        foreach (var result in results)
+        {
+            if (result.Outcome == PreBookedBlockOutcome.Booked)
             {
-                ResultMessages.Add($"Sample: {senderRef} — booking failed, so no blocks were booked.");
+                numberSuccess++;
                 continue;
             }
 
-            var numberSuccess = 0;
-            var numberFails = 0;
-
-            foreach (var result in results)
-            {
-                var blockRef = SenderRefHelpers.FormatBlockRef(result.BlockRef);
-                switch (result.Outcome)
-                {
-                    case PreBookedBlockOutcome.Booked:
-                        numberSuccess++;
-                        break;
-                    case PreBookedBlockOutcome.AlreadyExists:
-                        ResultMessages.Add($"Sample: {senderRef} Block {blockRef} not booked as it already exists.");
-                        numberFails++;
-                        break;
-                    default:
-                        ResultMessages.Add($"Sample: {senderRef} — failed to retrieve or create sample data.");
-                        numberFails++;
-                        break;
-                }
-            }
-
-            ResultMessages.Add($"Sample: {senderRef} {numberSuccess} blocks booked, {numberFails} blocks not booked.");
+            ResultMessages.Add(result.Outcome == PreBookedBlockOutcome.AlreadyExists
+                ? $"Sample: {senderRef} Block {SenderRefHelpers.FormatBlockRef(result.BlockRef)} not booked as it already exists."
+                : $"Sample: {senderRef} — failed to retrieve or create sample data.");
+            numberFails++;
         }
 
-        var requested = (senderRefs?.Count ?? 0) * (blockRefTo - blockRefFrom + 1);
+        ResultMessages.Add($"Sample: {senderRef} {numberSuccess} blocks booked, {numberFails} blocks not booked.");
+    }
+
+    private string? BuildSuccessMessage(int requested)
+    {
+        if (requested == 0) return "No blocks were requested.";
+
         var anyFailed = ResultMessages.Exists(m =>
             m.Contains("not booked", StringComparison.OrdinalIgnoreCase)
             || m.Contains("failed", StringComparison.OrdinalIgnoreCase));
-        SuccessMessage = requested == 0 ? "No blocks were requested." : (anyFailed ? null : "Blocks booked successfully.");
-        return Page();
+        return anyFailed ? null : "Blocks booked successfully.";
     }
 }

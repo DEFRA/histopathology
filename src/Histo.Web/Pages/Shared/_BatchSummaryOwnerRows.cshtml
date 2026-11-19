@@ -1,0 +1,9 @@
+@*
+    Entered by / entered area / submitted by / submitted area rows of a batch summary list.
+    Model = (entered by, entered area, submitted by, submitted area); missing values render as an em dash.
+*@
+@model (string? EnteredBy, string? EnteredArea, string? SubmittedBy, string? SubmittedArea)
+@SummaryList.Row("Entered by", Model.EnteredBy ?? "\u2014")
+@SummaryList.Row("Entered area", Model.EnteredArea ?? "\u2014")
+@SummaryList.Row("Submitted by", Model.SubmittedBy ?? "\u2014")
+@SummaryList.Row("Submitted area", Model.SubmittedArea ?? "\u2014")

@@ -52,6 +52,21 @@ public class BookBlockRefModelTests
         Assert.Equal("The requested block ref range cannot be created.", sut.Error);
     }
 
+    [Theory]
+    [InlineData("PGnoslash")]
+    [InlineData("MCabc")]
+    public async Task OnPostAsync_MalformedPgOrMouseSenderRef_ReturnsRangeCannotBeCreated(string senderRef)
+    {
+        var sut = CreateSut();
+        sut.SenderRefFrom = senderRef;
+        sut.BlockRefFrom = "01";
+
+        await sut.OnPostAsync();
+
+        Assert.Equal("The range requested cannot be created.", sut.Error);
+        _blocks.VerifyNoOtherCalls();
+    }
+
     [Fact]
     public async Task OnPostAsync_PlainSenderRef_BooksBlocksForFirstRefOnly()
     {
@@ -219,4 +234,50 @@ public class BookBlockRefModelTests
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
         Assert.Equal("/Bookings/BookBlockRef?SenderRefFrom=&SenderRefTo=&BlockRefFrom=&BlockRefTo=", redirect.RouteValues?["ReturnPage"]);
     }
-}
+
+    [Fact]
+    public void OnGet_SetsPageTitle()
+    {
+        var sut = CreateSut();
+
+        sut.OnGet();
+
+        Assert.Equal("Book blocks", sut.ViewData["Title"]);
+    }
+
+    [Fact]
+    public async Task OnPostAsync_PgNumberRange_BooksEachSenderRefInRange()
+    {
+        _blocks.Setup(b => b.BookPreBookedBlocksAsync(It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<PreBookedBlockResult>)[new PreBookedBlockResult(1, PreBookedBlockOutcome.Booked)]);
+        var sut = CreateSut();
+        sut.SenderRefFrom = "PG0001/24";
+        sut.SenderRefTo = "PG0003/24";
+        sut.BlockRefFrom = "01";
+
+        await sut.OnPostAsync();
+
+        Assert.Null(sut.Error);
+        Assert.Equal(3, sut.ResultMessages.Count);
+        foreach (var senderRef in new[] { "PG0001/24", "PG0002/24", "PG0003/24" })
+            _blocks.Verify(b => b.BookPreBookedBlocksAsync(senderRef, It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("PG0001/24", "PG0003/25", "PG Number years must be the same.")]
+    [InlineData("PG0005/24", "PG0003/24", "The requested sender ref range cannot be created.")]
+    [InlineData("PG0001/24", "NOTPG", "The range requested cannot be created.")]
+    [InlineData("MC000005", "MC000002", "The requested sender ref range cannot be created.")]
+    [InlineData("MC000001", "NOTMC", "The range requested cannot be created.")]
+    public async Task OnPostAsync_InvalidSenderRefRange_ReportsErrorAndBooksNothing(string from, string to, string expectedError)
+    {
+        var sut = CreateSut();
+        sut.SenderRefFrom = from;
+        sut.SenderRefTo = to;
+        sut.BlockRefFrom = "01";
+
+        await sut.OnPostAsync();
+
+        Assert.Equal(expectedError, sut.Error);
+        _blocks.VerifyNoOtherCalls();
+    }}

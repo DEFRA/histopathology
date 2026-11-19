@@ -226,8 +226,39 @@ public class BlockDetailsModelTests
     [Fact]
     public async Task LoadSupportingData_AssignTissueJourney_OnlyOffersTheSubmissionsTissues()
     {
-        // Reached from Assign Tissues to Blocks (BatchBlocks): the list is the submission's tissues
-        // only, even though the whole-list default is on and no toggle is offered.
+        // Reached from Assign Tissues to Blocks (BatchBlocks): the list defaults to the submission's tissues
+        // only; the entire list is opt-in.
+        _session.Setup(s => s.SampleDetailReturnPage).Returns("/Batches/BatchBlocks?batchId=5");
+        var animal = new Animal { ID = 2, SenderRef = "S2" };
+        _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
+        _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[animal]);
+        _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[
+            new BatchSubmission { ID = 69945, BatchID = 5, AnimalID = 2, Order = 1 },
+        ]);
+        _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 69945, Owner = TissueOwner.Submission, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01", Order = 1 },
+        ]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _lookups.Setup(l => l.GetLookupDataAsync(9, It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[
+            new LookupItem { Code = "AGAR", Name = "Agar" },
+            new LookupItem { Code = "OTHER", Name = "Other tissue" },
+        ]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+
+        await sut.OnGetAsync();
+
+        Assert.True(sut.IsAssignTissueMode);
+        Assert.False(sut.UseWholeTissueList);
+        Assert.Contains(sut.TissueOptions, o => o.Code == "AGAR");
+        Assert.DoesNotContain(sut.TissueOptions, o => o.Code == "OTHER");
+    }
+
+    [Fact]
+    public async Task LoadSupportingData_AssignTissueJourney_EntireListOptedIn_OffersEveryTissue()
+    {
         _session.Setup(s => s.SampleDetailReturnPage).Returns("/Batches/BatchBlocks?batchId=5");
         var animal = new Animal { ID = 2, SenderRef = "S2" };
         _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
@@ -251,9 +282,7 @@ public class BlockDetailsModelTests
 
         await sut.OnGetAsync();
 
-        Assert.True(sut.IsAssignTissueMode);
-        Assert.Contains(sut.TissueOptions, o => o.Code == "AGAR");
-        Assert.DoesNotContain(sut.TissueOptions, o => o.Code == "OTHER");
+        Assert.Contains(sut.TissueOptions, o => o.Code == "OTHER");
     }
 
     [Fact]
@@ -354,7 +383,7 @@ public class BlockDetailsModelTests
         _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
-        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(400);
         _batches.Setup(b => b.GetBatchTestSelectionsAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Histo.Submissions.Models.BatchTestSelections
         {
@@ -385,7 +414,7 @@ public class BlockDetailsModelTests
         _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
-        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(400);
         _batches.Setup(b => b.GetBatchTestSelectionsAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Histo.Submissions.Models.BatchTestSelections
         {
@@ -513,7 +542,7 @@ public class BlockDetailsModelTests
         Assert.Equal("typed", sut.NewComment);
         Assert.True(sut.NewRepeatBlock);
         _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
-            It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<int>(), It.IsAny<BlockOptions?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Theory]
@@ -543,15 +572,18 @@ public class BlockDetailsModelTests
     }
 
     [Fact]
-    public async Task OnPostNextBlockAsync_NewBlockRef_NeverGoesBelowTheAnimalsStoredNextBlockRef()
+    public async Task OnPostNextBlockAsync_NewBlockRef_IsTheLowestUnusedRef_EvenBelowTheStoredNextBlockRef()
     {
-        // 01/02 remain after 03 was deleted, and the animal's counter says 04: the next block must be 04.
+        // 01 and 02 are used, 03 was skipped/deleted and the animal's counter says 04: the next block is the lowest free, 03.
         _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2", NextBlockRef = "04" }]);
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
         _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
-        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 1, OwnerID = 1, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+            new Tissue { ID = 2, OwnerID = 2, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
             new Block { ID = 1, BatchID = 5, AnimalID = 2, BlockRef = "01" },
             new Block { ID = 2, BatchID = 5, AnimalID = 2, BlockRef = "02" },
@@ -559,7 +591,7 @@ public class BlockDetailsModelTests
         _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 2, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
             new Tissue { ID = 1, OwnerID = 2, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
         ]);
-        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, "03", It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(9);
         var sut = CreateSut(animalId: 2, blockId: 2);
         sut.NewBlockRef = "02";
@@ -567,7 +599,7 @@ public class BlockDetailsModelTests
 
         await sut.OnPostNextBlockAsync();
 
-        _blocks.Verify(b => b.AddBlockAsync(5, 2, "04", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _blocks.Verify(b => b.AddBlockAsync(5, 2, "03", It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -576,6 +608,7 @@ public class BlockDetailsModelTests
         // Regression: clicking "Add block" auto-provisions a real DB row on first load (see
         // OnGetAsync's Add-mode branch) — Back must discard it if the user leaves without doing
         // anything, matching legacy btnCancel_Click, instead of leaving an empty orphan block.
+        BlockInBatch(319181);
         _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _blocks.Setup(b => b.DeleteBlockAsync(319181, 7, It.IsAny<CancellationToken>())).ReturnsAsync(true);
         var sut = CreateSut(animalId: 2, blockId: 319181);
@@ -595,6 +628,7 @@ public class BlockDetailsModelTests
         // immediately and independently — Cancel must still be able to fully discard a never-"Done"
         // block even when tissues were already added, instead of silently no-oping on the FK-guarded
         // block delete and leaving an incomplete block + its tissues behind.
+        BlockInBatch(319181);
         _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
             new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR" },
             new Tissue { ID = 2, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "OTHER" },
@@ -616,6 +650,7 @@ public class BlockDetailsModelTests
     {
         // Regression: BlockTestService.SaveTestSelectionsAsync re-throws on failure (unlike the
         // other cleanup calls here) — Cancel must still complete and redirect, not surface a 500.
+        BlockInBatch(319181);
         _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _blockTests.Setup(t => t.SaveTestSelectionsAsync(5, 319181, It.IsAny<IReadOnlyList<string>>(), It.IsAny<IReadOnlyList<string>>(),
             It.IsAny<IReadOnlyList<string>>(), 7, It.IsAny<CancellationToken>())).ThrowsAsync(new InvalidOperationException("boom"));
@@ -629,6 +664,25 @@ public class BlockDetailsModelTests
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
         Assert.Equal("/Submissions/SubmissionDetailsBlock", redirect.PageName);
     }
+
+    [Fact]
+    public async Task OnPostCancelAsync_BlockFromAnotherBatch_IsNotDeleted()
+    {
+        BlockInBatch(111);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.IsAddFlow = true;
+
+        var result = await sut.OnPostCancelAsync();
+
+        _blocks.Verify(b => b.DeleteBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _submissions.Verify(s => s.DeleteTissueAsync(It.IsAny<int>(), It.IsAny<TissueOwner>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
+    }
+
+    private void BlockInBatch(int blockId) =>
+        _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = blockId, BatchID = 5, AnimalID = 2, BlockRef = "01" },
+        ]);
 
     [Fact]
     public async Task OnPostCancelAsync_EditingEstablishedBlock_DoesNotDeleteIt()
@@ -686,7 +740,7 @@ public class BlockDetailsModelTests
         Assert.Equal("Enter a Histology Reference for this sample before adding a block.", sut.TempData["SubmissionDetailsBlock_Error"]);
         Assert.Equal("EditHistologyRef", sut.TempData["SubmissionDetailsBlock_ErrorFieldId"]);
         _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
-            It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<int>(), It.IsAny<BlockOptions?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -709,7 +763,7 @@ public class BlockDetailsModelTests
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
         Assert.Equal("/Submissions/SubmissionDetailsBlock", redirect.PageName);
         _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
-            It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<int>(), It.IsAny<BlockOptions?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -725,7 +779,7 @@ public class BlockDetailsModelTests
         _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
-        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(400);
         var sut = CreateSut(animalId: 2, blockId: 0);
 
@@ -733,7 +787,7 @@ public class BlockDetailsModelTests
 
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
         Assert.Null(redirect.PageName);
-        _blocks.Verify(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _blocks.Verify(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>
@@ -756,7 +810,7 @@ public class BlockDetailsModelTests
         _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
         _blocks.Setup(b => b.GetPreBookedByAnimalAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
-        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(400);
         var sut = CreateSut(animalId: 2, blockId: 0);
 
@@ -765,7 +819,7 @@ public class BlockDetailsModelTests
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
         Assert.Null(redirect.PageName);
         Assert.False(sut.NoPreBookedRefsAvailable);
-        _blocks.Verify(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _blocks.Verify(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()), Times.Once);
         _blocks.Verify(b => b.ClaimPreBookedBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<IEnumerable<int>>(), It.IsAny<int>(), null, It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -786,21 +840,21 @@ public class BlockDetailsModelTests
         _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
             new Tissue { ID = 1, OwnerID = 300, Owner = TissueOwner.Block, TissueCode = "AGAR" },
         ]);
-        _blocks.Setup(b => b.AddBlockAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(400);
         var sut = CreateSut(animalId: 2, blockId: 0);
 
         var result = await sut.OnGetAsync();
 
         Assert.Equal("02", sut.NewBlockRef);
-        _blocks.Verify(b => b.AddBlockAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _blocks.Verify(b => b.AddBlockAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task OnGetAsync_AddMode_PreviousBlockWasDeleted_NextRefContinuesPastIt()
+    public async Task OnGetAsync_AddMode_PreviousBlockWasDeleted_LowestUnusedRefIsOfferedAgain()
     {
         // Block "01" was added and then deleted, which advanced the animal's NextBlockRef to "02".
-        // With no blocks left, a computed max+1 alone would hand "01" out again.
+        // The lowest unused ref ("01") is offered again; the user can still override it.
         _session.Setup(s => s.UserArea).Returns("Neuropath");
         _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>()))
@@ -809,14 +863,14 @@ public class BlockDetailsModelTests
         _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[]);
-        _blocks.Setup(b => b.AddBlockAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, "01", It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(400);
         var sut = CreateSut(animalId: 2, blockId: 0);
 
         await sut.OnGetAsync();
 
-        Assert.Equal("02", sut.NewBlockRef);
-        _blocks.Verify(b => b.AddBlockAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal("01", sut.NewBlockRef);
+        _blocks.Verify(b => b.AddBlockAsync(5, 2, "01", It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -843,7 +897,7 @@ public class BlockDetailsModelTests
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
         Assert.Equal(300, redirect.RouteValues?["blockId"]);
         _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
-            It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<int>(), It.IsAny<BlockOptions?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -880,7 +934,7 @@ public class BlockDetailsModelTests
         Assert.Equal("01", sut.NewBlockRef);
         _blocks.Verify(b => b.ClaimPreBookedBlockAsync(preBooked01, 5, It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()), Times.Once);
         _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
-            It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<int>(), It.IsAny<BlockOptions?>(), It.IsAny<CancellationToken>()), Times.Never);
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
         Assert.Equal(900, redirect.RouteValues?["blockId"]);
     }
@@ -913,14 +967,18 @@ public class BlockDetailsModelTests
     [Fact]
     public async Task OnPostNextBlockAsync_NotPreCassetted_SkipsPreBookedRefs_LandsOnFirstGenuinelyFreeRef()
     {
-        // User-reported scenario continued: the sample's current block is "02"; refs 03/04 are
+        // User-reported scenario continued: the sample has blocks "01" and "02"; refs 03/04 are
         // pre-booked for this sample, so "Next block" must skip both and land on "05".
         _submissions.Setup(s => s.GetBlockAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[]);
         _submissions.Setup(s => s.GetAnimalsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Animal>)[new Animal { ID = 2, SenderRef = "S2" }]);
         _submissions.Setup(s => s.GetSubmissionsByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<BatchSubmission>)[]);
         _submissions.Setup(s => s.GetBatchSubmissionTissuesAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
-        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
+        _submissions.Setup(s => s.GetTissuesByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 8, OwnerID = 319180, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+            new Tissue { ID = 9, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
         _blocks.Setup(b => b.GetByBatchAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Block>)[
+            new Block { ID = 319180, BatchID = 5, AnimalID = 2, BlockRef = "01" },
             new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "02" },
         ]);
         _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
@@ -931,7 +989,7 @@ public class BlockDetailsModelTests
             new Block { ID = 900, AnimalID = 2, BlockRef = "03", Status = BlockStatus.PreBooked },
             new Block { ID = 901, AnimalID = 2, BlockRef = "04", Status = BlockStatus.PreBooked },
         ]);
-        _blocks.Setup(b => b.AddBlockAsync(5, 2, "05", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, "05", It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(319182);
         var sut = CreateSut(animalId: 2, blockId: 319181);
         sut.IsAddFlow = false;
@@ -940,7 +998,7 @@ public class BlockDetailsModelTests
 
         await sut.OnPostNextBlockAsync();
 
-        _blocks.Verify(b => b.AddBlockAsync(5, 2, "05", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _blocks.Verify(b => b.AddBlockAsync(5, 2, "05", It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -1054,7 +1112,7 @@ public class BlockDetailsModelTests
         foreach (var r in new[] { "02", "03", "04", "05" })
             _blocks.Verify(b => b.AddBlockKeepingRefAsync(5, 2, r, It.IsAny<IEnumerable<int>>(), 7, new BlockOptions(null, null, false), It.IsAny<CancellationToken>()), Times.Once);
         _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
-            It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<int>(), It.IsAny<BlockOptions?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -1093,7 +1151,7 @@ public class BlockDetailsModelTests
         _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
             new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
         ]);
-        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(319182);
         var sut = CreateSut(animalId: 2, blockId: 319181);
         sut.IsAddFlow = false; // editing an established block when "Next block" is clicked
@@ -1134,7 +1192,7 @@ public class BlockDetailsModelTests
         Assert.IsType<PageResult>(result);
         Assert.Equal("There are no more pre-booked block references available for this sample.", sut.ErrorMessage);
         _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
-            It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<int>(), It.IsAny<BlockOptions?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -1166,7 +1224,7 @@ public class BlockDetailsModelTests
 
         _blocks.Verify(b => b.ClaimPreBookedBlockAsync(preBooked02, 5, It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()), Times.Once);
         _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
-            It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<int>(), It.IsAny<BlockOptions?>(), It.IsAny<CancellationToken>()), Times.Never);
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
         Assert.Equal(901, redirect.RouteValues?["blockId"]);
     }
@@ -1188,7 +1246,7 @@ public class BlockDetailsModelTests
             new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
         ]);
         _blocks.Setup(b => b.UpdateBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
-        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(319182);
         var sut = CreateSut(animalId: 2, blockId: 319181);
         sut.NewBlockRef = "01";
@@ -1226,7 +1284,7 @@ public class BlockDetailsModelTests
         Assert.IsType<PageResult>(result);
         Assert.Equal("Add at least one tissue to this block before completing it.", sut.ErrorMessage);
         _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
-            It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<int>(), It.IsAny<BlockOptions?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -1241,7 +1299,7 @@ public class BlockDetailsModelTests
             new Block { ID = 319181, BatchID = 5, AnimalID = 2, BlockRef = "01" },
         ]);
         _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[]);
-        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(319182);
         var sut = CreateSut(animalId: 2, blockId: 319181);
         sut.NewBlockRef = "01";
@@ -1287,7 +1345,7 @@ public class BlockDetailsModelTests
         // "02" is the sibling duplicated by SaveCurrentBlockDetailsAsync; "03" is the actual next block.
         _blocks.Setup(b => b.AddBlockKeepingRefAsync(5, 2, "02", It.IsAny<IEnumerable<int>>(), 7, new BlockOptions("CUST", null, false), It.IsAny<CancellationToken>()))
             .ReturnsAsync(400);
-        _blocks.Setup(b => b.AddBlockAsync(5, 2, "03", It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, "03", It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(500);
         var sut = CreateSut(animalId: 2, blockId: 319181);
         sut.NewBlockRef = "01";
@@ -1316,7 +1374,7 @@ public class BlockDetailsModelTests
         _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
             new Tissue { ID = 1, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
         ]);
-        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, null, false, It.IsAny<CancellationToken>()))
+        _blocks.Setup(b => b.AddBlockAsync(5, 2, It.IsAny<string>(), It.IsAny<IEnumerable<int>>(), 7, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(319182);
         var sut = CreateSut(animalId: 2, blockId: 319181);
         sut.NewBlockRef = "01";
@@ -1706,7 +1764,7 @@ public class BlockDetailsModelTests
 
         // Resumes the existing abandoned block 319182 (ref "02") instead of creating a new row.
         _blocks.Verify(b => b.AddBlockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IEnumerable<int>>(),
-            It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<int>(), It.IsAny<BlockOptions?>(), It.IsAny<CancellationToken>()), Times.Never);
         var redirect = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(result);
         Assert.Equal(319182, redirect.RouteValues?["blockId"]);
     }

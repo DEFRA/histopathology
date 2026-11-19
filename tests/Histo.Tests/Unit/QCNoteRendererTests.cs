@@ -79,7 +79,7 @@ public class QCNoteRendererTests
             "QCNote-Test.pdf");
 
         var pdf = await QCNoteRenderer.RenderAsync(ds);
-        await File.WriteAllBytesAsync(outputPath, pdf);
+        await File.WriteAllBytesAsync(outputPath, pdf, TestContext.Current.CancellationToken);
 
         Assert.True(File.Exists(outputPath), "PDF file should exist on disk.");
         Assert.True(new FileInfo(outputPath).Length > 0, "PDF file should not be empty.");

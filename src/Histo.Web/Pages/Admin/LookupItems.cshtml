@@ -38,7 +38,7 @@
             <input class="govuk-checkboxes__input" type="checkbox" id="showDeactivated"
                    name="ShowDeactivated" value="true"
                    @(Model.ShowDeactivated ? "checked" : "")
-                   onchange="this.form.submit()" />
+                   data-auto-submit />
             <label class="govuk-label govuk-checkboxes__label" for="showDeactivated">Show deactivated items</label>
         </div>
     </div>
@@ -58,10 +58,10 @@
         </tr>
     </thead>
     <tbody class="govuk-table__body">
-        @foreach (var i in Model.PagedEntries)
+        @foreach (var i in Model.GetPagedEntries())
         {
             <tr class="govuk-table__row">
-                <td class="govuk-table__cell">@(Model.ShowAreaColumn ? (Model.AreaNameById.TryGetValue(i.Area ?? "", out var aName) ? aName : i.Area) : (i.Code ?? i.ID.ToString()))</td>
+                <td class="govuk-table__cell">@Model.FirstColumnValue(i)</td>
                 <td class="govuk-table__cell">@i.Name</td>
                 <td class="govuk-table__cell">@(i.Active ? "Yes" : "No")</td>
                 <td class="govuk-table__cell govuk-table__cell--numeric">

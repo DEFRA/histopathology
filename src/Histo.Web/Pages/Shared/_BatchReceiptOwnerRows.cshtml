@@ -1,0 +1,9 @@
+@*
+    Entered by / entered area / submitted by / submitted area rows of a batch summary list.
+    Model = (entered by, entered area, submitted by, submitted area); missing values render as "Not recorded".
+*@
+@model (string? EnteredBy, string? EnteredArea, string? SubmittedBy, string? SubmittedArea)
+@SummaryList.Row("Entered by", Model.EnteredBy ?? "Not recorded")
+@SummaryList.Row("Entered area", Model.EnteredArea ?? "Not recorded")
+@SummaryList.Row("Submitted by", Model.SubmittedBy ?? "Not recorded")
+@SummaryList.Row("Submitted area", Model.SubmittedArea ?? "Not recorded")

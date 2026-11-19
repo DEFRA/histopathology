@@ -6,8 +6,8 @@ namespace Histo.Infrastructure;
 /// Replaces direct calls to <c>DataAccessLib/clsInfoLog.vb::InfoLog.LogToEventViewer</c>
 /// and <c>HistopathologyLib/clsLog.vb::clsLog.LogException</c>.
 ///
-/// The implementation (<see cref="AppLogger{T}"/>) delegates to
-/// <c>Microsoft.Extensions.Logging.ILogger&lt;T&gt;</c>, which is backed by Serilog
+/// The implementation (<see cref="AppLogger"/>) delegates to
+/// <c>Microsoft.Extensions.Logging.ILogger</c>, which is backed by Serilog
 /// at the composition root (<c>Histo.Web/Program.cs</c>).
 ///
 /// Callers should prefer injecting <see cref="IAppLogger"/> rather than the generic

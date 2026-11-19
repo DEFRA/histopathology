@@ -6,15 +6,17 @@
 *@
 @inject Histo.Web.Services.ISessionService SessionSvc
 
-<span class="app-header-user-item">User: @SessionSvc.UserName</span>
-<span class="app-header-user-item">Group: @SessionSvc.GroupName</span>
-@if (!string.IsNullOrEmpty(SessionSvc.UserArea))
-{
-    <span class="app-header-user-item">Area: @SessionSvc.UserArea</span>
-}
-@if (SessionSvc.BatchID.HasValue)
-{
-    <span class="app-header-user-item">Sub. No: @SessionSvc.BatchID</span>
-}
+<ul class="app-header-user-list">
+    <li class="app-header-user-item">User: @SessionSvc.UserName</li>
+    <li class="app-header-user-item">Group: @SessionSvc.GroupName</li>
+    @if (!string.IsNullOrEmpty(SessionSvc.UserArea))
+    {
+        <li class="app-header-user-item">Area: @SessionSvc.UserArea</li>
+    }
+    @if (SessionSvc.BatchID.HasValue)
+    {
+        <li class="app-header-user-item">Sub. No: @SessionSvc.BatchID</li>
+    }
+</ul>
 
 

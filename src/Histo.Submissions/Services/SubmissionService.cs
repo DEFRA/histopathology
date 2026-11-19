@@ -212,6 +212,10 @@ public sealed class SubmissionService : ISubmissionService
     public async Task UpdateAnimalHistologyRefAsync(string senderRef, string? newHistologyRef, int userId, CancellationToken ct = default)
         => await _repo.UpdateAnimalHistologyRefAsync(senderRef, newHistologyRef, userId, ct);
 
+    /// <inheritdoc/>
+    public Task<bool> IsHistologyRefInUseAsync(string histologyRef, CancellationToken ct = default)
+        => _repo.IsHistologyRefInUseAsync(histologyRef, ct);
+
     // -----------------------------------------------------------------------
     // Tissues
     // -----------------------------------------------------------------------

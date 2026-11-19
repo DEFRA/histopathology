@@ -67,11 +67,9 @@ public sealed class BlockService : IBlockService
         string blockRef,
         IEnumerable<int> existingOrders,
         int userId,
-        string? customerRef = null,
-        string? comment = null,
-        bool repeatBlock = false,
+        BlockOptions? options = null,
         CancellationToken ct = default) =>
-        AddAsync(NewBlock(batchId, animalId, blockRef, existingOrders, customerRef, comment, repeatBlock), userId, keepRef: false, ct);
+        AddAsync(NewBlock(batchId, animalId, blockRef, existingOrders, options?.CustomerRef, options?.Comment, options?.RepeatBlock ?? false), userId, keepRef: false, ct);
 
     /// <inheritdoc/>
     public Task<int> AddBlockKeepingRefAsync(

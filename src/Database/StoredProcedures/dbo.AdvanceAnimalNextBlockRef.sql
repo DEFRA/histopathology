@@ -1,4 +1,4 @@
-/****** Object:  StoredProcedure [dbo].[AdvanceAnimalNextBlockRef] ******/
+-- Object:  StoredProcedure [dbo].[AdvanceAnimalNextBlockRef]
 -- ============================================================================
 -- dbo.AdvanceAnimalNextBlockRef
 -- ============================================================================

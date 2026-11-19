@@ -68,6 +68,9 @@ public interface ISubmissionService
     /// <summary>Renames (or clears) the Histology Ref. Throws <see cref="AnimalRefUpdateException"/> on conflict.</summary>
     Task UpdateAnimalHistologyRefAsync(string senderRef, string? newHistologyRef, int userId, CancellationToken ct = default);
 
+    /// <summary>True when any sample already holds this Histology Ref.</summary>
+    Task<bool> IsHistologyRefInUseAsync(string histologyRef, CancellationToken ct = default);
+
     // Tissues
     /// <summary>Returns tissues for one batch submission. Filters the batch-wide result of <c>GetBatchTissues</c> by BatchSubmissionID.</summary>
     Task<IReadOnlyList<Tissue>> GetTissuesBySubmissionAsync(int batchId, int submissionId, CancellationToken ct = default);

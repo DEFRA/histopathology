@@ -69,7 +69,7 @@
             @{ var noteRef = Model.Test?.QCNoteRef; }
             @if (noteRef is > 0)
             {
-                <a asp-page="/Reports/QCNote" asp-route-qcNoteRef="@noteRef" class="govuk-link">@noteRef</a>
+                <a asp-page="/Reports/QCNote" asp-route-qcNoteRef="@noteRef" class="govuk-link" target="_blank" rel="noopener noreferrer">@noteRef<span class="govuk-visually-hidden"> (opens in new tab)</span></a>
             }
             else
             {

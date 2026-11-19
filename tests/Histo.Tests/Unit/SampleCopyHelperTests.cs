@@ -14,6 +14,10 @@ namespace Histo.Tests.Unit;
 /// </summary>
 public class SampleCopyHelperTests
 {
+    private static readonly string[] TestTypeIds = ["1"];
+    private static readonly string[] StainCodes = ["A1"];
+    private static readonly string[] SpecialCodes = ["S1"];
+
     private readonly Mock<IBlockService> _blocks = new();
     private readonly Mock<ISubmissionService> _submissions = new();
     private readonly Mock<IBlockTestService> _blockTests = new();
@@ -47,9 +51,9 @@ public class SampleCopyHelperTests
 
         _submissions.Verify(s => s.CopyTissueAsync(tissue, 55, 7, It.IsAny<CancellationToken>()), Times.Once);
         _blockTests.Verify(t => t.SaveTestSelectionsAsync(1, 55,
-            It.Is<IReadOnlyList<string>>(c => c.SequenceEqual(new[] { "1" })),
-            It.Is<IReadOnlyList<string>>(c => c.SequenceEqual(new[] { "A1" })),
-            It.Is<IReadOnlyList<string>>(c => c.SequenceEqual(new[] { "S1" })),
+            It.Is<IReadOnlyList<string>>(c => c.SequenceEqual(TestTypeIds)),
+            It.Is<IReadOnlyList<string>>(c => c.SequenceEqual(StainCodes)),
+            It.Is<IReadOnlyList<string>>(c => c.SequenceEqual(SpecialCodes)),
             7, It.IsAny<CancellationToken>()), Times.Once);
         // BlockHelpers.ComputeNextBlockRef("01") -> "02", assigned to the animal in memory.
         Assert.Equal("02", target.NextBlockRef);

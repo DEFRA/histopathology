@@ -1,0 +1,43 @@
+@*
+    Shared sortable results table + pagination for the audit log search pages.
+    Model = the current page of entries (GetPagedEntries()).
+*@
+@model IReadOnlyList<Histo.AuditLog.Models.AuditLogEntry>
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            @{ ViewData["Label"] = "Table"; ViewData["Column"] = "TableName"; ViewData["FormId"] = "audit-log-form"; ViewData["Handler"] = ""; }
+            <partial name="_SortableHeaderPost" />
+            @{ ViewData["Label"] = "Field"; ViewData["Column"] = "FieldName"; }
+            <partial name="_SortableHeaderPost" />
+            @{ ViewData["Label"] = "Date/Time"; ViewData["Column"] = "ChangedAt"; }
+            <partial name="_SortableHeaderPost" />
+            @{ ViewData["Label"] = "User"; ViewData["Column"] = "UserName"; }
+            <partial name="_SortableHeaderPost" />
+            @{ ViewData["Label"] = "Before"; ViewData["Column"] = "BeforeValue"; }
+            <partial name="_SortableHeaderPost" />
+            @{ ViewData["Label"] = "After"; ViewData["Column"] = "AfterValue"; }
+            <partial name="_SortableHeaderPost" />
+            @{ ViewData["Label"] = "Reason"; ViewData["Column"] = "Reason"; }
+            <partial name="_SortableHeaderPost" />
+            @{ ViewData["Label"] = "Key"; ViewData["Column"] = "KeyID"; }
+            <partial name="_SortableHeaderPost" />
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @foreach (var e in Model)
+        {
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">@e.TableName</td>
+                <td class="govuk-table__cell">@e.FieldName</td>
+                <td class="govuk-table__cell">@e.ChangedAt.ToString("dd/MM/yyyy HH:mm:ss")</td>
+                <td class="govuk-table__cell">@e.UserName</td>
+                <td class="govuk-table__cell">@e.BeforeValue</td>
+                <td class="govuk-table__cell">@e.AfterValue</td>
+                <td class="govuk-table__cell">@e.Reason</td>
+                <td class="govuk-table__cell">@e.KeyID</td>
+            </tr>
+        }
+    </tbody>
+</table>
+<partial name="_PaginationPost" />

@@ -1,0 +1,56 @@
+@*
+    Selection-prefill script shared by the Archive pages. Model = noun used in the comment ("block"/"tissue").
+*@
+@model string
+<script>
+        // Selecting exactly one @Model pre-fills its existing archive details for editing;
+        // selecting zero or multiple clears the fields back to bulk mode's blank-is-unchanged default.
+        // The "All" checkbox only ever reaches the server as the SelectAllAcrossPages flag (rows on
+        // other pages aren't in the DOM to check individually), so here it just mirrors the
+        // checked state onto this page's row checkboxes for feedback.
+        (function () {
+            var selectAll = document.getElementById('select-all');
+            var checkboxes = document.querySelectorAll('input[name="SelectedIds"]');
+            var locationSelect = document.getElementById('ArchiveLocationCode');
+            var dateInput = document.getElementById('ArchivedDate');
+            var commentInput = document.getElementById('Comment');
+            if (!checkboxes.length || !locationSelect || !dateInput || !commentInput) return;
+
+            function applySelection() {
+                var checked = Array.from(checkboxes).filter(function (cb) { return cb.checked; });
+                if (checked.length === 1 && (!selectAll || !selectAll.checked)) {
+                    var cb = checked[0];
+                    locationSelect.value = cb.dataset.archiveLocation || '';
+                    dateInput.value = cb.dataset.archivedDate || '';
+                    commentInput.value = cb.dataset.comment || '';
+                } else {
+                    locationSelect.value = '';
+                    dateInput.value = '';
+                    commentInput.value = '';
+                }
+            }
+
+            checkboxes.forEach(function (cb) { cb.addEventListener('change', applySelection); });
+
+            // The server ignores the row list while All is posted, so unticking a row drops All and
+            // lets the rows still ticked decide what is updated (legacy rows were individually togglable).
+            if (selectAll) checkboxes.forEach(function (cb) {
+                cb.addEventListener('change', function () { if (!cb.checked) selectAll.checked = false; });
+            });
+
+            if (selectAll) {
+                selectAll.addEventListener('change', function () {
+                    checkboxes.forEach(function (cb) {
+                        cb.checked = selectAll.checked;
+                    });
+                    applySelection();
+                });
+                if (selectAll.checked) checkboxes.forEach(function (cb) { cb.checked = true; });
+            }
+
+            // After a postback the server has already rendered the submitted selection and values;
+            // re-applying here would overwrite them with the row's stored values or blanks.
+            var posted = @(ViewContext.HttpContext.Request.Method == "POST" ? "true" : "false");
+            if (!posted) applySelection();
+        })();
+</script>

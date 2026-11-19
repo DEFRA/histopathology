@@ -153,9 +153,10 @@ public class UserMaintenanceModel : GridPageModel
     /// falls back to the lookup dictionary when that column is empty.
     /// </summary>
     public string ResolveGroupName(User u)
-        => !string.IsNullOrWhiteSpace(u.GroupName) ? u.GroupName
-           : GroupNames.TryGetValue(u.GroupCode, out var n) ? n
-           : u.GroupCode.ToString();
+    {
+        if (!string.IsNullOrWhiteSpace(u.GroupName)) return u.GroupName;
+        return GroupNames.TryGetValue(u.GroupCode, out var n) ? n : u.GroupCode.ToString();
+    }
 
     /// <summary>
     /// Returns the display name for a user area code.
@@ -163,7 +164,8 @@ public class UserMaintenanceModel : GridPageModel
     /// falls back to the lookup dictionary when that column is empty.
     /// </summary>
     public string ResolveAreaName(User u)
-        => !string.IsNullOrWhiteSpace(u.AreaName) ? u.AreaName
-           : AreaNames.TryGetValue(u.AreaCode, out var n) ? n
-           : u.AreaCode.ToString();
+    {
+        if (!string.IsNullOrWhiteSpace(u.AreaName)) return u.AreaName;
+        return AreaNames.TryGetValue(u.AreaCode, out var n) ? n : u.AreaCode.ToString();
+    }
 }

@@ -19,6 +19,8 @@ namespace Histo.Web.Pages.Bookings;
 /// </summary>
 public class EditHistologyRefModel : HistoPageModel
 {
+    private const string EditHistologyRefTitle = "Edit Histology Reference";
+
     private readonly IHistologyRefService _refs;
 
     public EditHistologyRefModel(ISessionService session, IHistologyRefService refs)
@@ -32,14 +34,14 @@ public class EditHistologyRefModel : HistoPageModel
 
     public void OnGet()
     {
-        ViewData["Title"] = "Edit Histology Reference";
-        ViewData["PageTitle"] = "Edit Histology Reference";
+        ViewData["Title"] = EditHistologyRefTitle;
+        ViewData["PageTitle"] = EditHistologyRefTitle;
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ViewData["Title"] = "Edit Histology Reference";
-        ViewData["PageTitle"] = "Edit Histology Reference";
+        ViewData["Title"] = EditHistologyRefTitle;
+        ViewData["PageTitle"] = EditHistologyRefTitle;
 
         if (HistologyType <= 0)
         {

@@ -7,6 +7,7 @@ using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace Histo.Web.Pages.Batches;
 
@@ -32,6 +33,9 @@ namespace Histo.Web.Pages.Batches;
 /// </summary>
 public class BatchDetailsModel : HistoPageModel
 {
+    private const string CreateMode = "create";
+    private const string NewSubmissionTitle = "New submission";
+
     private const int LookupContacts    = 18;
     private const int LookupProjects    = 19;
     private const int LookupFixation    = 10;
@@ -69,8 +73,7 @@ public class BatchDetailsModel : HistoPageModel
 
     // ── Query param — "create" activates the new-batch form ──
     [BindProperty(SupportsGet = true)] public string? Mode { get; set; }
-    public bool IsCreateMode => string.Equals(Mode, "create", StringComparison.OrdinalIgnoreCase);
-    public bool ShowLeaveWarning => false;
+    public bool IsCreateMode => string.Equals(Mode, CreateMode, StringComparison.OrdinalIgnoreCase);
 
     public const string CreateSubmissionLeaveWarning =
         "If you exit now all the data you have entered will be lost. Are you sure you wish to exit?";
@@ -279,14 +282,14 @@ public class BatchDetailsModel : HistoPageModel
             Create_SelectedAntibodyCodes,
             Create_SelectedStainCodes));
 
-        var returnUrl = Url.Page("/Batches/BatchDetails", new { mode = "create", copyToken = CopyToken });
+        var returnUrl = Url.Page("/Batches/BatchDetails", new { mode = CreateMode, copyToken = CopyToken });
 
         return field switch
         {
             "submittedBy" => RedirectToPage("/Admin/UserMaintenance", new { returnUrl }),
             "project"     => RedirectToPage("/Admin/LookupItems", new { tableId = LookupProjects, ReturnUrl = returnUrl }),
             "pathologist" => RedirectToPage("/Admin/LookupItems", new { tableId = LookupContacts, ReturnUrl = returnUrl }),
-            _             => RedirectToPage("/Batches/BatchDetails", new { mode = "create" }),
+            _             => RedirectToPage("/Batches/BatchDetails", new { mode = CreateMode }),
         };
     }
 
@@ -400,6 +403,26 @@ public class BatchDetailsModel : HistoPageModel
         TempData[CreateIsPreCassettedKey] = sourceBatch.IsPreCassetted.ToString();
     }
 
+    // DEFECT-FIX: area-scoped lists omit a copied value from another area (or since deactivated), so it showed as "-- Select --".
+    private async Task EnsureSelectedProjectAndContactListedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(Create_ProjectContractCode)
+            && !Create_Projects.Any(p => p.ID.ToString() == Create_ProjectContractCode))
+        {
+            var all = await _lookups.GetLookupDataAsync(LookupProjects, includeInactive: true);
+            var match = all.FirstOrDefault(p => p.ID.ToString() == Create_ProjectContractCode);
+            if (match is not null) Create_Projects = [.. Create_Projects, match];
+        }
+
+        if (!string.IsNullOrWhiteSpace(Create_ContactName)
+            && !Create_Contacts.Any(c => c.ID.ToString() == Create_ContactName))
+        {
+            var all = await _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true);
+            var match = all.FirstOrDefault(c => c.ID.ToString() == Create_ContactName);
+            if (match is not null) Create_Contacts = [.. Create_Contacts, match];
+        }
+    }
+
     /// <summary>
     /// Resolves a <c>luSubmittedAs</c> code to its description. <c>includeInactive</c> is required:
     /// a batch may have been created against a type that has since been deactivated (e.g. code 6,
@@ -429,23 +452,15 @@ public class BatchDetailsModel : HistoPageModel
             .GroupBy(b => b.AnimalID)
             .ToDictionary(g => g.Key, g => g.OrderBy(b => b.Order).ToList());
 
-        var tissuesBySubmissionId = new Dictionary<int, IReadOnlyList<Tissue>>();
-        var blockPlansByAnimalId = new Dictionary<int, IReadOnlyList<CopiedBlockPlan>>();
         var allTests = await _blockTests.GetAllSelectionsByBatchAsync(sourceBatchId);
+        var context = new CopySourceContext(
+            sourceBatchId, submissions, animalsById, firstSubmId, blocksByAnimalId, allTests,
+            new Dictionary<int, IReadOnlyList<Tissue>>(), new Dictionary<int, IReadOnlyList<CopiedBlockPlan>>());
         var plan = new List<CopiedSamplePlan>();
 
         foreach (var pending in pendingSamples.Where(p => !string.IsNullOrWhiteSpace(p.NewSenderRef)))
         {
-            var samplePlan = await BuildPendingSamplePlanAsync(
-                sourceBatchId,
-                pending,
-                submissions,
-                animalsById,
-                firstSubmId,
-                blocksByAnimalId,
-                allTests,
-                tissuesBySubmissionId,
-                blockPlansByAnimalId);
+            var samplePlan = await BuildPendingSamplePlanAsync(pending, context);
 
             if (samplePlan is not null)
                 plan.Add(samplePlan);
@@ -454,27 +469,28 @@ public class BatchDetailsModel : HistoPageModel
         return plan;
     }
 
-    private async Task<CopiedSamplePlan?> BuildPendingSamplePlanAsync(
-        int sourceBatchId,
-        CopyBatchModel.AnimalRow pending,
-        IReadOnlyList<BatchSubmission> submissions,
-        IReadOnlyDictionary<int, Animal> animalsById,
-        int firstSubmId,
-        IReadOnlyDictionary<int, List<Block>> blocksByAnimalId,
-        IReadOnlyList<BlockTest> allTests,
-        Dictionary<int, IReadOnlyList<Tissue>> tissuesBySubmissionId,
-        Dictionary<int, IReadOnlyList<CopiedBlockPlan>> blockPlansByAnimalId)
+    private sealed record CopySourceContext(
+        int SourceBatchId,
+        IReadOnlyList<BatchSubmission> Submissions,
+        IReadOnlyDictionary<int, Animal> AnimalsById,
+        int FirstSubmId,
+        IReadOnlyDictionary<int, List<Block>> BlocksByAnimalId,
+        IReadOnlyList<BlockTest> AllTests,
+        Dictionary<int, IReadOnlyList<Tissue>> TissuesBySubmissionId,
+        Dictionary<int, IReadOnlyList<CopiedBlockPlan>> BlockPlansByAnimalId);
+
+    private async Task<CopiedSamplePlan?> BuildPendingSamplePlanAsync(CopyBatchModel.AnimalRow pending, CopySourceContext context)
     {
         var label = string.IsNullOrWhiteSpace(pending.SenderRef) ? pending.NewSenderRef : pending.SenderRef;
-        var animal = ResolveAnimalForPendingSample(pending, animalsById, label);
-        var submission = ResolveSubmissionForPendingSample(submissions, pending, animal, firstSubmId);
+        var animal = ResolveAnimalForPendingSample(pending, context.AnimalsById, label);
+        var submission = ResolveSubmissionForPendingSample(context.Submissions, pending, animal, context.FirstSubmId);
 
         if (submission is null)
             throw new InvalidOperationException(
                 $"Could not copy sample '{label}' because its submission record could not be found. Start the copy again. Nothing was saved.");
 
-        var tissues = await GetTissuesForSubmissionAsync(sourceBatchId, submission, tissuesBySubmissionId);
-        var blockPlans = await GetBlockPlansForAnimalAsync(sourceBatchId, animal, blocksByAnimalId, allTests, blockPlansByAnimalId);
+        var tissues = await GetTissuesForSubmissionAsync(context.SourceBatchId, submission, context.TissuesBySubmissionId);
+        var blockPlans = await GetBlockPlansForAnimalAsync(context.SourceBatchId, animal, context.BlocksByAnimalId, context.AllTests, context.BlockPlansByAnimalId);
 
         return new CopiedSamplePlan
         {
@@ -567,37 +583,12 @@ public class BatchDetailsModel : HistoPageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
-        ViewData["Title"]     = IsCreateMode ? "New submission" : "Submission details";
-        ViewData["PageTitle"] = IsCreateMode ? "New submission" : "Submission details";
+        ViewData["Title"]     = IsCreateMode ? NewSubmissionTitle : "Submission details";
+        ViewData["PageTitle"] = IsCreateMode ? NewSubmissionTitle : "Submission details";
 
         if (IsCreateMode)
         {
-            await LoadCreateLookupsAsync();
-            var pendingCopy = TryGetValidPendingCopy();
-            Create_CopiedSamples = pendingCopy?.Samples ?? [];
-
-            if (!RestoreCreateDraft())
-            {
-                if (pendingCopy is not null)
-                {
-                    await PrefillFromCopySourceAsync(pendingCopy);
-                }
-                else
-                {
-                    Create_BatchDateStr = DateTime.Today.ToString("yyyy-MM-dd");
-                    // Default Submitted by/area to the logged-in user — still a normal editable
-                    // dropdown, just pre-selected rather than requiring the user to find themselves.
-                    Create_OtherSubmittedBy   = Session.UserID;
-                    Create_OtherSubmittedArea = Session.UserAreaID.ToString();
-                }
-            }
-            // Resolve SubmittedAs name from TempData for display
-            if (TempData.TryGetValue(CreateSubmittedAsCodeKey, out var saCode))
-            {
-                Create_SubmittedAsName ??= await ResolveSubmittedAsNameAsync(saCode?.ToString());
-                TempData.Keep(CreateSubmittedAsCodeKey);
-                TempData.Keep(CreateIsPreCassettedKey);
-            }
+            await PrepareCreateModeAsync();
             return Page();
         }
 
@@ -622,101 +613,134 @@ public class BatchDetailsModel : HistoPageModel
             return Page();
         }
         if (Batch is not null)
-        {
-            Session.BatchType = Batch.BatchType;  // ISS-023: restore from DB for downstream lookup selection
-
-            // Load batch-level test selections and translate codes to descriptions.
-            var batchId = effectiveBatchId.Value;
-            var antibodyTableId = Batch.BatchType == BatchTypeConstants.NonTse ? 5 : 4;
-
-            var selectionsTask     = _batches.GetBatchTestSelectionsAsync(batchId);
-            var histologyTask      = _lookups.GetHistologyTypesAsync();
-            // includeInactive: true — a saved Antibody/Stain code may since have been deactivated;
-            // without this the raw code is shown instead of its name (same issue as Project/Pathologist below).
-            var antibodyTask       = _lookups.GetLookupDataAsync(antibodyTableId, includeInactive: true);
-            var stainTask          = _lookups.GetLookupDataAsync(6, includeInactive: true);   // LOOKUP_SPECIAL_STAIN = 6
-            var speciesTask        = _lookups.GetSpeciesLookupAsync();
-            var usersTask          = _users.GetAllUsersAsync();
-            // includeInactive: true — a batch entered under a since-retired area (e.g. Mouse
-            // Bioassay/Neuropath) must still resolve to a readable name, not "Not recorded".
-            var userAreasTask      = _lookups.GetUserAreasAsync(includeInactive: true);
-            var submittedAsTask    = _batches.GetSubmittedAsCodeAsync(batchId);
-            var submittedAsLookup  = _lookups.GetLookupDataAsync(11); // LOOKUP_SUBMITTEDAS = 11
-            // includeInactive: true — an existing submission's saved Project/Pathologist may since
-            // have been deactivated; without this the raw code is shown instead of its name.
-            var projectsLookup     = _lookups.GetLookupDataAsync(LookupProjects, includeInactive: true);
-            var contactsLookup     = _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true);
-            var fixationsLookup    = _lookups.GetLookupDataAsync(LookupFixation);
-            var animalsTask        = _submissions.GetAnimalsByBatchAsync(batchId);
-
-            await Task.WhenAll(selectionsTask, histologyTask, antibodyTask, stainTask,
-                               speciesTask, usersTask, userAreasTask, submittedAsTask, submittedAsLookup,
-                               projectsLookup, contactsLookup, fixationsLookup, animalsTask);
-
-            SampleCount     = animalsTask.Result.Count;
-
-            TestSelections  = selectionsTask.Result;
-            HistologyNames  = ToDictionary(histologyTask.Result);
-            AntibodyNames   = ToDictionary(antibodyTask.Result);
-            StainNames      = ToDictionary(stainTask.Result);
-
-            // Resolve SpeciesID → species name.  Legacy stores an integer SpeciesID in tblBatch.Species.
-            var speciesById = speciesTask.Result
-                .ToDictionary(s => s.ID.ToString(), s => s.Name, StringComparer.OrdinalIgnoreCase);
-            SpeciesName = !string.IsNullOrWhiteSpace(Batch.Species)
-                && speciesById.TryGetValue(Batch.Species, out var sn)
-                    ? sn
-                    : Batch.Species;
-
-            // Resolve Entered By / Submitted By user IDs → names.
-            var userById = usersTask.Result.ToDictionary(u => u.UserID, u => u.Name);
-            EnteredByName    = Batch.SubmittedBy.HasValue     && userById.TryGetValue(Batch.SubmittedBy.Value,     out var eb) ? eb : null;
-            SubmittedByName  = Batch.OtherSubmittedBy.HasValue && userById.TryGetValue(Batch.OtherSubmittedBy.Value, out var sb) ? sb : null;
-
-            // Resolve Entered Area / Submitted Area codes → descriptions.
-            // GetUserAreasAsync uses MapCodeDescription: Code column → LookupItem.ID (int), Description → Name.
-            // SubmittedArea/OtherSubmittedArea are varchar codes in DB; match them as strings.
-            var areaByCode = userAreasTask.Result.ToDictionary(a => a.ID.ToString(), a => a.Name, StringComparer.OrdinalIgnoreCase);
-            EnteredAreaName   = !string.IsNullOrEmpty(Batch.SubmittedArea)     && areaByCode.TryGetValue(Batch.SubmittedArea,      out var ea) ? ea : null;
-            SubmittedAreaName = !string.IsNullOrEmpty(Batch.OtherSubmittedArea) && areaByCode.TryGetValue(Batch.OtherSubmittedArea, out var sa) ? sa : null;
-
-            // Resolve Submitted As code → description via LOOKUP_SUBMITTEDAS (table 11).
-            var code = submittedAsTask.Result;
-            if (!string.IsNullOrWhiteSpace(code))
-            {
-                var saLookup = submittedAsLookup.Result
-                    .FirstOrDefault(x => string.Equals(x.Code ?? x.ID.ToString(), code, StringComparison.OrdinalIgnoreCase));
-                SubmittedAsDescription = saLookup?.Name ?? code;
-            }
-
-            // Resolve ProjectContractCode / ContactName raw codes → descriptions.
-            // Both LOOKUP_PROJECTS (19) and LOOKUP_CONTACTS (18) are ID-keyed tables (LookupItem.Code is
-            // null for these — see LookupItem.cs), so the raw code is matched against LookupItem.ID.
-            var projectsById = projectsLookup.Result
-                .ToDictionary(p => p.ID.ToString(), p => p.Name, StringComparer.OrdinalIgnoreCase);
-            ProjectName = !string.IsNullOrWhiteSpace(Batch.ProjectContractCode)
-                && projectsById.TryGetValue(Batch.ProjectContractCode, out var pn)
-                    ? pn
-                    : Batch.ProjectContractCode;
-
-            var contactsById = contactsLookup.Result
-                .ToDictionary(c => c.ID.ToString(), c => c.Name, StringComparer.OrdinalIgnoreCase);
-            PathologistName = !string.IsNullOrWhiteSpace(Batch.ContactName)
-                && contactsById.TryGetValue(Batch.ContactName, out var cn)
-                    ? cn
-                    : Batch.ContactName;
-
-            // Resolve Fixation raw code → description via LOOKUP_FIXATION (table 10).
-            // Unlike Projects/Contacts, legacy binds ddlFixation.DataValueField = "Code" (not ID), so the
-            // lookup here is Code-keyed — reuse the same Code-preferred/ID-fallback helper as the test-type
-            // dictionaries above.
-            var fixationsByCode = ToDictionary(fixationsLookup.Result);
-            FixationName = !string.IsNullOrWhiteSpace(Batch.Fixation)
-                && fixationsByCode.TryGetValue(Batch.Fixation, out var fn)
-                    ? fn
-                    : Batch.Fixation;
-        }
+            await LoadBatchDisplayAsync(Batch, effectiveBatchId.Value);
         return Page();
+    }
+
+    private async Task PrepareCreateModeAsync()
+    {
+        await LoadCreateLookupsAsync();
+        var pendingCopy = TryGetValidPendingCopy();
+        Create_CopiedSamples = pendingCopy?.Samples ?? [];
+
+        if (!RestoreCreateDraft())
+            await InitialiseCreateDraftAsync(pendingCopy);
+
+        await EnsureSelectedProjectAndContactListedAsync();
+        // Resolve SubmittedAs name from TempData for display
+        if (TempData.TryGetValue(CreateSubmittedAsCodeKey, out var saCode))
+        {
+            Create_SubmittedAsName ??= await ResolveSubmittedAsNameAsync(saCode?.ToString());
+            TempData.Keep(CreateSubmittedAsCodeKey);
+            TempData.Keep(CreateIsPreCassettedKey);
+        }
+    }
+
+    private async Task InitialiseCreateDraftAsync(CopyBatchModel.PendingCopy? pendingCopy)
+    {
+        if (pendingCopy is not null)
+        {
+            await PrefillFromCopySourceAsync(pendingCopy);
+            return;
+        }
+
+        Create_BatchDateStr = DateTime.Today.ToString("yyyy-MM-dd");
+        // Default Submitted by/area to the logged-in user — still a normal editable
+        // dropdown, just pre-selected rather than requiring the user to find themselves.
+        Create_OtherSubmittedBy   = Session.UserID;
+        Create_OtherSubmittedArea = Session.UserAreaID.ToString();
+    }
+
+    private static string? LookupNameOrRaw(Dictionary<string, string> byKey, string? raw) =>
+        !string.IsNullOrWhiteSpace(raw) && byKey.TryGetValue(raw, out var name) ? name : raw;
+
+    private static string? LookupNameOrNull(Dictionary<string, string> byKey, string? raw) =>
+        !string.IsNullOrEmpty(raw) && byKey.TryGetValue(raw, out var name) ? name : null;
+
+    private static string? LookupUserName(Dictionary<int, string> byId, int? userId) =>
+        userId.HasValue && byId.TryGetValue(userId.Value, out var name) ? name : null;
+
+    private async Task LoadBatchDisplayAsync(Batch batch, int batchId)
+    {
+        Session.BatchType = batch.BatchType;  // ISS-023: restore from DB for downstream lookup selection
+
+        // Load batch-level test selections and translate codes to descriptions.
+        var antibodyTableId = batch.BatchType == BatchTypeConstants.NonTse ? 5 : 4;
+
+        var selectionsTask     = _batches.GetBatchTestSelectionsAsync(batchId);
+        var histologyTask      = _lookups.GetHistologyTypesAsync();
+        // includeInactive: true — a saved Antibody/Stain code may since have been deactivated;
+        // without this the raw code is shown instead of its name (same issue as Project/Pathologist below).
+        var antibodyTask       = _lookups.GetLookupDataAsync(antibodyTableId, includeInactive: true);
+        var stainTask          = _lookups.GetLookupDataAsync(6, includeInactive: true);   // LOOKUP_SPECIAL_STAIN = 6
+        var speciesTask        = _lookups.GetSpeciesLookupAsync();
+        var usersTask          = _users.GetAllUsersAsync();
+        // includeInactive: true — a batch entered under a since-retired area (e.g. Mouse
+        // Bioassay/Neuropath) must still resolve to a readable name, not "Not recorded".
+        var userAreasTask      = _lookups.GetUserAreasAsync(includeInactive: true);
+        var submittedAsTask    = _batches.GetSubmittedAsCodeAsync(batchId);
+        var submittedAsLookup  = _lookups.GetLookupDataAsync(11); // LOOKUP_SUBMITTEDAS = 11
+        // includeInactive: true — an existing submission's saved Project/Pathologist may since
+        // have been deactivated; without this the raw code is shown instead of its name.
+        var projectsLookup     = _lookups.GetLookupDataAsync(LookupProjects, includeInactive: true);
+        var contactsLookup     = _lookups.GetLookupDataAsync(LookupContacts, includeInactive: true);
+        var fixationsLookup    = _lookups.GetLookupDataAsync(LookupFixation);
+        var animalsTask        = _submissions.GetAnimalsByBatchAsync(batchId);
+
+        await Task.WhenAll(selectionsTask, histologyTask, antibodyTask, stainTask,
+                           speciesTask, usersTask, userAreasTask, submittedAsTask, submittedAsLookup,
+                           projectsLookup, contactsLookup, fixationsLookup, animalsTask);
+
+        SampleCount     = animalsTask.Result.Count;
+
+        TestSelections  = selectionsTask.Result;
+        HistologyNames  = ToDictionary(histologyTask.Result);
+        AntibodyNames   = ToDictionary(antibodyTask.Result);
+        StainNames      = ToDictionary(stainTask.Result);
+
+        // Resolve SpeciesID → species name.  Legacy stores an integer SpeciesID in tblBatch.Species.
+        var speciesById = speciesTask.Result
+            .ToDictionary(s => s.ID.ToString(), s => s.Name, StringComparer.OrdinalIgnoreCase);
+        SpeciesName = LookupNameOrRaw(speciesById, batch.Species);
+
+        // Resolve Entered By / Submitted By user IDs → names.
+        var userById = usersTask.Result.ToDictionary(u => u.UserID, u => u.Name);
+        EnteredByName    = LookupUserName(userById, batch.SubmittedBy);
+        SubmittedByName  = LookupUserName(userById, batch.OtherSubmittedBy);
+
+        // Resolve Entered Area / Submitted Area codes → descriptions.
+        // GetUserAreasAsync uses MapCodeDescription: Code column → LookupItem.ID (int), Description → Name.
+        // SubmittedArea/OtherSubmittedArea are varchar codes in DB; match them as strings.
+        var areaByCode = userAreasTask.Result.ToDictionary(a => a.ID.ToString(), a => a.Name, StringComparer.OrdinalIgnoreCase);
+        EnteredAreaName   = LookupNameOrNull(areaByCode, batch.SubmittedArea);
+        SubmittedAreaName = LookupNameOrNull(areaByCode, batch.OtherSubmittedArea);
+
+        // Resolve Submitted As code → description via LOOKUP_SUBMITTEDAS (table 11).
+        var code = submittedAsTask.Result;
+        if (!string.IsNullOrWhiteSpace(code))
+        {
+            var saLookup = submittedAsLookup.Result
+                .FirstOrDefault(x => string.Equals(x.Code ?? x.ID.ToString(), code, StringComparison.OrdinalIgnoreCase));
+            SubmittedAsDescription = saLookup?.Name ?? code;
+        }
+
+        // Resolve ProjectContractCode / ContactName raw codes → descriptions.
+        // Both LOOKUP_PROJECTS (19) and LOOKUP_CONTACTS (18) are ID-keyed tables (LookupItem.Code is
+        // null for these — see LookupItem.cs), so the raw code is matched against LookupItem.ID.
+        var projectsById = projectsLookup.Result
+            .ToDictionary(p => p.ID.ToString(), p => p.Name, StringComparer.OrdinalIgnoreCase);
+        ProjectName = LookupNameOrRaw(projectsById, batch.ProjectContractCode);
+
+        var contactsById = contactsLookup.Result
+            .ToDictionary(c => c.ID.ToString(), c => c.Name, StringComparer.OrdinalIgnoreCase);
+        PathologistName = LookupNameOrRaw(contactsById, batch.ContactName);
+
+        // Resolve Fixation raw code → description via LOOKUP_FIXATION (table 10).
+        // Unlike Projects/Contacts, legacy binds ddlFixation.DataValueField = "Code" (not ID), so the
+        // lookup here is Code-keyed — reuse the same Code-preferred/ID-fallback helper as the test-type
+        // dictionaries above.
+        var fixationsByCode = ToDictionary(fixationsLookup.Result);
+        FixationName = LookupNameOrRaw(fixationsByCode, batch.Fixation);
     }
 
     /// <summary>
@@ -737,9 +761,10 @@ public class BatchDetailsModel : HistoPageModel
 
     public async Task<IActionResult> OnPostCreateAsync()
     {
-        ViewData["Title"]     = "New submission";
-        ViewData["PageTitle"] = "New submission";
+        ViewData["Title"]     = NewSubmissionTitle;
+        ViewData["PageTitle"] = NewSubmissionTitle;
         await LoadCreateLookupsAsync();
+        await EnsureSelectedProjectAndContactListedAsync();
 
         // Read type-selection values from TempData (set by Cassetted step)
         var submittedAsCode = TempData[CreateSubmittedAsCodeKey]?.ToString() ?? "";
@@ -752,8 +777,53 @@ public class BatchDetailsModel : HistoPageModel
         Create_SubmittedAsName = await ResolveSubmittedAsNameAsync(submittedAsCode);
 
         var errors = new Dictionary<string, string>();
+        ValidateRequiredCreateFields(errors);
+        var batchDate = ParseCreateBatchDate(errors);
+        ValidateCreateTestSelections(errors);
 
-        // Required fields — mirrors legacy ValidateMandatoryFields()
+        // Antibody required when IHC-PrP or IHC-Other is selected; stain when Special Stain is selected.
+        var needsAntibodies = NeedsAntibodies();
+        var needsStains = NeedsStains();
+
+        if (errors.Count > 0)
+        {
+            Errors = errors;
+            Mode = CreateMode;
+            return Page();
+        }
+
+        // An unresolved type (e.g. lost TempData) must not flag the batch as cassetted: that would hide a wet tissue submission from Assign blocks.
+        var isBlockType = Create_SubmittedAsName is not null && !ValidationHelpers.IsWetTissueDescription(Create_SubmittedAsName);
+
+        var batch = BuildCreateBatch(batchDate, isBlockType);
+        var testCodes = new SelectedTestCodes(
+            Create_SelectedHistologyCodes,
+            needsAntibodies ? Create_SelectedAntibodyCodes : new List<string>(),
+            needsStains     ? Create_SelectedStainCodes    : new List<string>());
+
+        // "Copy submission" journey: create the batch header, test-type selections, submitted-as,
+        // and every staged sample/tissue in ONE DB transaction — CreateBatchWithCopiedSamplesAsync
+        // rolls everything back on any failure instead of silently continuing past a failed
+        // sample/tissue copy after the batch has already been committed. pendingCopy is only
+        // non-null here when CopyToken matched the token it was staged with (TryGetValidPendingCopy)
+        // — a stale/abandoned entry was already discarded above. Keyed on the request alone, not on
+        // the sample count: copying an empty submission is still a copy, and falling through would
+        // redirect to the wrong summary and leave the pending entry behind.
+        return pendingCopy is not null
+            ? await CreateCopiedBatchAsync(batch, pendingCopy, testCodes, submittedAsCode)
+            : await CreateNewBatchAsync(batch, testCodes, submittedAsCode);
+    }
+
+    private bool NeedsAntibodies() =>
+        Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcPrp)
+        || Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcOther);
+
+    private bool NeedsStains() =>
+        Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.SpecialStain);
+
+    // Required fields — mirrors legacy ValidateMandatoryFields()
+    private void ValidateRequiredCreateFields(Dictionary<string, string> errors)
+    {
         if (string.IsNullOrWhiteSpace(Create_ProjectContractCode))
             errors["Create_ProjectContractCode"] = "Select a project or contract code.";
         if (string.IsNullOrWhiteSpace(Create_ContactName))
@@ -766,18 +836,23 @@ public class BatchDetailsModel : HistoPageModel
             errors["Create_OtherSubmittedBy"] = "Select the submitted by person.";
         if (string.IsNullOrWhiteSpace(Create_OtherSubmittedArea))
             errors["Create_OtherSubmittedArea"] = "Select the submitted area.";
+    }
 
-        DateTime? batchDate = null;
-        if (!string.IsNullOrWhiteSpace(Create_BatchDateStr))
-        {
-            if (!DateTime.TryParseExact(Create_BatchDateStr, BatchDateFormats,
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.None, out var parsed))
-                errors["Create_BatchDateStr"] = "Enter a valid submission date.";
-            else
-                batchDate = parsed;
-        }
+    private DateTime? ParseCreateBatchDate(Dictionary<string, string> errors)
+    {
+        if (string.IsNullOrWhiteSpace(Create_BatchDateStr)) return null;
 
+        if (DateTime.TryParseExact(Create_BatchDateStr, BatchDateFormats,
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var parsed))
+            return parsed;
+
+        errors["Create_BatchDateStr"] = "Enter a valid submission date.";
+        return null;
+    }
+
+    private void ValidateCreateTestSelections(Dictionary<string, string> errors)
+    {
         if (Create_SelectedHistologyCodes.Count == 0)
             errors["Create_Histology"] = "Select at least one histology type.";
         else if (Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.Archive) && Create_SelectedHistologyCodes.Count > 1)
@@ -786,109 +861,76 @@ public class BatchDetailsModel : HistoPageModel
         if (Create_SafeToHandle is null)
             errors["Create_SafeToHandle"] = "Select whether the submission is adequately fixed.";
 
-        // Antibody required when IHC-PrP or IHC-Other is selected
-        var needsAntibodies = Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcPrp)
-                           || Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.IhcOther);
-        if (needsAntibodies && Create_SelectedAntibodyCodes.Count == 0)
+        if (NeedsAntibodies() && Create_SelectedAntibodyCodes.Count == 0)
             errors["Create_Antibodies"] = "Select at least one antibody (required when IHC is selected).";
 
-        // Stain required when Special Stain is selected
-        var needsStains = Create_SelectedHistologyCodes.Contains(Histo.Submissions.Models.HistologyCode.SpecialStain);
-        if (needsStains && Create_SelectedStainCodes.Count == 0)
+        if (NeedsStains() && Create_SelectedStainCodes.Count == 0)
             errors["Create_Stains"] = "Select at least one special stain.";
+    }
 
-        if (errors.Count > 0)
+    private Batch BuildCreateBatch(DateTime? batchDate, bool isBlockType) => new()
+    {
+        SubmittedByUserID   = Session.UserID,
+        UserAreaCode        = Session.UserAreaID,
+        // Legacy Cassetted.aspx/BatchDetails.aspx: every type except Wet Tissue is saved Cassetted + IsBlocked,
+        // which keeps it off Assign blocks and sends it straight to Quality data once received.
+        IsCassetted         = isBlockType,
+        IsBlocked           = isBlockType,
+        BatchType           = Session.BatchType,
+        ProjectContractCode = Create_ProjectContractCode,
+        ContactName         = Create_ContactName,
+        Species             = Create_SpeciesId,
+        BatchDate           = batchDate ?? DateTime.Today,
+        Fixation            = Create_Fixation,
+        SafeToHandle        = Create_SafeToHandle,
+        OtherSubmittedBy    = Create_OtherSubmittedBy,
+        OtherSubmittedArea  = Create_OtherSubmittedArea ?? string.Empty,
+        Comments            = Create_Comments,
+    };
+
+    private PageResult CreateSaveError(string message)
+    {
+        Errors = new Dictionary<string, string> { [CreateSaveErrorKey] = message };
+        Mode = CreateMode;
+        return Page();
+    }
+
+    private async Task<IActionResult> CreateCopiedBatchAsync(
+        Batch batch, CopyBatchModel.PendingCopy pendingCopy, SelectedTestCodes testCodes, string submittedAsCode)
+    {
+        int newBatchId;
+        try
         {
-            Errors = errors;
-            Mode = "create";
-            return Page();
+            // Inside the try so an unresolvable staged sample surfaces as a page error, the
+            // same way a failure inside the transaction does.
+            var plan = await BuildCopyPlanAsync(pendingCopy.SourceBatchId, pendingCopy.Samples);
+            newBatchId = await _submissions.CreateBatchWithCopiedSamplesAsync(
+                batch,
+                testCodes,
+                submittedAsCode,
+                plan,
+                Session.UserID);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return CreateSaveError(ex.Message);
         }
 
-        // An unresolved type (e.g. lost TempData) must not flag the batch as cassetted: that would hide a wet tissue submission from Assign blocks.
-        var isBlockType = Create_SubmittedAsName is not null && !ValidationHelpers.IsWetTissueDescription(Create_SubmittedAsName);
+        if (newBatchId <= 0) return CreateSaveError(CreateSaveFailedMessage);
 
-        var batch = new Batch
-        {
-            SubmittedByUserID   = Session.UserID,
-            UserAreaCode        = Session.UserAreaID,
-            // Legacy Cassetted.aspx/BatchDetails.aspx: every type except Wet Tissue is saved Cassetted + IsBlocked,
-            // which keeps it off Assign blocks and sends it straight to Quality data once received.
-            IsCassetted         = isBlockType,
-            IsBlocked           = isBlockType,
-            BatchType           = Session.BatchType,
-            ProjectContractCode = Create_ProjectContractCode,
-            ContactName         = Create_ContactName,
-            Species             = Create_SpeciesId,
-            BatchDate           = batchDate ?? DateTime.Today,
-            Fixation            = Create_Fixation,
-            SafeToHandle        = Create_SafeToHandle,
-            OtherSubmittedBy    = Create_OtherSubmittedBy,
-            OtherSubmittedArea  = Create_OtherSubmittedArea ?? string.Empty,
-            Comments            = Create_Comments,
-        };
+        TempData.Remove(PendingCopyKey);
+        Session.BatchID = newBatchId;
+        Session.SampleSummaryReturnPage = null;
+        return RedirectToPage("/Batches/CopyBatchSummary", new { newBatchId });
+    }
 
-        // "Copy submission" journey: create the batch header, test-type selections, submitted-as,
-        // and every staged sample/tissue in ONE DB transaction — CreateBatchWithCopiedSamplesAsync
-        // rolls everything back on any failure instead of silently continuing past a failed
-        // sample/tissue copy after the batch has already been committed. pendingCopy is only
-        // non-null here when CopyToken matched the token it was staged with (TryGetValidPendingCopy)
-        // — a stale/abandoned entry was already discarded above. Keyed on the request alone, not on
-        // the sample count: copying an empty submission is still a copy, and falling through would
-        // redirect to the wrong summary and leave the pending entry behind.
-        if (pendingCopy is not null)
-        {
-            int newBatchId;
-            try
-            {
-                // Inside the try so an unresolvable staged sample surfaces as a page error, the
-                // same way a failure inside the transaction does.
-                var plan = await BuildCopyPlanAsync(pendingCopy.SourceBatchId, pendingCopy.Samples);
-                var testCodes = new SelectedTestCodes(
-                    Create_SelectedHistologyCodes,
-                    needsAntibodies ? Create_SelectedAntibodyCodes : new List<string>(),
-                    needsStains     ? Create_SelectedStainCodes    : new List<string>());
-                newBatchId = await _submissions.CreateBatchWithCopiedSamplesAsync(
-                    batch,
-                    testCodes,
-                    submittedAsCode,
-                    plan,
-                    Session.UserID);
-            }
-            catch (InvalidOperationException ex)
-            {
-                Errors = new Dictionary<string, string> { [CreateSaveErrorKey] = ex.Message };
-                Mode = "create";
-                return Page();
-            }
-
-            if (newBatchId <= 0)
-            {
-                Errors = new Dictionary<string, string> { [CreateSaveErrorKey] = CreateSaveFailedMessage };
-                Mode = "create";
-                return Page();
-            }
-
-            TempData.Remove(PendingCopyKey);
-            Session.BatchID = newBatchId;
-            Session.SampleSummaryReturnPage = null;
-            return RedirectToPage("/Batches/CopyBatchSummary", new { newBatchId });
-        }
-
+    private async Task<IActionResult> CreateNewBatchAsync(Batch batch, SelectedTestCodes testCodes, string submittedAsCode)
+    {
         int batchId;
         try { batchId = await _batches.AddAsync(batch, Session.UserID); }
-        catch
-        {
-            Errors = new Dictionary<string, string> { [CreateSaveErrorKey] = CreateSaveFailedMessage };
-            Mode = "create";
-            return Page();
-        }
+        catch { return CreateSaveError(CreateSaveFailedMessage); }
 
-        if (batchId <= 0)
-        {
-            Errors = new Dictionary<string, string> { [CreateSaveErrorKey] = CreateSaveFailedMessage };
-            Mode = "create";
-            return Page();
-        }
+        if (batchId <= 0) return CreateSaveError(CreateSaveFailedMessage);
 
         Session.BatchID   = batchId;
 
@@ -898,9 +940,9 @@ public class BatchDetailsModel : HistoPageModel
         // Save test type selections — mirrors clsCheckBoxData.UpdateTable for BATCH_HISTOLOGY/ANTIBODIES/STAIN
         await _batches.SaveBatchTestSelectionsAsync(
             batchId,
-            Create_SelectedHistologyCodes,
-            needsAntibodies ? Create_SelectedAntibodyCodes : new List<string>(),
-            needsStains     ? Create_SelectedStainCodes    : new List<string>(),
+            testCodes.HistologyCodes,
+            testCodes.AntibodyCodes,
+            testCodes.StainCodes,
             Session.UserID);
 
         // Legacy continues straight into the sample-adding screen (BatchSummary.aspx /

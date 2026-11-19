@@ -14,6 +14,8 @@ namespace Histo.Web.Pages.Submissions;
 /// </summary>
 public class SubmissionDetailsModel : HistoPageModel
 {
+    private const string SampleDetailsTitle = "Sample Details";
+
     private const int LookupTissueCode = 9;
 
     private readonly ISubmissionService _submissions;
@@ -58,6 +60,9 @@ public class SubmissionDetailsModel : HistoPageModel
     public IReadOnlyList<Tissue> Tissues { get; private set; } = [];
     public IReadOnlyList<LookupItem> TissueOptions { get; private set; } = [];
 
+    /// <summary>Tissue information only applies to Wet Tissue submissions; block types carry tissues on their blocks.</summary>
+    public bool IsWetTissue { get; private set; }
+
     /// <summary>Resolves a tissue code to its description, matching legacy's GetListType(TissueCode, LOOKUP_TISSUE_CODE).</summary>
     public string TissueName(string code) => TissueOptions.FirstOrDefault(o => o.Code == code)?.Name ?? code;
 
@@ -70,8 +75,8 @@ public class SubmissionDetailsModel : HistoPageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
-        ViewData["Title"] = "Sample Details";
-        ViewData["PageTitle"] = "Sample Details";
+        ViewData["Title"] = SampleDetailsTitle;
+        ViewData["PageTitle"] = SampleDetailsTitle;
 
         BatchId ??= Session.BatchID;
         var redirect = await LoadAnimalAsync();
@@ -79,6 +84,9 @@ public class SubmissionDetailsModel : HistoPageModel
         if (Animal is null) return Page();
 
         PMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
+        var submittedAsCode = await _batches.GetSubmittedAsCodeAsync(BatchId ?? 0);
+        var submittedAs = (await _lookups.GetLookupDataAsync(11, includeInactive: true)).FirstOrDefault(i => i.Code == submittedAsCode)?.Name; // 11 = LOOKUP_SUBMITTEDAS
+        IsWetTissue = ValidationHelpers.IsWetTissueDescription(submittedAs);
         Tissues = await _submissions.GetTissuesBySubmissionAsync(BatchId ?? 0, Animal.BatchSubmissionID);
         TissueOptions = await _lookups.GetLookupDataAsync(LookupTissueCode);
 
@@ -99,8 +107,8 @@ public class SubmissionDetailsModel : HistoPageModel
 
     public async Task<IActionResult> OnPostSaveDetailsAsync()
     {
-        ViewData["Title"] = "Sample Details";
-        ViewData["PageTitle"] = "Sample Details";
+        ViewData["Title"] = SampleDetailsTitle;
+        ViewData["PageTitle"] = SampleDetailsTitle;
 
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
@@ -108,7 +116,7 @@ public class SubmissionDetailsModel : HistoPageModel
 
         var updated = new Animal
         {
-            ID = Animal!.ID,
+            ID = Animal.ID,
             BatchSubmissionID = Animal.BatchSubmissionID,
             SenderRef = Animal.SenderRef,
             NextBlockRef = Animal.NextBlockRef,
@@ -141,7 +149,7 @@ public class SubmissionDetailsModel : HistoPageModel
         {
             var tissue = new Tissue
             {
-                OwnerID = Animal!.BatchSubmissionID,
+                OwnerID = Animal.BatchSubmissionID,
                 Owner = TissueOwner.Submission,
                 TissueCode = TissueCode,
                 NoPieces = NoPieces,
@@ -186,6 +194,11 @@ public class SubmissionDetailsModel : HistoPageModel
     {
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
+
+        // tissueId is client-controlled and DeleteTissue acts on the ID alone, so it must belong to this sample.
+        var owned = Animal is null ? [] : await _submissions.GetTissuesBySubmissionAsync(BatchId ?? 0, Animal.BatchSubmissionID);
+        if (owned.All(t => t.ID != tissueId))
+            return RedirectToPage(new { batchId = BatchId, animalId = AnimalId });
 
         await _submissions.DeleteTissueAsync(tissueId, TissueOwner.Submission, Session.UserID);
         await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);

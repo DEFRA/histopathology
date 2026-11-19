@@ -1,0 +1,20 @@
+@model Histo.Web.Pages.Blocks.BlockDetailsModel
+        <input type="hidden" name="BlockFieldsPosted" value="true" />
+        <input type="hidden" name="NewBlockRef" value="@Model.NewBlockRef" />
+        <input type="hidden" name="NewNumberOfBlocks" value="@Model.NewNumberOfBlocks" />
+        <input type="hidden" name="NewCustomerRef" value="@Model.NewCustomerRef" />
+        <input type="hidden" name="NewRepeatBlock" value="@(Model.NewRepeatBlock ? "true" : "false")" />
+        <input type="hidden" name="NewComment" value="@Model.NewComment" />
+        @foreach (var code in Model.SelectedHistologyCodes)
+        {
+            <input type="hidden" name="SelectedHistologyCodes" value="@code" />
+        }
+        @foreach (var code in Model.SelectedAntibodyCodes)
+        {
+            <input type="hidden" name="SelectedAntibodyCodes" value="@code" />
+        }
+        @foreach (var code in Model.SelectedStainCodes)
+        {
+            <input type="hidden" name="SelectedStainCodes" value="@code" />
+        }
+        <input type="hidden" name="CarryTestsToNextBlock" value="@(Model.CarryTestsToNextBlock ? "true" : "false")" />

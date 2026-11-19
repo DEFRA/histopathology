@@ -119,7 +119,7 @@ public class HistologyReportDataSetBuilderTests
             rawBatch: [DefaultBatchRow()],
             rawSubmittedAs: [],
             batchId: 99,
-            projectsById: projectsById);
+            lookups: new HistologyReportDataSetBuilder.BatchLookups { ProjectsById = projectsById });
 
         // DefaultBatchRow's ProjectContractCode is "TBA", which isn't in the lookup — should fall back to the raw code.
         Assert.Equal("TBA", table.Rows[0]["ProjectContractCode"]);
@@ -139,7 +139,7 @@ public class HistologyReportDataSetBuilderTests
             rawBatch: [row],
             rawSubmittedAs: [],
             batchId: 99,
-            projectsById: projectsById);
+            lookups: new HistologyReportDataSetBuilder.BatchLookups { ProjectsById = projectsById });
 
         Assert.Equal("Defra research", table.Rows[0]["ProjectContractCode"]);
     }
@@ -161,7 +161,7 @@ public class HistologyReportDataSetBuilderTests
                 SubmittedAsRow(batchId, "6")
             ],
             batchId: batchId,
-            submittedAsByCode: submittedAsByCode);
+            lookups: new HistologyReportDataSetBuilder.BatchLookups { SubmittedAsByCode = submittedAsByCode });
 
         Assert.Equal("Wax Block, Fresh Tissue", table.Rows[0]["SubmittedAs"]);
     }
@@ -183,7 +183,7 @@ public class HistologyReportDataSetBuilderTests
                 SubmittedAsRow(999,     "9")
             ],
             batchId: batchId,
-            submittedAsByCode: submittedAsByCode);
+            lookups: new HistologyReportDataSetBuilder.BatchLookups { SubmittedAsByCode = submittedAsByCode });
 
         Assert.Equal("Wax Block", table.Rows[0]["SubmittedAs"]);
     }
@@ -196,7 +196,7 @@ public class HistologyReportDataSetBuilderTests
         row["Fixation"] = "1";
 
         var table = HistologyReportDataSetBuilder.BuildBatchTable(
-            rawBatch: [row], rawSubmittedAs: [], batchId: 99, fixationByCode: fixationByCode);
+            rawBatch: [row], rawSubmittedAs: [], batchId: 99, lookups: new HistologyReportDataSetBuilder.BatchLookups { FixationByCode = fixationByCode });
 
         Assert.Equal("Other", table.Rows[0]["Fixation"]);
     }
@@ -209,7 +209,7 @@ public class HistologyReportDataSetBuilderTests
         row["TimeReceived"] = "2";
 
         var table = HistologyReportDataSetBuilder.BuildBatchTable(
-            rawBatch: [row], rawSubmittedAs: [], batchId: 99, timeReceivedByCode: timeReceivedByCode);
+            rawBatch: [row], rawSubmittedAs: [], batchId: 99, lookups: new HistologyReportDataSetBuilder.BatchLookups { TimeReceivedByCode = timeReceivedByCode });
 
         Assert.Equal("before 11.00", table.Rows[0]["TimeReceived"]);
     }
@@ -222,7 +222,7 @@ public class HistologyReportDataSetBuilderTests
 
         var table = HistologyReportDataSetBuilder.BuildBatchTable(
             rawBatch: [row], rawSubmittedAs: [], batchId: 99,
-            fixationByCode: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["1"] = "Other" });
+            lookups: new HistologyReportDataSetBuilder.BatchLookups { FixationByCode = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["1"] = "Other" } });
 
         Assert.Equal("7", table.Rows[0]["Fixation"]);
     }
@@ -237,6 +237,55 @@ public class HistologyReportDataSetBuilderTests
     }
 
     [Fact]
+    public void BuildBatchTable_SpeciesContactAndSubmitter_ResolveToDisplayNames()
+    {
+        var row = DefaultBatchRow();
+        row["Species"] = "3";
+        row["ContactName"] = "8";
+        row["OtherSubmittedBy"] = "12";
+
+        var table = HistologyReportDataSetBuilder.BuildBatchTable(
+            rawBatch: [row], rawSubmittedAs: [], batchId: 99,
+            lookups: new HistologyReportDataSetBuilder.BatchLookups
+            {
+                SpeciesById = new Dictionary<string, string> { ["3"] = "Ovine" },
+                ContactsById = new Dictionary<string, string> { ["8"] = "Dr Jones" },
+                UserById = new Dictionary<int, string> { [12] = "A User" },
+            });
+
+        Assert.Equal("Ovine", table.Rows[0]["Species"]);
+        Assert.Equal("Dr Jones", table.Rows[0]["ContactName"]);
+        Assert.Equal("A User", table.Rows[0]["OtherSubmittedBy"]);
+    }
+
+    [Fact]
+    public void BuildBatchTable_NonNumericSubmitter_FallsBackToRawValue()
+    {
+        var table = HistologyReportDataSetBuilder.BuildBatchTable(
+            rawBatch: [DefaultBatchRow()], rawSubmittedAs: [], batchId: 99,
+            lookups: new HistologyReportDataSetBuilder.BatchLookups { UserById = new Dictionary<int, string> { [1] = "X" } });
+
+        Assert.Equal("VLA Lasswade", table.Rows[0]["OtherSubmittedBy"]);
+    }
+
+    [Fact]
+    public void BuildHistologyTable_IhcFlagNonTse_UsesNonTseAntibodyLookup()
+    {
+        var table = HistologyReportDataSetBuilder.BuildHistologyTable(
+            rawHistology: [Row(("Code", "6"))],
+            batchId: 1,
+            rawAntibodies: [Row(("Code", "1"))],
+            batchType: 1,
+            lookups: new HistologyReportDataSetBuilder.HistologyLookups
+            {
+                TseAntibodiesByCode = new Dictionary<string, string> { ["1"] = "TSE name" },
+                NonTseAntibodiesByCode = new Dictionary<string, string> { ["1"] = "Non-TSE name" },
+            });
+
+        Assert.Equal("Non-TSE name", Assert.Single(table.Rows.Cast<DataRow>())["Code"]);
+    }
+
+    [Fact]
     public void BuildBatchTable_SafeToHandleTrue_MapsToBoolTrue()
     {
         var table = HistologyReportDataSetBuilder.BuildBatchTable(
@@ -244,7 +293,7 @@ public class HistologyReportDataSetBuilderTests
             rawSubmittedAs: [],
             batchId: 99);
 
-        Assert.Equal(true, table.Rows[0]["SafeToHandle"]);
+        Assert.True((bool)table.Rows[0]["SafeToHandle"]);
     }
 
     [Fact]
@@ -255,7 +304,7 @@ public class HistologyReportDataSetBuilderTests
             rawSubmittedAs: [],
             batchId: 99);
 
-        Assert.Equal(false, table.Rows[0]["SafeToHandle"]);
+        Assert.False((bool)table.Rows[0]["SafeToHandle"]);
     }
 
     // ── BuildPostFixationTable ────────────────────────────────────────────────
@@ -343,7 +392,7 @@ public class HistologyReportDataSetBuilderTests
         var table = HistologyReportDataSetBuilder.BuildHistologyTable(
             rawHistology: [Row(("Code", "2")), Row(("Code", "7"))],
             batchId: 1,
-            histologyByCode: histologyByCode);
+            lookups: new HistologyReportDataSetBuilder.HistologyLookups { HistologyByCode = histologyByCode });
 
         Assert.Equal(2, table.Rows.Count);
         Assert.Equal("H&E", table.Rows[0]["Code"]);
@@ -356,7 +405,7 @@ public class HistologyReportDataSetBuilderTests
         var table = HistologyReportDataSetBuilder.BuildHistologyTable(
             rawHistology: [Row(("Code", "7"))],
             batchId: 42,
-            histologyByCode: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["7"] = "Archive" });
+            lookups: new HistologyReportDataSetBuilder.HistologyLookups { HistologyByCode = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["7"] = "Archive" } });
 
         Assert.Equal("Archive", table.Rows[0]["Code"]);
         Assert.Equal(42, table.Rows[0]["BatchID"]);
@@ -370,7 +419,7 @@ public class HistologyReportDataSetBuilderTests
             rawHistology: [Row(("Code", "3"))],
             batchId: 1,
             rawStains: [Row(("Code", "14")), Row(("Code", "Other"))],
-            specialStainByCode: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["14"] = "PAS" });
+            lookups: new HistologyReportDataSetBuilder.HistologyLookups { SpecialStainByCode = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["14"] = "PAS" } });
 
         Assert.Equal(2, table.Rows.Count);
         Assert.Equal("PAS", table.Rows[0]["Code"]);
@@ -386,7 +435,7 @@ public class HistologyReportDataSetBuilderTests
             batchId: 1,
             rawAntibodies: [Row(("Code", "1")), Row(("Code", "Other"))],
             batchType: 0, // TSE
-            tseAntibodiesByCode: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["1"] = "PrP (SAF84)" });
+            lookups: new HistologyReportDataSetBuilder.HistologyLookups { TseAntibodiesByCode = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["1"] = "PrP (SAF84)" } });
 
         Assert.Equal(2, table.Rows.Count);
         Assert.Equal("PrP (SAF84)", table.Rows[0]["Code"]);
@@ -400,7 +449,7 @@ public class HistologyReportDataSetBuilderTests
         var table = HistologyReportDataSetBuilder.BuildHistologyTable(
             rawHistology: codes,
             batchId: 1,
-            histologyByCode: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["2"] = "H&E" });
+            lookups: new HistologyReportDataSetBuilder.HistologyLookups { HistologyByCode = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["2"] = "H&E" } });
 
         Assert.Equal(8, table.Rows.Count);
     }
@@ -529,9 +578,9 @@ public class HistologyReportDataSetBuilderTests
         var table = HistologyReportDataSetBuilder.BuildSubmissionTable(
             [], [sTiss], [animal], [block], [bTiss], 7, blocksAssigned);
 
-        Assert.Single(table.Rows);
-        Assert.Equal(expectedBlockRef, table.Rows[0]["BlockRef"]);
-        Assert.Equal(expectedTissue, table.Rows[0]["TissueDetails"]);
+        var row = Assert.Single(table.Rows.Cast<DataRow>());
+        Assert.Equal(expectedBlockRef, row["BlockRef"]);
+        Assert.Equal(expectedTissue, row["TissueDetails"]);
     }
 
     [Fact]
@@ -544,8 +593,8 @@ public class HistologyReportDataSetBuilderTests
         var table = HistologyReportDataSetBuilder.BuildSubmissionTable(
             [], [], [animal], [block], [bTiss], 7, blocksAssigned: false);
 
-        Assert.Single(table.Rows);
-        Assert.Equal("01", table.Rows[0]["BlockRef"]);
+        var row = Assert.Single(table.Rows.Cast<DataRow>());
+        Assert.Equal("01", row["BlockRef"]);
     }
 
     [Fact]
@@ -593,5 +642,82 @@ public class HistologyReportDataSetBuilderTests
 
         Assert.Equal(["A", "A", "B", "B", "B"], table.Rows.Cast<DataRow>().Select(r => (string)r["BlockRef"]));
         Assert.Equal(["Obex", "Obex", "Adrenal", "Adrenal", "Adrenal"], table.Rows.Cast<DataRow>().Select(r => (string)r["TissueDetails"]));
+    }
+
+    // ── Incomplete submissions (defect 766965 / legacy SubmissionForm.aspx.vb parity) ──
+
+    [Fact]
+    public void BuildSubmissionTable_BlocksAssigned_SampleWithHistologyRefButNoBlock_IsOmitted()
+    {
+        // Legacy CreateBatchBlocksDataTable emits rows per block→tissue only, so a sample that has an
+        // HR but no block yet never reaches the print-out; the sample with a block does.
+        var withBlock = Row(("ID", (object)1), ("SenderRef", "S-1"), ("HistologyRef", "26/40001"));
+        var noBlock   = Row(("ID", (object)2), ("SenderRef", "S-2"), ("HistologyRef", "26/40002"));
+        var block     = Row(("ID", (object)900), ("AnimalID", (object)1), ("BlockRef", "01"), ("RepeatBlock", (object)false));
+        var bTissue   = Row(("BlockID", (object)900), ("ID", (object)10), ("TissueCode", "Obex"), ("NoPieces", (object)1), ("Comment", ""));
+        var subTissues = new[]
+        {
+            Row(("AnimalID", (object)1), ("ID", (object)1), ("TissueCode", "Obex"), ("Comment", "")),
+            Row(("AnimalID", (object)2), ("ID", (object)2), ("TissueCode", "Obex"), ("Comment", "")),
+        };
+
+        var table = HistologyReportDataSetBuilder.BuildSubmissionTable(
+            [], subTissues, [withBlock, noBlock], [block], [bTissue], 7, blocksAssigned: true);
+
+        var row = Assert.Single(table.Rows.Cast<DataRow>());
+        Assert.Equal("S-1", row["SenderRef"]);
+        Assert.Equal("26/40001", row["HistologyRef"]);
+        Assert.Equal("01", row["BlockRef"]);
+    }
+
+    [Fact]
+    public void BuildSubmissionTable_BlocksAssigned_BlockWithoutTissues_ProducesNoRow()
+    {
+        // A block with no tissues (never completed) has nothing to list under it in legacy either.
+        var animal = Row(("ID", (object)1), ("SenderRef", "S-1"), ("HistologyRef", "26/40001"));
+        var done   = Row(("ID", (object)900), ("AnimalID", (object)1), ("BlockRef", "01"), ("RepeatBlock", (object)false));
+        var empty  = Row(("ID", (object)901), ("AnimalID", (object)1), ("BlockRef", "02"), ("RepeatBlock", (object)false));
+        var tissue = Row(("BlockID", (object)900), ("ID", (object)10), ("TissueCode", "Obex"), ("NoPieces", (object)1), ("Comment", ""));
+
+        var table = HistologyReportDataSetBuilder.BuildSubmissionTable(
+            [], [], [animal], [done, empty], [tissue], 7, blocksAssigned: true);
+
+        Assert.Equal(["01"], table.Rows.Cast<DataRow>().Select(r => (string)r["BlockRef"]));
+    }
+
+    [Fact]
+    public void BuildSubmissionTable_NotBlocked_ListsEverySampleWithItsCurrentHistologyRef()
+    {
+        // Wet Tissue before Done: legacy CreateBatchSubmissionDataTable lists every sample's tissues,
+        // the HR shown as it stands (blank when unassigned) and never a block ref.
+        var assigned   = Row(("ID", (object)1), ("SenderRef", "S-1"), ("HistologyRef", "26/40001"));
+        var unassigned = Row(("ID", (object)2), ("SenderRef", "S-2"), ("HistologyRef", ""));
+        var subTissues = new[]
+        {
+            Row(("AnimalID", (object)1), ("ID", (object)1), ("TissueCode", "Obex"), ("Comment", "")),
+            Row(("AnimalID", (object)2), ("ID", (object)2), ("TissueCode", "Obex"), ("Comment", "")),
+        };
+
+        var table = HistologyReportDataSetBuilder.BuildSubmissionTable(
+            [], subTissues, [assigned, unassigned], [], [], 7, blocksAssigned: false);
+
+        Assert.Equal(["S-1", "S-2"], table.Rows.Cast<DataRow>().Select(r => (string)r["SenderRef"]));
+        Assert.Equal(["26/40001", ""], table.Rows.Cast<DataRow>().Select(r => (string)r["HistologyRef"]));
+        Assert.All(table.Rows.Cast<DataRow>(), r => Assert.Equal("", r["BlockRef"]));
+    }
+
+    [Fact]
+    public void BuildSubmissionTable_HistologyRefAssignedAfterFirstPrint_AppearsOnNextBuild()
+    {
+        // Defect 766965: the HR must come from the animal as it is now, not a stale copy.
+        var tissue = Row(("AnimalID", (object)1), ("ID", (object)1), ("TissueCode", "Obex"), ("Comment", ""));
+        var before = Row(("ID", (object)1), ("SenderRef", "S-1"), ("HistologyRef", ""));
+        var after  = Row(("ID", (object)1), ("SenderRef", "S-1"), ("HistologyRef", "26/40009"));
+
+        var first  = HistologyReportDataSetBuilder.BuildSubmissionTable([], [tissue], [before], [], [], 7, blocksAssigned: false);
+        var second = HistologyReportDataSetBuilder.BuildSubmissionTable([], [tissue], [after],  [], [], 7, blocksAssigned: false);
+
+        Assert.Equal("", first.Rows[0]["HistologyRef"]);
+        Assert.Equal("26/40009", second.Rows[0]["HistologyRef"]);
     }
 }

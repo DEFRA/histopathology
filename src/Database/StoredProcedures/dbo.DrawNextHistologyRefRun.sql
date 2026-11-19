@@ -1,4 +1,4 @@
-/****** Object:  StoredProcedure [dbo].[DrawNextHistologyRefRun] ******/
+-- Object:  StoredProcedure [dbo].[DrawNextHistologyRefRun]
 -- ============================================================================
 -- dbo.DrawNextHistologyRefRun
 -- ============================================================================

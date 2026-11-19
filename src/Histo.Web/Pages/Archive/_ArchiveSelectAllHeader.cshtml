@@ -1,0 +1,10 @@
+@model Histo.Web.Pages.Archive.IArchivePage
+<th scope="col" class="govuk-table__header">
+    <div class="govuk-checkboxes govuk-checkboxes--small">
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" type="checkbox" id="select-all" name="SelectAllAcrossPages" value="true"
+                   checked="@Model.SelectAllAcrossPages" @(Model.IsViewMode ? "disabled" : "") />
+            <label class="govuk-label govuk-checkboxes__label" for="select-all">All</label>
+        </div>
+    </div>
+</th>

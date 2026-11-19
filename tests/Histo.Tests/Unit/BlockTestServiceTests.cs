@@ -16,10 +16,12 @@ public class BlockTestServiceTests
 
     private BlockTestService CreateSut() => new(_repo.Object, _logger.Object);
 
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
     [Fact]
     public async Task AddTestsToBatchBlocksAsync_DelegatesToRepository()
     {
-        await CreateSut().AddTestsToBatchBlocksAsync(5, Histology, Antibodies, Stains, 7);
+        await CreateSut().AddTestsToBatchBlocksAsync(5, Histology, Antibodies, Stains, 7, Ct);
 
         _repo.Verify(r => r.AddTestsToBatchBlocksAsync(5, Histology, Antibodies, Stains, 7, It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -33,6 +35,6 @@ public class BlockTestServiceTests
             .ThrowsAsync(new InvalidOperationException("boom"));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            CreateSut().AddTestsToBatchBlocksAsync(5, Histology, Antibodies, Stains, 7));
+            CreateSut().AddTestsToBatchBlocksAsync(5, Histology, Antibodies, Stains, 7, Ct));
     }
 }

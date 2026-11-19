@@ -2,6 +2,7 @@ using Histo.Reporting.Reports;
 using Histo.Reporting.Services;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 
 namespace Histo.Web.Pages.Reports;
 
@@ -14,6 +15,7 @@ namespace Histo.Web.Pages.Reports;
 /// Legacy equivalent: <c>QCNoteForm.aspx.vb — CreateReport(iQCNoteRef)</c> which called
 /// Crystal Reports <c>QCNote.rpt</c> and streamed the PDF via <c>Response.WriteFile</c>.
 /// </summary>
+[ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
 public class QCNoteModel : HistoPageModel
 {
     private readonly QCNoteDataSetBuilder _dataSetBuilder;
@@ -34,6 +36,9 @@ public class QCNoteModel : HistoPageModel
         var ds  = await _dataSetBuilder.BuildAsync(qcNoteRef, ct);
         var pdf = await QCNoteRenderer.RenderAsync(ds);
 
-        return File(pdf, "application/pdf", $"QCNote-{qcNoteRef}.pdf");
+        // "inline" makes the browser display the PDF; the filename is used if the user saves it.
+        Response.Headers[HeaderNames.ContentDisposition] =
+            new ContentDispositionHeaderValue("inline") { FileName = $"QCNote-{qcNoteRef}.pdf" }.ToString();
+        return File(pdf, "application/pdf");
     }
 }

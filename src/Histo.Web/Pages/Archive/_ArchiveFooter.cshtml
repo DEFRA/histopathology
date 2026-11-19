@@ -1,0 +1,54 @@
+@*
+    Pagination, "Go to page" box and the archive-details fields/button shared by the Archive pages.
+    Reads ViewData["ArchiveNoun"] ("block"/"tissue") and ViewData["ArchiveButtonGroup"] (wrap the button in a button group).
+*@
+@model Histo.Web.Pages.Archive.IArchivePage
+@{
+    var noun = ViewData["ArchiveNoun"]?.ToString();
+    var buttonGroup = ViewData["ArchiveButtonGroup"] is true;
+}
+<partial name="_Pagination" />
+@if (Model.TotalPages > 1)
+{
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="GoToPage">Go to page (1 to @Model.TotalPages)</label>
+        <div class="app-field-with-button">
+            <input class="govuk-input govuk-input--width-3" id="GoToPage" name="PageNumber" type="number" min="1" max="@Model.TotalPages" value="@Model.PageNumber" form="go-to-page-form" />
+            <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" form="go-to-page-form">Go</button>
+        </div>
+    </div>
+}
+
+@if (!Model.IsViewMode)
+{
+    <h2 class="govuk-heading-m">Archive selected @(noun)s</h2>
+    <p class="govuk-hint">Select the "All" checkbox to select every row across all pages. Selecting one @(noun) lets you edit its existing archive details. Archive location and Archived date are required. Selecting two or more applies them to every selected @(noun); a blank Comment leaves each @(noun)'s comment unchanged.</p>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="ArchiveLocationCode">Archive location</label>
+        <select class="govuk-select" id="ArchiveLocationCode" name="ArchiveLocationCode">
+            <option value="">-- Select --</option>
+            @foreach (var loc in Model.ArchiveLocations)
+            {
+                <option value="@loc.Code" selected="@(Model.ArchiveLocationCode == loc.Code)">@loc.Name</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="ArchivedDate">Archived date</label>
+        <input class="govuk-input govuk-input--width-10" id="ArchivedDate" name="ArchivedDate" type="date" value="@Model.ArchivedDate?.ToString("yyyy-MM-dd")" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Comment">Comment</label>
+        <textarea class="govuk-textarea" id="Comment" name="Comment" rows="4">@Model.Comment</textarea>
+    </div>
+    @if (buttonGroup)
+    {
+        <div class="govuk-button-group">
+            <button type="submit" class="govuk-button" data-module="govuk-button">Update selected</button>
+        </div>
+    }
+    else
+    {
+        <button type="submit" class="govuk-button" data-module="govuk-button">Update selected</button>
+    }
+}

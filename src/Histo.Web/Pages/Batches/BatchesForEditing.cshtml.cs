@@ -9,47 +9,31 @@ namespace Histo.Web.Pages.Batches;
 /// Lists all batches available for editing — replaces <c>BatchesForEditing.aspx</c>.
 /// Legacy source: <c>clsBatch.GetBatchesWithStatus(0)</c> where status 0 returns all batches.
 /// </summary>
-public class BatchesForEditingModel : GridPageModel
+public class BatchesForEditingModel : BatchListPageModelBase
 {
-    private readonly IBatchService _batches;
+    private const string BatchesForEditingTitle = "Submissions available for editing";
 
     public BatchesForEditingModel(ISessionService session, IBatchService batches)
-        : base(session) => _batches = batches;
+        : base(session, batches) { }
 
-    public IReadOnlyList<BatchListResult> Batches { get; private set; } = [];
+    protected override string ListTitle => BatchesForEditingTitle;
 
-    public int TotalCount => Batches.Count;
+    // ISS-044: use GetAllBatchesAsync (maps to GetAllBatches SP) — legacy showed all statuses
+    protected override Task<IReadOnlyList<BatchListResult>> FetchBatchesAsync() => BatchService.GetAllBatchesAsync();
 
-    public IReadOnlyList<BatchListResult> PagedEntries =>
-        (SortColumn switch
+    public IReadOnlyList<BatchListResult> GetPagedEntries() =>
+        TakePage(SortColumn switch
         {
-            "ProjectDescription" => SortDesc ? Batches.OrderByDescending(b => b.ProjectDescription) : Batches.OrderBy(b => b.ProjectDescription),
-            "ContactDescription" => SortDesc ? Batches.OrderByDescending(b => b.ContactDescription) : Batches.OrderBy(b => b.ContactDescription),
-            "Species"            => SortDesc ? Batches.OrderByDescending(b => b.Species)            : Batches.OrderBy(b => b.Species),
-            "BatchDate"          => SortDesc ? Batches.OrderByDescending(b => b.BatchDate)           : Batches.OrderBy(b => b.BatchDate),
-            "Status"             => SortDesc ? Batches.OrderByDescending(b => b.Status)              : Batches.OrderBy(b => b.Status),
+            "ProjectDescription" => OrderBatches(b => b.ProjectDescription),
+            "ContactDescription" => OrderBatches(b => b.ContactDescription),
+            "Species"            => OrderBatches(b => b.Species),
+            "BatchDate"          => OrderBatches(b => b.BatchDate),
+            "Status"             => OrderBatches(b => b.Status),
             // No column clicked yet — legacy default: dvBatchesView.Sort = "ID DESC".
             _                    => Batches.OrderByDescending(b => b.ID),
-        })
-        .Skip((PageNumber - 1) * PageSize)
-        .Take(PageSize)
-        .ToList();
+        }, PageNumber);
 
-    /// <summary>Quick-Go: direct navigation by submission number.</summary>
-    [BindProperty]
-    public int? QuickGoId { get; set; }
-
-    /// <summary>Inline error message for Quick-Go validation failures.</summary>
-    public string? GoError { get; private set; }
-
-    public async Task OnGetAsync()
-    {
-        ViewData["Title"] = "Submissions available for editing";
-        ViewData["PageTitle"] = "Submissions available for editing";
-        // ISS-044: use GetAllBatchesAsync (maps to GetAllBatches SP) — legacy showed all statuses
-        Batches = await _batches.GetAllBatchesAsync();
-        PopulateGridViewData(TotalCount);
-    }
+    public async Task OnGetAsync() => await LoadListAsync();
 
     public IActionResult OnPostSelect(int batchId)
     {
@@ -63,18 +47,11 @@ public class BatchesForEditingModel : GridPageModel
 
     public async Task<IActionResult> OnPostGoAsync()
     {
-        ViewData["Title"] = "Submissions available for editing";
-        ViewData["PageTitle"] = "Submissions available for editing";
-        Batches = await _batches.GetAllBatchesAsync();
-        PopulateGridViewData(TotalCount);
+        await LoadListAsync();
 
-        if (!QuickGoId.HasValue || QuickGoId.Value <= 0)
-        {
-            GoError = "Enter a submission number.";
-            return Page();
-        }
+        if (IsQuickGoIdMissing()) return Page();
 
-        var batch = await _batches.GetByIdAsync(QuickGoId.Value);
+        var batch = await BatchService.GetByIdAsync(QuickGoId.Value);
         if (batch is null)
         {
             GoError = $"Submission {QuickGoId.Value} could not be found.";

@@ -23,6 +23,9 @@ public class CopyBatchSummaryModel : HistoPageModel
 
     public int NewBatchId { get; private set; }
     public Batch? NewBatch { get; private set; }
+
+    protected override int? RequestedBatchId =>
+        Histo.Web.Auth.RequestValues.GetPositiveInt(Request, "newBatchId") ?? Session.BatchID;
     public int SubmissionCount { get; private set; }
     public int AnimalCount { get; private set; }
 

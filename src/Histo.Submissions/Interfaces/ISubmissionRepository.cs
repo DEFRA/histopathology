@@ -138,6 +138,12 @@ public interface ISubmissionRepository
     /// </summary>
     Task UpdateAnimalHistologyRefAsync(string senderRef, string? newHistologyRef, int userId, CancellationToken ct = default);
 
+    /// <summary>
+    /// True when any sample already holds <paramref name="histologyRef"/>. Maps to <c>CountAnimalsByHistologyRef</c>.
+    /// Legacy source: SubmissionDetailsBlock.aspx.vb::ValidateData - <c>GetAnimalByHistologyRef</c>.
+    /// </summary>
+    Task<bool> IsHistologyRefInUseAsync(string histologyRef, CancellationToken ct = default);
+
     // -----------------------------------------------------------------------
     // Tissues
     // -----------------------------------------------------------------------

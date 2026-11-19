@@ -13,6 +13,8 @@ public class DapperRepositoryTests
     private static readonly string[] HistologyH2 = ["2"];
     private static readonly string[] NoCodes = [];
 
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
     private static DataTable Table(string name, params (string Column, Type Type)[] columns)
     {
         var table = new DataTable(name);
@@ -44,7 +46,7 @@ public class DapperRepositoryTests
             OnQuery = c => c.Text == "GetBatchBlockTests" ? BatchBlockTests([1, 2], [(1, "2")]) : null,
         };
 
-        await new BlockTestRepository(db).AddTestsToBatchBlocksAsync(5, HistologyH2, NoCodes, NoCodes, 7);
+        await new BlockTestRepository(db).AddTestsToBatchBlocksAsync(5, HistologyH2, NoCodes, NoCodes, 7, Ct);
 
         var added = db.Commands.Where(c => c.Text == "AddBlockHistology").ToList();
         var only = Assert.Single(added);
@@ -59,7 +61,7 @@ public class DapperRepositoryTests
     {
         var db = new FakeDb();
 
-        await new BlockTestRepository(db).AddTestsToBatchBlocksAsync(5, NoCodes, NoCodes, NoCodes, 7);
+        await new BlockTestRepository(db).AddTestsToBatchBlocksAsync(5, NoCodes, NoCodes, NoCodes, 7, Ct);
 
         Assert.Empty(db.Commands);
     }
@@ -74,7 +76,7 @@ public class DapperRepositoryTests
         };
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new BlockTestRepository(db).AddTestsToBatchBlocksAsync(5, HistologyH2, NoCodes, NoCodes, 7));
+            new BlockTestRepository(db).AddTestsToBatchBlocksAsync(5, HistologyH2, NoCodes, NoCodes, 7, Ct));
 
         Assert.True(db.RolledBack);
         Assert.False(db.Committed);
@@ -91,7 +93,7 @@ public class DapperRepositoryTests
         rows.Rows.Add(4, 11, "Project B", "Ovine", DBNull.Value);
         var db = new FakeDb { OnQuery = _ => new DataSet().Also(ds => ds.Tables.Add(rows)) };
 
-        var notes = await new QCNoteRepository(db).GetAllAsync();
+        var notes = await new QCNoteRepository(db).GetAllAsync(Ct);
 
         Assert.Equal(2, notes.Count);
         var first = notes.Single(n => n.QCNoteRef == 10);
@@ -122,7 +124,7 @@ public class DapperRepositoryTests
         };
         var block = new Block { ID = 0, BatchID = 5, AnimalID = 2, BlockRef = "01", Status = BlockStatus.Used };
 
-        var id = await new BlockRepository(db).SaveAsync(block, 7);
+        var id = await new BlockRepository(db).SaveAsync(block, 7, ct: Ct);
 
         Assert.Equal(77, id);
         var insert = Assert.Single(db.Commands, c => c.Text == "AddBlock");
@@ -144,8 +146,8 @@ public class DapperRepositoryTests
         };
         var repo = new BlockTestRepository(db);
 
-        Assert.Empty(await repo.GetByBatchAsync(5));
-        Assert.Empty(await repo.GetAllSelectionsByBatchAsync(5));
+        Assert.Empty(await repo.GetByBatchAsync(5, Ct));
+        Assert.Empty(await repo.GetAllSelectionsByBatchAsync(5, Ct));
     }
 
     [Fact]
@@ -153,7 +155,7 @@ public class DapperRepositoryTests
     {
         var db = new FakeDb();
 
-        await new BlockRepository(db).CreatePreBookedBlockAsync(2, "05");
+        await new BlockRepository(db).CreatePreBookedBlockAsync(2, "05", Ct);
 
         var insert = Assert.Single(db.Commands, c => c.Text == "AddBlock");
         Assert.Equal(2, insert.Parameters["AnimalID"]);
@@ -176,7 +178,7 @@ public class DapperRepositoryTests
             },
         };
 
-        var results = await new BlockRepository(db).BookPreBookedBlocksAsync("S1", [1, 2, 3]);
+        var results = await new BlockRepository(db).BookPreBookedBlocksAsync("S1", [1, 2, 3], Ct);
 
         Assert.Equal(
             [PreBookedBlockOutcome.AlreadyExists, PreBookedBlockOutcome.Booked, PreBookedBlockOutcome.Booked],
@@ -194,7 +196,7 @@ public class DapperRepositoryTests
             OnExecute = c => { if (c.Text == "sp_getapplock") c.Command.Parameters["RETURN_VALUE"].Value = 0; },
         };
 
-        var results = await new BlockRepository(db).BookPreBookedBlocksAsync("S1", [4]);
+        var results = await new BlockRepository(db).BookPreBookedBlocksAsync("S1", [4], Ct);
 
         Assert.Equal(PreBookedBlockOutcome.NoSample, Assert.Single(results).Outcome);
     }
