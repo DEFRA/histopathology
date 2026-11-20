@@ -241,6 +241,36 @@ public class SubmissionDetailsBlockHandlerTests
     }
 
     [Fact]
+    public async Task OnPostSaveHistologyDetails_StoredRefWithTrailingSpace_IsNotRejected()
+    {
+        var stored = $"{Yy}/40020 ";
+        var sut = CreateSut(new Animal { ID = 1, HistologyRef = stored, HistoRefSet = true });
+        GivenCompletedBlock();
+        _histologyRefs.Setup(h => h.GetCountersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<HistologyRefCounter>)[new HistologyRefCounter { Type = 4, NextHistologyRef = "40010" }]);
+        sut.EditHistologyRef = stored;
+
+        var result = await sut.OnPostSaveHistologyDetailsAsync();
+
+        Assert.IsNotType<PageResult>(result);
+        Assert.Null(sut.ErrorMessage);
+        _submissions.Verify(s => s.UpdateAnimalAsync(It.IsAny<Animal>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostSaveHistologyDetails_TypedRefWithTrailingSpace_StillFailsTheFormatCheck()
+    {
+        var sut = CreateSut(new Animal { ID = 1 });
+        GivenCompletedBlock();
+        sut.EditHistologyRef = $"{Yy}/40005 ";
+
+        var result = await sut.OnPostSaveHistologyDetailsAsync();
+
+        Assert.IsType<PageResult>(result);
+        Assert.Contains("NN/NNNNN format", sut.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task OnPostSaveHistologyDetails_RefAlreadyUsedElsewhere_ShowsDuplicateError()
     {
         var sut = CreateSut(new Animal { ID = 1 });

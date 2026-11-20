@@ -358,6 +358,10 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         if (string.IsNullOrWhiteSpace(histologyRef))
             return null;
 
+        // Migrated rows can carry trailing spaces; only an untouched stored value is trimmed, a typed one is not.
+        if (string.Equals(histologyRef, currentHistologyRef, StringComparison.Ordinal))
+            histologyRef = currentHistologyRef = histologyRef.Trim();
+
         var histologyRefPattern = HistologyRefRegex();
 
         if (!histologyRefPattern.IsMatch(histologyRef))
