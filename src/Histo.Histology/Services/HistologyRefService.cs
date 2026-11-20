@@ -176,17 +176,8 @@ public sealed class HistologyRefService : IHistologyRefService
             if (!HistologyRefTypeCode.TryGetRange(histologyType, out var lowerBoundInclusive, out var upperBoundExclusive))
                 return null;
 
-            // Pre-booked-but-unused refs of this type are consumed first, lowest number first, so
-            // auto-generate matches SubmissionDetailsBlock's "Get next ref" button exactly. Only
-            // this calendar year's refs are eligible — a pooled ref stores its own year prefix
-            // from whenever it was booked, so the pool still holds refs from years gone by.
-            var fromPool = (await _repo.GetUnusedRefsAsync(histologyType, ct))
-                .Select(r => r.Ref?.Trim())
-                .Where(Histo.Core.Domain.HistologyRefHelpers.IsCurrentYear)
-                .OrderBy(Histo.Core.Domain.HistologyRefHelpers.RefNumber)
-                .FirstOrDefault();
-            if (fromPool is not null) return fromPool;
-
+            // Counter only, never the unused pool: legacy never read persisted pool rows when
+            // picking, and handing them to unrelated samples gave scattered out-of-order refs.
             // Legacy clsHistology.vb::GetNextAvailableHistologyRef — the GetNextHistologyRef SP
             // reads and advances the counter itself.
             return await DrawFromCounterAsync(histologyType, lowerBoundInclusive, upperBoundExclusive, ct);
@@ -194,6 +185,29 @@ public sealed class HistologyRefService : IHistologyRefService
         catch (Exception ex)
         {
             _logger.LogError("Failed to draw the next available histology ref for type {HistologyType}.", ex, histologyType);
+            return null;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<string?> FindReleasedRefForSenderAsync(string senderRef, int histologyType, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(senderRef)) return null;
+
+        try
+        {
+            var rows = await _repo.GetReleasedRefsForSenderAsync(senderRef.Trim(), Histo.Core.Domain.HistologyRefHelpers.CurrentYearPrefix, ct);
+            return rows
+                .Where(r => HistologyRefTypeCode.FromExistingRef(r.Ref) == histologyType
+                            && (r.SenderRef ?? string.Empty).Split(',', StringSplitOptions.TrimEntries)
+                                .Contains(senderRef.Trim(), StringComparer.OrdinalIgnoreCase))
+                .Select(r => r.Ref)
+                .OrderBy(r => r, StringComparer.Ordinal)
+                .FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to look up released histology refs for a sample.", ex);
             return null;
         }
     }
@@ -230,7 +244,18 @@ public sealed class HistologyRefService : IHistologyRefService
 
     private async Task<string?> DrawFromCounterAsync(int histologyType, int lowerInclusive, int upperExclusive, CancellationToken ct)
     {
-        var claimed = await _repo.DrawNextRefAsync(histologyType, ct);
+        var counter = (await _repo.GetCountersAsync(ct)).FirstOrDefault(c => c.Type == histologyType);
+        if (counter is null) return null;
+
+        // The SP advances the counter whatever it hands back, so refuse before drawing once the type is
+        // exhausted (or the counter is garbage) — otherwise each attempt would push it further out of range.
+        if (!int.TryParse(counter.NextHistologyRef, out var current) || current < lowerInclusive || current >= upperExclusive)
+        {
+            LogCounterOutOfRange(histologyType, counter.NextHistologyRef, lowerInclusive, upperExclusive);
+            return null;
+        }
+
+        var claimed = await _repo.DrawNextRefAsync(histologyType, upperExclusive, ct);
         if (claimed is null) return null;
 
         // The counter is an unconstrained varchar(5), so it can hold a non-numeric or
@@ -238,12 +263,15 @@ public sealed class HistologyRefService : IHistologyRefService
         // garbage), so refuse rather than write it.
         if (!int.TryParse(claimed, out var number) || number < lowerInclusive || number >= upperExclusive)
         {
-            _logger.LogError(
-                "Histology ref counter for type {HistologyType} holds '{Claimed}', which is not a number in the range {Lower}-{Upper}. No ref was drawn.",
-                null, histologyType, claimed, lowerInclusive, upperExclusive - 1);
+            LogCounterOutOfRange(histologyType, claimed, lowerInclusive, upperExclusive);
             return null;
         }
 
         return Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(claimed);
     }
+
+    private void LogCounterOutOfRange(int histologyType, string? value, int lowerInclusive, int upperExclusive) =>
+        _logger.LogError(
+            "Histology ref counter for type {HistologyType} holds '{Claimed}', which is not a number in the range {Lower}-{Upper}. No ref was drawn.",
+            null, histologyType, value ?? string.Empty, lowerInclusive, upperExclusive - 1);
 }

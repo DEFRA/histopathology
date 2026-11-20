@@ -358,6 +358,10 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         if (string.IsNullOrWhiteSpace(histologyRef))
             return null;
 
+        // Migrated rows can carry trailing spaces; only an untouched stored value is trimmed, a typed one is not.
+        if (string.Equals(histologyRef, currentHistologyRef, StringComparison.Ordinal))
+            histologyRef = currentHistologyRef = histologyRef.Trim();
+
         var histologyRefPattern = HistologyRefRegex();
 
         if (!histologyRefPattern.IsMatch(histologyRef))
@@ -378,7 +382,9 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
             return "Invalid Histology Reference number.";
 
         var histologyType = DetermineHistologyTypeFromRef(refNumber);
-        if (histologyType != 0 && !IsPreviousYearHistoRef(year))
+        var unchanged = string.Equals(histologyRef, currentHistologyRef, StringComparison.OrdinalIgnoreCase);
+        // A ref already on the sample was accepted when assigned; the counter may since have been reset below it.
+        if (histologyType != 0 && !IsPreviousYearHistoRef(year) && !unchanged)
         {
             var counters = await _histologyRefs.GetCountersAsync();
             var counter = counters.FirstOrDefault(c => c.Type == histologyType);
@@ -387,7 +393,7 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         }
 
         // DEFECT-FIX: legacy ValidateData rejected a Histology Ref already held by another sample.
-        if (!string.Equals(histologyRef, currentHistologyRef, StringComparison.OrdinalIgnoreCase)
+        if (!unchanged
             && await _submissions.IsHistologyRefInUseAsync(histologyRef))
             return "The Histology Ref entered already exists. Please enter an alternative reference.";
 
@@ -518,6 +524,7 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         {
             string? nextRef;
             bool isPgNumber;
+            var keepsCurrentRef = false;
             if (HistologyRefType.Value == HistologyRefTypeCode.UsePgNumber)
             {
                 // "use pg number" reverses the sample's own PG-format Sender Ref into a Histology
@@ -530,16 +537,27 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
                 if (!isValidPgFormat)
                     ErrorMessage = "PG Number Format: PGNNNN/NN";
             }
+            else if (KeepsCurrentRefForType(Animal, HistologyRefType.Value))
+            {
+                // Legacy ProcessNextHistologyRef filed the current ref as unused, then found it again for the same type.
+                nextRef = Animal.HistologyRef;
+                isPgNumber = false;
+                keepsCurrentRef = true;
+            }
             else
             {
-                nextRef = await GetNextRefForTypeAsync(HistologyRefType.Value);
+                // A ref this same sample released earlier (e.g. via Back) is reused before drawing a new one.
+                var released = await _histologyRefs.FindReleasedRefForSenderAsync(Animal.SenderRef, HistologyRefType.Value);
+                nextRef = released is not null && !await _submissions.IsHistologyRefInUseAsync(released)
+                    ? released
+                    : await _histologyRefs.GetNextAvailableRefAsync(HistologyRefType.Value);
                 isPgNumber = false;
                 if (nextRef is null)
                     ErrorMessage = "No histology reference is available for the selected type. " +
                                    "Check the next available reference for this type on the Edit Histology Reference page.";
             }
 
-            if (nextRef is not null)
+            if (nextRef is not null && !keepsCurrentRef)
             {
                 var updated = new Animal
                 {
@@ -556,19 +574,27 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
                     BookedHistologyRef = Animal.BookedHistologyRef,
                     RowStamp = Animal.RowStamp,
                 };
-                await _submissions.UpdateAnimalAsync(updated, Session.UserID);
-                Animal.HistologyRef = nextRef;
-                Animal.HistoRefSet = true;
-                Animal.IsPGNumber = isPgNumber;
-                HrAssignedThisVisit = true;
+                var saved = await _submissions.UpdateAnimalAsync(updated, Session.UserID);
+                if (saved)
+                {
+                    Animal.HistologyRef = nextRef;
+                    Animal.HistoRefSet = true;
+                    Animal.IsPGNumber = isPgNumber;
+                    HrAssignedThisVisit = true;
+                }
+                else
+                {
+                    ErrorMessage = "The histology reference could not be saved. Please try again.";
+                }
             }
         }
 
-        // This handler posts a separate <form> from the one holding EditHistologyRef/EditPMDate,
-        // so those bind properties never travel with this request — repopulate them from Animal
-        // (same as OnGetAsync) or the page redisplays with both fields blanked out.
+        // The posted HR would otherwise be redisplayed in place of the one just drawn.
+        ModelState.Remove(nameof(EditHistologyRef));
         EditHistologyRef = Animal.HistologyRef;
-        EditPMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
+        // Legacy kept a typed PM date across the type pick; it is saved with "Save details".
+        if (PMDateLocked || string.IsNullOrWhiteSpace(EditPMDate))
+            EditPMDate = DateFormatHelpers.ToIsoDate(Animal.PMDate);
 
         var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
         Blocks = allBlocks.Where(b => b.AnimalID == Animal.ID).ToList();
@@ -577,47 +603,15 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         return Page();
     }
 
-    /// <summary>
-    /// Takes the lowest-numbered pre-booked-but-unused ref of the given type from the CURRENT
-    /// calendar year; when none remain, mints the next ref from the type's counter and advances
-    /// it — legacy: <c>clsHistology.GetNextAvailableHistologyRef</c> (SP <c>GetNextHistologyRef</c>),
-    /// reusing the same counter <c>BookHistologyRef.aspx</c> uses. Either way the ref returned
-    /// always carries the current two-digit year prefix.
-    ///
-    /// Two known divergences, both pre-dating this method and left deliberately: legacy's
-    /// <c>FindUnusedHistologyRef</c> matches a pooled ref by Sender Ref rather than by type, and
-    /// legacy's counter draw happens server-side in one statement rather than
-    /// this read-then-write pair. <see cref="IHistologyRefService.GetNextAvailableRefAsync"/> is
-    /// the faithful version — switching to it broke this page's tests, which mock the granular
-    /// calls below, so the two intentionally differ.
-    /// </summary>
-    private async Task<string?> GetNextRefForTypeAsync(int histologyType)
+    private static bool KeepsCurrentRefForType(Animal animal, int histologyType)
     {
-        if (!HistologyRefTypeCode.TryGetRange(histologyType, out var lower, out var upper)) return null;
-
-        // Pooled refs carry their own "yy/" prefix from whenever they were booked, so the pool
-        // holds refs from many past years. Only this calendar year's refs are eligible, and the
-        // lowest-numbered one of those is taken first.
-        var fromPool = (await _histologyRefs.GetUnusedRefsAsync(histologyType))
-            .Select(r => r.Ref?.Trim())
-            .Where(Histo.Core.Domain.HistologyRefHelpers.IsCurrentYear)
-            .OrderBy(Histo.Core.Domain.HistologyRefHelpers.RefNumber)
-            .FirstOrDefault();
-        if (fromPool is not null) return fromPool;
-
-        var counters = await _histologyRefs.GetCountersAsync();
-        var counter = counters.FirstOrDefault(c => c.Type == histologyType);
-        // The counter is an unconstrained varchar(5) — a non-numeric or out-of-range value would
-        // otherwise mint a ref of the wrong type, so refuse rather than write it.
-        if (counter is null ||
-            !int.TryParse(counter.NextHistologyRef, out var current) ||
-            current < lower || current >= upper)
-            return null;
-
-        var advanced = await _histologyRefs.SetCounterAsync(histologyType, (current + 1).ToString());
-        if (!advanced) return null;
-
-        return Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(counter.NextHistologyRef);
+        var current = animal.HistologyRef?.Trim();
+        return !animal.IsPGNumber
+            && current is { Length: > 0 }
+            && HistologyRefRegex().IsMatch(current)
+            && int.TryParse(current[..2], out var year)
+            && !IsPreviousYearHistoRef(year)
+            && HistologyRefTypeCode.FromExistingRef(current) == histologyType;
     }
 
     /// <summary>

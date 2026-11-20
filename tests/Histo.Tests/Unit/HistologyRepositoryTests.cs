@@ -43,6 +43,20 @@ public class HistologyRepositoryTests
     }
 
     [Fact]
+    public async Task GetReleasedRefsForSender_PassesSenderAndYearPrefix_AndMapsRows()
+    {
+        var db = new FakeDb { OnQuery = _ => Single(UnusedPool(("26/10004 ", "A, HISTO1"))) };
+
+        var item = Assert.Single(await new HistologyRepository(db).GetReleasedRefsForSenderAsync("HISTO1", "26/", Ct));
+
+        Assert.Equal("26/10004", item.Ref);
+        Assert.Equal("A, HISTO1", item.SenderRef);
+        Assert.Equal("HISTO1", db.Commands[0].Parameters["SenderRef"]);
+        Assert.Equal("26/", db.Commands[0].Parameters["Prefix"]);
+        Assert.Contains("Used = 0", db.Commands[0].Text);
+    }
+
+    [Fact]
     public async Task GetUnusedRefs_NullSenderRef_MapsToEmptyString()
     {
         var db = new FakeDb { OnQuery = _ => Single(UnusedPool(("26/20001", null))) };
@@ -136,12 +150,25 @@ public class HistologyRepositoryTests
             ScalarResult = 0,
         };
 
-        var drawn = await new HistologyRepository(db).DrawNextRefAsync(4, Ct);
+        var drawn = await new HistologyRepository(db).DrawNextRefAsync(4, 60000, Ct);
 
         Assert.Equal("40001", drawn);
         Assert.Equal(4, db.Commands[0].Parameters["Type"]);
         Assert.Equal("CountAnimalsByHistologyRef", db.Commands[1].Text);
         Assert.EndsWith("/40001", (string)db.Commands[1].Parameters["HistologyRef"]!);
+    }
+
+    [Fact]
+    public async Task DrawNextRef_DrawnNumberPastTheRange_IsReturnedWithoutSkippingOnThroughTheNextType()
+    {
+        var db = new FakeDb
+        {
+            OnExecute = c => { if (c.Text == "GetNextHistologyRef") c.Command.Parameters["NextHistologyRef"].Value = "60000"; },
+            ScalarResult = 1,
+        };
+
+        Assert.Equal("60000", await new HistologyRepository(db).DrawNextRefAsync(4, 60000, Ct));
+        Assert.Single(db.Commands);
     }
 
     [Theory]
@@ -155,7 +182,7 @@ public class HistologyRepositoryTests
             OnExecute = c => { if (c.Text == "GetNextHistologyRef") c.Command.Parameters["NextHistologyRef"].Value = next; },
         };
 
-        Assert.Null(await new HistologyRepository(db).DrawNextRefAsync(4, Ct));
+        Assert.Null(await new HistologyRepository(db).DrawNextRefAsync(4, 60000, Ct));
         Assert.Single(db.Commands);
     }
 
@@ -168,7 +195,7 @@ public class HistologyRepositoryTests
             ScalarResult = 1,
         };
 
-        Assert.Null(await new HistologyRepository(db).DrawNextRefAsync(4, Ct));
+        Assert.Null(await new HistologyRepository(db).DrawNextRefAsync(4, 60000, Ct));
         Assert.Equal(2000, db.Commands.Count);
     }
 
