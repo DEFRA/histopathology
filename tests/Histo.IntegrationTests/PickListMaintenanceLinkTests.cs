@@ -7,8 +7,11 @@ using Moq;
 namespace Histo.IntegrationTests;
 
 [Collection(HostCollection.Name)]
-public class PickListMaintenanceLinkTests(HistoWebFactory factory)
+public partial class PickListMaintenanceLinkTests(HistoWebFactory factory)
 {
+    [GeneratedRegex("href=\"(/Admin/(?:LookupItems|SpeciesItems)[^\"]*)\"")]
+    private static partial Regex PickListHrefRegex();
+
     [Fact]
     public async Task EditItemsLinks_CarryTheTableId_AndSpeciesUsesItsOwnPage()
     {
@@ -24,7 +27,7 @@ public class PickListMaintenanceLinkTests(HistoWebFactory factory)
         using var client = factory.CreateClientAs(TestUser.Maintenance);
         var html = await client.GetStringAsync("/Admin/PickListMaintenance", TestContext.Current.CancellationToken);
 
-        var hrefs = Regex.Matches(html, "href=\"(/Admin/(?:LookupItems|SpeciesItems)[^\"]*)\"")
+        var hrefs = PickListHrefRegex().Matches(html)
                          .Select(m => m.Groups[1].Value)
                          .ToList();
 
