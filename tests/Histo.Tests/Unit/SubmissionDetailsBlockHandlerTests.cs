@@ -226,6 +226,21 @@ public class SubmissionDetailsBlockHandlerTests
     }
 
     [Fact]
+    public async Task OnPostSaveHistologyDetails_RefAlreadyOnSampleAboveCounter_IsNotRejected()
+    {
+        var sut = CreateSut(new Animal { ID = 1, HistologyRef = $"{Yy}/40020", HistoRefSet = true });
+        GivenCompletedBlock();
+        _histologyRefs.Setup(h => h.GetCountersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<HistologyRefCounter>)[new HistologyRefCounter { Type = 4, NextHistologyRef = "40010" }]);
+        sut.EditHistologyRef = $"{Yy}/40020";
+
+        var result = await sut.OnPostSaveHistologyDetailsAsync();
+
+        Assert.IsNotType<PageResult>(result);
+        Assert.Null(sut.ErrorMessage);
+    }
+
+    [Fact]
     public async Task OnPostSaveHistologyDetails_RefAlreadyUsedElsewhere_ShowsDuplicateError()
     {
         var sut = CreateSut(new Animal { ID = 1 });

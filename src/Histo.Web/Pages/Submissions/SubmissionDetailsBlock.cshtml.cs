@@ -378,7 +378,9 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
             return "Invalid Histology Reference number.";
 
         var histologyType = DetermineHistologyTypeFromRef(refNumber);
-        if (histologyType != 0 && !IsPreviousYearHistoRef(year))
+        var unchanged = string.Equals(histologyRef, currentHistologyRef, StringComparison.OrdinalIgnoreCase);
+        // A ref already on the sample was accepted when assigned; the counter may since have been reset below it.
+        if (histologyType != 0 && !IsPreviousYearHistoRef(year) && !unchanged)
         {
             var counters = await _histologyRefs.GetCountersAsync();
             var counter = counters.FirstOrDefault(c => c.Type == histologyType);
@@ -387,7 +389,7 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         }
 
         // DEFECT-FIX: legacy ValidateData rejected a Histology Ref already held by another sample.
-        if (!string.Equals(histologyRef, currentHistologyRef, StringComparison.OrdinalIgnoreCase)
+        if (!unchanged
             && await _submissions.IsHistologyRefInUseAsync(histologyRef))
             return "The Histology Ref entered already exists. Please enter an alternative reference.";
 
