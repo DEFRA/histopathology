@@ -522,71 +522,9 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
 
         if (ShowHistologyRefTypePicker && HistologyRefType is > 0)
         {
-            string? nextRef;
-            bool isPgNumber;
-            var keepsCurrentRef = false;
-            if (HistologyRefType.Value == HistologyRefTypeCode.UsePgNumber)
-            {
-                // "use pg number" reverses the sample's own PG-format Sender Ref into a Histology
-                // Ref instead of drawing from a type counter — legacy: DefaultHistoRefPGReverse.
-                nextRef = TryReversePgSenderRef(Animal.SenderRef, out var isValidPgFormat);
-                isPgNumber = true;
-                // Legacy: SenderRef.ascx.vb::CheckPGNumber's SetErrorToolTip, shown only when the
-                // Sender Ref doesn't even match the PG format — NOT when it's valid but the year
-                // falls outside the 01-69 reversal window (that case stays a silent no-op).
-                if (!isValidPgFormat)
-                    ErrorMessage = "PG Number Format: PGNNNN/NN";
-            }
-            else if (KeepsCurrentRefForType(Animal, HistologyRefType.Value))
-            {
-                // Legacy ProcessNextHistologyRef filed the current ref as unused, then found it again for the same type.
-                nextRef = Animal.HistologyRef;
-                isPgNumber = false;
-                keepsCurrentRef = true;
-            }
-            else
-            {
-                // A ref this same sample released earlier (e.g. via Back) is reused before drawing a new one.
-                var released = await _histologyRefs.FindReleasedRefForSenderAsync(Animal.SenderRef, HistologyRefType.Value);
-                nextRef = released is not null && !await _submissions.IsHistologyRefInUseAsync(released)
-                    ? released
-                    : await _histologyRefs.GetNextAvailableRefAsync(HistologyRefType.Value);
-                isPgNumber = false;
-                if (nextRef is null)
-                    ErrorMessage = "No histology reference is available for the selected type. " +
-                                   "Check the next available reference for this type on the Edit Histology Reference page.";
-            }
-
-            if (nextRef is not null && !keepsCurrentRef)
-            {
-                var updated = new Animal
-                {
-                    ID = Animal.ID,
-                    BatchSubmissionID = Animal.BatchSubmissionID,
-                    SenderRef = Animal.SenderRef,
-                    NextBlockRef = Animal.NextBlockRef,
-                    HistoRefSet = true,
-                    HistologyRef = nextRef,
-                    OnHold = Animal.OnHold,
-                    PMDate = Animal.PMDate,
-                    PMDateSet = Animal.PMDateSet,
-                    IsPGNumber = isPgNumber,
-                    BookedHistologyRef = Animal.BookedHistologyRef,
-                    RowStamp = Animal.RowStamp,
-                };
-                var saved = await _submissions.UpdateAnimalAsync(updated, Session.UserID);
-                if (saved)
-                {
-                    Animal.HistologyRef = nextRef;
-                    Animal.HistoRefSet = true;
-                    Animal.IsPGNumber = isPgNumber;
-                    HrAssignedThisVisit = true;
-                }
-                else
-                {
-                    ErrorMessage = "The histology reference could not be saved. Please try again.";
-                }
-            }
+            var choice = await ChooseNextHistologyRefAsync(Animal, HistologyRefType.Value);
+            if (choice.NextRef is not null && !choice.KeepsCurrentRef)
+                await SaveAssignedHistologyRefAsync(Animal, choice.NextRef, choice.IsPgNumber);
         }
 
         // The posted HR would otherwise be redisplayed in place of the one just drawn.
@@ -601,6 +539,71 @@ public partial class SubmissionDetailsBlockModel : HistoPageModel
         await LoadSupportingDataAsync();
 
         return Page();
+    }
+
+    private readonly record struct HistologyRefChoice(string? NextRef, bool IsPgNumber, bool KeepsCurrentRef);
+
+    private async Task<HistologyRefChoice> ChooseNextHistologyRefAsync(Animal animal, int histologyType)
+    {
+        if (histologyType == HistologyRefTypeCode.UsePgNumber)
+        {
+            // "use pg number" reverses the sample's own PG-format Sender Ref into a Histology
+            // Ref instead of drawing from a type counter — legacy: DefaultHistoRefPGReverse.
+            var reversed = TryReversePgSenderRef(animal.SenderRef, out var isValidPgFormat);
+            // Legacy: SenderRef.ascx.vb::CheckPGNumber's SetErrorToolTip, shown only when the
+            // Sender Ref doesn't even match the PG format — NOT when it's valid but the year
+            // falls outside the 01-69 reversal window (that case stays a silent no-op).
+            if (!isValidPgFormat)
+                ErrorMessage = "PG Number Format: PGNNNN/NN";
+            return new HistologyRefChoice(reversed, IsPgNumber: true, KeepsCurrentRef: false);
+        }
+
+        if (KeepsCurrentRefForType(animal, histologyType))
+        {
+            // Legacy ProcessNextHistologyRef filed the current ref as unused, then found it again for the same type.
+            return new HistologyRefChoice(animal.HistologyRef, IsPgNumber: false, KeepsCurrentRef: true);
+        }
+
+        // A ref this same sample released earlier (e.g. via Back) is reused before drawing a new one.
+        var released = await _histologyRefs.FindReleasedRefForSenderAsync(animal.SenderRef, histologyType);
+        var nextRef = released is not null && !await _submissions.IsHistologyRefInUseAsync(released)
+            ? released
+            : await _histologyRefs.GetNextAvailableRefAsync(histologyType);
+        if (nextRef is null)
+            ErrorMessage = "No histology reference is available for the selected type. " +
+                           "Check the next available reference for this type on the Edit Histology Reference page.";
+        return new HistologyRefChoice(nextRef, IsPgNumber: false, KeepsCurrentRef: false);
+    }
+
+    private async Task SaveAssignedHistologyRefAsync(Animal animal, string nextRef, bool isPgNumber)
+    {
+        var updated = new Animal
+        {
+            ID = animal.ID,
+            BatchSubmissionID = animal.BatchSubmissionID,
+            SenderRef = animal.SenderRef,
+            NextBlockRef = animal.NextBlockRef,
+            HistoRefSet = true,
+            HistologyRef = nextRef,
+            OnHold = animal.OnHold,
+            PMDate = animal.PMDate,
+            PMDateSet = animal.PMDateSet,
+            IsPGNumber = isPgNumber,
+            BookedHistologyRef = animal.BookedHistologyRef,
+            RowStamp = animal.RowStamp,
+        };
+        var saved = await _submissions.UpdateAnimalAsync(updated, Session.UserID);
+        if (saved)
+        {
+            animal.HistologyRef = nextRef;
+            animal.HistoRefSet = true;
+            animal.IsPGNumber = isPgNumber;
+            HrAssignedThisVisit = true;
+        }
+        else
+        {
+            ErrorMessage = "The histology reference could not be saved. Please try again.";
+        }
     }
 
     private static bool KeepsCurrentRefForType(Animal animal, int histologyType)
