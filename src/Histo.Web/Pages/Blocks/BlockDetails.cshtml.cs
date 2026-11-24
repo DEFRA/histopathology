@@ -479,8 +479,10 @@ public class BlockDetailsModel : HistoPageModel
         // add flow block #1 already exists (auto-created on first load so tissues/tests could be
         // assigned immediately), so this updates that record then creates count-1 more siblings.
         var current = allBlocks.FirstOrDefault(b => b.ID == BlockId);
-        if (current is null || string.IsNullOrWhiteSpace(NewBlockRef))
+        if (current is null)
             return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
+        if (string.IsNullOrWhiteSpace(NewBlockRef))
+            return await RenderEditErrorAsync(EnterBlockRefMessage, postedBlockRef, postedCustomerRef, postedRepeatBlock, postedComment);
 
         // Defense-in-depth for the same rule "Add block" already enforces on OnGetAsync — only for
         // the brand-new-block creation sequence, never when editing an existing/already-completed
@@ -691,6 +693,7 @@ public class BlockDetailsModel : HistoPageModel
     }
 
     private const string DraftKey = "BlockDetails_Draft";
+    private const string EnterBlockRefMessage = "Enter a block reference.";
 
     /// <summary>
     /// Set by the page script when it copies the typed block fields into a tissue form. Needed because an
@@ -740,12 +743,12 @@ public class BlockDetailsModel : HistoPageModel
         var redirect = await LoadAnimalAsync();
         if (redirect is not null) return redirect;
         if (Animal is null || BlockId is not > 0 || TissueId <= 0)
-            return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
+            return OnPostReload();
 
         var existing = (await _submissions.GetTissuesByBlockAsync(BatchId ?? 0, BlockId.Value))
             .FirstOrDefault(t => t.ID == TissueId);
         if (existing is null || string.IsNullOrWhiteSpace(EditTissueCode))
-            return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId });
+            return OnPostReload();
 
         var updated = new Tissue
         {
@@ -766,10 +769,10 @@ public class BlockDetailsModel : HistoPageModel
     }
 
     /// <summary>
-    /// Opens (or, with no <see cref="EditTissueId"/>, closes) the inline tissue editor without losing the
-    /// block fields typed but not yet saved. Saves nothing itself.
+    /// Reloads the page with the posted <see cref="EditTissueId"/> and <see cref="UseWholeTissueList"/> without
+    /// losing the block fields typed but not yet saved. Saves nothing itself.
     /// </summary>
-    public IActionResult OnPostEditTissue()
+    public IActionResult OnPostReload()
     {
         StashDraft();
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, editTissueId = EditTissueId, isAddFlow = IsAddFlow, isFromNextBlock = IsFromNextBlock, useWholeTissueList = UseWholeTissueList, carryTestsToNextBlock = CarryTestsToNextBlock });
@@ -806,8 +809,10 @@ public class BlockDetailsModel : HistoPageModel
 
         var allBlocks = await _blocks.GetByBatchAsync(BatchId ?? 0);
         var current = allBlocks.FirstOrDefault(b => b.ID == BlockId);
-        if (current is null || string.IsNullOrWhiteSpace(NewBlockRef))
+        if (current is null)
             return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow, isFromNextBlock = IsFromNextBlock });
+        if (string.IsNullOrWhiteSpace(NewBlockRef))
+            return await RenderEditErrorAsync(EnterBlockRefMessage, postedBlockRef, postedCustomerRef, postedRepeatBlock, postedComment);
 
         // Legacy btnAddBlock_Click calls the exact same ValidateRequiredData/UpdateBlockDetails/
         // CreateMultiBlocks sequence as btnDone_Click before creating the next block — this is

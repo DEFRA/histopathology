@@ -520,7 +520,7 @@ public class BlockDetailsModelTests
         sut.NewBlockRef = "09";
         sut.EditTissueId = 11;
 
-        var result = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(sut.OnPostEditTissue());
+        var result = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(sut.OnPostReload());
         Assert.Equal(11, result.RouteValues!["editTissueId"]);
         _submissions.Verify(s => s.UpdateTissueAsync(It.IsAny<Tissue>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
 
@@ -529,6 +529,80 @@ public class BlockDetailsModelTests
         await next.OnGetAsync();
 
         Assert.Equal("09", next.NewBlockRef);
+    }
+
+    [Fact]
+    public async Task Reload_SwitchingTheTissueList_KeepsTheTypedBlockRef()
+    {
+        SetupExistingBlock();
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.BlockFieldsPosted = true;
+        sut.NewBlockRef = "09";
+        sut.UseWholeTissueList = true;
+
+        var result = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(sut.OnPostReload());
+        Assert.Equal(true, result.RouteValues!["useWholeTissueList"]);
+
+        var next = CreateSut(animalId: 2, blockId: 319181);
+        next.TempData = sut.TempData;
+        await next.OnGetAsync();
+
+        Assert.Equal("09", next.NewBlockRef);
+    }
+
+    [Fact]
+    public async Task UpdateTissue_TissueNoLongerExists_StillKeepsTheTypedBlockRef()
+    {
+        SetupExistingBlock();
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.BlockFieldsPosted = true;
+        sut.NewBlockRef = "09";
+        sut.TissueId = 11;
+        sut.EditTissueCode = "BRN";
+
+        await sut.OnPostUpdateTissueAsync();
+
+        var next = CreateSut(animalId: 2, blockId: 319181);
+        next.TempData = sut.TempData;
+        await next.OnGetAsync();
+
+        Assert.Equal("09", next.NewBlockRef);
+        _submissions.Verify(s => s.UpdateTissueAsync(It.IsAny<Tissue>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostDoneAsync_EmptyBlockRef_ShowsAnErrorAndKeepsThePostedFields()
+    {
+        SetupExistingBlock();
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewBlockRef = "";
+        sut.NewCustomerRef = "CUST";
+        sut.SelectedHistologyCodes = [HistologyCode.HAndE];
+
+        var result = await sut.OnPostDoneAsync();
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RazorPages.PageResult>(result);
+        Assert.Equal("Enter a block reference.", sut.ErrorMessage);
+        Assert.Equal("", sut.NewBlockRef);
+        Assert.Equal("CUST", sut.NewCustomerRef);
+        _blocks.Verify(b => b.UpdateBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostNextBlockAsync_EmptyBlockRef_ShowsAnErrorAndKeepsThePostedFields()
+    {
+        SetupExistingBlock();
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewBlockRef = " ";
+        sut.NewComment = "typed";
+        sut.SelectedHistologyCodes = [HistologyCode.HAndE];
+
+        var result = await sut.OnPostNextBlockAsync();
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RazorPages.PageResult>(result);
+        Assert.Equal("Enter a block reference.", sut.ErrorMessage);
+        Assert.Equal("typed", sut.NewComment);
+        _blocks.Verify(b => b.UpdateBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
