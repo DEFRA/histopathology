@@ -588,6 +588,49 @@ public class BlockDetailsModelTests
         _blocks.Verify(b => b.UpdateBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Theory]
+    [InlineData("5", 1, "Enter a block reference of 2 digits (01 to 99) or 3 digits (100 to 999).")]
+    [InlineData("00", 1, "Enter a block reference of 2 digits (01 to 99) or 3 digits (100 to 999).")]
+    [InlineData("012", 1, "Enter a block reference of 2 digits (01 to 99) or 3 digits (100 to 999).")]
+    [InlineData("ab", 1, "Enter a block reference of 2 digits (01 to 99) or 3 digits (100 to 999).")]
+    [InlineData("998", 3, "Adding the required blocks will take the Block Ref above 999. Any sample is only allowed a maximum of 999 blocks.")]
+    public async Task OnPostDoneAsync_InvalidBlockRef_ShowsTheLegacyErrorAndSavesNothing(string blockRef, int count, string expected)
+    {
+        SetupExistingBlock();
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 11, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewBlockRef = blockRef;
+        sut.NewNumberOfBlocks = count;
+        sut.SelectedHistologyCodes = [HistologyCode.HAndE];
+
+        var result = await sut.OnPostDoneAsync();
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.RazorPages.PageResult>(result);
+        Assert.Equal(expected, sut.ErrorMessage);
+        Assert.Equal(blockRef, sut.NewBlockRef);
+        _blocks.Verify(b => b.UpdateBlockAsync(It.IsAny<Block>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnPostDoneAsync_BlockRef997WithThreeBlocks_IsWithinTheLimit()
+    {
+        SetupExistingBlock();
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 11, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.NewBlockRef = "997";
+        sut.NewNumberOfBlocks = 3;
+        sut.SelectedHistologyCodes = [HistologyCode.HAndE];
+
+        await sut.OnPostDoneAsync();
+
+        Assert.Null(sut.ErrorMessage);
+        _blocks.Verify(b => b.UpdateBlockAsync(It.Is<Block>(x => x.BlockRef == "997"), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     [Fact]
     public async Task OnPostNextBlockAsync_EmptyBlockRef_ShowsAnErrorAndKeepsThePostedFields()
     {

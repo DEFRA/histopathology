@@ -152,6 +152,8 @@ else
 
     @if (Model.Block is not null)
     {
+        // Legacy TissuesPager_EditModeStart: these stay disabled until the tissue is saved or cancelled.
+        var editingTissue = Model.EditTissueId is > 0 && Model.Tissues.Any(t => t.ID == Model.EditTissueId);
         @* Every tissue action and the tissue-list switch keep the block fields typed above (see the script below). *@
         <div class="govuk-warning-text">
             <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
@@ -276,14 +278,14 @@ else
                 {
                     <div class="govuk-hint">
                         Showing every tissue type.
-                        <button type="submit" form="tissue-list-toggle-form" class="app-link-button">Show only tissues used on this submission</button>
+                        <button type="submit" form="tissue-list-toggle-form" class="app-link-button" disabled="@editingTissue">Show only tissues used on this submission</button>
                     </div>
                 }
                 else
                 {
                     <div class="govuk-hint">
                         Showing only tissue types already used on this submission.
-                        <button type="submit" form="tissue-list-toggle-form" class="app-link-button">Show the entire tissue list</button>
+                        <button type="submit" form="tissue-list-toggle-form" class="app-link-button" disabled="@editingTissue">Show the entire tissue list</button>
                     </div>
                 }
                 <select class="govuk-select" asp-for="NewTissueCode">
@@ -401,22 +403,30 @@ else
             <textarea class="govuk-textarea" asp-for="NewComment" rows="3" form="block-details-form"></textarea>
         </div>
 
+        @if (editingTissue)
+        {
+            <p class="govuk-body" id="tissue-editing-hint">Save or cancel the tissue you are editing before you select Done, Next block or Cancel.</p>
+        }
         <div class="govuk-button-group">
-            <button type="submit" form="block-details-form" class="govuk-button" data-module="govuk-button">Done</button>
+            <button type="submit" form="block-details-form" class="govuk-button" data-module="govuk-button" disabled="@editingTissue" aria-disabled="@(editingTissue ? "true" : null)">Done</button>
             @* formaction routes this button's submit of block-details-form to NextBlock instead of
                the form's default Done handler — the live Tests checkboxes above (form="block-details-form")
                are then genuinely part of this submission instead of a separate, stale snapshot.
                Placed after Done (not before) so Done — the primary action — stays the browser's
                implicit-Enter-key default for this form; GOV.UK convention also lists the primary
                action first. *@
-            <button type="submit" form="block-details-form" formaction="?handler=NextBlock" class="govuk-button govuk-button--secondary" data-module="govuk-button">Next block</button>
+            <button type="submit" form="block-details-form" formaction="?handler=NextBlock" class="govuk-button govuk-button--secondary" data-module="govuk-button" disabled="@editingTissue" aria-disabled="@(editingTissue ? "true" : null)">Next block</button>
             @* Explicit, labelled discard action alongside Done/Next block — matches every other
                form page in this app (Cancel button next to the primary action) and the Help page's
                own documented text ("Select Cancel to discard the data..."), rather than relying on
                the ambiguous top-of-page Back link alone. *@
             @if (Model.IsAddFlow)
             {
-                <button type="submit" form="cancel-add-block-form" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</button>
+                <button type="submit" form="cancel-add-block-form" class="govuk-button govuk-button--secondary" data-module="govuk-button" disabled="@editingTissue" aria-disabled="@(editingTissue ? "true" : null)">Cancel</button>
+            }
+            else if (editingTissue)
+            {
+                <button type="button" class="govuk-button govuk-button--secondary" data-module="govuk-button" disabled aria-disabled="true">Cancel</button>
             }
             else
             {

@@ -533,6 +533,12 @@ public class BlockDetailsModel : HistoPageModel
     /// </summary>
     private async Task<string?> SaveCurrentBlockDetailsAsync(Block current, IReadOnlyList<Block> allBlocks, Animal animal)
     {
+        // Legacy: revBlockRef (ValidateBlockRefRef) and ValidateRequiredData's 999 limit.
+        if (!SenderRefHelpers.IsValidBlockRef(NewBlockRef!))
+            return "Enter a block reference of 2 digits (01 to 99) or 3 digits (100 to 999).";
+        if (int.Parse(NewBlockRef!, System.Globalization.CultureInfo.InvariantCulture) + Math.Max(1, NewNumberOfBlocks) > 1000)
+            return "Adding the required blocks will take the Block Ref above 999. Any sample is only allowed a maximum of 999 blocks.";
+
         // A block with nothing assigned to it isn't a usable result — require at least one
         // tissue (unless it's a repeat block, legacy: "If chkRepeatBlock.Checked = False Then
         // ... dtView.Count = 0" exemption) before either Done or Next Block can proceed (also
