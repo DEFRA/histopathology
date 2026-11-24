@@ -480,19 +480,14 @@ public static class HistologyReportRenderer
     {
         t.ColumnsDefinition(c =>
         {
-            c.RelativeColumn(10); // 1  Sender Ref
-            c.RelativeColumn(9);  // 2  Histology Ref
+            c.RelativeColumn(11); // 1  Sender Ref
+            c.RelativeColumn(10); // 2  Histology Ref
             c.RelativeColumn(6);  // 3  Block Ref
-            c.RelativeColumn(9);  // 4  Tissue Code
-            c.RelativeColumn(6);  // 5  Block      (blank)
-            c.RelativeColumn(5);  // 6  Cass       (blank)
-            c.RelativeColumn(6);  // 7  Embed      (blank)
-            c.RelativeColumn(6);  // 8  Section    (blank)
-            c.RelativeColumn(7);  // 9  Block Filed (blank)
-            c.RelativeColumn(6);  // 10 Stain      (blank)
-            c.RelativeColumn(6);  // 11 QC Code    (blank)
-            c.RelativeColumn(14); // 12 Comments   (CustomerRef)
-            c.RelativeColumn(10); // 13 Dispatch   (blank)
+            c.RelativeColumn(11); // 4  Tissue Code
+            // 5–11 and 13 are initial/date boxes — equal width so each stage has the same room.
+            for (var i = 0; i < 7; i++) c.RelativeColumn(SignOffColumnWidth); // 5–11 Block..QC Code
+            c.RelativeColumn(16); // 12 Comments   (CustomerRef)
+            c.RelativeColumn(SignOffColumnWidth); // 13 Dispatch   (blank)
         });
 
         t.Header(h =>
@@ -502,7 +497,7 @@ public static class HistologyReportRenderer
                  .Background(Colors.Grey.Lighten3)
                  .Border(0.5f)
                  .PaddingVertical(2).PaddingHorizontal(2)
-                 .Text(label).Bold().FontSize(7.5f);
+                 .Text(label).Bold().FontSize(9);
         });
 
         DataRow? prevRow = null;
@@ -531,6 +526,8 @@ public static class HistologyReportRenderer
         }
     }
 
+    private const float SignOffColumnWidth = 8;
+
     private static readonly string[] SubmissionHeaders =
     [
         "Sender Ref", "Histology\nRef", "Block\nRef", "Tissue\nCode", "Block", "Cass", "Embed",
@@ -540,7 +537,7 @@ public static class HistologyReportRenderer
     private static void AddCell(TableDescriptor t, string value) =>
         t.Cell().Border(0.5f)
          .PaddingVertical(2).PaddingHorizontal(2)
-         .Text(value).FontSize(8);
+         .Text(value).FontSize(10);
 
     // ── Private helpers ──────────────────────────────────────────────────────────
 
