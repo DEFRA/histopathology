@@ -483,11 +483,11 @@ public static class HistologyReportRenderer
             c.RelativeColumn(11); // 1  Sender Ref
             c.RelativeColumn(10); // 2  Histology Ref
             c.RelativeColumn(6);  // 3  Block Ref
-            c.RelativeColumn(11); // 4  Tissue Code
-            // 5–11 and 13 are initial/date boxes — equal width so each stage has the same room.
+            c.RelativeColumn(9);  // 4  Tissue Code
+            // 5–11 are initial/date boxes — equal width (~53pt, as legacy).
             for (var i = 0; i < 7; i++) c.RelativeColumn(SignOffColumnWidth); // 5–11 Block..QC Code
-            c.RelativeColumn(16); // 12 Comments   (CustomerRef)
-            c.RelativeColumn(SignOffColumnWidth); // 13 Dispatch   (blank)
+            c.RelativeColumn(17); // 12 Comments   (CustomerRef)
+            c.RelativeColumn(10); // 13 Dispatch   (legacy is slightly wider than the other boxes)
         });
 
         t.Header(h =>
@@ -497,7 +497,7 @@ public static class HistologyReportRenderer
                  .Background(Colors.Grey.Lighten3)
                  .Border(0.5f)
                  .PaddingVertical(2).PaddingHorizontal(2)
-                 .Text(label).Bold().FontSize(9);
+                 .Text(label).Bold().FontSize(9.65f);
         });
 
         DataRow? prevRow = null;
@@ -537,7 +537,7 @@ public static class HistologyReportRenderer
     private static void AddCell(TableDescriptor t, string value) =>
         t.Cell().Border(0.5f)
          .PaddingVertical(2).PaddingHorizontal(2)
-         .Text(value).FontSize(10);
+         .Text(value).FontSize(9.65f);
 
     // ── Private helpers ──────────────────────────────────────────────────────────
 
