@@ -107,9 +107,8 @@ else
             @* "Or Pick" — assigns the next unused histology ref for a type and saves it immediately.
                Histopath-user-area-only, matching legacy's Session(SV_HeaderUserArea)="Histopath" gate —
                see Model.ShowHistologyRefTypePicker. Always enabled, even once a ref is already set — a
-               Histopath user can re-pick a type at any time to change the Histology Ref. The select/button
-               submit the separate hidden "get-next-histology-ref-form" below via the form="" attribute,
-               so picking a type saves independently of "Save details". *@
+               Histopath user can re-pick a type at any time to change the Histology Ref. The button posts
+               this same form to the pick handler (formaction) so a typed PM date is kept, as in legacy. *@
             @if (Model.ShowHistologyRefTypePicker)
             {
                 <div class="govuk-grid-column-one-half">
@@ -119,7 +118,7 @@ else
                         {
                             <div class="govuk-hint">Mandatory for pre-cassetted submissions.</div>
                         }
-                        <select class="govuk-select" asp-for="HistologyRefType" form="get-next-histology-ref-form">
+                        <select class="govuk-select" asp-for="HistologyRefType">
                             <option value="">-- Select --</option>
                             @foreach (var t in Model.HistologyRefTypeOptions)
                             {
@@ -127,7 +126,7 @@ else
                             }
                         </select>
                     </div>
-                    <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button" form="get-next-histology-ref-form">Get next ref</button>
+                    <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-page-handler="GetNextHistologyRef" formnovalidate>Get next ref</button>
                 </div>
             }
         </div>
@@ -136,15 +135,6 @@ else
             <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Save details</button>
         }
     </form>
-
-    @if (Model.ShowHistologyRefTypePicker)
-    {
-        <form method="post" asp-page-handler="GetNextHistologyRef" id="get-next-histology-ref-form" class="govuk-visually-hidden">
-            <input type="hidden" name="BatchId" value="@Model.BatchId" />
-            <input type="hidden" name="HrAssignedThisVisit" value="@(Model.HrAssignedThisVisit ? "true" : "false")" />
-            <input type="hidden" name="AnimalId" value="@Model.AnimalId" />
-        </form>
-    }
 
     <h2 class="govuk-heading-m">Blocks</h2>
 

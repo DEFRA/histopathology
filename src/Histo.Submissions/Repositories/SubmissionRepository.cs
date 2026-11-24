@@ -456,9 +456,9 @@ public sealed class SubmissionRepository : ISubmissionRepository
     /// <summary>
     /// Draws the next histology ref for a type inside the copy transaction, so a rollback returns
     /// the counter rather than permanently skipping the claimed numbers. Mirrors
-    /// <c>HistologyRefService.GetNextAvailableRefAsync</c> — this year's lowest pre-booked-unused
-    /// ref first, then the <c>GetNextHistologyRef</c> SP — duplicated because this module can't
-    /// reference Histo.Histology.
+    /// <c>HistologyRefService.GetNextAvailableRefAsync</c> — counter only via the
+    /// <c>GetNextHistologyRef</c> SP, never the unused pool (legacy <c>CopyBlocks.aspx.vb</c>) —
+    /// duplicated because this module can't reference Histo.Histology.
     /// </summary>
     private static async Task<string?> DrawHistologyRefAsync(IDbConnection conn, IDbTransaction tx, int? histologyType)
     {
@@ -475,20 +475,17 @@ public sealed class SubmissionRepository : ISubmissionRepository
         };
         if (upper == 0) return null;
 
-        // Legacy GetUnusedHistologyRefs returns the whole pool, so the year/range filter is applied here. The row is
-        // not locked; a concurrent copy taking the same ref is rejected by AddAnimal (return 2) and rolls back.
-        var pool = await conn.QueryAsync<string>(
-            "GetUnusedHistologyRefs",
-            transaction: tx,
-            commandType: System.Data.CommandType.StoredProcedure);
-        var pooled = pool
-            .Where(Histo.Core.Domain.HistologyRefHelpers.IsCurrentYear)
-            .Select(r => r.Trim())
-            .Where(r => Histo.Core.Domain.HistologyRefHelpers.RefNumber(r) >= lower && Histo.Core.Domain.HistologyRefHelpers.RefNumber(r) < upper)
-            .OrderBy(Histo.Core.Domain.HistologyRefHelpers.RefNumber)
-            .FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(pooled)) return pooled;
+        // The SP advances the counter whatever it hands back, so refuse before drawing once the type is
+        // exhausted — otherwise each copy would push the counter further out of its range.
+        var counters = await conn.QueryAsync("GetHistologyRefs", transaction: tx, commandType: System.Data.CommandType.StoredProcedure);
+        var counterRow = counters.Cast<IDictionary<string, object>>()
+            .FirstOrDefault(r => r.TryGetValue("Type", out var t) && Convert.ToInt32(t) == histologyType.Value);
+        var current = counterRow is not null && counterRow.TryGetValue("NextHistologyRef", out var currentValue)
+            ? Convert.ToString(currentValue)?.Trim()
+            : null;
+        if (!int.TryParse(current, out var currentNumber) || currentNumber < lower || currentNumber >= upper) return null;
 
+        // The counter row is not locked; a concurrent copy taking the same ref is rejected by AddAnimal (return 2) and rolls back.
         var p = new DynamicParameters();
         p.Add("Type", histologyType.Value, dbType: System.Data.DbType.Int32);
         p.Add("NextHistologyRef", dbType: System.Data.DbType.String, size: 5, direction: System.Data.ParameterDirection.Output);

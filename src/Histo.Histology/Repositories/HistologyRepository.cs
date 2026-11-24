@@ -87,6 +87,25 @@ public sealed class HistologyRepository : IHistologyRepository
     }
 
     /// <inheritdoc/>
+    public async Task<IReadOnlyList<HistologyRef>> GetReleasedRefsForSenderAsync(string senderRef, string yearPrefix, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        var rows = await conn.QueryAsync(
+            "SELECT HistologyRef, SenderRef FROM UnUsedHistologyRefs WHERE Used = 0 AND HistologyRef LIKE @Prefix + '%' AND CHARINDEX(@SenderRef, SenderRef) > 0",
+            new { Prefix = yearPrefix, SenderRef = senderRef });
+
+        return rows.Select(r =>
+        {
+            var row = (IDictionary<string, object>)r;
+            return new HistologyRef
+            {
+                Ref = row.TryGetValue("HistologyRef", out var refVal) && refVal is not DBNull ? Convert.ToString(refVal)?.Trim() ?? string.Empty : string.Empty,
+                SenderRef = row.TryGetValue("SenderRef", out var senderVal) && senderVal is not DBNull ? Convert.ToString(senderVal) : null,
+            };
+        }).ToList();
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<HistologyRefCounter>> GetCountersAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
@@ -107,7 +126,7 @@ public sealed class HistologyRepository : IHistologyRepository
     }
 
     /// <inheritdoc/>
-    public async Task<string?> DrawNextRefAsync(int histologyType, CancellationToken ct = default)
+    public async Task<string?> DrawNextRefAsync(int histologyType, int upperExclusive, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
 
@@ -128,6 +147,11 @@ public sealed class HistologyRepository : IHistologyRepository
             if (string.IsNullOrWhiteSpace(next)) return null;
 
             var drawn = next.Trim();
+
+            // Past the type's range: hand it back for the caller to refuse rather than skip on through
+            // numbers that belong to the next type, which would drag the counter out of its range.
+            if (int.TryParse(drawn, out var number) && number >= upperExclusive) return drawn;
+
             var taken = await conn.ExecuteScalarAsync<int>(
                 "CountAnimalsByHistologyRef",
                 new { HistologyRef = Histo.Core.Domain.HistologyRefHelpers.ForCurrentYear(drawn) },
