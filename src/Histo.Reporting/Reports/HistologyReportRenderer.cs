@@ -480,14 +480,14 @@ public static class HistologyReportRenderer
     {
         t.ColumnsDefinition(c =>
         {
-            c.RelativeColumn(11); // 1  Sender Ref
-            c.RelativeColumn(10); // 2  Histology Ref
-            c.RelativeColumn(6);  // 3  Block Ref
-            c.RelativeColumn(9);  // 4  Tissue Code
-            // 5–11 are initial/date boxes — equal width (~53pt, as legacy).
+            // Widths in points measured from the legacy form (total 797pt); scaled to the page.
+            c.RelativeColumn(71.75f); // 1  Sender Ref
+            c.RelativeColumn(66f);    // 2  Histology Ref
+            c.RelativeColumn(42f);    // 3  Block Ref
+            c.RelativeColumn(61f);    // 4  Tissue Code
             for (var i = 0; i < 7; i++) c.RelativeColumn(SignOffColumnWidth); // 5–11 Block..QC Code
-            c.RelativeColumn(17); // 12 Comments   (CustomerRef)
-            c.RelativeColumn(10); // 13 Dispatch   (legacy is slightly wider than the other boxes)
+            c.RelativeColumn(114f);   // 12 Comments   (CustomerRef)
+            c.RelativeColumn(65.25f); // 13 Dispatch
         });
 
         t.Header(h =>
@@ -526,7 +526,7 @@ public static class HistologyReportRenderer
         }
     }
 
-    private const float SignOffColumnWidth = 8;
+    private const float SignOffColumnWidth = 53.9f;
 
     private static readonly string[] SubmissionHeaders =
     [
@@ -535,7 +535,7 @@ public static class HistologyReportRenderer
     ];
 
     private static void AddCell(TableDescriptor t, string value) =>
-        t.Cell().Border(0.5f)
+        t.Cell().Border(0.5f).MinHeight(16.75f)
          .PaddingVertical(2).PaddingHorizontal(2)
          .Text(value).FontSize(9.65f);
 
