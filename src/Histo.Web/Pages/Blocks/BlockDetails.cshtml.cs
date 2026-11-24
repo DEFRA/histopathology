@@ -761,7 +761,18 @@ public class BlockDetailsModel : HistoPageModel
         };
         await _submissions.UpdateTissueAsync(updated, Session.UserID);
         await _batches.RefreshAllTissuesAssignedAsync(BatchId ?? 0, Session.UserID);
+        StashDraft();
         return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, isAddFlow = IsAddFlow, isFromNextBlock = IsFromNextBlock, useWholeTissueList = UseWholeTissueList, carryTestsToNextBlock = CarryTestsToNextBlock });
+    }
+
+    /// <summary>
+    /// Opens (or, with no <see cref="EditTissueId"/>, closes) the inline tissue editor without losing the
+    /// block fields typed but not yet saved. Saves nothing itself.
+    /// </summary>
+    public IActionResult OnPostEditTissue()
+    {
+        StashDraft();
+        return RedirectToPage(new { batchId = BatchId, animalId = AnimalId, blockId = BlockId, editTissueId = EditTissueId, isAddFlow = IsAddFlow, isFromNextBlock = IsFromNextBlock, useWholeTissueList = UseWholeTissueList, carryTestsToNextBlock = CarryTestsToNextBlock });
     }
 
     /// <summary>

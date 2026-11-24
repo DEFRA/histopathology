@@ -152,13 +152,13 @@ else
 
     @if (Model.Block is not null)
     {
-        @* Add and Delete tissue keep the block fields typed above (see the script below). Edit tissue,
-           Save tissue and Cancel reload from the saved block, so unsaved changes are discarded there. *@
+        @* Tissue Add/Edit/Save/Delete keep the block fields typed above (see the script below); links that
+           reload the page read from the saved block, so unsaved changes are discarded there. *@
         <div class="govuk-warning-text">
             <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
             <strong class="govuk-warning-text__text">
                 <span class="govuk-visually-hidden">Warning</span>
-                Adding or deleting a tissue keeps your changes to this block. Editing a tissue, or selecting a link that reloads the page, discards unsaved changes to Block ref, Number of blocks, Customer reference, Comments or Tests unless you select Done first.
+                Adding, editing or deleting a tissue keeps your changes to this block. Selecting a link that reloads the page discards unsaved changes to Block ref, Number of blocks, Customer reference, Comments or Tests unless you select Done first.
             </strong>
         </div>
 
@@ -178,14 +178,14 @@ else
                     {
                         <tr class="govuk-table__row">
                             <td class="govuk-table__cell" colspan="3">
-                                <form method="post" asp-page-handler="UpdateTissue">
+                                <form method="post" asp-page-handler="UpdateTissue" data-keep-block-fields>
                                     <input type="hidden" asp-for="BatchId" />
                                     <input type="hidden" asp-for="AnimalId" />
                                     <input type="hidden" asp-for="BlockId" />
                                     <input type="hidden" asp-for="IsAddFlow" />
                                     <input type="hidden" asp-for="IsFromNextBlock" />
                                     <input type="hidden" asp-for="UseWholeTissueList" />
-                                    <input type="hidden" name="CarryTestsToNextBlock" value="@(Model.CarryTestsToNextBlock ? "true" : "false")" />
+                                    <partial name="_BlockCarryFields" model="Model" />
                                     <input type="hidden" asp-for="TissueId" />
                                     <div class="govuk-form-group">
                                         <label class="govuk-label" for="EditTissueCode">Tissue type</label>
@@ -202,7 +202,8 @@ else
                                     </div>
                                     <div class="govuk-button-group">
                                         <button type="submit" class="govuk-button" data-module="govuk-button">Save tissue</button>
-                                        <a asp-page="/Blocks/BlockDetails" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-BlockId="@Model.BlockId" asp-route-IsAddFlow="@Model.IsAddFlow" asp-route-IsFromNextBlock="@Model.IsFromNextBlock" asp-route-UseWholeTissueList="@Model.UseWholeTissueList" asp-route-CarryTestsToNextBlock="@Model.CarryTestsToNextBlock" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</a>
+                                        @* No EditTissueId is posted, so EditTissue closes the editor. *@
+                                        <button type="submit" formaction="?handler=EditTissue" formnovalidate class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</button>
                                     </div>
                                 </form>
                             </td>
@@ -215,10 +216,19 @@ else
                             <td class="govuk-table__cell">@t.NoPieces</td>
                             <td class="govuk-table__cell">
                                 <div class="govuk-button-group govuk-!-margin-bottom-0">
-                                    <a asp-page="/Blocks/BlockDetails" asp-route-BatchId="@Model.BatchId" asp-route-AnimalId="@Model.AnimalId" asp-route-BlockId="@Model.BlockId"
-                                       asp-route-EditTissueId="@t.ID" asp-route-IsAddFlow="@Model.IsAddFlow" asp-route-IsFromNextBlock="@Model.IsFromNextBlock" asp-route-UseWholeTissueList="@Model.UseWholeTissueList" asp-route-CarryTestsToNextBlock="@Model.CarryTestsToNextBlock" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Edit</a>
-                                    @* display:contents removes the form from the flex layout so the button
-                                       itself is the flex item, aligning it with the Edit link. *@
+                                    @* display:contents removes the forms from the flex layout so the buttons
+                                       themselves are the flex items and sit side by side. *@
+                                    <form method="post" asp-page-handler="EditTissue" style="display:contents" data-keep-block-fields>
+                                        <input type="hidden" name="BatchId" value="@Model.BatchId" />
+                                        <input type="hidden" name="AnimalId" value="@Model.AnimalId" />
+                                        <input type="hidden" name="BlockId" value="@Model.BlockId" />
+                                        <input type="hidden" name="IsAddFlow" value="@(Model.IsAddFlow ? "true" : "false")" />
+                                        <input type="hidden" name="IsFromNextBlock" value="@(Model.IsFromNextBlock ? "true" : "false")" />
+                                        <input type="hidden" name="UseWholeTissueList" value="@(Model.UseWholeTissueList ? "true" : "false")" />
+                                        <partial name="_BlockCarryFields" model="Model" />
+                                        <input type="hidden" name="EditTissueId" value="@t.ID" />
+                                        <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Edit</button>
+                                    </form>
                                     <form method="post" asp-page-handler="DeleteTissue" style="display:contents" data-keep-block-fields>
                                         <input type="hidden" name="BatchId" value="@Model.BatchId" />
                                         <input type="hidden" name="AnimalId" value="@Model.AnimalId" />
@@ -407,7 +417,7 @@ else
 
 @section Scripts {
     <script>
-        // Add/Delete tissue are separate forms from block-details-form, so copy the block fields the
+        // The tissue forms are separate from block-details-form, so copy the block fields the
         // user has typed into them on submit; BlockDetailsModel stashes them and restores them after the redirect.
         (function () {
             var main = document.getElementById('block-details-form');

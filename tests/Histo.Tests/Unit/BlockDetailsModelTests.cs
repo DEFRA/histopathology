@@ -487,6 +487,51 @@ public class BlockDetailsModelTests
     }
 
     [Fact]
+    public async Task UpdateTissue_KeepsTheTypedBlockRefAcrossTheRedirect()
+    {
+        SetupExistingBlock();
+        _submissions.Setup(s => s.GetTissuesByBlockAsync(5, 319181, It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<Tissue>)[
+            new Tissue { ID = 11, OwnerID = 319181, Owner = TissueOwner.Block, TissueCode = "AGAR", NoPieces = 1 },
+        ]);
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.BlockFieldsPosted = true;
+        sut.NewBlockRef = "09";
+        sut.NewNumberOfBlocks = 2;
+        sut.TissueId = 11;
+        sut.EditTissueCode = "BRN";
+        sut.EditNoPieces = 2;
+
+        await sut.OnPostUpdateTissueAsync();
+
+        var next = CreateSut(animalId: 2, blockId: 319181);
+        next.TempData = sut.TempData;
+        await next.OnGetAsync();
+
+        Assert.Equal("09", next.NewBlockRef);
+        Assert.Equal(2, next.NewNumberOfBlocks);
+    }
+
+    [Fact]
+    public async Task EditTissue_OpensTheEditorKeepingTheTypedBlockRef()
+    {
+        SetupExistingBlock();
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+        sut.BlockFieldsPosted = true;
+        sut.NewBlockRef = "09";
+        sut.EditTissueId = 11;
+
+        var result = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(sut.OnPostEditTissue());
+        Assert.Equal(11, result.RouteValues!["editTissueId"]);
+        _submissions.Verify(s => s.UpdateTissueAsync(It.IsAny<Tissue>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        var next = CreateSut(animalId: 2, blockId: 319181);
+        next.TempData = sut.TempData;
+        await next.OnGetAsync();
+
+        Assert.Equal("09", next.NewBlockRef);
+    }
+
+    [Fact]
     public async Task OnPostNextBlockAsync_CurrentBlockHasNoTissues_ShowsTheSaveErrorAndKeepsThePostedFields()
     {
         SetupExistingBlock();
