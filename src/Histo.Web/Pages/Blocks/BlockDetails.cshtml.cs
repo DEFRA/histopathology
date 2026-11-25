@@ -5,6 +5,7 @@ using Histo.Histology.Interfaces;
 using Histo.Histology.Models;
 using Histo.Submissions.Interfaces;
 using Histo.Submissions.Models;
+using Histo.Web.Pages.Batches;
 using Histo.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -1047,8 +1048,11 @@ public class BlockDetailsModel : HistoPageModel
         var allowedStains = batchDefaults.Stains.Select(r => r.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         HistologyOptions = fullHistologyOptions.Where(o => o.Code is not null && allowedHistology.Contains(o.Code)).ToList();
-        AntibodyOptions = fullAntibodyOptions.Where(o => o.Code is not null && allowedAntibodies.Contains(o.Code)).ToList();
-        StainOptions = fullStainOptions.Where(o => o.Code is not null && allowedStains.Contains(o.Code)).ToList();
+        // Legacy LoadCheckBoxLists appended "Other" before HideTests filtered, so a submission-level "Other" stays tickable.
+        AntibodyOptions = BatchTestListOptions.EnsureOtherOption(fullAntibodyOptions)
+            .Where(o => o.Code is not null && allowedAntibodies.Contains(o.Code)).ToList();
+        StainOptions = BatchTestListOptions.EnsureOtherOption(fullStainOptions)
+            .Where(o => o.Code is not null && allowedStains.Contains(o.Code)).ToList();
     }
 
     /// <summary>Resolves <see cref="Animal"/> from the URL's batch/animal ID.</summary>

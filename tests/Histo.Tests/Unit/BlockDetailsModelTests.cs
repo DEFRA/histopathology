@@ -373,6 +373,47 @@ public class BlockDetailsModelTests
     }
 
     [Fact]
+    public async Task TestOptions_SubmissionChoseOther_OffersOtherForAntibodiesAndStains()
+    {
+        SetupExistingBlock();
+        _lookups.Setup(l => l.GetLookupDataAsync(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[
+            new LookupItem { Code = "AB01", Name = "Antibody 1" },
+        ]);
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Histo.Submissions.Models.BatchTestSelections
+        {
+            Histology = [new BatchTestSelectionRow { ID = 1, BatchID = 5, Code = HistologyCode.IhcOther }],
+            Antibodies = [new BatchTestSelectionRow { ID = 2, BatchID = 5, Code = "Other" }],
+            Stains = [new BatchTestSelectionRow { ID = 3, BatchID = 5, Code = "Other" }],
+        });
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+
+        await sut.OnGetAsync();
+
+        Assert.Equal(["Other"], sut.AntibodyOptions.Select(o => o.Code));
+        Assert.Equal(["Other"], sut.StainOptions.Select(o => o.Code));
+    }
+
+    [Fact]
+    public async Task TestOptions_SubmissionDidNotChooseOther_DoesNotOfferIt()
+    {
+        SetupExistingBlock();
+        _lookups.Setup(l => l.GetLookupDataAsync(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<LookupItem>)[
+            new LookupItem { Code = "AB01", Name = "Antibody 1" },
+        ]);
+        _batches.Setup(b => b.GetBatchTestSelectionsAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new Histo.Submissions.Models.BatchTestSelections
+        {
+            Histology = [new BatchTestSelectionRow { ID = 1, BatchID = 5, Code = HistologyCode.IhcOther }],
+            Antibodies = [new BatchTestSelectionRow { ID = 2, BatchID = 5, Code = "AB01" }],
+        });
+        var sut = CreateSut(animalId: 2, blockId: 319181);
+
+        await sut.OnGetAsync();
+
+        Assert.Equal(["AB01"], sut.AntibodyOptions.Select(o => o.Code));
+        Assert.Empty(sut.StainOptions);
+    }
+
+    [Fact]
     public async Task OnGetAsync_AddMode_PersistsBatchDefaultsForTheNewBlock()
     {
         _session.Setup(s => s.UserArea).Returns("Neuropath");
