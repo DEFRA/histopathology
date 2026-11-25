@@ -117,10 +117,12 @@ public static class HistologyReportRenderer
                     foot.Spacing(0);
 
                     // ── Section 3 — 4-panel bottom row ───────────────────────────
-                    foot.Item().Border(1).Row(panels =>
+                    foot.Item().Row(panels =>
                     {
+                        // Separate boxed panels with a gap, as in the legacy form (was one joined box).
+                        panels.Spacing(6);
                         // ── Panel A — Histology Required ──────────────────────
-                        panels.RelativeItem(30).BorderRight(1).Padding(3).Column(a =>
+                        panels.RelativeItem(30).Border(1).Padding(5).Column(a =>
                         {
                             a.Spacing(2);
 
@@ -128,7 +130,7 @@ public static class HistologyReportRenderer
                             // list on the left, Comments box + "More comments" checkbox on the right.
                             a.Item().Row(top =>
                             {
-                                top.RelativeItem(40).Column(left =>
+                                top.RelativeItem(47).Column(left =>
                                 {
                                     left.Item().Text("Histology Required").Bold().FontSize(9.65f);
 
@@ -138,7 +140,7 @@ public static class HistologyReportRenderer
 
                                 top.ConstantItem(6);
 
-                                top.RelativeItem(60).Column(cmt =>
+                                top.RelativeItem(53).Column(cmt =>
                                 {
                                     cmt.Item().Text("Comments").Bold().FontSize(8.75f);
                                     // Fixed (not Min) height — a hard cap so long comments never push
@@ -158,7 +160,7 @@ public static class HistologyReportRenderer
                         });
 
                         // ── Panel B — Fixation ────────────────────────────────
-                        panels.RelativeItem(16).BorderRight(1).Padding(3).Column(b =>
+                        panels.RelativeItem(16).Border(1).Padding(5).Column(b =>
                         {
                             b.Spacing(2);
                             b.Item().Text("Fixation").Bold().FontSize(9.65f);
@@ -189,7 +191,7 @@ public static class HistologyReportRenderer
                         });
 
                         // ── Panel C — Tissue Processing (pre-printed, no data) ─
-                        panels.RelativeItem(32).BorderRight(1).Padding(3).Column(c =>
+                        panels.RelativeItem(32).Border(1).Padding(5).Column(c =>
                         {
                             c.Spacing(2);
 
@@ -248,7 +250,7 @@ public static class HistologyReportRenderer
                         });
 
                         // ── Panel D — Dispatch ────────────────────────────────
-                        panels.RelativeItem(22).Padding(3).Column(d =>
+                        panels.RelativeItem(22).Border(1).Padding(5).Column(d =>
                         {
                             d.Spacing(3);
                             d.Item().Text("Dispatch").Bold().FontSize(9.65f);
@@ -572,22 +574,22 @@ public static class HistologyReportRenderer
     private static void CheckboxItem(IContainer item, bool isChecked, string label,
         bool trailingLine = false, string trailingValue = "")
     {
-        item.PaddingBottom(3).Row(row =>
+        item.PaddingBottom(5).Row(row =>
         {
-            // AlignMiddle before Height so the fixed 9×9 box is vertically centred in the row
+            // AlignMiddle before Height so the fixed 12×12 box is vertically centred in the row
             // rather than stretched to the taller label height — stretching left glitched corners.
-            row.ConstantItem(9).AlignMiddle().Width(9).Height(9).Border(0.75f).AlignMiddle().AlignCenter()
-               .Text(isChecked ? "X" : string.Empty).FontSize(7).Bold();
-            row.ConstantItem(4);
+            row.ConstantItem(12).AlignMiddle().Width(12).Height(12).Border(0.75f).AlignMiddle().AlignCenter()
+               .Text(isChecked ? "X" : string.Empty).FontSize(9).Bold();
+            row.ConstantItem(5);
             if (trailingLine)
             {
-                row.ConstantItem(30).AlignMiddle().Text(label).FontSize(8);
+                row.ConstantItem(36).AlignMiddle().Text(label).FontSize(8.75f);
                 row.RelativeItem().AlignBottom().PaddingBottom(1).BorderBottom(0.75f)
-                   .Text(trailingValue).FontSize(8);
+                   .Text(trailingValue).FontSize(8.75f);
             }
             else
             {
-                row.RelativeItem().AlignMiddle().Text(label).FontSize(8);
+                row.RelativeItem().AlignMiddle().Text(label).FontSize(8.75f);
             }
         });
     }
