@@ -106,7 +106,7 @@ public static class HistologyReportRenderer
                 page.MarginBottom(10, Unit.Millimetre);
                 page.MarginLeft(10,   Unit.Millimetre);
                 page.MarginRight(10,  Unit.Millimetre);
-                page.DefaultTextStyle(s => s.FontFamily("Arial").FontSize(8));
+                page.DefaultTextStyle(s => s.FontFamily("Arial").FontSize(9.65f));
 
                 // ── Footer — bottom panels + version/disclaimer/page row ────────
                 // QuestPDF footer grows upward from the page bottom, so the 4 panels
@@ -117,10 +117,12 @@ public static class HistologyReportRenderer
                     foot.Spacing(0);
 
                     // ── Section 3 — 4-panel bottom row ───────────────────────────
-                    foot.Item().Border(1).Row(panels =>
+                    foot.Item().Row(panels =>
                     {
+                        // Separate boxed panels with a gap, as in the legacy form (was one joined box).
+                        panels.Spacing(6);
                         // ── Panel A — Histology Required ──────────────────────
-                        panels.RelativeItem(30).BorderRight(1).Padding(3).Column(a =>
+                        panels.RelativeItem(30).Border(1).Padding(5).Column(a =>
                         {
                             a.Spacing(2);
 
@@ -128,9 +130,9 @@ public static class HistologyReportRenderer
                             // list on the left, Comments box + "More comments" checkbox on the right.
                             a.Item().Row(top =>
                             {
-                                top.RelativeItem(34).Column(left =>
+                                top.RelativeItem(47).Column(left =>
                                 {
-                                    left.Item().Text("Histology Required").Bold().FontSize(8);
+                                    left.Item().Text("Histology Required").Bold().FontSize(9.65f);
 
                                     // HistologySubReport inlined (ADR-004): BatchHistology codes list.
                                     AddHistologyCodes(left, histologyRows);
@@ -138,12 +140,12 @@ public static class HistologyReportRenderer
 
                                 top.ConstantItem(6);
 
-                                top.RelativeItem(66).Column(cmt =>
+                                top.RelativeItem(53).Column(cmt =>
                                 {
-                                    cmt.Item().Text("Comments").Bold().FontSize(7.5f);
+                                    cmt.Item().Text("Comments").Bold().FontSize(8.75f);
                                     // Fixed (not Min) height — a hard cap so long comments never push
                                     // into or overlap the "Stain Ref" line below; overflow text clips.
-                                    cmt.Item().Border(0.5f).Height(95).Padding(2).Text(comments).FontSize(8).ClampLines(7);
+                                    cmt.Item().Border(0.5f).Height(95).Padding(2).Text(comments).FontSize(9.65f).ClampLines(7);
                                     CheckboxItem(cmt.Item().PaddingTop(3), commentLengthOk, "More comments on Submissions database");
                                 });
                             });
@@ -152,19 +154,19 @@ public static class HistologyReportRenderer
                             // Processor/Program box style so it reads clearly as a form field.
                             a.Item().PaddingTop(6).Border(0.75f).Padding(3).Column(sr =>
                             {
-                                sr.Item().Text("Stain Ref").Bold().FontSize(8);
+                                sr.Item().Text("Stain Ref").Bold().FontSize(9.65f);
                                 sr.Item().PaddingTop(6).PaddingRight(4).BorderBottom(0.75f).MinHeight(2);
                             });
                         });
 
                         // ── Panel B — Fixation ────────────────────────────────
-                        panels.RelativeItem(16).BorderRight(1).Padding(3).Column(b =>
+                        panels.RelativeItem(16).Border(1).Padding(5).Column(b =>
                         {
                             b.Spacing(2);
-                            b.Item().Text("Fixation").Bold().FontSize(8);
-                            b.Item().Text(fixation).FontSize(8);
+                            b.Item().Text("Fixation").Bold().FontSize(9.65f);
+                            b.Item().Text(fixation).FontSize(9.65f);
 
-                            b.Item().PaddingTop(3).Text("Post Fixation").Bold().FontSize(8);
+                            b.Item().PaddingTop(3).Text("Post Fixation").Bold().FontSize(9.65f);
 
                             CheckboxItem(b.Item(), decal,  "Decalcify");
                             CheckboxItem(b.Item(), phenol, "Phenol / Alc");
@@ -173,14 +175,14 @@ public static class HistologyReportRenderer
 
                             b.Item().PaddingTop(4).Text(t =>
                             {
-                                t.Span("Date").FontSize(8);
+                                t.Span("Date").FontSize(9.65f);
                                 t.Span("  (sign)").FontSize(7);
                             });
 
                             void SignLine(string lbl) =>
                                 b.Item().PaddingTop(3).Row(row =>
                                 {
-                                    row.ConstantItem(22).Text(lbl).FontSize(8);
+                                    row.ConstantItem(22).Text(lbl).FontSize(9.65f);
                                     row.RelativeItem().AlignBottom().PaddingBottom(1).BorderBottom(0.75f).MinHeight(11);
                                 });
 
@@ -189,15 +191,15 @@ public static class HistologyReportRenderer
                         });
 
                         // ── Panel C — Tissue Processing (pre-printed, no data) ─
-                        panels.RelativeItem(32).BorderRight(1).Padding(3).Column(c =>
+                        panels.RelativeItem(32).Border(1).Padding(5).Column(c =>
                         {
                             c.Spacing(2);
 
                             // Title row: section name (left) + "Diagram" label (right, above the box).
                             c.Item().Row(titleRow =>
                             {
-                                titleRow.RelativeItem().Text("Tissue Processing").Bold().FontSize(8);
-                                titleRow.ConstantItem(94).AlignRight().Text("Diagram").FontSize(7.5f);
+                                titleRow.RelativeItem().Text("Tissue Processing").Bold().FontSize(9.65f);
+                                titleRow.ConstantItem(94).AlignRight().Text("Diagram").FontSize(8.75f);
                             });
 
                             c.Item().Row(r =>
@@ -219,7 +221,7 @@ public static class HistologyReportRenderer
                                 {
                                     midCol.Item().Border(0.75f).Height(62).Padding(3).Column(dateCol =>
                                     {
-                                        dateCol.Item().Text("Date").FontSize(8);
+                                        dateCol.Item().Text("Date").FontSize(9.65f);
                                         dateCol.Item().PaddingTop(32).BorderBottom(0.75f).MinHeight(2);
                                     });
                                 });
@@ -235,23 +237,23 @@ public static class HistologyReportRenderer
                             {
                                 r.RelativeItem().Column(pc =>
                                 {
-                                    pc.Item().Text("Processor").FontSize(8);
+                                    pc.Item().Text("Processor").FontSize(9.65f);
                                     pc.Item().PaddingTop(10).PaddingRight(4).BorderBottom(0.75f).MinHeight(2);
                                 });
                                 r.ConstantItem(6);
                                 r.RelativeItem().Column(pr =>
                                 {
-                                    pr.Item().Text("Program").FontSize(8);
+                                    pr.Item().Text("Program").FontSize(9.65f);
                                     pr.Item().PaddingTop(10).PaddingRight(4).BorderBottom(0.75f).MinHeight(2);
                                 });
                             });
                         });
 
                         // ── Panel D — Dispatch ────────────────────────────────
-                        panels.RelativeItem(22).Padding(3).Column(d =>
+                        panels.RelativeItem(22).Border(1).Padding(5).Column(d =>
                         {
                             d.Spacing(3);
-                            d.Item().Text("Dispatch").Bold().FontSize(8);
+                            d.Item().Text("Dispatch").Bold().FontSize(9.65f);
 
                             // L / S grid with No. Blocks and No. Slides rows.
                             d.Item().Table(grid =>
@@ -265,10 +267,10 @@ public static class HistologyReportRenderer
 
                                 void GridHeader(string lbl) =>
                                     grid.Cell().PaddingHorizontal(2).AlignCenter()
-                                        .Text(lbl).Bold().FontSize(8);
+                                        .Text(lbl).Bold().FontSize(9.65f);
                                 void GridLabel(string lbl) =>
                                     grid.Cell().PaddingVertical(2)
-                                        .Text(lbl).FontSize(8);
+                                        .Text(lbl).FontSize(9.65f);
                                 void GridBox() =>
                                     grid.Cell().Border(0.5f).MinHeight(22);
 
@@ -284,7 +286,7 @@ public static class HistologyReportRenderer
                              .Column(box =>
                              {
                                  box.Item().AlignCenter()
-                                    .Text("Submission Number").Bold().FontSize(8);
+                                    .Text("Submission Number").Bold().FontSize(9.65f);
                                  box.Item().AlignCenter()
                                     .Text(batchId).Bold().FontSize(18);
                              });
@@ -336,16 +338,16 @@ public static class HistologyReportRenderer
                         {
                             left.ColumnsDefinition(c =>
                             {
-                                c.RelativeColumn(45); // label
-                                c.RelativeColumn(55); // value
+                                c.RelativeColumn(55); // label
+                                c.RelativeColumn(45); // value
                             });
 
                             void LLabel(string text) =>
                                 left.Cell().PaddingVertical(2).PaddingHorizontal(3)
-                                    .Text(text).Bold().FontSize(8);
+                                    .Text(text).Bold().FontSize(9.65f);
                             void LValue(string val) =>
                                 left.Cell().PaddingVertical(2).PaddingHorizontal(3)
-                                    .Text(val).FontSize(8);
+                                    .Text(val).FontSize(9.65f);
 
                             LLabel("Project/Contract Code"); LValue(projectCode);
                             LLabel("Pathologist");           LValue(pathologist);
@@ -368,7 +370,7 @@ public static class HistologyReportRenderer
                                   .AlignMiddle()
                                   .AlignCenter()
                                   .Text("HISTOLOGY SUBMISSION FORM")
-                                  .Bold().FontSize(13).FontColor(Colors.White);
+                                  .Bold().FontSize(17.9f).FontColor(Colors.White);
 
                             // Dates + species grid — 4 columns.
                             centre.Item().Table(grid =>
@@ -383,10 +385,10 @@ public static class HistologyReportRenderer
 
                                 void GLabel(string t) =>
                                     grid.Cell().PaddingVertical(2).PaddingHorizontal(3)
-                                        .Text(t).Bold().FontSize(8);
+                                        .Text(t).Bold().FontSize(9.65f);
                                 void GValue(string v) =>
                                     grid.Cell().PaddingVertical(2).PaddingHorizontal(3)
-                                        .Text(v).FontSize(8);
+                                        .Text(v).FontSize(9.65f);
 
                                 GLabel("Submission Date"); GValue(batchDate);
                                 GLabel("Received Date");   GValue(dateReceived);
@@ -422,10 +424,10 @@ public static class HistologyReportRenderer
                                 void RLabel(string t) =>
                                     rtable.Cell().PaddingVertical(2).PaddingHorizontal(3)
                                           .Background(Colors.Grey.Lighten3)
-                                          .Text(t).Bold().FontSize(8);
+                                          .Text(t).Bold().FontSize(9.65f);
                                 void RValue(string v) =>
                                     rtable.Cell().PaddingVertical(2).PaddingHorizontal(3)
-                                          .Text(v).FontSize(8);
+                                          .Text(v).FontSize(9.65f);
 
                                 RLabel("Adequately Fixed?"); RValue(adequatelyFixed);
                                 RLabel("Total Samples");     RValue(totalSamples);
@@ -439,7 +441,7 @@ public static class HistologyReportRenderer
                     col.Item()
                        .AlignCenter()
                        .Text("It is essential that this form is dated and initialled at completion of each stage")
-                       .Italic().FontSize(7.5f);
+                       .Italic().FontSize(8.75f);
                 });
 
                 ComposeContent(page.Content(), submissionRows, rowsPerPage);
@@ -480,19 +482,14 @@ public static class HistologyReportRenderer
     {
         t.ColumnsDefinition(c =>
         {
-            c.RelativeColumn(10); // 1  Sender Ref
-            c.RelativeColumn(9);  // 2  Histology Ref
-            c.RelativeColumn(6);  // 3  Block Ref
-            c.RelativeColumn(9);  // 4  Tissue Code
-            c.RelativeColumn(6);  // 5  Block      (blank)
-            c.RelativeColumn(5);  // 6  Cass       (blank)
-            c.RelativeColumn(6);  // 7  Embed      (blank)
-            c.RelativeColumn(6);  // 8  Section    (blank)
-            c.RelativeColumn(7);  // 9  Block Filed (blank)
-            c.RelativeColumn(6);  // 10 Stain      (blank)
-            c.RelativeColumn(6);  // 11 QC Code    (blank)
-            c.RelativeColumn(14); // 12 Comments   (CustomerRef)
-            c.RelativeColumn(10); // 13 Dispatch   (blank)
+            // Widths in points measured from the legacy form (total 797pt); scaled to the page.
+            c.RelativeColumn(71.75f); // 1  Sender Ref
+            c.RelativeColumn(66f);    // 2  Histology Ref
+            c.RelativeColumn(42f);    // 3  Block Ref
+            c.RelativeColumn(61f);    // 4  Tissue Code
+            for (var i = 0; i < 7; i++) c.RelativeColumn(SignOffColumnWidth); // 5–11 Block..QC Code
+            c.RelativeColumn(114f);   // 12 Comments   (CustomerRef)
+            c.RelativeColumn(65.25f); // 13 Dispatch
         });
 
         t.Header(h =>
@@ -502,7 +499,7 @@ public static class HistologyReportRenderer
                  .Background(Colors.Grey.Lighten3)
                  .Border(0.5f)
                  .PaddingVertical(2).PaddingHorizontal(2)
-                 .Text(label).Bold().FontSize(7.5f);
+                 .Text(label).Bold().FontSize(9.65f);
         });
 
         DataRow? prevRow = null;
@@ -531,6 +528,8 @@ public static class HistologyReportRenderer
         }
     }
 
+    private const float SignOffColumnWidth = 53.9f;
+
     private static readonly string[] SubmissionHeaders =
     [
         "Sender Ref", "Histology\nRef", "Block\nRef", "Tissue\nCode", "Block", "Cass", "Embed",
@@ -538,9 +537,9 @@ public static class HistologyReportRenderer
     ];
 
     private static void AddCell(TableDescriptor t, string value) =>
-        t.Cell().Border(0.5f)
+        t.Cell().Border(0.5f).MinHeight(16.75f)
          .PaddingVertical(2).PaddingHorizontal(2)
-         .Text(value).FontSize(8);
+         .Text(value).FontSize(9.65f);
 
     // ── Private helpers ──────────────────────────────────────────────────────────
 
@@ -575,22 +574,22 @@ public static class HistologyReportRenderer
     private static void CheckboxItem(IContainer item, bool isChecked, string label,
         bool trailingLine = false, string trailingValue = "")
     {
-        item.PaddingBottom(3).Row(row =>
+        item.PaddingBottom(5).Row(row =>
         {
-            // AlignMiddle before Height so the fixed 9×9 box is vertically centred in the row
+            // AlignMiddle before Height so the fixed 12×12 box is vertically centred in the row
             // rather than stretched to the taller label height — stretching left glitched corners.
-            row.ConstantItem(9).AlignMiddle().Width(9).Height(9).Border(0.75f).AlignMiddle().AlignCenter()
-               .Text(isChecked ? "X" : string.Empty).FontSize(7).Bold();
-            row.ConstantItem(4);
+            row.ConstantItem(12).AlignMiddle().Width(12).Height(12).Border(0.75f).AlignMiddle().AlignCenter()
+               .Text(isChecked ? "X" : string.Empty).FontSize(9).Bold();
+            row.ConstantItem(5);
             if (trailingLine)
             {
-                row.ConstantItem(30).AlignMiddle().Text(label).FontSize(8);
+                row.ConstantItem(36).AlignMiddle().Text(label).FontSize(8.75f);
                 row.RelativeItem().AlignBottom().PaddingBottom(1).BorderBottom(0.75f)
-                   .Text(trailingValue).FontSize(8);
+                   .Text(trailingValue).FontSize(8.75f);
             }
             else
             {
-                row.RelativeItem().AlignMiddle().Text(label).FontSize(8);
+                row.RelativeItem().AlignMiddle().Text(label).FontSize(8.75f);
             }
         });
     }
