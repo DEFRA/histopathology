@@ -582,7 +582,7 @@ public class BlockDetailsModelTests
         sut.UseWholeTissueList = true;
 
         var result = Assert.IsType<Microsoft.AspNetCore.Mvc.RedirectToPageResult>(sut.OnPostReload());
-        Assert.Equal(true, result.RouteValues!["useWholeTissueList"]);
+        Assert.True(result.RouteValues!["useWholeTissueList"] is true);
 
         var next = CreateSut(animalId: 2, blockId: 319181);
         next.TempData = sut.TempData;
