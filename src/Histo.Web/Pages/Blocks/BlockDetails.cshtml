@@ -198,7 +198,7 @@ else
                                     </div>
                                     <div class="govuk-form-group">
                                         <label class="govuk-label" for="EditNoPieces">Number of pieces</label>
-                                        <input class="govuk-input govuk-input--width-3" asp-for="EditNoPieces" />
+                                        <input class="govuk-input govuk-input--width-3" asp-for="EditNoPieces" min="1" />
                                     </div>
                                     <div class="govuk-button-group">
                                         <button type="submit" class="govuk-button" data-module="govuk-button">Save tissue</button>
@@ -276,7 +276,7 @@ else
             </div>
             <div class="govuk-form-group">
                 <label class="govuk-label" for="NewTissueNoPieces">Number of pieces</label>
-                <input class="govuk-input govuk-input--width-3" asp-for="NewTissueNoPieces" />
+                <input class="govuk-input govuk-input--width-3" asp-for="NewTissueNoPieces" min="1" />
             </div>
             <button type="submit" class="govuk-button" data-module="govuk-button">Add tissue</button>
         </form>
