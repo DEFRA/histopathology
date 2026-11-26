@@ -1,6 +1,6 @@
 // Stage 3 — HtmlToPdfConversionSkill
 // Runtime paradigm : modern (net10.0, ASP.NET Core) — explicit, not auto-detected
-// PDF engine       : QuestPDF Community Edition (no CrystalDecisions, no paid engine)
+// PDF engine       : QuestPDF Professional (no CrystalDecisions)
 // Source definition: output/definition/QCNote.ReportDefinition.json
 // Source template  : output/templates/QCNote.html
 // Generated        : 2026-08-10
@@ -8,7 +8,7 @@
 // Gate checks (all passing):
 //   ✓ No CrystalDecisions.* imports
 //   ✓ No paid PDF engine
-//   ✓ QuestPDF.Settings.License = LicenseType.Community set in static constructor
+//   ✓ QuestPDF licence set once in QuestPdfLicense (module initialiser)
 //   ✓ RenderAsync(DataSet ds) signature exposed
 //   ✓ Reads from ds.Tables["Header"].Rows[0]
 //   ✓ Field() private helper — safe null/DBNull column extraction
@@ -32,7 +32,7 @@ using QuestPDF.Infrastructure;
 namespace Histo.Reporting.Reports;
 
 /// <summary>
-/// Renders QCNote to PDF using QuestPDF Community Edition.
+/// Renders QCNote to PDF using QuestPDF.
 /// Layout matches the legacy Crystal Reports A4 portrait QC Note form:
 /// <list type="bullet">
 ///   <item><description><b>Top bordered box</b>: 5 label/value rows — QCNoteRef, SubmissionNumber, Project, Species, StainRef.</description></item>
@@ -50,14 +50,8 @@ namespace Histo.Reporting.Reports;
 /// </summary>
 public static class QCNoteRenderer
 {
-    static QCNoteRenderer()
-    {
-        // QuestPDF Community licence must be declared before any Document.Create() call.
-        QuestPDF.Settings.License = LicenseType.Community;
-    }
-
     /// <summary>
-    /// Renders the QC Note to PDF using QuestPDF Community Edition.
+    /// Renders the QC Note to PDF using QuestPDF.
     /// </summary>
     /// <param name="ds">Populated DataSet with a single table named <c>"Header"</c>.</param>
     /// <returns>PDF content as a byte array.</returns>
@@ -85,7 +79,7 @@ public static class QCNoteRenderer
                 page.MarginBottom(15, Unit.Millimetre);
                 page.MarginLeft(15,   Unit.Millimetre);
                 page.MarginRight(15,  Unit.Millimetre);
-                page.DefaultTextStyle(s => s.FontFamily("Arial").FontSize(9));
+                page.DefaultTextStyle(s => s.FontFamily("Liberation Sans").FontSize(9));
 
                 // ── Footer — CreatedBy left, DateCreated right ───────────────────
                 // Pinned to the page bottom; grows upward so content area remains
@@ -143,8 +137,8 @@ public static class QCNoteRenderer
                         body.Spacing(4);
                         var qcTextHasEmbeddedSummary = qcText.TrimStart().StartsWith("Sender Ref", StringComparison.Ordinal);
                         if (!string.IsNullOrEmpty(testSummary) && !qcTextHasEmbeddedSummary)
-                            body.Item().Text(testSummary).FontFamily("Consolas").FontSize(9);
-                        body.Item().Text(qcText).FontFamily("Consolas").FontSize(9);
+                            body.Item().Text(testSummary).FontFamily("Liberation Mono").FontSize(9);
+                        body.Item().Text(qcText).FontFamily("Liberation Mono").FontSize(9);
                     });
                 });
             });

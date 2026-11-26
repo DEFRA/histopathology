@@ -10,12 +10,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- QuestPDF Community Edition — free open-source PDF engine (no native binary required).
-         Community licence is declared at runtime via QuestPDF.Settings.License = LicenseType.Community
-         in each renderer's static constructor.
+    <!-- QuestPDF Professional licence is declared at runtime in QuestPdfLicense (module initialiser).
          Pin to a specific patch version before production release. -->
-    <PackageReference Include="QuestPDF" Version="2024.3.5" />
+    <PackageReference Include="QuestPDF" Version="2026.9.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- QuestPDF 2026.9+ ignores system fonts; Liberation Sans/Mono (SIL OFL) are metric-compatible with Arial/Courier-width text and are auto-registered from the output folder. -->
+    <Content Include="Fonts\*.ttf" CopyToOutputDirectory="PreserveNewest" Link="Fonts\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

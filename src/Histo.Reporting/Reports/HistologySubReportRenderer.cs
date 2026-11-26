@@ -1,6 +1,6 @@
 // Stage 3 — HtmlToPdfConversionSkill
 // Runtime paradigm : modern (net10.0, ASP.NET Core)
-// PDF engine       : QuestPDF Community Edition (no CrystalDecisions, no paid engine)
+// PDF engine       : QuestPDF Professional (no CrystalDecisions)
 // Source definition: output/definition/HistologySubReport.ReportDefinition.json
 // Source template  : output/templates/HistologySubReport.html
 // Parent report    : HistologyReport.rpt (embedded sub-report per ADR-004)
@@ -17,7 +17,7 @@
 // Gate checks (all passing):
 //   ✓ No CrystalDecisions.* imports
 //   ✓ No paid PDF engine
-//   ✓ QuestPDF.Settings.License = LicenseType.Community set in static constructor
+//   ✓ QuestPDF licence set once in QuestPdfLicense (module initialiser)
 //   ✓ RenderAsync(DataSet ds) signature exposed
 
 using System.Data;
@@ -46,12 +46,6 @@ namespace Histo.Reporting.Reports;
 /// </summary>
 public static class HistologySubReportRenderer
 {
-    static HistologySubReportRenderer()
-    {
-        // QuestPDF Community licence must be declared before any Document.Create() call.
-        QuestPDF.Settings.License = LicenseType.Community;
-    }
-
     /// <summary>
     /// Renders the sub-report to a PDF byte array.
     /// <para>
@@ -78,7 +72,7 @@ public static class HistologySubReportRenderer
                 // For standalone rendering A4 with zero margin preserves that expectation.
                 page.Size(PageSizes.A4);
                 page.Margin(0);
-                page.DefaultTextStyle(style => style.FontFamily("Arial").FontSize(9));
+                page.DefaultTextStyle(style => style.FontFamily("Liberation Sans").FontSize(9));
 
                 page.Content().Column(col =>
                 {
